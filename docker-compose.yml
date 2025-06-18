@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  minesearch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: minesearch-app
+    ports:
+      - "8501:8501"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=sqlite:///data/minesearch.db
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - minesearch-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: PostgreSQL for production
+  postgres:
+    image: postgres:14-alpine
+    container_name: minesearch-db
+    environment:
+      POSTGRES_DB: minesearch
+      POSTGRES_USER: minesearch
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - minesearch-net
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # Optional: Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: minesearch-cache
+    ports:
+      - "6379:6379"
+    networks:
+      - minesearch-net
+    restart: unless-stopped
+    profiles:
+      - production
+
+networks:
+  minesearch-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
