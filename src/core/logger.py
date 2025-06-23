@@ -4,7 +4,7 @@ Logging-System für Multi-Agent Mining Research System
 import logging
 import logging.handlers
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 from datetime import datetime
 import json
 
@@ -83,7 +83,7 @@ class PerformanceLogger:
     
     def __init__(self, logger: StructuredLogger):
         self.logger = logger
-        self.timers = {}
+        self.timers: Dict[str, datetime] = {}
     
     def start_timer(self, operation: str):
         """Startet Timer für Operation"""

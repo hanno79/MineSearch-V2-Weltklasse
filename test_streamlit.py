@@ -1,5 +1,4 @@
 import streamlit as st
 
-st.title("Test Streamlit App")
-st.write("If you see this, Streamlit is working!")
-st.success("Streamlit is running correctly")
+st.title("Test - MineSearch läuft!")
+st.write("Wenn du das siehst, funktioniert Streamlit grundsätzlich.")

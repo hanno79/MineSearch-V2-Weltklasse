@@ -11,6 +11,7 @@ from enum import Enum
 
 class SearchStage(Enum):
     """Verschiedene Suchphasen"""
+    SOURCE_DISCOVERY = 0  # Quellensuche
     BASIC = 1  # Basis-Informationen
     PRODUCTION = 2  # Produktionsdaten
     FINANCIAL = 3  # Finanzdaten
@@ -38,6 +39,17 @@ class StagedSearchStrategy:
         """Initialisiert die verschiedenen Suchphasen"""
         
         return {
+            SearchStage.SOURCE_DISCOVERY: StageDefinition(
+                name="Quellensuche",
+                fields=[
+                    "sources", "websites", "databases", "government_sites",
+                    "company_websites", "news_sources", "technical_reports"
+                ],
+                priority=0,  # Höchste Priorität - wird zuerst ausgeführt
+                max_agents=self.max_agents_per_stage,
+                timeout=90  # ÄNDERUNG 21.06.2025: Reduziert von 300 auf 90 Sekunden
+            ),
+            
             SearchStage.BASIC: StageDefinition(
                 name="Basis-Informationen",
                 fields=[
@@ -49,7 +61,7 @@ class StagedSearchStrategy:
                 ],
                 priority=1,
                 max_agents=self.max_agents_per_stage,
-                timeout=300  # 5 Minuten
+                timeout=90  # ÄNDERUNG 21.06.2025: Reduziert von 300 auf 90 Sekunden
             ),
             
             SearchStage.PRODUCTION: StageDefinition(
@@ -63,7 +75,7 @@ class StagedSearchStrategy:
                 ],
                 priority=2,
                 max_agents=self.max_agents_per_stage,
-                timeout=240  # 4 Minuten
+                timeout=60  # ÄNDERUNG 21.06.2025: Reduziert von 240 auf 60 Sekunden
             ),
             
             SearchStage.FINANCIAL: StageDefinition(
@@ -76,7 +88,7 @@ class StagedSearchStrategy:
                 ],
                 priority=3,
                 max_agents=self.max_agents_per_stage,  # Erhöht für maximale Parallelität bei wichtigen Finanzdaten
-                timeout=240  # 4 Minuten
+                timeout=60  # ÄNDERUNG 21.06.2025: Reduziert von 240 auf 60 Sekunden
             ),
             
             SearchStage.ENVIRONMENTAL: StageDefinition(
@@ -89,7 +101,7 @@ class StagedSearchStrategy:
                 ],
                 priority=4,
                 max_agents=self.max_agents_per_stage,  # Erhöht von 3 auf 50 für bessere Umweltdaten-Abdeckung
-                timeout=180  # 3 Minuten
+                timeout=60  # ÄNDERUNG 21.06.2025: Reduziert von 180 auf 60 Sekunden
             ),
             
             SearchStage.COMPLETE: StageDefinition(
@@ -97,7 +109,7 @@ class StagedSearchStrategy:
                 fields=[],  # Alle Felder
                 priority=5,
                 max_agents=self.max_agents_per_stage,  # Erhöht von 5 auf 50 für vollständige Suche
-                timeout=600  # 10 Minuten
+                timeout=120  # ÄNDERUNG 21.06.2025: Reduziert von 600 auf 120 Sekunden
             )
         }
     
@@ -110,9 +122,17 @@ class StagedSearchStrategy:
         """
         needed_stages = []
         
+        # ÄNDERUNG 18.06.2025: Source Discovery wird NICHT automatisch hinzugefügt
+        # Das passiert jetzt im Orchestrator
+        
         for stage, definition in self.stages.items():
-            if stage == SearchStage.COMPLETE:
-                continue  # Complete nur wenn explizit angefordert
+            # ÄNDERUNG 18.06.2025: Verwende try/except statt hasattr
+            try:
+                if stage.value == 5:  # COMPLETE
+                    continue  # Complete nur wenn explizit angefordert
+            except AttributeError:
+                # Falls kein value Attribut, überspringen
+                continue
                 
             # Prüfe ob Felder aus dieser Phase benötigt werden
             if any(field in required_fields for field in definition.fields):
@@ -130,10 +150,35 @@ class StagedSearchStrategy:
         Returns:
             Liste der Felder, die in dieser Phase gesucht werden sollen
         """
-        if stage == SearchStage.COMPLETE:
-            return required_fields
+        # ÄNDERUNG 19.06.2025: Robusterer Zugriff auf stages Dictionary
+        # Verwende stage direkt oder suche nach value
+        stage_def = None
+        
+        # Versuche direkten Zugriff
+        if stage in self.stages:
+            stage_def = self.stages[stage]
+        else:
+            # Falls nicht gefunden, suche nach value
+            try:
+                stage_value = stage.value
+                for s, definition in self.stages.items():
+                    if hasattr(s, 'value') and s.value == stage_value:
+                        stage_def = definition
+                        break
+            except AttributeError:
+                pass
+        
+        if not stage_def:
+            return []
             
-        stage_fields = self.stages[stage].fields
+        # Spezialbehandlung für COMPLETE
+        try:
+            if stage.value == 5:  # COMPLETE
+                return required_fields
+        except AttributeError:
+            pass
+            
+        stage_fields = stage_def.fields
         
         # Nur Felder zurückgeben, die auch angefordert wurden
         return [f for f in required_fields if f in stage_fields]
@@ -145,9 +190,22 @@ class StagedSearchStrategy:
         Returns:
             Liste der empfohlenen Agenten für diese Phase
         """
+        # ÄNDERUNG 21.06.2025: Debug-Logging für Agent-Auswahl
+        from src.core.logger import get_logger
+        logger = get_logger("staged_search")
+        logger.info(f"DEBUG: get_best_agents_for_stage - Stage: {stage}, Available: {available_agents}")
+        
         # ÄNDERUNG 17.06.2025: Nutze ALLE verfügbaren Agenten, die der Nutzer ausgewählt hat
         # Keine künstliche Begrenzung - der Nutzer hat sie aus gutem Grund ausgewählt
         # Max_agents wurde auf 50 erhöht für maximale Parallelität
+        
+        # Für SOURCE_DISCOVERY: Nutze ALLE verfügbaren Agenten
+        try:
+            if stage.value == 0:  # SOURCE_DISCOVERY
+                logger.info(f"DEBUG: SOURCE_DISCOVERY - returning all {len(available_agents)} agents")
+                return available_agents[:self.stages[stage].max_agents]
+        except:
+            pass
         
         # Optional: Priorisierung für bessere Ergebnisse
         stage_agent_priorities = {
@@ -206,13 +264,53 @@ class StagedSearchStrategy:
         """
         stage_fields = self.get_fields_for_stage(current_stage, required_fields)
         
-        # Prüfe ob mindestens 50% der Felder dieser Phase gefunden wurden
+        # ÄNDERUNG 21.06.2025: Aggressivere Beendigung für bessere Performance
+        # Prüfe ob genug Felder dieser Phase gefunden wurden
         fields_found = sum(1 for f in stage_fields if results_found.get(f, 0) > 0)
         completion_rate = fields_found / len(stage_fields) if stage_fields else 0
         
-        # Fortfahren wenn mindestens 50% gefunden oder kritische Felder fehlen
+        # Prüfe Gesamtabdeckung
+        total_fields_needed = len(required_fields)
+        total_fields_found = sum(1 for f in required_fields if results_found.get(f, 0) > 0)
+        total_completion_rate = total_fields_found / total_fields_needed if total_fields_needed else 0
+        
+        # Beende früh wenn:
+        # 1. 80% aller Felder gefunden wurden (gesamt)
+        # 2. 70% der aktuellen Phase gefunden wurden
+        # 3. Wir in BASIC sind und schon 60% aller Felder haben
+        if total_completion_rate >= 0.8:
+            return False  # Genug Daten, stoppe Suche
+            
+        if completion_rate >= 0.7:
+            return True  # Phase gut abgedeckt, weiter zur nächsten
+            
+        if current_stage == SearchStage.BASIC and total_completion_rate >= 0.6:
+            return False  # Basis-Daten reichen aus
+            
+        # Standard: Fortfahren wenn mindestens 50% gefunden oder kritische Phase
         return completion_rate >= 0.5 or current_stage == SearchStage.BASIC
     
     def get_stage_info(self, stage: SearchStage) -> StageDefinition:
         """Gibt Informationen zu einer Suchphase zurück"""
-        return self.stages[stage]
+        # ÄNDERUNG 19.06.2025: Robusterer Zugriff auf stages Dictionary
+        if stage in self.stages:
+            return self.stages[stage]
+        
+        # Falls nicht gefunden, suche nach value
+        try:
+            stage_value = stage.value
+            for s, definition in self.stages.items():
+                if hasattr(s, 'value') and s.value == stage_value:
+                    return definition
+        except AttributeError:
+            pass
+            
+        # ÄNDERUNG 19.06.2025: Fallback auf BASIC Stage statt None
+        # Dies verhindert Type Error und gibt eine sinnvolle Standard-Definition zurück
+        return self.stages.get(SearchStage.BASIC, StageDefinition(
+            name="Basis-Informationen",
+            fields=[],
+            priority=1,
+            max_agents=self.max_agents_per_stage,
+            timeout=300
+        ))

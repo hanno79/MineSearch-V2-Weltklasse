@@ -13,7 +13,7 @@ from datetime import datetime
 
 from .base_agent import BaseAgent, MineQuery, SearchResult, AgentStatus
 from .rate_limiter import RateLimiter
-from ..core.logger import get_logger, PerformanceLogger
+from src.core.logger import get_logger, PerformanceLogger
 from .enhanced_search import get_mining_search_queries, get_mining_domains
 
 
@@ -121,13 +121,13 @@ class GPTAgent(BaseAgent):
             )
             
             # Update Statistiken
-            self.stats['total_searches'] += 1
-            self.stats['successful_searches'] += 1 if results else 0
-            self.stats['fields_found'] += len(results)
+            self.stats['total_requests'] += 1
+            self.stats['successful_requests'] += 1 if results else 0
+            self.stats['total_fields_found'] += len(results)
             
         except Exception as e:
             self.logger.error(f"Fehler bei Suche: {e}")
-            self.stats['failed_searches'] += 1
+            self.stats['failed_requests'] += 1
             
         return results
     
@@ -434,7 +434,7 @@ Focus on official, verifiable data from authoritative sources."""
             self.logger.error(f"API Anfrage Fehler: {e}")
             return None
     
-    def _parse_response(self, response: Dict[str, Any], query: MineQuery, language: str) -> List[SearchResult]:
+    def _parse_response(self, response: Dict[str, Any], query: MineQuery, search_type: str) -> List[SearchResult]:
         """Parst API-Antwort zu SearchResult Objekten"""
         results = []
         
@@ -449,16 +449,21 @@ Focus on official, verifiable data from authoritative sources."""
                     if 'results' in data:
                         for item in data['results']:
                             if item.get('value') and item['value'] != 'nichts gefunden':
+                                # ÄNDERUNG 20.06.2025: Korrekte Parameter für SearchResult
+                                confidence_mapping = {'high': 0.9, 'medium': 0.7, 'low': 0.5}
+                                confidence_score = confidence_mapping.get(item.get('confidence', 'medium'), 0.7)
+                                
                                 result = SearchResult(
+                                    mine_name=query.mine_name,
                                     field_name=item.get('field_name', ''),
                                     value=item.get('value'),
                                     source=item.get('source', 'GPT-4'),
                                     source_url=item.get('source_url', ''),
                                     source_date=item.get('source_date', datetime.now().year),
-                                    confidence=item.get('confidence', 'medium'),
+                                    confidence_score=confidence_score,
                                     agent_name=self.name,
-                                    search_language=language,
-                                    found_at=datetime.now()
+                                    timestamp=datetime.now(),
+                                    metadata={'search_type': search_type}
                                 )
                                 results.append(result)
                                 self.logger.info(f"Gefunden: {result.field_name} = {result.value}")

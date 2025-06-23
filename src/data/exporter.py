@@ -8,9 +8,9 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 import pandas as pd
 
-from ..core.config import get_config
-from ..core.database import get_db_manager, Mine
-from ..core.logger import get_logger
+from src.core.config import get_config
+from src.core.database import get_db_manager, Mine
+from src.core.logger import get_logger
 
 
 class DataExporter:
@@ -60,6 +60,7 @@ class DataExporter:
             
             # Füge aggregierte Felder hinzu
             agg_data = result['aggregated'].get('data', {})
+            alternatives = result['aggregated'].get('alternatives', {})
             
             # Standard-Felder
             field_mapping = {
@@ -78,24 +79,23 @@ class DataExporter:
             
             for field_key, field_name in field_mapping.items():
                 if field_key in agg_data:
+                    # Hauptwert
                     value = agg_data[field_key]['value']
                     source = agg_data[field_key]['source']
                     confidence = agg_data[field_key]['confidence']
                     
-                    # Formatiere Wert mit Quelle und Konfidenz
-                    formatted_value = f"{value}{cell_sep}{source}{cell_sep}{confidence}"
-                    row[field_name] = formatted_value
+                    # Formatiere Hauptwert ohne Quelle und Konfidenz (nur der Wert)
+                    row[field_name] = value
+                    
+                    # Alternative Werte in separater Spalte
+                    if field_key in alternatives and alternatives[field_key]:
+                        row[f"{field_name}_alternatives"] = alternatives[field_key]
+                    else:
+                        # Wenn keine Alternativen, aber Hauptwert existiert, zeige Quelle
+                        row[f"{field_name}_alternatives"] = f"{value} (1x: {source})"
                 else:
-                    row[field_name] = f"nichts gefunden{cell_sep}{cell_sep}"
-            
-            # Alternative Werte
-            alternatives = result['aggregated'].get('alternatives', {})
-            if alternatives:
-                alt_values = []
-                for field, alts in alternatives.items():
-                    for alt in alts[:2]:  # Max 2 Alternativen
-                        alt_values.append(f"{field}: {alt['value']} ({alt['source']})")
-                row['Alternative Values'] = cell_sep.join(alt_values)
+                    row[field_name] = "nichts gefunden"
+                    row[f"{field_name}_alternatives"] = ""
             
             rows.append(row)
         

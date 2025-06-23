@@ -20,6 +20,9 @@ class APIConfig:
     scrapingbee_key: Optional[str] = None
     firecrawl_key: Optional[str] = None
     brightdata_key: Optional[str] = None
+    deepseek_key: Optional[str] = None
+    gemini_key: Optional[str] = None
+    anthropic_key: Optional[str] = None
     custom_key: Optional[str] = None
     custom_endpoint: Optional[str] = None
     
@@ -34,6 +37,9 @@ class APIConfig:
             "scrapingbee": bool(self.scrapingbee_key),
             "firecrawl": bool(self.firecrawl_key),
             "brightdata": bool(self.brightdata_key),
+            "deepseek": bool(self.deepseek_key),
+            "gemini": bool(self.gemini_key),
+            "anthropic": bool(self.anthropic_key),
             "custom": bool(self.custom_key and self.custom_endpoint)
         }
 
@@ -104,12 +110,15 @@ class Config:
             scrapingbee_key=os.getenv("SCRAPINGBEE_API_KEY"),
             firecrawl_key=os.getenv("FIRECRAWL_API_KEY"),
             brightdata_key=os.getenv("BRIGHTDATA_API_KEY"),
+            deepseek_key=os.getenv("DEEPSEEK_API_KEY"),
+            gemini_key=os.getenv("GEMINI_API_KEY"),
+            anthropic_key=os.getenv("ANTHROPIC_API_KEY"),
             custom_key=os.getenv("CUSTOM_API_KEY"),
             custom_endpoint=os.getenv("CUSTOM_API_ENDPOINT")
         )
         
         self.database = DatabaseConfig(
-            path=os.getenv("DATABASE_PATH", "./data/minesearch.db")
+            path=Path(os.getenv("DATABASE_PATH", "./data/minesearch.db"))
         )
         
         self.logging = LoggingConfig(
@@ -148,7 +157,7 @@ class Config:
         
     def validate(self) -> Dict[str, Any]:
         """Validiert die gesamte Konfiguration"""
-        validation_result = {
+        validation_result: Dict[str, Any] = {
             "api_status": self.api.validate(),
             "database_exists": self.database.path.parent.exists(),
             "log_writable": self.logging.file_path.parent.exists(),

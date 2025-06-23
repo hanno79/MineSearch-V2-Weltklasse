@@ -27,7 +27,7 @@ class RateLimiter:
             while tokens > self.allowance:
                 # Berechne wie lange gewartet werden muss
                 elapsed = time.monotonic() - self.last_check
-                self.allowance += elapsed * (self.rate / self.per)
+                self.allowance += int(elapsed * (self.rate / self.per))
                 
                 if self.allowance > self.rate:
                     self.allowance = self.rate

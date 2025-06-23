@@ -27,6 +27,19 @@ class DataValidator:
     # Währungscodes
     VALID_CURRENCIES = ['CAD', 'USD', 'EUR', 'GBP', 'AUD', 'CHF', 'JPY', 'CNY']
     
+    # Gültige Rohstoffe
+    VALID_COMMODITIES = [
+        'gold', 'or', 'silver', 'argent', 'copper', 'cuivre', 'kupfer',
+        'zinc', 'lead', 'plomb', 'blei', 'nickel', 'cobalt', 'kobalt',
+        'iron', 'fer', 'eisen', 'uranium', 'lithium', 'coal', 'charbon', 'kohle',
+        'diamond', 'diamant', 'platinum', 'platin', 'palladium',
+        'molybdenum', 'molybdän', 'tungsten', 'wolfram', 'tin', 'étain', 'zinn',
+        'aluminium', 'aluminum', 'bauxite', 'chromium', 'chrome', 'chrom',
+        'manganese', 'mangan', 'titanium', 'titan', 'vanadium', 'graphite', 'graphit',
+        'rare earth', 'terres rares', 'seltene erden', 'phosphate', 'phosphat',
+        'potash', 'potasse', 'kali', 'salt', 'sel', 'salz', 'limestone', 'calcaire', 'kalkstein'
+    ]
+    
     # Gültige Minenstatus
     VALID_MINE_STATUS = [
         'aktiv', 'active', 'in betrieb', 'operating',
@@ -199,6 +212,10 @@ class DataValidator:
             return None
         
         # Validiere Bereiche
+        if lat is None or lon is None:
+            self.errors.append("Koordinaten konnten nicht extrahiert werden")
+            return None
+            
         if not -90 <= lat <= 90:
             self.errors.append(f"Ungültige Latitude: {lat} (muss zwischen -90 und 90 liegen)")
             return None

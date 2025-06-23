@@ -13,7 +13,7 @@ from .base_agent import BaseAgent
 from .deepseek_research_agent import DeepSeekResearchAgent
 from .perplexity_deep_agent import PerplexityDeepAgent
 from .research_orchestrator import ResearchOrchestrator
-from ..core.logger import get_logger
+from src.core.logger import get_logger
 
 # Load environment variables
 load_dotenv()

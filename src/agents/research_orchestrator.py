@@ -15,8 +15,8 @@ import json
 from .base_agent import BaseAgent, MineQuery, SearchResult
 from .deepseek_research_agent import DeepSeekResearchAgent
 from .factory import AgentFactory
-from ..core.config import Config
-from ..core.logger import get_logger
+from src.core.config import Config
+from src.core.logger import get_logger
 
 
 class TaskType(Enum):

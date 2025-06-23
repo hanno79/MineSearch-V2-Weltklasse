@@ -20,7 +20,7 @@ Dies testet:
 
 ```bash
 # Starte die Web-Oberfläche
-streamlit run ui/streamlit_app.py
+streamlit run src/ui/main.py
 ```
 
 Dann öffne im Browser: http://localhost:8501
@@ -168,5 +168,5 @@ pkill -f python
 ### "Port already in use" (Streamlit)
 ```bash
 # Anderen Port verwenden
-streamlit run ui/streamlit_app.py --server.port 8502
+streamlit run src/ui/main.py --server.port 8502
 ```

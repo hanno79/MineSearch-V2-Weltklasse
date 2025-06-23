@@ -1,418 +1,261 @@
 """
-Orchestrator für die Koordination der Agenten
+Author: rahn
+Datum: 22.06.2025
+Version: 2.0
+Beschreibung: Refactored MineSearch Orchestrator - koordiniert alle Komponenten
 """
-import asyncio
 from typing import List, Dict, Any, Optional, Callable
-from datetime import datetime
-import logging
+import asyncio
 
-from ..agents.base_agent import BaseAgent, MineQuery, SearchResult
-from ..agents.factory import AgentFactory
-from ..agents.agent_coordinator import AgentCoordinator
-from ..agents.staged_search import StagedSearchStrategy, SearchStage
-from ..agents.research_orchestrator import ResearchOrchestrator
-from ..data.aggregator import DataAggregator
+from src.agents.base_agent import MineQuery, SearchResult
+from src.data.aggregator import DataAggregator
 from .config import Config
 from .logger import get_logger
+from .cancellation import CancellationToken, CancellationException
+
+# Import refactored components
+from .agent_manager import AgentManager
+from .search_executor import SearchExecutor
+from .source_discovery_service import SourceDiscoveryService
+from .search_strategy_manager import SearchStrategyManager
+from .source_manager import SourceManager
 
 
-class MineSearchOrchestrator:
-    """Koordiniert die Suche über mehrere Agenten"""
+class MineSearchOrchestratorV2:
+    """Refactored Orchestrator - koordiniert alle Such-Komponenten"""
     
     def __init__(self, config: Config, status_callback: Optional[Callable[[str], None]] = None):
         self.config = config
-        self.agents: Dict[str, BaseAgent] = {}
-        self.active_agents: List[str] = []
-        self.aggregator = DataAggregator()
-        self.coordinator = AgentCoordinator(config)
-        self.staged_search = StagedSearchStrategy(config)
         self.logger = get_logger("orchestrator")
-        self._initialized = False
         self.status_callback = status_callback
-        self.research_orchestrator = None  # Will be initialized when needed
         
+        # Initialize components
+        self.agent_manager = AgentManager(config)
+        self.search_executor = SearchExecutor()
+        self.source_manager = SourceManager()
+        self.source_discovery = SourceDiscoveryService(self.source_manager)
+        self.aggregator = DataAggregator()
+        
+        # Initialize strategy manager with components
+        self.strategy_manager = SearchStrategyManager({
+            'search_executor': self.search_executor,
+            'source_discovery': self.source_discovery,
+            'staged_search': self._get_staged_search(),
+            'research_orchestrator': self._get_research_orchestrator()
+        })
+        
+        self._initialized = False
+        
+        # Database manager
+        from .database import get_db_manager
+        self.db_manager = get_db_manager()
+        
+        # Kompatibilitäts-Attribute
+        self.agents = {}  # Wird von agent_manager verwaltet
+        self.active_agents = []  # Wird von agent_manager verwaltet
+        self.coordinator = None  # Deprecated
+        self.staged_search = self._get_staged_search()
+        self.research_orchestrator = self._get_research_orchestrator()
+    
+    async def initialize(self) -> bool:
+        """Initialisiert den Orchestrator und alle Agenten"""
+        if self._initialized:
+            return True
+        
+        self._report_status("🚀 Initialisiere MineSearch Orchestrator V2...")
+        
+        # Initialize agents
+        success = await self.agent_manager.initialize_agents(self.status_callback)
+        
+        if success:
+            self._initialized = True
+            # Synchronisiere Agent-Referenzen für Kompatibilität
+            self.agents = self.agent_manager.agents
+            self.active_agents = self.agent_manager.active_agents
+            self._report_status("✅ Orchestrator erfolgreich initialisiert")
+        else:
+            self._report_status("❌ Orchestrator-Initialisierung fehlgeschlagen")
+        
+        return success
+    
+    async def search_mine(
+        self,
+        query: MineQuery,
+        search_params: Optional[Dict[str, Any]] = None
+    ) -> List[SearchResult]:
+        """
+        Hauptmethode für Mine-Suche
+        
+        Args:
+            query: Such-Query mit Mine-Informationen
+            search_params: Zusätzliche Such-Parameter
+            
+        Returns:
+            Liste der Suchergebnisse
+        """
+        if not self._initialized:
+            await self.initialize()
+        
+        search_params = search_params or {}
+        
+        # Determine strategy
+        strategy = search_params.get('strategy', 'staged')
+        
+        # Get active agents
+        agent_types = search_params.get('agent_types', [])
+        if agent_types:
+            self.agent_manager.set_active_agents(agent_types)
+        
+        active_agents = self.agent_manager.get_active_agents()
+        
+        if not active_agents:
+            self._report_status("❌ Keine aktiven Agenten verfügbar")
+            return []
+        
+        # Get cancellation token
+        cancellation_token = search_params.get('cancellation_token')
+        
+        try:
+            # Execute search with chosen strategy
+            results = await self.strategy_manager.execute_search(
+                strategy_name=strategy,
+                query=query,
+                agents=active_agents,
+                params=search_params,
+                status_callback=self.status_callback,
+                cancellation_token=cancellation_token
+            )
+            
+            # Aggregate results
+            aggregated_results = self.aggregator.aggregate_results(results)
+            
+            # Save to database if enabled
+            if search_params.get('save_to_db', True):
+                await self._save_results_to_db(query, aggregated_results)
+            
+            return aggregated_results
+            
+        except CancellationException:
+            self._report_status("🛑 Suche abgebrochen")
+            raise
+        except Exception as e:
+            self.logger.error(f"Fehler bei Suche: {e}")
+            self._report_status(f"❌ Fehler: {str(e)}")
+            raise
+    
+    async def search_mine_staged(
+        self,
+        query: MineQuery,
+        search_params: Optional[Dict[str, Any]] = None
+    ) -> List[SearchResult]:
+        """Kompatibilitäts-Methode für staged search"""
+        search_params = search_params or {}
+        search_params['strategy'] = 'staged'
+        return await self.search_mine(query, search_params)
+    
+    async def search_mine_deep_research(
+        self,
+        query: MineQuery
+    ) -> List[SearchResult]:
+        """Kompatibilitäts-Methode für deep research"""
+        return await self.search_mine(query, {'strategy': 'deep_research'})
+    
+    async def discover_sources(
+        self,
+        query: MineQuery,
+        cancellation_token=None
+    ) -> List:
+        """Entdeckt Quellen für eine Mine"""
+        agents = self.agent_manager.get_active_agents()
+        
+        sources = await self.source_discovery.discover_sources(
+            query=query,
+            agents=agents,
+            status_callback=self.status_callback,
+            cancellation_token=cancellation_token
+        )
+        
+        return sources
+    
+    def set_active_agents(self, agent_types: List[str]):
+        """Setzt aktive Agenten"""
+        self.agent_manager.set_active_agents(agent_types)
+    
+    def get_agent_statistics(self) -> Dict[str, Dict[str, Any]]:
+        """Gibt Agent-Statistiken zurück"""
+        agent_stats = self.agent_manager.get_agent_statistics()
+        search_stats = self.search_executor.get_statistics()
+        
+        # Kombiniere Statistiken
+        combined_stats = {}
+        for agent_type, stats in agent_stats.items():
+            combined_stats[agent_type] = {
+                **stats,
+                'search_history': search_stats.get(stats.get('name', agent_type), [])
+            }
+        
+        return combined_stats
+    
+    async def cleanup(self):
+        """Räumt alle Ressourcen auf"""
+        self._report_status("🧹 Räume Orchestrator auf...")
+        await self.agent_manager.cleanup_agents()
+        self._initialized = False
+        self._report_status("✅ Orchestrator aufgeräumt")
+    
+    def _get_staged_search(self):
+        """Holt Staged Search Strategie"""
+        try:
+            from src.agents.staged_search import StagedSearchStrategy
+            return StagedSearchStrategy(self.config)
+        except:
+            return None
+    
+    def _get_research_orchestrator(self):
+        """Holt Research Orchestrator"""
+        try:
+            from src.agents.research_orchestrator import ResearchOrchestrator
+            return ResearchOrchestrator(self.config)
+        except:
+            return None
+    
+    async def _save_results_to_db(self, query: MineQuery, results: List[SearchResult]):
+        """Speichert Ergebnisse in Datenbank"""
+        try:
+            # Implementation würde hier Ergebnisse in DB speichern
+            pass
+        except Exception as e:
+            self.logger.error(f"Fehler beim Speichern in DB: {e}")
+    
     def _report_status(self, message: str):
-        """Reports status to callback if available"""
+        """Berichtet Status über Callback"""
         self.logger.info(message)
         if self.status_callback:
             try:
                 self.status_callback(message)
             except Exception as e:
                 self.logger.error(f"Error in status callback: {e}")
-        
-    async def initialize(self) -> bool:
-        """Initialisiert alle verfügbaren Agenten"""
-        if self._initialized:
-            return True
-            
-        self._report_status("Initialisiere Orchestrator...")
-        
-        # Hole verfügbare Agenten
-        available_agents = AgentFactory.get_available_agents(self.config)
-        self._report_status(f"Gefunden: {len([a for a, v in available_agents.items() if v])} verfügbare Agenten")
-        
-        # Erstelle und initialisiere Agenten
-        init_tasks = []
-        for agent_type, is_available in available_agents.items():
-            if is_available:
-                try:
-                    # Handle OpenRouter models
-                    if agent_type.startswith("openrouter_"):
-                        # Extract model ID from agent type
-                        model_suffix = agent_type.replace("openrouter_", "")
-                        # Find matching model
-                        from ..agents.openrouter_agent import OpenRouterAgent
-                        model_id = None
-                        
-                        # Search in both FREE_MODELS and PREMIUM_MODELS
-                        all_models = {**OpenRouterAgent.FREE_MODELS, **OpenRouterAgent.PREMIUM_MODELS}
-                        for mid, model in all_models.items():
-                            # Handle models with :free suffix and other special cases
-                            model_key = mid.split('/')[-1].split(':')[0]
-                            if model_key == model_suffix:
-                                model_id = mid
-                                break
-                        
-                        if model_id:
-                            agent = AgentFactory.create_agent(agent_type, self.config, model_id=model_id)
-                        else:
-                            self.logger.warning(f"Model ID not found for {agent_type}")
-                            continue
-                    else:
-                        agent = AgentFactory.create_agent(agent_type, self.config)
-                    
-                    if agent:
-                        self.agents[agent_type] = agent
-                        init_tasks.append(self._init_agent(agent_type, agent))
-                except Exception as e:
-                    self.logger.error(f"Fehler beim Erstellen von Agent {agent_type}: {e}")
-        
-        # Initialisiere alle Agenten parallel
-        if init_tasks:
-            results = await asyncio.gather(*init_tasks, return_exceptions=True)
-            
-            # Prüfe Ergebnisse
-            for i, (agent_type, result) in enumerate(zip(self.agents.keys(), results)):
-                if isinstance(result, Exception):
-                    self.logger.error(f"Agent {agent_type} Initialisierung fehlgeschlagen: {result}")
-                    del self.agents[agent_type]
-                elif result:
-                    self.active_agents.append(agent_type)
-                    self.logger.info(f"Agent {agent_type} erfolgreich initialisiert")
-        
-        self._initialized = True
-        self.logger.info(f"Orchestrator initialisiert mit {len(self.active_agents)} aktiven Agenten")
-        return True
     
-    async def _init_agent(self, agent_type: str, agent: BaseAgent) -> bool:
-        """Initialisiert einen einzelnen Agenten"""
-        try:
-            return await agent.initialize()
-        except Exception as e:
-            self.logger.error(f"Fehler bei Initialisierung von {agent_type}: {e}")
-            return False
+    # Kompatibilitäts-Methoden (delegieren an neue Komponenten)
     
-    async def search_mine_staged(self, query: MineQuery, search_params: Optional[Dict[str, Any]] = None) -> List[SearchResult]:
-        """Führt gestaffelte Suche durch für bessere Ergebnisse"""
-        if not self._initialized:
-            await self.initialize()
-        
-        self._report_status(f"🎯 Starte gestaffelte Suche für Mine: {query.mine_name}")
-        self._report_status(f"📍 Region: {query.region}, {query.country}")
-        
-        # Bestimme benötigte Suchphasen
-        needed_stages = self.staged_search.get_stages_for_fields(query.required_fields)
-        self._report_status(f"📋 Geplant: {len(needed_stages)} Suchphasen mit {len(self.active_agents)} Agenten")
-        
-        all_results = []
-        results_by_field = {}
-        phase_counter = 0
-        
-        # Führe Suche phasenweise durch
-        for stage in needed_stages:
-            phase_counter += 1
-            stage_info = self.staged_search.get_stage_info(stage)
-            
-            self._report_status(f"\n{'='*60}")
-            self._report_status(f"📊 PHASE {phase_counter}/{len(needed_stages)}: {stage_info.name}")
-            self._report_status(f"{'='*60}")
-            
-            # Bestimme Felder für diese Phase
-            stage_fields = self.staged_search.get_fields_for_stage(stage, query.required_fields)
-            if not stage_fields:
-                continue
-            
-            self._report_status(f"🔍 Suche nach {len(stage_fields)} Feldern:")
-            fields_display = ", ".join(stage_fields[:5])
-            if len(stage_fields) > 5:
-                fields_display += f" ... und {len(stage_fields) - 5} weitere"
-            self._report_status(f"   {fields_display}")
-                
-            # Wähle beste Agenten für diese Phase
-            stage_agents = self.staged_search.get_best_agents_for_stage(stage, self.active_agents)
-            self._report_status(f"\n🤖 Aktiviere {len(stage_agents)} Agenten für diese Phase:")
-            
-            # Zeige Agenten in Gruppen
-            for i in range(0, len(stage_agents), 5):
-                batch = stage_agents[i:i+5]
-                self._report_status(f"   • {', '.join(batch)}")
-            
-            # Erstelle Query für diese Phase
-            stage_query = MineQuery(
-                mine_name=query.mine_name,
-                region=query.region,
-                country=query.country,
-                languages=query.languages,
-                required_fields=stage_fields
-            )
-            
-            # Führe Suche mit Agenten-Koordinator durch
-            search_params_stage = {
-                'active_agents': stage_agents,
-                'timeout': stage_info.timeout,
-                'use_coordinator': True,
-                'phase_info': f"Phase {phase_counter}: {stage_info.name}"
-            }
-            
-            self._report_status(f"\n⚡ Starte parallele Suche mit {len(stage_agents)} Agenten...")
-            
-            stage_results = await self.search_mine(stage_query, search_params_stage)
-            all_results.extend(stage_results)
-            
-            # Sammle detaillierte Ergebnisse
-            fields_found = {}
-            agents_with_results = set()
-            
-            for result in stage_results:
-                if result.field_name not in results_by_field:
-                    results_by_field[result.field_name] = 0
-                results_by_field[result.field_name] += 1
-                
-                if result.field_name not in fields_found:
-                    fields_found[result.field_name] = []
-                fields_found[result.field_name].append(result.agent_name)
-                agents_with_results.add(result.agent_name)
-            
-            # Zeige Phase-Zusammenfassung
-            self._report_status(f"\n✅ Phase {phase_counter} abgeschlossen:")
-            self._report_status(f"   • {len(stage_results)} Ergebnisse gefunden")
-            self._report_status(f"   • {len(fields_found)} von {len(stage_fields)} Feldern mit Daten")
-            self._report_status(f"   • {len(agents_with_results)} Agenten lieferten Ergebnisse")
-            
-            # Zeige welche Felder gefunden wurden
-            if fields_found:
-                self._report_status(f"\n📌 Gefundene Felder:")
-                for field, agents in list(fields_found.items())[:5]:
-                    self._report_status(f"   • {field}: {len(agents)} Quellen")
-                if len(fields_found) > 5:
-                    self._report_status(f"   • ... und {len(fields_found) - 5} weitere Felder")
-            
-            # Prüfe ob zur nächsten Phase übergegangen werden soll
-            if not self.staged_search.should_continue_to_next_stage(stage, results_by_field, query.required_fields):
-                self._report_status("\n🎯 Genügend Ergebnisse gefunden, beende Suche")
-                break
-                
-            # Kurze Pause zwischen Phasen
-            if phase_counter < len(needed_stages):
-                self._report_status(f"\n⏳ Kurze Pause vor nächster Phase...")
-                await asyncio.sleep(2)
-        
-        self._report_status(f"\n{'='*60}")
-        self._report_status(f"🏁 SUCHE ABGESCHLOSSEN")
-        self._report_status(f"{'='*60}")
-        self._report_status(f"📊 Gesamtergebnis: {len(all_results)} Datenpunkte gefunden")
-        self._report_status(f"📈 Abdeckung: {len(results_by_field)} von {len(query.required_fields)} Feldern")
-        
-        return all_results
+    async def _init_agent(self, agent_type: str, agent) -> bool:
+        """Kompatibilität: Delegiert an AgentManager"""
+        return await self.agent_manager._init_agent(agent_type, agent)
     
-    async def search_mine(self, query: MineQuery, search_params: Optional[Dict[str, Any]] = None) -> List[SearchResult]:
-        """Führt Suche mit optimierter Agentenzuweisung durch"""
-        if not self._initialized:
-            await self.initialize()
-        
-        # Phase info wenn verfügbar
-        phase_info = search_params.get('phase_info', '') if search_params else ''
-        if not phase_info:
-            self._report_status(f"🔍 Starte Suche für Mine: {query.mine_name}")
-        
-        # Apply search parameters if provided
-        timeout = 600  # Default 10 minutes for deeper searches
-        use_coordinator = True  # Nutze Agenten-Koordinator standardmäßig
-        
-        if search_params:
-            timeout = search_params.get('timeout', timeout)
-            use_coordinator = search_params.get('use_coordinator', True)
-            if 'active_agents' in search_params:
-                # Override active agents for this search
-                self.active_agents = [a for a in search_params['active_agents'] if a in self.agents]
-        
-        # Nutze AgentCoordinator für optimale Zuweisung
-        if use_coordinator and query.required_fields:
-            # Zeige nur kurze Info, keine Details
-            self.logger.info("Optimiere Agentenzuweisung...")
-            agent_assignments = self.coordinator.get_agent_assignment(
-                fields=query.required_fields,
-                available_agents=self.active_agents
-            )
-            
-            # Log Zuweisungen (nur ins Log, nicht in UI)
-            for agent, fields in agent_assignments.items():
-                self.logger.info(f"Agent {agent} zugewiesen für: {', '.join(fields)}")
-        else:
-            # Fallback: Alle Agenten suchen alle Felder
-            agent_assignments = {agent: query.required_fields for agent in self.active_agents}
-        
-        # Erstelle Such-Tasks mit spezialisierten Queries
-        search_tasks = []
-        for agent_type, assigned_fields in agent_assignments.items():
-            if agent_type in self.agents:
-                agent = self.agents[agent_type]
-                # Erstelle spezialisierte Query für diesen Agenten
-                specialized_query = MineQuery(
-                    mine_name=query.mine_name,
-                    region=query.region,
-                    country=query.country,
-                    languages=query.languages,
-                    required_fields=assigned_fields
-                )
-                search_tasks.append(self._search_with_agent(agent, specialized_query))
-        
-        # Führe Suchen parallel aus
-        all_results = []
-        if search_tasks:
-            # Detaillierte Info nur wenn nicht in Phase
-            if not phase_info:
-                self._report_status(f"Führe {len(search_tasks)} parallele Suchen aus...")
-            
-            # Mit Timeout für alle Suchen
-            try:
-                results = await asyncio.wait_for(
-                    asyncio.gather(*search_tasks, return_exceptions=True),
-                    timeout=timeout
-                )
-                
-                # Sammle alle erfolgreichen Ergebnisse
-                successful_agents = 0
-                failed_agents = 0
-                
-                for i, result in enumerate(results):
-                    if isinstance(result, list):
-                        all_results.extend(result)
-                        if result:
-                            successful_agents += 1
-                        self.logger.debug(f"Agent {i+1}/{len(results)} lieferte {len(result)} Ergebnisse")
-                    elif isinstance(result, Exception):
-                        failed_agents += 1
-                        self.logger.error(f"Agent-Suche fehlgeschlagen: {result}")
-                
-                # Kompakte Zusammenfassung
-                if not phase_info:
-                    self._report_status(f"✅ {successful_agents} Agenten erfolgreich, {failed_agents} fehlgeschlagen")
-                        
-            except asyncio.TimeoutError:
-                self._report_status(f"⏱️ Such-Timeout nach {timeout} Sekunden")
-                self.logger.error(f"Such-Timeout nach {timeout} Sekunden")
-        
-        # Aggregiere Ergebnisse
-        if all_results:
-            if not phase_info:
-                self._report_status("📊 Aggregiere und dedupliziere Ergebnisse...")
-            aggregated_results = self.aggregator.aggregate_results(all_results)
-            if not phase_info:
-                self._report_status(f"✅ Suche abgeschlossen: {len(aggregated_results)} finale Ergebnisse")
-            return aggregated_results
-        
-        if not phase_info:
-            self._report_status("❌ Keine Ergebnisse gefunden")
-        return []
+    async def _search_with_agent(self, agent, query, cancellation_token=None):
+        """Kompatibilität: Delegiert an SearchExecutor"""
+        return await self.search_executor._search_with_agent(agent, query, cancellation_token)
     
-    async def _search_with_agent(self, agent: BaseAgent, query: MineQuery) -> List[SearchResult]:
-        """Führt Suche mit einem einzelnen Agenten aus"""
-        try:
-            # Log nur, zeige nicht im UI
-            self.logger.info(f"Starte Suche mit Agent {agent.name}...")
-            results = await agent.execute_search(query)
-            
-            if results:
-                self.logger.info(f"Agent {agent.name} lieferte {len(results)} Ergebnisse")
-                # Log erste Ergebnisse für Debugging
-                for i, result in enumerate(results[:2]):
-                    self.logger.debug(f"{agent.name} Ergebnis {i+1}: {result.field_name} = {result.value[:50]}...")
-            else:
-                self.logger.info(f"Agent {agent.name} fand keine Ergebnisse")
-                
-            return results
-        except Exception as e:
-            self.logger.error(f"Fehler bei Agent {agent.name}: {type(e).__name__}: {str(e)}")
-            return []
+    async def _gather_search_tasks(self, tasks):
+        """Kompatibilität: Delegiert an SearchExecutor"""
+        return await self.search_executor._execute_parallel(tasks, None)
     
-    async def cleanup(self):
-        """Räumt alle Agenten auf"""
-        self.logger.info("Räume Orchestrator auf...")
-        
-        cleanup_tasks = []
-        for agent in self.agents.values():
-            cleanup_tasks.append(agent.cleanup())
-        
-        if cleanup_tasks:
-            await asyncio.gather(*cleanup_tasks, return_exceptions=True)
-        
-        self.agents.clear()
-        self.active_agents.clear()
-        self._initialized = False
-        self.logger.info("Orchestrator Cleanup abgeschlossen")
-        
-        # Clean up research orchestrator if exists
-        if self.research_orchestrator:
-            await self.research_orchestrator.cleanup()
-            self.research_orchestrator = None
-    
-    def get_agent_statistics(self) -> Dict[str, Dict[str, Any]]:
-        """Gibt Statistiken aller Agenten zurück"""
-        stats = {}
-        for agent_type, agent in self.agents.items():
-            stats[agent_type] = {
-                'status': agent.status.value,
-                'stats': agent.get_statistics(),
-                'is_active': agent_type in self.active_agents
-            }
-        return stats
-    
-    def set_active_agents(self, agent_types: List[str]):
-        """Setzt die aktiven Agenten für die nächste Suche"""
-        self.active_agents = [a for a in agent_types if a in self.agents]
-        self.logger.info(f"Aktive Agenten gesetzt: {self.active_agents}")
-    
-    async def search_mine_deep_research(self, query: MineQuery) -> List[SearchResult]:
-        """Führt Deep Research mit Research Orchestrator durch"""
-        if not self._initialized:
-            await self.initialize()
-        
-        self._report_status(f"🔬 Starte Deep Research für Mine: {query.mine_name}")
-        self._report_status(f"🌍 Region: {query.region}, {query.country}")
-        self._report_status(f"🎯 Zielfelder: {len(query.required_fields)}")
-        
-        # Initialize Research Orchestrator if needed
-        if not self.research_orchestrator:
-            self.research_orchestrator = ResearchOrchestrator(
-                self.config,
-                self.active_agents
-            )
-        
-        # Execute deep research
-        try:
-            results = await self.research_orchestrator.execute_research(query)
-            
-            self._report_status(f"✅ Deep Research abgeschlossen: {len(results)} Ergebnisse gefunden")
-            
-            # Log field coverage
-            fields_found = set(r.field_name for r in results)
-            coverage = len(fields_found) / len(query.required_fields) * 100 if query.required_fields else 0
-            self._report_status(f"📊 Feldabdeckung: {coverage:.1f}% ({len(fields_found)}/{len(query.required_fields)} Felder)")
-            
-            return results
-            
-        except Exception as e:
-            self.logger.error(f"Fehler bei Deep Research: {e}")
-            self._report_status(f"❌ Fehler bei Deep Research: {str(e)}")
-            return []
+    def _determine_source_type(self, url: str, field_name: str = "") -> str:
+        """Kompatibilität: Delegiert an SourceDiscoveryService"""
+        return self.source_discovery._determine_source_type(url)
+
+
+# Kompatibilitäts-Klasse
+class MineSearchOrchestrator(MineSearchOrchestratorV2):
+    """Alias für Kompatibilität"""
+    pass

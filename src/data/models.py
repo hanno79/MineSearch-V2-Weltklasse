@@ -21,12 +21,12 @@ class Mine(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Beziehungen
-    search_results = relationship("SearchResult", back_populates="mine", cascade="all, delete-orphan")
+    search_results = relationship("SearchResultDB", back_populates="mine", cascade="all, delete-orphan")
     searches = relationship("Search", back_populates="mine", cascade="all, delete-orphan")
 
 
-class SearchResult(Base):
-    """Suchergebnis von Agenten"""
+class SearchResultDB(Base):
+    """Suchergebnis von Agenten (Datenbank-Modell)"""
     __tablename__ = 'search_results'
     
     id = Column(Integer, primary_key=True)
@@ -76,6 +76,9 @@ class Search(Base):
     
     # Beziehungen
     mine = relationship("Mine", back_populates="searches")
+
+# Alias für Kompatibilität
+SearchSession = Search
 
 
 class AgentStatistics(Base):

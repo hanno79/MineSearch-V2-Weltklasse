@@ -5,7 +5,7 @@ Version: 1.0
 Beschreibung: Flexible Extraction Patterns für Mining-Daten - Anpassbar für alle Länder/Sprachen
 """
 
-from typing import List, Dict, Pattern, Optional, Tuple, Any
+from typing import List, Dict, Pattern, Optional, Tuple, Any, Callable
 import re
 from dataclasses import dataclass
 from enum import Enum
@@ -33,7 +33,17 @@ class ExtractionPattern:
     language: str
     confidence: float
     extraction_method: str
-    post_processor: Optional[callable] = None
+    post_processor: Optional[Callable] = None
+
+class ExtractorBase:
+    """Basis-Klasse für Daten-Extraktion"""
+    
+    def __init__(self):
+        self.patterns = {}
+        
+    def extract(self, text: str, field_type: str) -> Optional[str]:
+        """Extrahiert Feld aus Text"""
+        return None
 
 class ExtractionPatterns:
     """
@@ -51,7 +61,7 @@ class ExtractionPatterns:
         
     def _initialize_patterns(self) -> Dict[FieldType, List[ExtractionPattern]]:
         """Initialisiert Basis-Extraktionsmuster"""
-        patterns = {field_type: [] for field_type in FieldType}
+        patterns: Dict[FieldType, List[ExtractionPattern]] = {field_type: [] for field_type in FieldType}
         
         # KOORDINATEN - Verschiedene Formate
         patterns[FieldType.COORDINATES].extend([
@@ -257,7 +267,7 @@ class ExtractionPatterns:
                 results.append((value, final_confidence))
         
         # Dedupliziere und sortiere nach Konfidenz
-        unique_results = {}
+        unique_results: Dict[str, float] = {}
         for value, conf in results:
             if value not in unique_results or conf > unique_results[value]:
                 unique_results[value] = conf

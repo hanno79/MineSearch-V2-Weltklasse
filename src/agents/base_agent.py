@@ -11,6 +11,7 @@ from enum import Enum
 import hashlib
 import json
 from .extraction_patterns import ExtractionPatterns
+from src.core.cancellation import CancellationToken, CancellationException
 
 
 class AgentStatus(Enum):
@@ -50,6 +51,7 @@ class SearchResult:
     agent_name: str
     timestamp: datetime
     metadata: Dict[str, Any]
+    found_at: Optional[str] = None  # Optional field for OpenRouter compatibility
     
     def to_dict(self) -> Dict[str, Any]:
         """Konvertiert zu Dictionary"""
@@ -63,7 +65,8 @@ class SearchResult:
             "confidence_score": self.confidence_score,
             "agent_name": self.agent_name,
             "timestamp": self.timestamp.isoformat(),
-            "metadata": self.metadata
+            "metadata": self.metadata,
+            "found_at": self.found_at
         }
 
 
@@ -75,7 +78,7 @@ class BaseAgent(ABC):
         self.config = config
         self.logger = logging.getLogger(f"agent.{name}")
         self.status = AgentStatus.READY
-        self.stats = {
+        self.stats: Dict[str, Any] = {
             "total_requests": 0,
             "successful_requests": 0,
             "failed_requests": 0,
@@ -86,6 +89,7 @@ class BaseAgent(ABC):
         self._session = None
         self.status_callback = None
         self.extractor = ExtractionPatterns()
+        self._cancellation_token: Optional[CancellationToken] = None
         
     @abstractmethod
     async def initialize(self) -> bool:
@@ -102,7 +106,7 @@ class BaseAgent(ABC):
         """Validiert API-Credentials"""
         pass
     
-    async def _send_status(self, message: str):
+    async def _send_status(self, message: str) -> None:
         """Sendet Status-Update wenn Callback vorhanden"""
         if self.status_callback:
             try:
@@ -145,10 +149,23 @@ class BaseAgent(ABC):
             self.logger.error(f"Fehler bei Suche: {str(e)}")
             return []
     
-    async def _check_rate_limit(self):
+    async def _check_rate_limit(self) -> None:
         """Implementiert Rate-Limiting"""
         if self._rate_limiter:
             await self._rate_limiter.acquire()
+    
+    async def cleanup(self) -> None:
+        """Räumt Ressourcen auf - muss von Subklassen überschrieben werden"""
+        # Basis-Cleanup
+        if hasattr(self, '_session') and self._session:
+            try:
+                await self._session.close()
+                self._session = None
+            except Exception as e:
+                self.logger.warning(f"Fehler beim Schließen der Session: {e}")
+        
+        # Weitere Ressourcen können von Subklassen aufgeräumt werden
+        self.logger.debug(f"Agent {self.name} aufgeräumt")
     
     def get_statistics(self) -> Dict[str, Any]:
         """Gibt Statistiken zurück"""
@@ -173,11 +190,6 @@ class BaseAgent(ABC):
             )
         }
     
-    async def cleanup(self):
-        """Cleanup-Methode für Ressourcen"""
-        if self._session:
-            await self._session.close()
-        self.logger.info(f"Agent {self.name} beendet")
     
     def _parse_language_response(self, text: str, language: str) -> str:
         """Hilfs-Methode für Sprachverarbeitung"""
@@ -218,7 +230,7 @@ class BaseAgent(ABC):
             await asyncio.sleep(5)  # Kurze Pause bei Rate Limit
         elif "unauthorized" in str(error).lower() or "forbidden" in str(error).lower():
             self.logger.error(f"{self.name}: API-Key ungültig oder keine Berechtigung")
-            self.status = AgentStatus.FAILED
+            self.status = AgentStatus.ERROR
         elif "timeout" in str(error).lower():
             self.logger.warning(f"{self.name}: Request timeout")
     
@@ -229,7 +241,8 @@ class BaseAgent(ABC):
         
         # Versuche direktes JSON-Parsing
         try:
-            return json.loads(text)
+            result: Dict[str, Any] = json.loads(text)
+            return result
         except:
             pass
         
@@ -239,7 +252,8 @@ class BaseAgent(ABC):
         
         for match in matches:
             try:
-                return json.loads(match)
+                parsed_result: Dict[str, Any] = json.loads(match)
+                return parsed_result
             except:
                 continue
         
@@ -275,6 +289,26 @@ class BaseAgent(ABC):
         
         return field_mappings.get(normalized, normalized)
     
+    def set_cancellation_token(self, token: Optional[CancellationToken]) -> None:
+        """
+        ÄNDERUNG 19.06.2025: Setzt das Cancellation Token für diesen Agenten
+        
+        Args:
+            token: CancellationToken oder None
+        """
+        self._cancellation_token = token
+    
+    async def check_cancellation(self) -> None:
+        """
+        ÄNDERUNG 19.06.2025: Prüft ob Abbruch angefordert wurde
+        
+        Raises:
+            CancellationException: Wenn Abbruch angefordert wurde
+        """
+        if self._cancellation_token and self._cancellation_token.is_cancelled():
+            self.logger.info(f"Agent {self.name} wird wegen Abbruch beendet")
+            raise CancellationException(f"Agent {self.name} abgebrochen")
+    
     def _extract_with_context(self, text: str, field: str) -> List[Tuple[Any, float]]:
         """
         Nutzt kontextbasierte Extraktion für bessere Ergebnisse
@@ -286,7 +320,24 @@ class BaseAgent(ABC):
         normalized_field = self._normalize_field_name(field)
         
         # Nutze kontextbasierten Extraktor
-        results = self.extractor.extract_with_confidence(text, normalized_field)
+        # ÄNDERUNG 19.06.2025: Korrigiere Methodenname - verwende extract_field statt extract_with_confidence
+        from ..agents.extraction_patterns import FieldType
+        
+        # Map field name to FieldType
+        field_type_map = {
+            "betreiber": FieldType.OPERATOR,
+            "koordinaten": FieldType.COORDINATES,
+            "rohstofftyp": FieldType.COMMODITY,
+            "aktivitaetsstatus": FieldType.STATUS,
+            "sanierungskosten": FieldType.COSTS,
+            "jahresproduktion": FieldType.PRODUCTION
+        }
+        
+        field_type = field_type_map.get(normalized_field)
+        if field_type:
+            results = self.extractor.extract_field(text, field_type)
+        else:
+            results = []
         
         # Log für Debugging
         if results:
@@ -321,3 +372,116 @@ class BaseAgent(ABC):
             
         except:
             return None
+    
+    def _add_geographic_constraints(self, query: str, region: str, country: str) -> str:
+        """
+        ÄNDERUNG 19.06.2025: Fügt geografische Einschränkungen zu einer Suchanfrage hinzu
+        
+        Args:
+            query: Die Basis-Suchanfrage
+            region: Die Region (z.B. "Quebec")
+            country: Das Land (z.B. "Canada")
+            
+        Returns:
+            Die erweiterte Suchanfrage mit geografischen Einschränkungen
+        """
+        # Füge Region und Land zur Query hinzu
+        if region and country:
+            query += f' "{region}" "{country}"'
+        elif country:
+            query += f' "{country}"'
+        elif region:
+            query += f' "{region}"'
+        
+        # Füge Ausschlüsse hinzu
+        exclusions = self._get_geographic_exclusions(region, country)
+        if exclusions:
+            query += " " + " ".join(exclusions)
+        
+        return query
+    
+    def _get_geographic_exclusions(self, region: str, country: str) -> List[str]:
+        """
+        ÄNDERUNG 19.06.2025: Gibt eine Liste von geografischen Ausschlüssen zurück
+        
+        Returns:
+            Liste von Ausschlüssen im Format "-Location"
+        """
+        exclusions = []
+        
+        # Länder-basierte Ausschlüsse
+        country_exclusions = {
+            "canada": ["-Greenland", "-Grönland", "-Iceland", "-Alaska"],
+            "usa": ["-Canada", "-Mexico", "-Greenland"],
+            "australia": ["-New Zealand", "-Indonesia", "-Papua New Guinea"],
+            "chile": ["-Argentina", "-Peru", "-Bolivia"],
+            "peru": ["-Chile", "-Brazil", "-Bolivia"],
+            "brazil": ["-Venezuela", "-Colombia", "-Peru", "-Argentina"],
+            "south africa": ["-Namibia", "-Botswana", "-Zimbabwe"],
+            "mexico": ["-USA", "-Guatemala", "-Belize"],
+            "germany": ["-Poland", "-Czech Republic", "-Austria"],
+            "china": ["-Mongolia", "-Russia", "-India"]
+        }
+        
+        # Regions-basierte Ausschlüsse
+        region_exclusions = {
+            "quebec": ["-Greenland", "-Grönland", "-Nunavut", "-Iceland"],
+            "ontario": ["-Michigan", "-Minnesota", "-Wisconsin"],
+            "british columbia": ["-Alaska", "-Washington"],
+            "yukon": ["-Alaska", "-Northwest Territories"],
+            "northwest territories": ["-Nunavut", "-Yukon"]
+        }
+        
+        if country and country.lower() in country_exclusions:
+            exclusions.extend(country_exclusions[country.lower()])
+        
+        if region and region.lower() in region_exclusions:
+            exclusions.extend(region_exclusions[region.lower()])
+        
+        # Entferne Duplikate
+        return list(set(exclusions))
+    
+    def _validate_geographic_result(self, result: SearchResult, query: MineQuery) -> bool:
+        """
+        ÄNDERUNG 19.06.2025: Validiert ob ein Suchergebnis geografisch korrekt ist
+        
+        Args:
+            result: Das zu validierende Suchergebnis
+            query: Die ursprüngliche Suchanfrage
+            
+        Returns:
+            True wenn das Ergebnis geografisch korrekt ist, False sonst
+        """
+        # Prüfe ob das Ergebnis Text enthält, der auf falsche geografische Zuordnung hinweist
+        if not result.value:
+            return True
+        
+        text_to_check = str(result.value).lower()
+        
+        # Liste von falschen geografischen Zuordnungen
+        false_positives = {
+            "canada": ["greenland", "grönland", "iceland", "alaska", "russia"],
+            "quebec": ["greenland", "grönland", "nunavut", "iceland"],
+            "usa": ["canada", "mexico", "greenland"],
+            "australia": ["new zealand", "indonesia", "papua new guinea"]
+        }
+        
+        # Prüfe Land
+        if query.country and query.country.lower() in false_positives:
+            for false_location in false_positives[query.country.lower()]:
+                if false_location in text_to_check:
+                    self.logger.warning(
+                        f"Geografisch falsches Ergebnis gefunden: {false_location} in Ergebnis für {query.country}"
+                    )
+                    return False
+        
+        # Prüfe Region
+        if query.region and query.region.lower() in false_positives:
+            for false_location in false_positives[query.region.lower()]:
+                if false_location in text_to_check:
+                    self.logger.warning(
+                        f"Geografisch falsches Ergebnis gefunden: {false_location} in Ergebnis für {query.region}"
+                    )
+                    return False
+        
+        return True

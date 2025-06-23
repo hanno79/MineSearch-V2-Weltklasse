@@ -17,7 +17,7 @@ from .base_agent import BaseAgent, MineQuery, SearchResult, AgentStatus
 from .rate_limiter import RateLimiter
 from .enhanced_search import get_mining_search_queries, get_mining_domains
 from .search_strategies import SearchStrategies
-from ..core.logger import get_logger, PerformanceLogger
+from src.core.logger import get_logger, PerformanceLogger
 
 
 class TavilyAgent(BaseAgent):
@@ -32,6 +32,11 @@ class TavilyAgent(BaseAgent):
         self.search_builder = SearchStrategies()
         self.perf_logger = PerformanceLogger(self.logger)
         
+    async def _ensure_session(self):
+        """ÄNDERUNG 20.06.2025: Stellt sicher, dass Session verfügbar ist"""
+        if not hasattr(self, '_session') or not self._session or self._session.closed:
+            self._session = aiohttp.ClientSession()
+    
     async def initialize(self) -> bool:
         """Initialisiert den Agenten"""
         try:
@@ -56,6 +61,9 @@ class TavilyAgent(BaseAgent):
             return False
             
         try:
+            # Stelle sicher, dass Session verfügbar ist
+            await self._ensure_session()
+            
             # Test-Suche
             payload = {
                 "api_key": self.api_key,
@@ -146,30 +154,47 @@ class TavilyAgent(BaseAgent):
         # Konvertiere zu Tavily-Format
         queries = {}
         
-        # Gruppiere Queries nach Priorität
-        priority_groups = {
-            'high_priority': [],
-            'medium_priority': [],
-            'low_priority': []
-        }
-        
-        for field, field_queries in specialized_queries.items():
-            if field_queries:
-                # Nimm die erste (höchste Priorität) Query für jedes Feld
-                queries[f'{field}_targeted'] = field_queries[0]
-                
-                # Zusätzliche Queries für wichtige Felder
-                if field in ['betreiber', 'koordinaten', 'sanierungskosten']:
-                    for i, q in enumerate(field_queries[1:3], 1):  # Nimm bis zu 2 weitere
-                        queries[f'{field}_alt{i}'] = q
+        # ÄNDERUNG 21.06.2025: Robustere Behandlung von specialized_queries
+        if specialized_queries is None:
+            self.logger.warning("specialized_queries ist None, verwende leere Liste")
+            specialized_queries = []
+            
+        if isinstance(specialized_queries, list):
+            # Konvertiere Liste von Queries zu Dict
+            for idx, query_item in enumerate(specialized_queries):
+                if isinstance(query_item, dict):
+                    field = query_item.get('field', f'query_{idx}')
+                    query_text = query_item.get('query', '')
+                    priority = query_item.get('priority', 'medium')
+                    
+                    if query_text:
+                        queries[f'{field}_{priority}'] = query_text
+        elif isinstance(specialized_queries, dict):
+            # Altes Format (Dict von Listen)
+            try:
+                for field, field_queries in specialized_queries.items():
+                    if field_queries:
+                        # Nimm die erste (höchste Priorität) Query für jedes Feld
+                        queries[f'{field}_targeted'] = field_queries[0]
+                        
+                        # Zusätzliche Queries für wichtige Felder
+                        if field in ['betreiber', 'koordinaten', 'sanierungskosten']:
+                            for i, q in enumerate(field_queries[1:3], 1):  # Nimm bis zu 2 weitere
+                                queries[f'{field}_alt{i}'] = q
+            except AttributeError as e:
+                self.logger.error(f"AttributeError bei specialized_queries: {e}, Type: {type(specialized_queries)}")
+        else:
+            self.logger.error(f"Unerwarteter Typ für specialized_queries: {type(specialized_queries)}")
+            # Fallback zu leerer Query-Liste
         
         # Füge generelle Queries hinzu
         queries['comprehensive'] = f'"{query.mine_name}" mine {" ".join(query.required_fields)} {query.region} {query.country}'
         
-        # Regierungsspezifische Queries basierend auf Land
-        gov_sites = self.search_builder.gov_sites_by_country.get(query.country, [])
-        if gov_sites:
-            site_filter = " OR ".join([f"site:{site}" for site in gov_sites[:5]])
+        # ÄNDERUNG 21.06.2025: Nutze site_recommendations statt gov_sites_by_country
+        # Hole länderspezifische Seiten über get_site_recommendations
+        if query.country.lower() == 'canada':
+            gov_sites = ['nrcan.gc.ca', 'mern.gouv.qc.ca', 'mining.ca', 'ec.gc.ca']
+            site_filter = " OR ".join([f"site:{site}" for site in gov_sites])
             queries['government'] = f'"{query.mine_name}" ({site_filter})'
         
         return queries
@@ -209,6 +234,9 @@ class TavilyAgent(BaseAgent):
         }
         
         try:
+            # Stelle sicher, dass Session verfügbar ist
+            await self._ensure_session()
+            
             async with self._session.post(
                 self.base_url,
                 json=payload,
@@ -251,6 +279,9 @@ class TavilyAgent(BaseAgent):
         }
         
         try:
+            # Stelle sicher, dass Session verfügbar ist
+            await self._ensure_session()
+            
             async with self._session.post(
                 self.base_url,
                 json=payload,

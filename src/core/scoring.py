@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from collections import defaultdict
 import statistics
 
-from ..agents.base_agent import SearchResult
+from src.agents.base_agent import SearchResult
 from .logger import get_logger
 
 
@@ -19,9 +19,9 @@ class ScoringEngine:
         # NEUE Gewichtungen für Gesamtscore - Konsistenz und Qualität priorisiert
         self.weights = {
             'consistency': 0.35,    # Konsistenz zwischen Quellen
-            'quality': 0.35,        # Quellenqualität  
-            'completeness': 0.2,    # Vollständigkeit
-            'actuality': 0.1        # Aktualität (weniger wichtig für historische Daten)
+            'quality': 0.30,        # Quellenqualität  
+            'completeness': 0.15,    # Vollständigkeit
+            'actuality': 0.20        # Aktualität (wichtiger für neueste Daten)
         }
         
         # Quellenqualität-Scores
@@ -167,6 +167,14 @@ class ScoringEngine:
                 return min(100, result.confidence_score * 120)  # Boost für hohe Konfidenz
             return 70  # Mittlerer Score für Einzelergebnis
         
+        # Zusätzlicher Boost für Werte, die mehrfach gefunden wurden
+        identical_count = sum(1 for r in field_results if str(r.value).lower() == str(result.value).lower())
+        if identical_count > 0:
+            # Je mehr Agenten denselben Wert finden, desto höher die Konsistenz
+            consistency_boost = min(20, identical_count * 5)  # Max 20 Punkte Bonus
+        else:
+            consistency_boost = 0
+        
         # Vergleiche Werte
         if result.field_name in ['betreiber', 'rohstofftyp', 'minentyp']:
             # Kategorische Felder - Fuzzy Matching
@@ -256,6 +264,9 @@ class ScoringEngine:
             # Standard-Konsistenz
             consistency = 75
         
+        # Füge Boost für mehrfach gefundene Werte hinzu
+        consistency = min(100, consistency + consistency_boost)
+        
         return round(consistency, 2)
     
     def _extract_numeric_value(self, value_str: str) -> Optional[float]:
@@ -292,6 +303,7 @@ class ScoringEngine:
         
         # Aggregiere mit Unterstützung für mehrere Werte
         aggregated = {}
+        alternatives: Dict[str, List[Dict[str, Any]]] = {}  # Sammle alternative Werte für jedes Feld
         
         for field_name, scored_results in field_groups.items():
             # Sortiere nach Score
@@ -313,6 +325,7 @@ class ScoringEngine:
                     'agent': best_result.agent_name,
                     'all_values': None  # Keine alternativen Werte
                 }
+                alternatives[field_name] = None  # Keine Alternativen
             else:
                 # Mehrere unterschiedliche Werte gefunden
                 best_group = value_groups[0]
@@ -329,6 +342,9 @@ class ScoringEngine:
                     'agent': best_result.agent_name,
                     'all_values': self._format_all_values(value_groups)
                 }
+                
+                # Sammle alle alternativen Werte
+                alternatives[field_name] = self._format_all_values(value_groups)
         
         # Berechne Gesamt-Metriken
         all_scores = [score for _, scored_results in field_groups.items() 
@@ -418,6 +434,10 @@ class ScoringEngine:
             
             # Berechne Durchschnittsscore für Gruppe
             group['avg_score'] = statistics.mean(group['scores'])
+            
+            # Sortiere innerhalb der Gruppe nach Datum (neueste zuerst)
+            group['results'].sort(key=lambda x: (x[0].source_date or 0, x[1]), reverse=True)
+            
             groups.append(group)
         
         # Sortiere Gruppen nach Durchschnittsscore
@@ -454,13 +474,25 @@ class ScoringEngine:
         return SequenceMatcher(None, str1, str2).ratio()
     
     def _format_all_values(self, value_groups: List[Dict[str, Any]]) -> str:
-        """Formatiert alle gefundenen Werte mit +++ als Trenner"""
+        """Formatiert alle gefundenen Werte mit +++ als Trenner und Häufigkeitsangabe"""
         all_values = []
         
         for group in value_groups:
             # Nimm den repräsentativsten Wert der Gruppe
             best_result = group['results'][0][0]
-            value_str = f"{best_result.value} (Score: {group['avg_score']:.1f}, Quelle: {best_result.source})"
+            count = len(group['results'])
+            
+            if count > 1:
+                # Mehrere Agenten haben diesen Wert gefunden
+                agents = [r[0].agent_name for r in group['results'][:3]]  # Max 3 Agenten anzeigen
+                agents_str = ", ".join(agents)
+                if len(group['results']) > 3:
+                    agents_str += f" +{len(group['results'])-3}"
+                value_str = f"{best_result.value} ({count}x: {agents_str})"
+            else:
+                # Nur ein Agent hat diesen Wert gefunden
+                value_str = f"{best_result.value} ({best_result.agent_name})"
+            
             all_values.append(value_str)
         
         # Verbinde mit +++ als Trenner

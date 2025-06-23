@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 from .base_agent import BaseAgent, MineQuery, SearchResult, AgentStatus
 from .rate_limiter import RateLimiter
 from .enhanced_search import get_mining_search_queries, get_mining_domains
-from ..core.logger import get_logger, PerformanceLogger
+from src.core.logger import get_logger, PerformanceLogger
 
 
 class PerplexityAgent(BaseAgent):
@@ -27,7 +27,7 @@ class PerplexityAgent(BaseAgent):
         super().__init__(name, config)
         self.api_key = config['api_config'].perplexity_key
         self.base_url = "https://api.perplexity.ai/chat/completions"
-        self.model = "pplx-70b-online"  # Online-Modell für aktuelle Daten
+        self.model = "sonar"  # Aktuelles Online-Modell für Web-Suche
         self._rate_limiter = RateLimiter(rate=10, per=60.0)  # 10 Anfragen pro Minute
         self.logger = get_logger(f"agent.{name}", agent_type="perplexity")
         self.perf_logger = PerformanceLogger(self.logger)
@@ -51,6 +51,11 @@ class PerplexityAgent(BaseAgent):
             self.logger.error(f"Fehler bei Initialisierung: {e}")
             return False
     
+    async def _ensure_session(self):
+        """ÄNDERUNG 20.06.2025: Stellt sicher, dass Session verfügbar ist"""
+        if not hasattr(self, '_session') or not self._session or self._session.closed:
+            self._session = aiohttp.ClientSession()
+    
     async def validate_credentials(self) -> bool:
         """Validiert API-Key mit Test-Anfrage"""
         if not self.api_key:
@@ -58,6 +63,9 @@ class PerplexityAgent(BaseAgent):
             return False
             
         try:
+            # Stelle sicher, dass Session verfügbar ist
+            await self._ensure_session()
+            
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
@@ -74,12 +82,21 @@ class PerplexityAgent(BaseAgent):
                 self.base_url,
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=10)
+                timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
-                return response.status == 200
+                if response.status == 200:
+                    self.logger.info("Perplexity API-Key erfolgreich validiert")
+                    return True
+                else:
+                    error_text = await response.text()
+                    self.logger.error(f"Perplexity Validierung fehlgeschlagen ({response.status}): {error_text}")
+                    return False
                 
+        except aiohttp.ClientTimeout:
+            self.logger.error("Perplexity Validierung Timeout - API antwortet nicht rechtzeitig")
+            return False
         except Exception as e:
-            self.logger.error(f"Credential-Validierung fehlgeschlagen: {e}")
+            self.logger.error(f"Perplexity Validierung fehlgeschlagen: {type(e).__name__}: {e}")
             return False
     
     async def search_mine(self, query: MineQuery) -> List[SearchResult]:
@@ -302,6 +319,9 @@ CRITICAL:
         }
         
         try:
+            # Stelle sicher, dass Session verfügbar ist
+            await self._ensure_session()
+            
             async with self._session.post(
                 self.base_url,
                 headers=headers,
@@ -309,8 +329,19 @@ CRITICAL:
                 timeout=aiohttp.ClientTimeout(total=90)  # Extended timeout for deeper searches
             ) as response:
                 if response.status == 200:
-                    data = await response.json()
-                    return data
+                    # ÄNDERUNG 20.06.2025: Sicheres JSON-Parsing
+                    try:
+                        data = await response.json()
+                        # Prüfe ob Response ein Dictionary ist
+                        if isinstance(data, dict):
+                            return data
+                        else:
+                            self.logger.error(f"Unerwartetes Response-Format: {type(data)}")
+                            return None
+                    except json.JSONDecodeError as e:
+                        text = await response.text()
+                        self.logger.error(f"JSON Parse Fehler: {e}, Response: {text[:200]}...")
+                        return None
                 else:
                     error_text = await response.text()
                     self.logger.error(f"API Fehler: {response.status} - {error_text}")
@@ -328,8 +359,22 @@ CRITICAL:
         results = []
         
         try:
+            # ÄNDERUNG 21.06.2025: Robustere Response-Behandlung
+            if not isinstance(response, dict):
+                self.logger.error(f"Response ist kein Dictionary: {type(response)}")
+                return results
+                
             if 'choices' in response and response['choices']:
-                content = response['choices'][0]['message']['content']
+                # ÄNDERUNG 21.06.2025: Robustere Behandlung von message Response
+                message = response['choices'][0].get('message', '')
+                if isinstance(message, str):
+                    content = message
+                elif isinstance(message, dict):
+                    content = message.get('content', '')
+                else:
+                    self.logger.error(f"Unerwarteter message Typ: {type(message)}")
+                    return results
+                    
                 citations = response.get('citations', [])
                 
                 # Extrahiere strukturierte Daten aus dem Text
@@ -337,16 +382,21 @@ CRITICAL:
                 
                 for field_name, value_data in extracted_data.items():
                     if value_data['value'] and value_data['value'] != 'nichts gefunden':
+                        # ÄNDERUNG 20.06.2025: Korrekte Parameter für SearchResult
+                        confidence_mapping = {'high': 0.9, 'medium': 0.7, 'low': 0.5}
+                        confidence_score = confidence_mapping.get(value_data.get('confidence', 'medium'), 0.7)
+                        
                         result = SearchResult(
+                            mine_name=query.mine_name,
                             field_name=field_name,
                             value=value_data['value'],
                             source=value_data.get('source', 'Perplexity Web Search'),
                             source_url=value_data.get('url', ''),
                             source_date=value_data.get('year', datetime.now().year),
-                            confidence=value_data.get('confidence', 'medium'),
+                            confidence_score=confidence_score,
                             agent_name=self.name,
-                            search_language='en',
-                            found_at=datetime.now()
+                            timestamp=datetime.now(),
+                            metadata={'search_type': search_type, 'language': 'en'}
                         )
                         results.append(result)
                         self.logger.info(f"Gefunden: {result.field_name} = {result.value}")
