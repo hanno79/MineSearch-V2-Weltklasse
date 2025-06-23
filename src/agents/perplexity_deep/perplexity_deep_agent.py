@@ -56,7 +56,10 @@ class PerplexityDeepAgent(BaseAgent):
     async def initialize(self) -> bool:
         """Initialisiert den Agenten"""
         try:
-            self._session = aiohttp.ClientSession()
+            # ÄNDERUNG 23.06.2025: Nutze Session Manager
+            from src.core.async_utils import get_session_manager
+            session_manager = get_session_manager()
+            self._session = await session_manager.get_session(f"perplexity_deep_{self.name}")
             self.api_client = PerplexityAPIClient(self.api_key, self._session)
             return await self.validate_credentials()
         except Exception as e:
@@ -69,6 +72,17 @@ class PerplexityDeepAgent(BaseAgent):
             self.logger.warning("Kein Perplexity API-Key konfiguriert")
             return False
         return True
+    
+    async def cleanup(self):
+        """Räumt Ressourcen auf"""
+        # ÄNDERUNG 23.06.2025: Nutze Session Manager für Cleanup
+        from src.core.async_utils import get_session_manager
+        session_manager = get_session_manager()
+        await session_manager.close_session(f"perplexity_deep_{self.name}")
+    
+    async def search(self, query: MineQuery) -> List[SearchResult]:
+        """Alias für search_mine - für Kompatibilität mit Source Discovery"""
+        return await self.search_mine(query)
     
     async def search_mine(self, query: MineQuery) -> List[SearchResult]:
         """

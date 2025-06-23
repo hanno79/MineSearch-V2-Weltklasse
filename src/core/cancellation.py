@@ -57,12 +57,20 @@ class CancellationToken:
             
             # Setze asyncio Event für async Waits
             try:
+                # ÄNDERUNG 23.06.2025: Verwende get_running_loop statt get_event_loop
                 # Event könnte in anderem Thread sein
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 loop.call_soon_threadsafe(self._event.set)
             except RuntimeError:
-                # Kein Event Loop im aktuellen Thread
-                pass
+                # Kein Event Loop im aktuellen Thread - versuche Event Loop Manager
+                try:
+                    from .event_loop_manager import get_event_loop_manager
+                    manager = get_event_loop_manager()
+                    if manager.is_running():
+                        manager.get_loop().call_soon_threadsafe(self._event.set)
+                except:
+                    # Event Loop Manager nicht verfügbar
+                    pass
             
             # Führe Callbacks aus
             for callback in self._callbacks:

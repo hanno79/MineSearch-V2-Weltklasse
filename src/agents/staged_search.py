@@ -314,3 +314,82 @@ class StagedSearchStrategy:
             max_agents=self.max_agents_per_stage,
             timeout=300
         ))
+    
+    async def execute_staged_search(self, query, agents, discovered_sources=None, cancellation_token=None):
+        """
+        Führt die gestaffelte Suche aus
+        
+        Args:
+            query: MineQuery Objekt
+            agents: Liste verfügbarer Agenten
+            discovered_sources: Optional bereits entdeckte Quellen
+            cancellation_token: Optional für Abbruch
+            
+        Returns:
+            Liste von SearchResults
+        """
+        from src.core.logger import get_logger
+        logger = get_logger("staged_search")
+        
+        all_results = []
+        results_by_field = {}
+        
+        # Bestimme benötigte Stages basierend auf required_fields
+        needed_stages = self.get_stages_for_fields(query.required_fields)
+        
+        logger.info(f"Führe Staged Search aus mit {len(needed_stages)} Phasen")
+        
+        for stage in needed_stages:
+            if cancellation_token and cancellation_token.is_cancelled():
+                logger.info("Suche wurde abgebrochen")
+                break
+                
+            stage_info = self.get_stage_info(stage)
+            logger.info(f"🔍 PHASE {stage.value}: {stage_info.name}")
+            
+            # Wähle Agenten für diese Phase
+            stage_agents = self.get_best_agents_for_stage(stage, [a.name for a in agents])
+            selected_agents = [a for a in agents if a.name in stage_agents]
+            
+            if not selected_agents:
+                logger.warning(f"Keine Agenten für Phase {stage_info.name} verfügbar")
+                continue
+            
+            # Führe Suche mit ausgewählten Agenten aus
+            import asyncio
+            search_tasks = []
+            
+            for agent in selected_agents:
+                if hasattr(agent, 'search_mine'):
+                    search_tasks.append(agent.search_mine(query))
+            
+            if search_tasks:
+                try:
+                    # Führe alle Suchen parallel aus mit Timeout
+                    stage_results = await asyncio.wait_for(
+                        asyncio.gather(*search_tasks, return_exceptions=True),
+                        timeout=stage_info.timeout
+                    )
+                    
+                    # Verarbeite Ergebnisse
+                    for result in stage_results:
+                        if isinstance(result, list):
+                            all_results.extend(result)
+                            # Tracke gefundene Felder
+                            for r in result:
+                                if hasattr(r, 'data') and r.data:
+                                    for field in r.data.keys():
+                                        results_by_field[field] = results_by_field.get(field, 0) + 1
+                        elif isinstance(result, Exception):
+                            logger.error(f"Fehler bei Agent: {result}")
+                            
+                except asyncio.TimeoutError:
+                    logger.warning(f"Timeout in Phase {stage_info.name}")
+            
+            # Prüfe ob wir zur nächsten Phase gehen sollen
+            if not self.should_continue_to_next_stage(stage, results_by_field, query.required_fields):
+                logger.info(f"Genügend Daten gefunden, beende Suche nach Phase {stage_info.name}")
+                break
+        
+        logger.info(f"Staged Search abgeschlossen mit {len(all_results)} Ergebnissen")
+        return all_results

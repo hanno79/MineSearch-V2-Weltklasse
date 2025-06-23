@@ -37,6 +37,20 @@ class PremiumMiningResearch(BaseAgent):
         # Logger
         self.logger = get_logger(f"agent.{name}", agent_type="premium_research")
     
+    async def initialize(self) -> bool:
+        """Initialisiert den Agent"""
+        # Premium Research hat keine speziellen Initialisierungsanforderungen
+        return True
+    
+    async def validate_credentials(self) -> bool:
+        """Validiert Credentials - Premium Research nutzt andere Agenten"""
+        # Prüfe ob mindestens ein Agent verfügbar ist
+        return len(self.agents) > 0
+    
+    async def search_mine(self, query: MineQuery) -> List[SearchResult]:
+        """Alias für search - für Kompatibilität"""
+        return await self.search(query)
+    
     async def search(self, query: MineQuery) -> List[SearchResult]:
         """Führt Premium-Recherche durch"""
         results = await self.research_mine(query)

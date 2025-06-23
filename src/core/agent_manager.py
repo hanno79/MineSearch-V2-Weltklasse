@@ -10,6 +10,7 @@ from datetime import datetime
 
 from src.agents.base_agent import BaseAgent, AgentStatus
 from src.agents.factory import AgentFactory
+from src.agents.openrouter.models import ModelRegistry
 from .config import Config
 from .logger import get_logger
 
@@ -102,7 +103,7 @@ class AgentManager:
         model_id = None
         
         # Search in both FREE_MODELS and PREMIUM_MODELS
-        all_models = {**OpenRouterAgent.FREE_MODELS, **OpenRouterAgent.PREMIUM_MODELS}
+        all_models = {**ModelRegistry.get_free_models(), **ModelRegistry.get_premium_models()}
         for mid, model in all_models.items():
             model_key = mid.split('/')[-1].split(':')[0]
             if model_key == model_suffix:

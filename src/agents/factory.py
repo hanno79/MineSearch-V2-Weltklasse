@@ -13,11 +13,12 @@ from src.agents.scraper_agent import ScraperAgent
 from src.agents.tavily_agent import TavilyAgent
 from src.agents.exa_agent import ExaAgent
 from src.agents.apify_agent import ApifyAgent
-from src.agents.scrapingbee_agent import ScrapingBeeAgent
+from src.agents.scrapingbee import ScrapingBeeAgent
 from src.agents.firecrawl_agent import FirecrawlAgent
 from src.agents.brightdata_agent import BrightDataAgent
 from src.agents.openrouter_agent import OpenRouterAgent
-from src.agents.deepseek_research_agent import DeepSeekResearchAgent
+from src.agents.openrouter.models import ModelRegistry
+from src.agents.deepseek_research import DeepSeekResearchAgent
 from src.agents.perplexity_deep_agent import PerplexityDeepAgent
 from src.agents.deep_web_crawler_agent import DeepWebCrawlerAgent
 from src.agents.browser_agent import BrowserAgent
@@ -66,7 +67,7 @@ class AgentFactory:
                 model_suffix = agent_type.replace("openrouter_", "")
                 
                 # Suche passende model_id
-                all_models = {**OpenRouterAgent.FREE_MODELS, **OpenRouterAgent.PREMIUM_MODELS}
+                all_models = {**ModelRegistry.get_free_models(), **ModelRegistry.get_premium_models()}
                 for mid, model in all_models.items():
                     # Handle models with :free suffix
                     model_key = mid.split('/')[-1].split(':')[0]
@@ -188,9 +189,8 @@ class AgentFactory:
         
         # OpenRouter models
         if config.api.openrouter_key:
-            from src.agents.openrouter_agent import OpenRouterAgent
             # Include both free and premium models
-            all_models = {**OpenRouterAgent.FREE_MODELS, **OpenRouterAgent.PREMIUM_MODELS}
+            all_models = {**ModelRegistry.get_free_models(), **ModelRegistry.get_premium_models()}
             for model_id in all_models:
                 # Handle models with :free suffix
                 model_key = f"openrouter_{model_id.split('/')[-1].split(':')[0]}"

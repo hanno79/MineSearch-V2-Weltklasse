@@ -53,6 +53,13 @@ class ScrapingBeeAgent(BaseAgent):
             self.logger.error(f"Fehler bei Initialisierung: {e}")
             return False
     
+    async def validate_credentials(self) -> bool:
+        """Validiert API-Key"""
+        if not self.api_key:
+            self.logger.warning("Kein ScrapingBee API-Key konfiguriert")
+            return False
+        return await self.api_client.validate_credentials()
+    
     async def search_mine(self, query: MineQuery) -> List[SearchResult]:
         """Führt Web Scraping mit ScrapingBee durch"""
         results = []

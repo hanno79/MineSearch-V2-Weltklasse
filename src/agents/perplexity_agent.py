@@ -35,8 +35,10 @@ class PerplexityAgent(BaseAgent):
     async def initialize(self) -> bool:
         """Initialisiert den Agenten"""
         try:
-            # Erstelle Session
-            self._session = aiohttp.ClientSession()
+            # ÄNDERUNG 23.06.2025: Nutze Session Manager
+            from src.core.async_utils import get_session_manager
+            session_manager = get_session_manager()
+            self._session = await session_manager.get_session(f"perplexity_{self.name}")
             
             # Validiere Credentials
             is_valid = await self.validate_credentials()
@@ -51,10 +53,28 @@ class PerplexityAgent(BaseAgent):
             self.logger.error(f"Fehler bei Initialisierung: {e}")
             return False
     
+    async def cleanup(self):
+        """Räumt Ressourcen auf"""
+        # ÄNDERUNG 23.06.2025: Sicheres Session-Cleanup
+        if hasattr(self, '_session') and self._session:
+            try:
+                if not self._session.closed:
+                    await self._session.close()
+            except Exception as e:
+                self.logger.warning(f"Fehler beim Schließen der Session: {e}")
+            finally:
+                self._session = None
+    
     async def _ensure_session(self):
         """ÄNDERUNG 20.06.2025: Stellt sicher, dass Session verfügbar ist"""
         if not hasattr(self, '_session') or not self._session or self._session.closed:
-            self._session = aiohttp.ClientSession()
+            # ÄNDERUNG 23.06.2025: Erstelle Session im aktuellen Event Loop
+            try:
+                loop = asyncio.get_running_loop()
+                self._session = aiohttp.ClientSession(loop=loop)
+            except RuntimeError:
+                # Kein laufender Event Loop - erstelle Session ohne expliziten Loop
+                self._session = aiohttp.ClientSession()
     
     async def validate_credentials(self) -> bool:
         """Validiert API-Key mit Test-Anfrage"""
@@ -98,6 +118,10 @@ class PerplexityAgent(BaseAgent):
         except Exception as e:
             self.logger.error(f"Perplexity Validierung fehlgeschlagen: {type(e).__name__}: {e}")
             return False
+    
+    async def search(self, query: MineQuery) -> List[SearchResult]:
+        """Alias für search_mine - für Kompatibilität mit Source Discovery"""
+        return await self.search_mine(query)
     
     async def search_mine(self, query: MineQuery) -> List[SearchResult]:
         """Führt Suche mit Perplexity durch"""
@@ -341,6 +365,9 @@ CRITICAL:
                     except json.JSONDecodeError as e:
                         text = await response.text()
                         self.logger.error(f"JSON Parse Fehler: {e}, Response: {text[:200]}...")
+                        # ÄNDERUNG 23.06.2025: Behandle String-Responses
+                        if text:
+                            return {"choices": [{"message": {"content": text}}], "type": "text_response"}
                         return None
                 else:
                     error_text = await response.text()
@@ -359,13 +386,27 @@ CRITICAL:
         results = []
         
         try:
+            # ÄNDERUNG 23.06.2025: Erweiterte Response-Behandlung für String-Responses
+            if isinstance(response, str):
+                # Wenn Response ein String ist, konvertiere zu Dict-Format
+                self.logger.warning(f"Response ist ein String, konvertiere zu Dict-Format")
+                response = {
+                    "choices": [{"message": {"content": response}}],
+                    "type": "text_response"
+                }
+            
             # ÄNDERUNG 21.06.2025: Robustere Response-Behandlung
             if not isinstance(response, dict):
                 self.logger.error(f"Response ist kein Dictionary: {type(response)}")
                 return results
                 
-            if 'choices' in response and response['choices']:
-                # ÄNDERUNG 21.06.2025: Robustere Behandlung von message Response
+            # ÄNDERUNG 23.06.2025: Behandle verschiedene Response-Typen
+            if response.get('type') == 'text_response':
+                # Direkte Text-Response
+                content = response.get('choices', [{}])[0].get('message', {}).get('content', '')
+                citations = []
+            elif 'choices' in response and response['choices']:
+                # Standard API Response
                 message = response['choices'][0].get('message', '')
                 if isinstance(message, str):
                     content = message
@@ -402,7 +443,13 @@ CRITICAL:
                         self.logger.info(f"Gefunden: {result.field_name} = {result.value}")
                         
         except Exception as e:
+            # ÄNDERUNG 23.06.2025: Erweiterte Fehlerdiagnose
             self.logger.error(f"Response Parse Fehler: {e}")
+            self.logger.error(f"Response Type: {type(response)}")
+            if isinstance(response, str):
+                self.logger.error(f"Response String: {response[:200]}...")
+            import traceback
+            self.logger.error(f"Stack Trace:\n{traceback.format_exc()}")
             
         return results
     
@@ -486,8 +533,14 @@ CRITICAL:
         
         return extracted
     
+    async def search(self, query: MineQuery) -> List[SearchResult]:
+        """Alias für search_mine - für Kompatibilität mit Source Discovery"""
+        return await self.search_mine(query)
+    
     async def cleanup(self):
         """Räumt Ressourcen auf"""
-        if hasattr(self, '_session') and self._session:
-            await self._session.close()
+        # ÄNDERUNG 23.06.2025: Nutze Session Manager für Cleanup
+        from src.core.async_utils import get_session_manager
+        session_manager = get_session_manager()
+        await session_manager.close_session(f"perplexity_{self.name}")
         self.logger.info("Perplexity Agent beendet")

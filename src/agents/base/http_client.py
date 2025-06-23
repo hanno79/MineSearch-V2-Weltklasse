@@ -50,16 +50,32 @@ class BaseHTTPClient:
     async def start(self):
         """Startet die HTTP Session"""
         if not self._session:
-            self._session = aiohttp.ClientSession(
-                timeout=self.timeout,
-                headers=self.default_headers
-            )
+            # ÄNDERUNG 23.06.2025: Stelle sicher, dass Session im aktuellen Event Loop erstellt wird
+            try:
+                loop = asyncio.get_running_loop()
+                self._session = aiohttp.ClientSession(
+                    timeout=self.timeout,
+                    headers=self.default_headers,
+                    loop=loop
+                )
+            except RuntimeError:
+                # Kein laufender Event Loop - erstelle Session ohne expliziten Loop
+                self._session = aiohttp.ClientSession(
+                    timeout=self.timeout,
+                    headers=self.default_headers
+                )
     
     async def close(self):
         """Schließt die HTTP Session"""
         if self._session:
-            await self._session.close()
-            self._session = None
+            # ÄNDERUNG 23.06.2025: Prüfe ob Session noch gültig ist bevor Schließen
+            try:
+                if not self._session.closed:
+                    await self._session.close()
+            except Exception as e:
+                logger.warning(f"Fehler beim Schließen der Session: {e}")
+            finally:
+                self._session = None
     
     async def _apply_rate_limit(self):
         """Wendet Rate Limiting an"""
@@ -86,7 +102,8 @@ class BaseHTTPClient:
         Returns:
             Response als Dict, String oder Bytes
         """
-        if not self._session:
+        # ÄNDERUNG 23.06.2025: Prüfe ob Session gültig ist
+        if not self._session or self._session.closed:
             await self.start()
         
         # Rate Limiting anwenden

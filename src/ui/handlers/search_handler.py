@@ -48,7 +48,7 @@ class SearchHandler:
         start_time = datetime.now()
         
         for idx, mine_data in enumerate(mines_to_search):
-            if cancellation_token and cancellation_token.is_cancelled:
+            if cancellation_token and cancellation_token.is_cancelled():
                 self.logger.info("Search cancelled by user")
                 break
             

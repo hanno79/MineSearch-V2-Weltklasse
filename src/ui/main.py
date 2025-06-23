@@ -1,13 +1,18 @@
 """
 Author: rahn
-Datum: 22.06.2025
-Version: 2.0
+Datum: 23.06.2025
+Version: 2.1
 Beschreibung: Refactored MineSearch Streamlit UI - Hauptdatei
+ÄNDERUNG 23.06.2025: nest_asyncio für Event Loop Kompatibilität
 """
 import streamlit as st
 import sys
 import os
 from datetime import datetime
+import nest_asyncio
+
+# ÄNDERUNG 23.06.2025: Aktiviere nested event loops für Streamlit
+nest_asyncio.apply()
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

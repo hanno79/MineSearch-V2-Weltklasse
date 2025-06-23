@@ -18,6 +18,7 @@ from .rate_limiter import RateLimiter
 from .enhanced_search import get_mining_search_queries, get_mining_domains
 from .search_strategies import SearchStrategies
 from src.core.logger import get_logger, PerformanceLogger
+from src.utils.retry_utils import async_retry
 
 
 class TavilyAgent(BaseAgent):
@@ -33,14 +34,16 @@ class TavilyAgent(BaseAgent):
         self.perf_logger = PerformanceLogger(self.logger)
         
     async def _ensure_session(self):
-        """ÄNDERUNG 20.06.2025: Stellt sicher, dass Session verfügbar ist"""
-        if not hasattr(self, '_session') or not self._session or self._session.closed:
-            self._session = aiohttp.ClientSession()
+        """ÄNDERUNG 23.06.2025: Nutzt globalen Session Manager"""
+        from src.core.async_utils import get_session_manager
+        session_manager = get_session_manager()
+        self._session = await session_manager.get_session(f"tavily_{self.name}")
     
     async def initialize(self) -> bool:
         """Initialisiert den Agenten"""
         try:
-            self._session = aiohttp.ClientSession()
+            # ÄNDERUNG 23.06.2025: Nutze Session Manager
+            await self._ensure_session()
             
             is_valid = await self.validate_credentials()
             if not is_valid:
@@ -53,6 +56,11 @@ class TavilyAgent(BaseAgent):
         except Exception as e:
             self.logger.error(f"Fehler bei Initialisierung: {e}")
             return False
+    
+    async def cleanup(self):
+        """Räumt Ressourcen auf"""
+        if hasattr(self, '_session') and self._session:
+            await self._session.close()
     
     async def validate_credentials(self) -> bool:
         """Validiert API-Key mit Test-Anfrage"""
@@ -81,6 +89,10 @@ class TavilyAgent(BaseAgent):
         except Exception as e:
             self.logger.error(f"Credential-Validierung fehlgeschlagen: {e}")
             return False
+    
+    async def search(self, query: MineQuery) -> List[SearchResult]:
+        """Alias für search_mine - für Kompatibilität mit Source Discovery"""
+        return await self.search_mine(query)
     
     async def search_mine(self, query: MineQuery) -> List[SearchResult]:
         """Führt Suche mit Tavily durch"""
@@ -219,6 +231,27 @@ class TavilyAgent(BaseAgent):
         mining_domains = get_mining_domains()
         all_domains = list(set(recommended_sites + mining_domains))[:25]
         
+        # ÄNDERUNG 23.06.2025: Geografische Filter aus Query extrahieren
+        exclude_domains = [
+            "wikipedia.org",  # Oft unzuverlässig für aktuelle Daten
+            "facebook.com", "twitter.com", "instagram.com",  # Social Media
+            "pinterest.com", "tumblr.com"
+        ]
+        
+        # Füge geografische Exclusions hinzu basierend auf Land
+        if mine_query and mine_query.country:
+            if mine_query.country.lower() in ["canada", "kanada"]:
+                exclude_domains.extend([
+                    "miningreview.com",
+                    "africanminingmarket.com",
+                    "mining-africa.com"
+                ])
+            elif mine_query.country.lower() in ["australia", "australien"]:
+                exclude_domains.extend([
+                    "africanminingmarket.com",
+                    "mining-africa.com"
+                ])
+        
         payload = {
             "api_key": self.api_key,
             "query": query,
@@ -226,11 +259,7 @@ class TavilyAgent(BaseAgent):
             "max_results": 15,  # More results for comprehensive search
             "include_answer": True,
             "include_domains": all_domains,  # Feldspezifische + Mining Domains
-            "exclude_domains": [
-                "wikipedia.org",  # Oft unzuverlässig für aktuelle Daten
-                "facebook.com", "twitter.com", "instagram.com",  # Social Media
-                "pinterest.com", "tumblr.com"
-            ]
+            "exclude_domains": exclude_domains
         }
         
         try:
@@ -254,7 +283,21 @@ class TavilyAgent(BaseAgent):
             self.logger.error("API Anfrage Timeout")
             return None
         except Exception as e:
+            # ÄNDERUNG 23.06.2025: Erweiterte Fehlerdiagnose
+            import traceback
             self.logger.error(f"API Anfrage Fehler: {e}")
+            self.logger.error(f"Fehler-Typ: {type(e).__name__}")
+            self.logger.error(f"Stack Trace:\n{traceback.format_exc()}")
+            
+            # Prüfe Event Loop Status
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                self.logger.error(f"Event Loop läuft: {loop.is_running()}")
+                self.logger.error(f"Event Loop geschlossen: {loop.is_closed()}")
+            except:
+                self.logger.error("Konnte Event Loop Status nicht prüfen")
+                
             return None
     
     async def _make_api_call(self, query: str) -> Optional[Dict[str, Any]]:
@@ -299,7 +342,21 @@ class TavilyAgent(BaseAgent):
             self.logger.error("API Anfrage Timeout")
             return None
         except Exception as e:
+            # ÄNDERUNG 23.06.2025: Erweiterte Fehlerdiagnose
+            import traceback
             self.logger.error(f"API Anfrage Fehler: {e}")
+            self.logger.error(f"Fehler-Typ: {type(e).__name__}")
+            self.logger.error(f"Stack Trace:\n{traceback.format_exc()}")
+            
+            # Prüfe Event Loop Status
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                self.logger.error(f"Event Loop läuft: {loop.is_running()}")
+                self.logger.error(f"Event Loop geschlossen: {loop.is_closed()}")
+            except:
+                self.logger.error("Konnte Event Loop Status nicht prüfen")
+                
             return None
     
     def _parse_response(self, response: Dict[str, Any], query: MineQuery, search_type: str) -> List[SearchResult]:
@@ -403,8 +460,14 @@ class TavilyAgent(BaseAgent):
         
         return results
     
+    async def search(self, query: MineQuery) -> List[SearchResult]:
+        """Alias für search_mine - für Kompatibilität mit Source Discovery"""
+        return await self.search_mine(query)
+    
     async def cleanup(self):
         """Räumt Ressourcen auf"""
-        if hasattr(self, '_session') and self._session:
-            await self._session.close()
+        # ÄNDERUNG 23.06.2025: Nutze Session Manager für Cleanup
+        from src.core.async_utils import get_session_manager
+        session_manager = get_session_manager()
+        await session_manager.close_session(f"tavily_{self.name}")
         self.logger.info("Tavily Agent beendet")

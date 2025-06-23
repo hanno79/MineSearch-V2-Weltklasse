@@ -199,6 +199,12 @@ class MineSearchOrchestratorV2:
     async def cleanup(self):
         """Räumt alle Ressourcen auf"""
         self._report_status("🧹 Räume Orchestrator auf...")
+        
+        # ÄNDERUNG 23.06.2025: Schließe alle Sessions vor dem Cleanup
+        from .async_utils import get_session_manager
+        session_manager = get_session_manager()
+        await session_manager.close_all()
+        
         await self.agent_manager.cleanup_agents()
         self._initialized = False
         self._report_status("✅ Orchestrator aufgeräumt")
@@ -208,7 +214,11 @@ class MineSearchOrchestratorV2:
         try:
             from src.agents.staged_search import StagedSearchStrategy
             return StagedSearchStrategy(self.config)
-        except:
+        except Exception as e:
+            # ÄNDERUNG 23.06.2025: Bessere Fehlerbehandlung für Debugging
+            self.logger.error(f"Fehler beim Erstellen der StagedSearchStrategy: {e}")
+            import traceback
+            self.logger.error(f"Stack Trace:\n{traceback.format_exc()}")
             return None
     
     def _get_research_orchestrator(self):
@@ -253,6 +263,25 @@ class MineSearchOrchestratorV2:
     def _determine_source_type(self, url: str, field_name: str = "") -> str:
         """Kompatibilität: Delegiert an SourceDiscoveryService"""
         return self.source_discovery._determine_source_type(url)
+    
+    async def cleanup(self):
+        """ÄNDERUNG 23.06.2025: Cleanup-Methode für sauberes Aufräumen"""
+        self.logger.info("Räume Orchestrator-Ressourcen auf...")
+        
+        # Räume alle Agenten auf
+        cleanup_tasks = []
+        for agent_name, agent in self.agents.items():
+            if hasattr(agent, 'cleanup'):
+                cleanup_tasks.append(agent.cleanup())
+        
+        if cleanup_tasks:
+            # Führe alle Cleanups parallel aus
+            results = await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+            for agent_name, result in zip(self.agents.keys(), results):
+                if isinstance(result, Exception):
+                    self.logger.warning(f"Cleanup-Fehler bei {agent_name}: {result}")
+        
+        self.logger.info("Orchestrator-Cleanup abgeschlossen")
 
 
 # Kompatibilitäts-Klasse

@@ -6,7 +6,7 @@ Beschreibung: Enhanced search module für Mining-Informationen
 """
 
 # Hauptexport der Query-Generierung
-from .query_generator import get_mining_search_queries
+from .query_generator import get_mining_search_queries, _get_geographic_exclusions
 
 # Domain-Verwaltung
 from .domain_manager import (
@@ -33,5 +33,6 @@ __all__ = [
     'get_document_search_patterns',
     'get_multilingual_queries',
     'create_geographic_constraints',
-    '_create_geographic_constraints'  # Für Rückwärtskompatibilität
+    '_create_geographic_constraints',  # Für Rückwärtskompatibilität
+    '_get_geographic_exclusions'
 ]

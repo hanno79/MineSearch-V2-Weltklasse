@@ -19,12 +19,12 @@ class PerplexityAPIClient:
         self.base_url = "https://api.perplexity.ai"
         self.logger = get_logger(__name__)
         
-        # Modelle für verschiedene Aufgaben
+        # ÄNDERUNG 23.06.2025: Verwende gültige Perplexity Modelle
         self.models = {
-            "deep_research": "pplx-deep-research",  # Hypothetisches Deep Research Modell
-            "reasoning": "pplx-reasoning",  # Reasoning Modell
-            "online": "pplx-70b-online",  # Standard Online Modell
-            "sonar": "sonar-small-32k-online"  # Sonar für schnelle Suchen
+            "deep_research": "sonar-medium-online",  # Verwende sonar-medium als Deep Research
+            "reasoning": "sonar-medium-online",  # Reasoning Modell
+            "online": "sonar-small-online",  # Standard Online Modell  
+            "sonar": "sonar-small-online"  # Sonar für schnelle Suchen
         }
     
     async def deep_research_search(self, message: str, system_prompt: str,

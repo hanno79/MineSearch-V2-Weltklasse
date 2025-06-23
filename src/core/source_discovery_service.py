@@ -109,7 +109,7 @@ class SourceDiscoveryService:
         agent_sources = []
         
         for agent in agents:
-            if cancellation_token and cancellation_token.is_cancelled:
+            if cancellation_token and cancellation_token.is_cancelled():
                 break
             
             try:
@@ -125,7 +125,8 @@ class SourceDiscoveryService:
                     required_fields=["official_website", "government_portal", "news_source"]
                 )
                 
-                results = await agent.search(source_query)
+                # ÄNDERUNG 23.06.2025: Fix - Verwende search_mine statt search
+                results = await agent.search_mine(source_query)
                 
                 # Extrahiere URLs aus Ergebnissen
                 for result in results:

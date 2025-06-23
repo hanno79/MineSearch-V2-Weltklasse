@@ -76,6 +76,37 @@ class DynamicSourceDiscovery:
         
         return prioritized
     
+    async def discover_sources(self, query, agents=None, status_callback=None, cancellation_token=None):
+        """
+        Wrapper-Methode für Kompatibilität mit SourceDiscoveryService
+        
+        Args:
+            query: MineQuery Objekt
+            agents: Liste verfügbarer Agenten
+            status_callback: Optional Callback für Status
+            cancellation_token: Optional für Abbruch
+            
+        Returns:
+            Liste von entdeckten Quellen
+        """
+        # Update agents if provided
+        if agents:
+            self.agents = {agent.name: agent for agent in agents}
+        
+        # Extract parameters from query
+        country = query.country if hasattr(query, 'country') else ""
+        region = query.region if hasattr(query, 'region') else ""
+        mine_name = query.mine_name if hasattr(query, 'mine_name') else ""
+        languages = query.languages if hasattr(query, 'languages') else ["en"]
+        
+        # Call the existing method
+        return await self.discover_sources_for_country(
+            country=country,
+            region=region,
+            mine_name=mine_name,
+            languages=languages
+        )
+    
     def _select_search_agent(self):
         """Wählt den besten verfügbaren Such-Agent"""
         for agent_name in ['tavily', 'perplexity', 'exa']:

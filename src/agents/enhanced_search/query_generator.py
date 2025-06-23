@@ -26,19 +26,22 @@ def get_mining_search_queries(mine_name: str, region: str = "", country: str = "
     
     queries = []
     
-    # ÄNDERUNG 19.06.2025: Erstelle geografische Einschränkungen für alle Queries
+    # ÄNDERUNG 23.06.2025: Verstärkte geografische Einschränkungen
     geo_constraints = create_geographic_constraints(region, country)
     geo_context = f'"{region}" "{country}"' if region and country else ''
     
+    # Geografische Ausschlüsse für bessere Ergebnisse
+    exclusions = _get_geographic_exclusions(country)
+    
     # 1. BASIC QUERIES - For each name variant mit geografischen Einschränkungen
     for name in name_variants[:3]:  # Use top 3 variants
-        # English queries mit geografischen Einschränkungen
+        # English queries mit geografischen Einschränkungen und Ausschlüssen
         queries.extend([
-            f'"{name}" mine operator owner company {geo_context} {geo_constraints}',
-            f'"{name}" mining coordinates location GPS {geo_context} {geo_constraints}',
-            f'"{name}" commodity mineral resource production {geo_context} {geo_constraints}',
-            f'"{name}" status operational closure {geo_context} {geo_constraints}',
-            f'"{name}" remediation costs environmental {geo_context} {geo_constraints}',
+            f'"{name}" mine operator owner company {geo_context} {geo_constraints} {exclusions}',
+            f'"{name}" mining coordinates location GPS {geo_context} {geo_constraints} {exclusions}',
+            f'"{name}" commodity mineral resource production {geo_context} {geo_constraints} {exclusions}',
+            f'"{name}" status operational closure {geo_context} {geo_constraints} {exclusions}',
+            f'"{name}" remediation costs environmental {geo_context} {geo_constraints} {exclusions}',
         ])
     
     # 2. MULTILINGUAL QUERIES
@@ -145,3 +148,26 @@ def get_mining_search_queries(mine_name: str, region: str = "", country: str = "
             unique_queries.append(q)
     
     return unique_queries
+
+
+def _get_geographic_exclusions(country: str) -> str:
+    """
+    ÄNDERUNG 23.06.2025: Erstellt geografische Ausschlüsse basierend auf Land
+    um falsche Ergebnisse zu vermeiden (z.B. Africa für kanadische Minen)
+    """
+    exclusions = ""
+    
+    # Länder-spezifische Ausschlüsse
+    if country.lower() in ["canada", "kanada"]:
+        exclusions = '-Africa -"South Africa" -"West Africa" -"East Africa" -Zimbabwe -Ghana -Tanzania -"Mining Review Africa"'
+    elif country.lower() in ["australia", "australien"]:
+        exclusions = '-Africa -"South America" -Canada -USA -"United States"'
+    elif country.lower() in ["usa", "united states", "amerika"]:
+        exclusions = '-Africa -Australia -"South America" -Canada'
+    elif country.lower() in ["chile", "peru", "brazil", "argentina"]:
+        exclusions = '-Africa -Australia -Canada -USA -"United States" -Europe'
+    
+    # Allgemeine Ausschlüsse für alle Länder
+    general_exclusions = '-"job posting" -"job opening" -"career opportunity" -recruitment'
+    
+    return f"{exclusions} {general_exclusions}"

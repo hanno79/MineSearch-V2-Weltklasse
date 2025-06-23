@@ -12,7 +12,7 @@ from typing import List, Dict, Any, Optional
 from ..base_agent import BaseAgent, MineQuery, SearchResult, AgentStatus
 from ..rate_limiter import RateLimiter
 from ..enhanced_search import get_mining_search_queries, get_mining_domains, get_country_specific_domains
-from src.core.logger import get_logger
+from src.core.logger import get_logger, PerformanceLogger
 from .models import DeepSeekModel, ModelConfig, ResearchContext, ResearchStep
 from .research_processor import ResearchProcessor
 
@@ -103,6 +103,10 @@ class DeepSeekResearchAgent(BaseAgent):
         except Exception as e:
             self.logger.error(f"Credential validation failed: {e}")
             return False
+    
+    async def search_mine(self, query: MineQuery) -> List[SearchResult]:
+        """Alias für search - für Kompatibilität"""
+        return await self.search(query)
     
     async def search(self, query: MineQuery) -> List[SearchResult]:
         """Execute advanced research for mining data"""

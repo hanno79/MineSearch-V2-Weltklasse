@@ -177,14 +177,174 @@ class SidebarComponent:
                 if mine_data['mine_name'] and pd.notna(mine_data['mine_name']):
                     mines_data.append(mine_data)
             
-            # Show preview
+            # Show preview and selection
             if mines_data:
                 st.success(f"✅ Loaded {len(mines_data)} mines from CSV")
-                with st.expander("Preview loaded mines"):
-                    for mine in mines_data[:5]:
-                        st.write(f"• {mine['mine_name']} - {mine['region']}, {mine['country']}")
-                    if len(mines_data) > 5:
-                        st.write(f"... and {len(mines_data) - 5} more")
+                
+                # Mine Selection
+                st.markdown("### Select Mines to Search")
+                
+                # Initialize session states for two-way sync
+                if 'all_selected_mine_indices' not in st.session_state:
+                    # All selected mines (persistent)
+                    # ÄNDERUNG 23.06.2025: Standard auf 5 Minen reduziert
+                    st.session_state['all_selected_mine_indices'] = list(range(min(5, len(mines_data))))
+                
+                if 'active_mine_indices' not in st.session_state:
+                    # Active mines for search (limited by max_mines)
+                    # ÄNDERUNG 23.06.2025: Standard auf 5 Minen
+                    st.session_state['active_mine_indices'] = st.session_state['all_selected_mine_indices'][:5]
+                
+                # Select All / Deselect All buttons
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if st.button("✅ Select All", use_container_width=True):
+                        st.session_state['all_selected_mine_indices'] = list(range(len(mines_data)))
+                        st.session_state['active_mine_indices'] = list(range(min(st.session_state.get('max_mines_limit', 20), len(mines_data))))
+                with col2:
+                    if st.button("❌ Deselect All", use_container_width=True):
+                        st.session_state['all_selected_mine_indices'] = []
+                        st.session_state['active_mine_indices'] = []
+                with col3:
+                    if st.button("🔄 Activate All", use_container_width=True):
+                        # Activate all selected mines and adjust max_mines
+                        num_selected = len(st.session_state['all_selected_mine_indices'])
+                        if num_selected > 0:
+                            st.session_state['max_mines_limit'] = num_selected
+                            st.session_state['active_mine_indices'] = st.session_state['all_selected_mine_indices'].copy()
+                            st.info(f"✅ Activated all {num_selected} selected mines")
+                
+                # Max selection limit with callback
+                def on_max_mines_change():
+                    new_max = st.session_state['max_mines_input']
+                    old_max = st.session_state.get('max_mines_limit', 20)
+                    
+                    if new_max != old_max:
+                        st.session_state['max_mines_limit'] = new_max
+                        
+                        # Update active mines based on new limit
+                        all_selected = st.session_state.get('all_selected_mine_indices', [])
+                        
+                        if new_max > old_max:
+                            # Expanding: activate more mines from all_selected
+                            st.session_state['active_mine_indices'] = all_selected[:new_max]
+                        else:
+                            # Reducing: keep only first new_max mines
+                            st.session_state['active_mine_indices'] = st.session_state['active_mine_indices'][:new_max]
+                
+                # Initialize max_mines_limit if not set
+                if 'max_mines_limit' not in st.session_state:
+                    st.session_state['max_mines_limit'] = 20
+                
+                max_mines = st.number_input(
+                    "Max mines to search at once",
+                    min_value=1,
+                    max_value=100,
+                    value=st.session_state.get('max_mines_limit', 20),
+                    key="max_mines_input",
+                    on_change=on_max_mines_change,
+                    help="Limit the number of mines for better performance"
+                )
+                
+                # Multi-select for mines
+                mine_options = [
+                    f"{mine['mine_name']} - {mine['region']}, {mine['country']}"
+                    for mine in mines_data
+                ]
+                
+                # Create checkboxes in an expander
+                with st.expander(f"Select mines", expanded=True):
+                    # Show current status
+                    num_all_selected = len(st.session_state.get('all_selected_mine_indices', []))
+                    num_active = len(st.session_state.get('active_mine_indices', []))
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Selected Mines", num_all_selected)
+                    with col2:
+                        st.metric("Active for Search", f"{num_active} / {max_mines}")
+                    
+                    if num_all_selected > max_mines:
+                        st.warning(f"⚠️ {num_all_selected - max_mines} selected mines are inactive. Increase 'Max mines' or click 'Activate All'")
+                    
+                    st.markdown("---")
+                    
+                    # Show only first 50 mines with checkboxes, rest in multiselect
+                    if len(mines_data) <= 50:
+                        # Checkbox interface for smaller lists
+                        new_selected_indices = []
+                        
+                        for idx, mine in enumerate(mines_data):
+                            # Determine checkbox state
+                            is_selected = idx in st.session_state.get('all_selected_mine_indices', [])
+                            is_active = idx in st.session_state.get('active_mine_indices', [])
+                            
+                            # Create label with status
+                            label = f"{mine['mine_name']} - {mine['region']}, {mine['country']}"
+                            if is_selected and not is_active:
+                                label += " ⚠️ (selected but inactive)"
+                            
+                            if st.checkbox(label, value=is_selected, key=f"mine_checkbox_{idx}"):
+                                new_selected_indices.append(idx)
+                        
+                        # Update all_selected based on checkboxes
+                        st.session_state['all_selected_mine_indices'] = new_selected_indices
+                        
+                        # Auto-adjust max_mines if more selected
+                        if len(new_selected_indices) > max_mines:
+                            st.session_state['max_mines_limit'] = len(new_selected_indices)
+                            st.session_state['active_mine_indices'] = new_selected_indices
+                            st.success(f"✅ Automatically increased max mines to {len(new_selected_indices)}")
+                        else:
+                            # Update active mines
+                            st.session_state['active_mine_indices'] = new_selected_indices[:max_mines]
+                    
+                    else:
+                        # Multiselect for large lists
+                        default_selection = [
+                            mine_options[i] 
+                            for i in st.session_state.get('all_selected_mine_indices', [])
+                        ]
+                        
+                        selected_options = st.multiselect(
+                            "Choose mines (no limit on selection)",
+                            options=mine_options,
+                            default=default_selection,
+                            help="Select as many as you want. Active mines will be limited by 'Max mines' setting."
+                        )
+                        
+                        # Convert back to indices
+                        new_selected_indices = [
+                            idx for idx, option in enumerate(mine_options)
+                            if option in selected_options
+                        ]
+                        
+                        st.session_state['all_selected_mine_indices'] = new_selected_indices
+                        
+                        # Auto-adjust max_mines if more selected
+                        if len(new_selected_indices) > max_mines:
+                            if st.checkbox("Auto-increase max mines to match selection?", value=True):
+                                st.session_state['max_mines_limit'] = len(new_selected_indices)
+                                st.session_state['active_mine_indices'] = new_selected_indices
+                            else:
+                                st.session_state['active_mine_indices'] = new_selected_indices[:max_mines]
+                        else:
+                            st.session_state['active_mine_indices'] = new_selected_indices[:max_mines]
+                
+                # Show final summary
+                num_active = len(st.session_state.get('active_mine_indices', []))
+                if num_active > 0:
+                    st.success(f"✅ Ready to search {num_active} mines")
+                    
+                    # Return only active mines for search
+                    active_mines = [
+                        mines_data[idx] 
+                        for idx in st.session_state.get('active_mine_indices', [])
+                    ]
+                    return active_mines
+                else:
+                    st.warning("⚠️ Please select at least one mine to search")
+                    return []
             
             return mines_data
             
@@ -338,6 +498,13 @@ class SidebarComponent:
             "Default Export Format",
             ["CSV", "JSON", "Excel"],
             help="Choose the default format for data export"
+        )
+        
+        # Debug mode
+        options['debug_mode'] = st.checkbox(
+            "🐛 Enable Debug Mode",
+            value=False,
+            help="Show detailed debug information during search"
         )
         
         return options

@@ -52,7 +52,7 @@ class SearchExecutor:
         # Erstelle Such-Tasks
         search_tasks = []
         for agent in agents:
-            if cancellation_token and cancellation_token.is_cancelled:
+            if cancellation_token and cancellation_token.is_cancelled():
                 break
                 
             task = self._create_search_task(
@@ -138,15 +138,16 @@ class SearchExecutor:
         """Führt Suche mit einem einzelnen Agenten aus"""
         try:
             # Check cancellation
-            if cancellation_token and cancellation_token.is_cancelled:
+            if cancellation_token and cancellation_token.is_cancelled():
                 raise CancellationException("Search cancelled")
             
+            # ÄNDERUNG 23.06.2025: Verwende search_mine statt search
             # Create task with timeout
-            search_task = asyncio.create_task(agent.search(query))
+            search_task = asyncio.create_task(agent.search_mine(query))
             
             # Wait with cancellation check
             while not search_task.done():
-                if cancellation_token and cancellation_token.is_cancelled:
+                if cancellation_token and cancellation_token.is_cancelled():
                     search_task.cancel()
                     raise CancellationException("Search cancelled")
                 
@@ -178,7 +179,11 @@ class SearchExecutor:
         except CancellationException:
             raise
         except Exception as e:
+            # ÄNDERUNG 23.06.2025: Erweiterte Fehlerdiagnose
+            import traceback
             self.logger.error(f"Error in agent search: {e}")
+            self.logger.error(f"Agent: {agent.name if hasattr(agent, 'name') else type(agent).__name__}")
+            self.logger.error(f"Stack Trace:\n{traceback.format_exc()}")
             raise
     
     async def _execute_parallel(
@@ -197,7 +202,7 @@ class SearchExecutor:
         """Führt Tasks sequentiell aus"""
         results = []
         for task in tasks:
-            if cancellation_token and cancellation_token.is_cancelled:
+            if cancellation_token and cancellation_token.is_cancelled():
                 break
             try:
                 result = await task
