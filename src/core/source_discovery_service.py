@@ -134,9 +134,12 @@ class SourceDiscoveryService:
                         source_info = SourceInfo(
                             url=result.source_url,
                             source_type=self._determine_source_type(result.source_url),
-                            discovered_by=agent_name,
                             relevance_score=0.7,
-                            last_updated=datetime.now()
+                            found_by_agents=[agent_name],
+                            applicable_mines=[query.mine_name],
+                            discovered_at=datetime.now(),
+                            meta_data={'agent': agent_name},
+                            discovered_by=agent_name
                         )
                         agent_sources.append(source_info)
                         self._report_status(f"📊 {result.source_url}", status_callback)
@@ -170,14 +173,16 @@ class SourceDiscoveryService:
         
         # Store in source manager
         for source in ranked_sources:
+            # Update source metadata
+            source.meta_data.update({
+                'mine_name': query.mine_name,
+                'discovered_by': source.discovered_by,
+                'relevance_score': source.relevance_score
+            })
             self.source_manager.add_source(
-                source.url,
-                source.source_type,
-                metadata={
-                    'mine_name': query.mine_name,
-                    'discovered_by': source.discovered_by,
-                    'relevance_score': source.relevance_score
-                }
+                query.mine_name,
+                source,
+                is_global=source.source_type in ['government', 'official']
             )
         
         return ranked_sources[:50]  # Return top 50 sources

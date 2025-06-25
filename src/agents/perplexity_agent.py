@@ -18,6 +18,8 @@ from .base_agent import BaseAgent, MineQuery, SearchResult, AgentStatus
 from .rate_limiter import RateLimiter
 from .enhanced_search import get_mining_search_queries, get_mining_domains
 from src.core.logger import get_logger, PerformanceLogger
+from src.utils.safe_dict_access import safe_get, safe_nested_get, ensure_dict, ensure_list
+from src.utils.session_manager import SessionManager
 
 
 class PerplexityAgent(BaseAgent):
@@ -27,54 +29,98 @@ class PerplexityAgent(BaseAgent):
         super().__init__(name, config)
         self.api_key = config['api_config'].perplexity_key
         self.base_url = "https://api.perplexity.ai/chat/completions"
-        self.model = "sonar"  # Aktuelles Online-Modell für Web-Suche
-        self._rate_limiter = RateLimiter(rate=10, per=60.0)  # 10 Anfragen pro Minute
+        self.model = "sonar-reasoning-pro"  # ÄNDERUNG 24.06.2025: Enhanced reasoning model für bessere Ergebnisse
+        # ÄNDERUNG 23.06.2025: Reduziertes Rate Limit
+        self._rate_limiter = RateLimiter(rate=5, per=60.0)  # Nur 5 Anfragen pro Minute
         self.logger = get_logger(f"agent.{name}", agent_type="perplexity")
         self.perf_logger = PerformanceLogger(self.logger)
+        # Request-Cache zur Vermeidung von Duplikaten
+        self._request_cache = {}
+        self._cache_ttl = 300  # 5 Minuten Cache
         
     async def initialize(self) -> bool:
         """Initialisiert den Agenten"""
         try:
-            # ÄNDERUNG 23.06.2025: Nutze Session Manager
-            from src.core.async_utils import get_session_manager
-            session_manager = get_session_manager()
-            self._session = await session_manager.get_session(f"perplexity_{self.name}")
-            
-            # Validiere Credentials
+            loop_id = id(asyncio.get_running_loop())
+            self.logger.debug(f"[PerplexityAgent] Initialisierung im Loop {loop_id}")
+            # ÄNDERUNG 25.06.2025: Verwende SessionManager Instanz
+            self._session_manager = SessionManager()
+            self._robust_session = await self._session_manager.get_robust_session(f"perplexity_{self.name}", timeout=90)
             is_valid = await self.validate_credentials()
             if not is_valid:
                 self.status = AgentStatus.DISABLED
                 return False
-                
             self.logger.info("Perplexity Agent erfolgreich initialisiert")
             return True
-            
         except Exception as e:
             self.logger.error(f"Fehler bei Initialisierung: {e}")
             return False
     
     async def cleanup(self):
         """Räumt Ressourcen auf"""
-        # ÄNDERUNG 23.06.2025: Sicheres Session-Cleanup
-        if hasattr(self, '_session') and self._session:
+        # ÄNDERUNG 25.06.2025: Robusteres Cleanup mit besserer Fehlerbehandlung
+        try:
+            loop_id = id(asyncio.get_running_loop())
+            self.logger.debug(f"[PerplexityAgent] Cleanup im Loop {loop_id}")
+        except RuntimeError:
+            self.logger.debug("[PerplexityAgent] Cleanup ohne aktiven Event Loop")
+        
+        # Session cleanup
+        if hasattr(self, '_session_manager') and self._session_manager:
             try:
-                if not self._session.closed:
-                    await self._session.close()
+                await self._session_manager.close_session(f"perplexity_{self.name}")
+                self.logger.debug("Session erfolgreich geschlossen")
             except Exception as e:
-                self.logger.warning(f"Fehler beim Schließen der Session: {e}")
-            finally:
-                self._session = None
+                self.logger.warning(f"Fehler beim Session Cleanup: {e}")
+        
+        # Setze Session auf None
+        self._robust_session = None
+        
+        # Rufe parent cleanup auf
+        try:
+            await super().cleanup()
+        except Exception as e:
+            self.logger.warning(f"Fehler beim parent cleanup: {e}")
+        
+        self.logger.info("Perplexity Agent beendet")
     
     async def _ensure_session(self):
-        """ÄNDERUNG 20.06.2025: Stellt sicher, dass Session verfügbar ist"""
-        if not hasattr(self, '_session') or not self._session or self._session.closed:
-            # ÄNDERUNG 23.06.2025: Erstelle Session im aktuellen Event Loop
-            try:
-                loop = asyncio.get_running_loop()
-                self._session = aiohttp.ClientSession(loop=loop)
-            except RuntimeError:
-                # Kein laufender Event Loop - erstelle Session ohne expliziten Loop
-                self._session = aiohttp.ClientSession()
+        """ÄNDERUNG 25.06.2025: Stellt sicher, dass Session verfügbar ist - verbesserte Event Loop Behandlung"""
+        # Robustere Event Loop Behandlung
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # Kein laufender Event Loop, erstelle einen neuen
+            self.logger.warning("[PerplexityAgent] Kein laufender Event Loop gefunden, erstelle neuen")
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        loop_id = id(loop)
+        self.logger.debug(f"[PerplexityAgent] _ensure_session im Loop {loop_id}")
+        
+        # ÄNDERUNG 25.06.2025: Verbesserte None-Prüfung für _robust_session
+        # Prüfe ob Session existiert und zum aktuellen Loop gehört
+        if (not hasattr(self, '_robust_session') or self._robust_session is None or 
+            not hasattr(self, '_session_manager') or self._session_manager is None):
+            self.logger.info(f"[PerplexityAgent] Session wird im neuen Loop {loop_id} neu initialisiert")
+            if not hasattr(self, '_session_manager') or self._session_manager is None:
+                self._session_manager = SessionManager()
+            self._robust_session = await self._session_manager.get_robust_session(f"perplexity_{self.name}", timeout=90)
+        else:
+            # Prüfe ob die Session noch gültig ist
+            if self._robust_session is not None:
+                try:
+                    session = await self._robust_session.get_session()
+                    if session.closed:
+                        self.logger.info(f"[PerplexityAgent] Session war geschlossen, erstelle neue")
+                        self._robust_session = await self._session_manager.get_robust_session(f"perplexity_{self.name}", timeout=90)
+                except Exception as e:
+                    self.logger.warning(f"[PerplexityAgent] Session-Check fehlgeschlagen: {e}, erstelle neue")
+                    self._robust_session = await self._session_manager.get_robust_session(f"perplexity_{self.name}", timeout=90)
+            else:
+                # Session ist None, erstelle neue
+                self.logger.info(f"[PerplexityAgent] Session war None, erstelle neue")
+                self._robust_session = await self._session_manager.get_robust_session(f"perplexity_{self.name}", timeout=90)
     
     async def validate_credentials(self) -> bool:
         """Validiert API-Key mit Test-Anfrage"""
@@ -95,14 +141,15 @@ class PerplexityAgent(BaseAgent):
             payload = {
                 "model": self.model,
                 "messages": [{"role": "user", "content": "test"}],
-                "max_tokens": 10
+                "max_tokens": 16  # ÄNDERUNG 24.06.2025: Minimum 16 für API-Kompatibilität
             }
             
-            async with self._session.post(
+            async with self._robust_session.request(
+                'POST',
                 self.base_url,
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=30
             ) as response:
                 if response.status == 200:
                     self.logger.info("Perplexity API-Key erfolgreich validiert")
@@ -134,23 +181,35 @@ class PerplexityAgent(BaseAgent):
             search_queries = get_mining_search_queries(query.mine_name, query.region, query.country)
             mining_domains = get_mining_domains()
             
-            # Limit to most relevant queries for Perplexity (to manage API costs)
-            priority_queries = search_queries[:10]  # Top 10 queries
+            # ÄNDERUNG 23.06.2025: Reduzierte Query-Anzahl und Caching
+            priority_queries = search_queries[:3]  # Nur Top 3 queries
             
             # Execute searches with different query strategies
             for idx, search_query in enumerate(priority_queries):
-                self.logger.info(f"Perplexity-Suche {idx+1}/{len(priority_queries)}: {search_query}")
+                # Check Cache
+                cache_key = f"{query.mine_name}_{search_query[:50]}"
+                if cache_key in self._request_cache:
+                    cached_time, cached_response = self._request_cache[cache_key]
+                    if (datetime.now() - cached_time).seconds < self._cache_ttl:
+                        self.logger.info(f"Using cached response for query {idx+1}")
+                        parsed_results = self._parse_response(cached_response, query, f"query_{idx+1}_cached")
+                        results.extend(parsed_results)
+                        continue
+                
+                self.logger.info(f"Perplexity-Suche {idx+1}/{len(priority_queries)}: {search_query[:100]}...")
                 
                 # Create prompt with search query and domain focus
                 prompt = self._create_enhanced_prompt(query, search_query, mining_domains[:5])
                 
                 response = await self._make_api_call(prompt)
                 if response:
+                    # Cache successful response
+                    self._request_cache[cache_key] = (datetime.now(), response)
                     parsed_results = self._parse_response(response, query, f"query_{idx+1}")
                     results.extend(parsed_results)
                     
-                # Kurze Pause zwischen Anfragen
-                await asyncio.sleep(1)
+                # Längere Pause zwischen Anfragen
+                await asyncio.sleep(3)
             
             # Also use original specialized prompts
             prompts = self._create_prompts(query)
@@ -184,25 +243,24 @@ class PerplexityAgent(BaseAgent):
         """Creates enhanced prompt using specific search queries and domains"""
         domains_str = ", ".join(priority_domains)
         
-        prompt = f"""Execute the following search query and extract specific mining information:
+        # ÄNDERUNG 23.06.2025: Klarere Prompt-Struktur für bessere Antworten
+        prompt = f"""Search for information about the {query.mine_name} mine in {query.region}, {query.country}.
 
-Search Query: {search_query}
+IMPORTANT: Provide ONLY factual information found in your search results. Do not repeat the search query or instructions.
 
-Focus on these priority sources: {domains_str}
+Focus on these sources: {domains_str}
 
-For the {query.mine_name} mine in {query.region}, {query.country}, extract:
-1. Current operator/owner company name
-2. Exact GPS coordinates (latitude, longitude)
-3. Current operational status (active/closed/suspended/care & maintenance)
-4. Type of mine (open pit/underground/both)
-5. Main commodities extracted (gold, silver, copper, etc.)
-6. Annual production volumes with units and year
-7. Number of employees/workforce size
-8. Rehabilitation/closure costs in CAD or USD
-9. Environmental bonds or financial assurances
-10. Recent news, updates, or reports (2020-2025)
+Find and report these specific data points:
+- Owner/Operator: [Company name that operates the mine]
+- Location: [GPS coordinates or precise location]
+- Status: [Current operational status]
+- Commodities: [What minerals/metals are mined]
+- Production: [Annual production volumes]
+- Workforce: [Number of employees]
+- Environmental costs: [Closure/remediation costs]
+- Recent updates: [News from 2020-2025]
 
-Provide specific facts with sources and URLs. Focus on official company reports, government databases, and reputable mining industry sources."""
+Format: Provide direct answers with source citations. Start with "Based on my search..." and list the findings."""
         
         return prompt
     
@@ -304,6 +362,8 @@ Find official data on:
     
     async def _make_api_call(self, prompt: str) -> Optional[Dict[str, Any]]:
         """Macht API-Aufruf zu Perplexity"""
+        loop_id = id(asyncio.get_running_loop())
+        self.logger.debug(f"[PerplexityAgent] _make_api_call im Loop {loop_id}")
         await self._rate_limiter.acquire()
         
         headers = {
@@ -316,20 +376,23 @@ Find official data on:
             "messages": [
                 {
                     "role": "system",
-                    "content": """You are a mining industry research specialist with expertise in:
-- Global mining databases and registries
-- Technical mining reports (NI 43-101, JORC)
-- Environmental regulations and compliance
-- Mining finance and economics
-- Multiple languages relevant to mining regions
+                    "content": """You are a mining industry research specialist. Your responses must:
 
-CRITICAL: 
-- Search EXHAUSTIVELY across ALL available sources
-- Include government, industry, NGO, news, and academic sources
-- Look for PDFs, technical reports, and official documents
-- Search in the local language(s) of the mining region
-- Cross-reference multiple sources for accuracy
-- Provide EXACT values with dates and specific sources"""
+1. Provide ONLY factual data from your search results
+2. Use this exact format for answers:
+   - Owner: [company name only]
+   - Status: [active/closed/suspended only]
+   - Coordinates: [numbers only]
+   - Production: [numbers with units]
+   - Costs: [numbers with currency]
+
+3. NEVER include:
+   - The search query in your response
+   - Phrases like "or owner company" or "extracted"
+   - Incomplete sentences
+   - Speculative information
+
+4. If data is not found, say "Not found" - do not guess"""
                 },
                 {
                     "role": "user",
@@ -346,11 +409,12 @@ CRITICAL:
             # Stelle sicher, dass Session verfügbar ist
             await self._ensure_session()
             
-            async with self._session.post(
+            async with self._robust_session.request(
+                'POST',
                 self.base_url,
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=90)  # Extended timeout for deeper searches
+                timeout=90  # Extended timeout for deeper searches
             ) as response:
                 if response.status == 200:
                     # ÄNDERUNG 20.06.2025: Sicheres JSON-Parsing
@@ -377,8 +441,21 @@ CRITICAL:
         except asyncio.TimeoutError:
             self.logger.error("API Anfrage Timeout")
             return None
+        except asyncio.CancelledError:
+            # Propagiere Cancellation
+            self.logger.debug("API Anfrage wurde abgebrochen")
+            raise
         except Exception as e:
-            self.logger.error(f"API Anfrage Fehler: {e}")
+            self.logger.error(f"API Anfrage Fehler: {type(e).__name__}: {str(e)}")
+            # ÄNDERUNG 25.06.2025: Bei Event Loop Fehlern, versuche Session neu zu erstellen
+            if "event loop" in str(e).lower() or "session" in str(e).lower():
+                self.logger.info("Versuche Session neu zu erstellen nach Event Loop Fehler...")
+                self._robust_session = None
+                try:
+                    await self._ensure_session()
+                    self.logger.info("Session erfolgreich neu erstellt, bitte Anfrage wiederholen")
+                except Exception as session_error:
+                    self.logger.error(f"Konnte Session nicht neu erstellen: {session_error}")
             return None
     
     def _parse_response(self, response: Dict[str, Any], query: MineQuery, search_type: str) -> List[SearchResult]:
@@ -386,7 +463,12 @@ CRITICAL:
         results = []
         
         try:
-            # ÄNDERUNG 23.06.2025: Erweiterte Response-Behandlung für String-Responses
+            # ÄNDERUNG 23.06.2025: Vollständige Type-Checking und Response-Behandlung
+            if response is None:
+                self.logger.error("Response ist None")
+                return results
+            
+            # Behandle verschiedene Response-Typen
             if isinstance(response, str):
                 # Wenn Response ein String ist, konvertiere zu Dict-Format
                 self.logger.warning(f"Response ist ein String, konvertiere zu Dict-Format")
@@ -394,46 +476,73 @@ CRITICAL:
                     "choices": [{"message": {"content": response}}],
                     "type": "text_response"
                 }
+            elif hasattr(response, '__dict__'):
+                # Wenn Response ein Objekt ist, konvertiere zu Dict
+                self.logger.warning(f"Response ist ein Objekt vom Typ {type(response)}, konvertiere zu Dict")
+                try:
+                    response = response.__dict__
+                except Exception as e:
+                    self.logger.error(f"Konnte Objekt nicht zu Dict konvertieren: {e}")
+                    return results
             
             # ÄNDERUNG 21.06.2025: Robustere Response-Behandlung
             if not isinstance(response, dict):
                 self.logger.error(f"Response ist kein Dictionary: {type(response)}")
                 return results
                 
-            # ÄNDERUNG 23.06.2025: Behandle verschiedene Response-Typen
-            if response.get('type') == 'text_response':
+            # ÄNDERUNG 23.06.2025: Sichere Navigation durch Response-Struktur
+            content = ""
+            citations = []
+            
+            if safe_get(response, 'type') == 'text_response':
                 # Direkte Text-Response
-                content = response.get('choices', [{}])[0].get('message', {}).get('content', '')
-                citations = []
+                choices = safe_get(response, 'choices', [])
+                if choices and isinstance(choices, list) and len(choices) > 0:
+                    first_choice = choices[0]
+                    if isinstance(first_choice, dict):
+                        message = safe_get(first_choice, 'message', {})
+                        if isinstance(message, dict):
+                            content = safe_get(message, 'content', '')
+                        elif isinstance(message, str):
+                            content = message
+                    elif isinstance(first_choice, str):
+                        content = first_choice
             elif 'choices' in response and response['choices']:
                 # Standard API Response
-                message = response['choices'][0].get('message', '')
-                if isinstance(message, str):
-                    content = message
-                elif isinstance(message, dict):
-                    content = message.get('content', '')
-                else:
-                    self.logger.error(f"Unerwarteter message Typ: {type(message)}")
-                    return results
+                choices = safe_get(response, 'choices', [])
+                if choices and isinstance(choices, list) and len(choices) > 0:
+                    first_choice = choices[0]
+                    if isinstance(first_choice, dict):
+                        message = safe_get(first_choice, 'message', '')
+                        if isinstance(message, str):
+                            content = message
+                        elif isinstance(message, dict):
+                            content = safe_get(message, 'content', '')
+                        else:
+                            self.logger.error(f"Unerwarteter message Typ: {type(message)}")
                     
-                citations = response.get('citations', [])
+                citations = safe_get(response, 'citations', [])
+                if not isinstance(citations, list):
+                    citations = []
                 
+            # Nur wenn Content vorhanden ist, extrahiere Daten
+            if content:
                 # Extrahiere strukturierte Daten aus dem Text
                 extracted_data = self._extract_structured_data(content, citations)
                 
                 for field_name, value_data in extracted_data.items():
-                    if value_data['value'] and value_data['value'] != 'nichts gefunden':
+                    if isinstance(value_data, dict) and safe_get(value_data, 'value') and value_data['value'] != 'nichts gefunden':
                         # ÄNDERUNG 20.06.2025: Korrekte Parameter für SearchResult
                         confidence_mapping = {'high': 0.9, 'medium': 0.7, 'low': 0.5}
-                        confidence_score = confidence_mapping.get(value_data.get('confidence', 'medium'), 0.7)
+                        confidence_score = confidence_mapping.get(safe_get(value_data, 'confidence', 'medium'), 0.7)
                         
                         result = SearchResult(
                             mine_name=query.mine_name,
                             field_name=field_name,
                             value=value_data['value'],
-                            source=value_data.get('source', 'Perplexity Web Search'),
-                            source_url=value_data.get('url', ''),
-                            source_date=value_data.get('year', datetime.now().year),
+                            source=safe_get(value_data, 'source', 'Perplexity Web Search'),
+                            source_url=safe_get(value_data, 'url', ''),
+                            source_date=safe_get(value_data, 'year', datetime.now().year),
                             confidence_score=confidence_score,
                             agent_name=self.name,
                             timestamp=datetime.now(),
@@ -441,6 +550,8 @@ CRITICAL:
                         )
                         results.append(result)
                         self.logger.info(f"Gefunden: {result.field_name} = {result.value}")
+            else:
+                self.logger.warning("Kein Content in Response gefunden")
                         
         except Exception as e:
             # ÄNDERUNG 23.06.2025: Erweiterte Fehlerdiagnose
@@ -448,6 +559,8 @@ CRITICAL:
             self.logger.error(f"Response Type: {type(response)}")
             if isinstance(response, str):
                 self.logger.error(f"Response String: {response[:200]}...")
+            elif isinstance(response, dict):
+                self.logger.error(f"Response Keys: {list(response.keys())}")
             import traceback
             self.logger.error(f"Stack Trace:\n{traceback.format_exc()}")
             
@@ -456,6 +569,18 @@ CRITICAL:
     def _extract_structured_data(self, content: str, citations: List[Dict]) -> Dict[str, Dict[str, Any]]:
         """Extrahiert strukturierte Daten aus Perplexity-Antwort"""
         extracted = {}
+        
+        # ÄNDERUNG 23.06.2025: Entferne Prompt-Echo aus Response
+        # Perplexity wiederholt manchmal den Search Query am Anfang
+        if "Search Query:" in content or "extract:" in content.lower():
+            # Versuche nur den tatsächlichen Antwort-Teil zu extrahieren
+            parts = content.split("\n\n", 2)
+            if len(parts) > 1:
+                # Suche nach dem Start der tatsächlichen Antwort
+                for i, part in enumerate(parts):
+                    if any(keyword in part.lower() for keyword in ["based on", "according to", "found", "shows", "indicates"]):
+                        content = "\n\n".join(parts[i:])
+                        break
         
         # Patterns für verschiedene Datentypen
         patterns = {
@@ -502,6 +627,7 @@ CRITICAL:
         
         content_lower = content.lower()
         
+        # ÄNDERUNG 23.06.2025: Verbesserte Pattern-Matching mit Validierung
         # Suche nach Mustern
         for field_name, field_patterns in patterns.items():
             for pattern in field_patterns:
@@ -514,13 +640,55 @@ CRITICAL:
                     # Bereinige Wert
                     value = value.strip()
                     
+                    # ÄNDERUNG 23.06.2025: Erweiterte Validierung extrahierter Werte
+                    # Vermeide Extraktion von Prompt-Fragmenten
+                    invalid_values = [
+                        "or owner company", "lac expanse", "quebec", "canada",
+                        "extract", "search", "find", "look for", "provide",
+                        "information", "data", "details", "based on", "according to",
+                        "search query", "find information", "please provide",
+                        "i need", "looking for", "tell me", "what is",
+                        "comprehensive information", "search for", "extract:"
+                    ]
+                    
+                    # Prüfe ob der Wert verdächtig aussieht
+                    if any(invalid in value.lower() for invalid in invalid_values):
+                        continue  # Skip diesen Match
+                    
+                    # Prüfe Mindestlänge für sinnvolle Werte
+                    if len(value) < 3:
+                        continue
+                    
+                    # ÄNDERUNG 23.06.2025: Zusätzliche Validierung für spezifische Felder
+                    if field_name == 'betreiber':
+                        # Betreiber sollte wie ein Firmenname aussehen
+                        if not any(char.isupper() for char in value):
+                            continue  # Sollte mindestens einen Großbuchstaben haben
+                        if len(value.split()) > 10:
+                            continue  # Zu lang für einen Firmennamen
+                    
+                    elif field_name == 'koordinaten':
+                        # Koordinaten sollten Zahlen enthalten
+                        if not any(char.isdigit() for char in value):
+                            continue
+                    
+                    elif field_name == 'sanierungskosten':
+                        # Kosten sollten Zahlen enthalten
+                        if not any(char.isdigit() for char in value):
+                            continue
+                    
                     # Bestimme Quelle aus Citations
                     source = "Perplexity Web Search"
                     url = ""
-                    if citations:
+                    if citations and isinstance(citations, list) and len(citations) > 0:
                         # Versuche die relevanteste Citation zu finden
-                        source = citations[0].get('title', source)
-                        url = citations[0].get('url', '')
+                        first_citation = citations[0]
+                        if isinstance(first_citation, dict):
+                            source = safe_get(first_citation, 'title', source)
+                            url = safe_get(first_citation, 'url', '')
+                        elif isinstance(first_citation, str):
+                            source = first_citation
+                            url = ""
                     
                     extracted[field_name] = {
                         'value': value,
@@ -536,11 +704,3 @@ CRITICAL:
     async def search(self, query: MineQuery) -> List[SearchResult]:
         """Alias für search_mine - für Kompatibilität mit Source Discovery"""
         return await self.search_mine(query)
-    
-    async def cleanup(self):
-        """Räumt Ressourcen auf"""
-        # ÄNDERUNG 23.06.2025: Nutze Session Manager für Cleanup
-        from src.core.async_utils import get_session_manager
-        session_manager = get_session_manager()
-        await session_manager.close_session(f"perplexity_{self.name}")
-        self.logger.info("Perplexity Agent beendet")

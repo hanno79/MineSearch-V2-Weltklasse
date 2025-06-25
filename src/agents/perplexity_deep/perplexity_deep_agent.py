@@ -3,6 +3,7 @@ Author: rahn
 Datum: 22.06.2025
 Version: 1.0
 Beschreibung: Hauptklasse für Perplexity Deep Research Agent
+# ÄNDERUNG 27.06.2025: SessionManager wird explizit übergeben
 """
 
 import aiohttp
@@ -27,7 +28,7 @@ class PerplexityDeepAgent(BaseAgent):
     - Umfassende Berichtserstellung
     """
     
-    def __init__(self, api_key: str, use_deep_research: bool = True):
+    def __init__(self, api_key: str, session_manager, use_deep_research: bool = True):
         """Initialize Perplexity Deep Research Agent"""
         # BaseAgent benötigt name und config
         config = {
@@ -52,15 +53,35 @@ class PerplexityDeepAgent(BaseAgent):
         self.max_search_iterations = 5
         self.sources_per_iteration = 20
         self.min_confidence_threshold = 0.7
+        
+        self.session_manager = session_manager
+        self._robust_session = None
+    
+    async def _ensure_session(self):
+        """Stellt sicher, dass Session verfügbar ist"""
+        if not hasattr(self, '_robust_session') or self._robust_session is None:
+            self.logger.info("[PerplexityDeepAgent] Session wird neu initialisiert")
+            self._robust_session = await self.session_manager.get_robust_session(f"perplexity_deep_{self.name}", timeout=90)
+            
+        # Update API Client mit aktueller Session
+        if self._robust_session:
+            session = await self._robust_session.get_session()
+            self.api_client = PerplexityAPIClient(self.api_key, session)
     
     async def initialize(self) -> bool:
         """Initialisiert den Agenten"""
         try:
-            # ÄNDERUNG 23.06.2025: Nutze Session Manager
-            from src.core.async_utils import get_session_manager
-            session_manager = get_session_manager()
-            self._session = await session_manager.get_session(f"perplexity_deep_{self.name}")
-            self.api_client = PerplexityAPIClient(self.api_key, self._session)
+            loop_id = id(asyncio.get_running_loop())
+            self.logger.debug(f"[PerplexityDeepAgent] initialize() im Loop {loop_id}")
+            
+            # Erstelle RobustSession statt direkter Session
+            self._robust_session = await self.session_manager.get_robust_session(f"perplexity_deep_{self.name}", timeout=90)
+            self.logger.debug(f"[PerplexityDeepAgent] RobustSession erhalten")
+            
+            # API Client bekommt die Session aus RobustSession
+            session = await self._robust_session.get_session()
+            self.api_client = PerplexityAPIClient(self.api_key, session)
+            
             return await self.validate_credentials()
         except Exception as e:
             self.logger.error(f"Fehler bei Initialisierung: {e}")
@@ -75,10 +96,24 @@ class PerplexityDeepAgent(BaseAgent):
     
     async def cleanup(self):
         """Räumt Ressourcen auf"""
-        # ÄNDERUNG 23.06.2025: Nutze Session Manager für Cleanup
-        from src.core.async_utils import get_session_manager
-        session_manager = get_session_manager()
-        await session_manager.close_session(f"perplexity_deep_{self.name}")
+        try:
+            loop_id = id(asyncio.get_running_loop())
+            self.logger.debug(f"[PerplexityDeepAgent] cleanup() im Loop {loop_id}")
+        except RuntimeError:
+            self.logger.debug("[PerplexityDeepAgent] cleanup() ohne aktiven Event Loop")
+            
+        # Session cleanup
+        if hasattr(self, 'session_manager') and self.session_manager:
+            try:
+                await self.session_manager.close_session(f"perplexity_deep_{self.name}")
+                self.logger.debug("Session erfolgreich geschlossen")
+            except Exception as e:
+                self.logger.warning(f"Fehler beim Session Cleanup: {e}")
+                
+        # Setze Referenzen auf None
+        self.api_client = None
+        self._robust_session = None
+        self._session = None
     
     async def search(self, query: MineQuery) -> List[SearchResult]:
         """Alias für search_mine - für Kompatibilität mit Source Discovery"""
@@ -94,6 +129,8 @@ class PerplexityDeepAgent(BaseAgent):
         3. Verfeinert basierend auf Erkenntnissen
         4. Konsolidiert in umfassenden Bericht
         """
+        loop_id = id(asyncio.get_running_loop())
+        self.logger.debug(f"[PerplexityDeepAgent] search_mine() im Loop {loop_id}")
         all_results = []
         
         self.perf_logger.start_timer(f"perplexity_deep_research_{query.mine_name}")
@@ -196,6 +233,9 @@ class PerplexityDeepAgent(BaseAgent):
                                  context: Dict[str, Any]) -> Dict[str, Any]:
         """Führt eine Deep Search Anfrage aus"""
         
+        # ÄNDERUNG 25.06.2025: Stelle sicher, dass Session verfügbar ist
+        await self._ensure_session()
+        
         system_prompt = """You are Perplexity Deep Research, designed to:
 - Perform dozens of searches automatically
 - Read and analyze hundreds of sources
@@ -220,6 +260,9 @@ class PerplexityDeepAgent(BaseAgent):
     
     async def _standard_search(self, query: MineQuery) -> List[SearchResult]:
         """Standard Suche (nicht Deep Research)"""
+        # ÄNDERUNG 25.06.2025: Stelle sicher, dass Session verfügbar ist
+        await self._ensure_session()
+        
         prompts = {
             "general": f"Search for comprehensive information about {query.mine_name} mine in {query.region}, {query.country}",
             "technical": f"Find technical and operational data for {query.mine_name} mine",
@@ -302,5 +345,4 @@ Format verification results clearly with confidence levels."""
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit"""
-        if self._session:
-            await self._session.close()
+        await self.cleanup()

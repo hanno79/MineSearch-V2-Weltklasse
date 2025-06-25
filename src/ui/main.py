@@ -4,12 +4,15 @@ Datum: 23.06.2025
 Version: 2.1
 Beschreibung: Refactored MineSearch Streamlit UI - Hauptdatei
 ÄNDERUNG 23.06.2025: nest_asyncio für Event Loop Kompatibilität
+# ÄNDERUNG 27.06.2025: Absolute Importe für Streamlit-Kompatibilität
 """
 import streamlit as st
 import sys
 import os
 from datetime import datetime
 import nest_asyncio
+from src.utils.session_manager import SessionManager
+from src.core.config import Config
 
 # ÄNDERUNG 23.06.2025: Aktiviere nested event loops für Streamlit
 nest_asyncio.apply()
@@ -24,7 +27,6 @@ from src.ui.components.sidebar import SidebarComponent
 from src.ui.components.search_form import SearchFormComponent
 from src.ui.components.results_display import ResultsDisplayComponent
 from src.ui.components.metrics_dashboard import MetricsDashboardComponent
-from src.core.config import Config
 
 # Page configuration
 st.set_page_config(
@@ -61,6 +63,10 @@ st.markdown("""
         border: 1px solid #e0e0e0;
         margin-bottom: 1rem;
     }
+    /* Prevent connection timeout */
+    .stApp {
+        max-width: 100%;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -71,8 +77,6 @@ def initialize_session_state():
         st.session_state.search_results = []
     if 'search_history' not in st.session_state:
         st.session_state.search_history = []
-    if 'config' not in st.session_state:
-        st.session_state.config = Config()
     if 'search_in_progress' not in st.session_state:
         st.session_state.search_in_progress = False
 
@@ -87,10 +91,11 @@ def main():
     st.markdown('<p class="sub-header">Multi-Agent Mining Research System</p>', 
                 unsafe_allow_html=True)
     
-    # Initialize components
-    config = st.session_state.config
+    # Initialize components (create fresh instances, don't store in session_state)
+    config = Config()
+    session_manager = SessionManager()
     sidebar = SidebarComponent(config)
-    search_form = SearchFormComponent(config)
+    search_form = SearchFormComponent(config, session_manager)
     results_display = ResultsDisplayComponent()
     metrics_dashboard = MetricsDashboardComponent()
     
@@ -142,4 +147,5 @@ def main():
 
 
 if __name__ == "__main__":
+    # Run main app
     main()

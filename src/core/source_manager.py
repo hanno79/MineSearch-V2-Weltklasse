@@ -20,6 +20,7 @@ class SourceInfo:
     applicable_mines: List[str] = field(default_factory=list)
     discovered_at: datetime = field(default_factory=datetime.now)
     meta_data: Dict = field(default_factory=dict)
+    discovered_by: str = ""
 
 class SourceManager:
     """Verwaltet gefundene Quellen für Mining-Recherche"""
@@ -147,7 +148,7 @@ class SourceManager:
                         'type': s.source_type,
                         'relevance': s.relevance_score,
                         'found_by': s.found_by_agents,
-                        'metadata': s.metadata
+                        'metadata': s.meta_data
                     }
                     for s in sources
                 ]
@@ -161,7 +162,7 @@ class SourceManager:
                         'type': s.source_type,
                         'relevance': s.relevance_score,
                         'applicable_mines': s.applicable_mines,
-                        'metadata': s.metadata
+                        'metadata': s.meta_data
                     }
                     for s in self.global_sources
                 ],
@@ -172,7 +173,7 @@ class SourceManager:
                             'type': s.source_type,
                             'relevance': s.relevance_score,
                             'found_by': s.found_by_agents,
-                            'metadata': s.metadata
+                            'metadata': s.meta_data
                         }
                         for s in sources
                     ]

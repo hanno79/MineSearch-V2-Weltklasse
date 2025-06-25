@@ -11,14 +11,16 @@ import time
 from src.agents.base_agent import MineQuery
 from src.core.orchestrator import MineSearchOrchestratorV2
 from src.core.cancellation import CancellationToken, CancellationException
-from src.core.async_utils import run_async
+from src.utils.streamlit_async_wrapper import streamlit_run_async
+from datetime import datetime
 
 
 class SearchFormComponent:
     """Such-Formular mit Status-Updates und Cancellation"""
     
-    def __init__(self, config):
+    def __init__(self, config, session_manager):
         self.config = config
+        self.session_manager = session_manager
         self.cancellation_token = None
         self.orchestrator = None
         self._orchestrator_initialized = False
@@ -27,9 +29,19 @@ class SearchFormComponent:
                advanced_options: Dict) -> Optional[List]:
         """Rendert das Such-Formular und führt Suche aus"""
         
+        # Session-State-Initialisierung für Status-Updates und Fehlerdetails
+        if 'status_updates' not in st.session_state:
+            st.session_state.status_updates = []
+        if 'error_details' not in st.session_state:
+            st.session_state.error_details = []
         # Initialize cancellation token in session state if needed
         if 'cancellation_token' not in st.session_state:
             st.session_state.cancellation_token = None
+        
+        # Orchestrator IMMER frisch initialisieren
+        from src.core.orchestrator import MineSearchOrchestratorV2
+        self.orchestrator = MineSearchOrchestratorV2(self.config, self.session_manager)
+        self._orchestrator_initialized = False
         
         # Create a container for dynamic button updates
         button_container = st.container()
@@ -48,6 +60,10 @@ class SearchFormComponent:
                     use_container_width=True,
                     key="start_search_button"
                 )
+                
+                # ÄNDERUNG 23.06.2025: Sofortiges State Update nach Button-Click
+                if search_clicked and mines_to_search and selected_agents:
+                    st.session_state.search_in_progress = True
             
             with col2:
                 # Cancel button - enabled during search
@@ -66,10 +82,13 @@ class SearchFormComponent:
                     help=cancel_help
                 )
                 
-                if cancel_clicked and st.session_state.get('cancellation_token'):
-                    st.session_state.cancellation_token.cancel()
-                    st.warning("🛑 Suche wird abgebrochen...")
+                if cancel_clicked:
+                    # ÄNDERUNG 23.06.2025: Robustere Cancel-Implementierung
+                    if st.session_state.get('cancellation_token'):
+                        st.session_state.cancellation_token.cancel()
+                    st.session_state.search_cancelled = True
                     st.session_state.search_in_progress = False
+                    st.warning("🛑 Suche wird abgebrochen...")
                     st.rerun()
             
             with col3:
@@ -87,8 +106,7 @@ class SearchFormComponent:
         
         # Handle search
         if search_clicked and mines_to_search and selected_agents:
-            # Set search in progress state BEFORE calling the search function
-            st.session_state.search_in_progress = True
+            # ÄNDERUNG 23.06.2025: State wird bereits oben gesetzt, direkt Search ausführen
             return self._perform_search(
                 mines_to_search, 
                 selected_agents, 
@@ -109,10 +127,25 @@ class SearchFormComponent:
                        advanced_options: Dict, status_container) -> List:
         """Führt die Suche aus mit UI-Updates für Cancel Button"""
         
+        # Orchestrator IMMER frisch initialisieren
+        from src.core.orchestrator import MineSearchOrchestratorV2
+        try:
+            self.orchestrator = MineSearchOrchestratorV2(self.config, self.session_manager)
+            self._orchestrator_initialized = False
+        except Exception as e:
+            st.error(f"❌ Fehler beim Initialisieren des Orchestrators: {str(e)}")
+            return []
+        
+        # Session-State-Initialisierung für Status-Updates und Fehlerdetails (erneut für neue Suchläufe)
+        if 'status_updates' not in st.session_state:
+            st.session_state.status_updates = []
+        if 'error_details' not in st.session_state:
+            st.session_state.error_details = []
         # Create new cancellation token and store in session state
         from src.core.cancellation import CancellationToken
         cancellation_token = CancellationToken()
         st.session_state.cancellation_token = cancellation_token
+        st.session_state.search_cancelled = False  # Reset cancel flag
         
         # Debug info
         if advanced_options.get('debug_mode', False):
@@ -120,76 +153,61 @@ class SearchFormComponent:
             st.write(f"🔍 Debug: Cancellation token created: {cancellation_token}")
             st.write(f"🔍 Debug: Is cancelled: {cancellation_token.is_cancelled()}")
             st.write(f"🔍 Debug: search_in_progress state: {st.session_state.get('search_in_progress', False)}")
+            st.write(f"🔍 Debug: search_cancelled flag: {st.session_state.get('search_cancelled', False)}")
         
         try:
             # Show search info
             with status_container.container():
                 st.info(f"🔍 Searching {len(mines_to_search)} mines with {len(selected_agents)} agents...")
-                
-                # Progress tracking
                 progress_bar = st.progress(0)
                 status_text = st.empty()
-                
-                # ÄNDERUNG 23.06.2025: Zeige Cancel-Hinweis während Suche
                 cancel_hint = st.empty()
                 cancel_hint.info("💡 Tipp: Drücke F5 oder aktualisiere die Seite, um die Suche abzubrechen")
-            
-            # Collect all results
             all_results = []
-            
             for idx, mine_data in enumerate(mines_to_search):
-                # Check cancellation with small delay to allow UI updates
-                if cancellation_token.is_cancelled():
+                if cancellation_token.is_cancelled() or st.session_state.get('search_cancelled', False):
                     st.warning("🛑 Search cancelled by user")
                     break
-                
-                # ÄNDERUNG 23.06.2025: Optimierte Pause für UI-Updates
-                time.sleep(0.2)  # Reduziert für bessere Reaktionsfähigkeit
-                
-                # Update progress
+                time.sleep(0.1)
                 progress = (idx + 1) / len(mines_to_search)
                 progress_bar.progress(progress)
-                
-                # ÄNDERUNG 23.06.2025: Erweiterte Status-Anzeige mit Cancel-Info
                 status_message = f"Searching mine {idx + 1} of {len(mines_to_search)}"
-                if idx % 3 == 0:  # Alle 3 Minen
+                if idx % 3 == 0:
                     status_message += " | 💡 Tipp: F5 drücken zum Abbrechen"
                 status_text.text(status_message)
-                
-                # Create status placeholder for this mine
-                mine_status = status_container.empty()
-                
+                # Status-Updates ausgeben (thread-sicher)
+                if st.session_state.status_updates:
+                    with st.expander("Status Updates", expanded=True):
+                        for update in st.session_state.status_updates[-10:]:
+                            st.write(f"{update['timestamp']}: {update['mine']} - {update['message']}")
                 # Initialize orchestrator once
                 if not self._orchestrator_initialized:
-                    self.orchestrator = MineSearchOrchestratorV2(self.config)
-                    # ÄNDERUNG 23.06.2025: Verwende Event Loop Manager statt asyncio.run
-                    run_async(self.orchestrator.initialize())
-                    self._orchestrator_initialized = True
+                    try:
+                        init_success = streamlit_run_async(self.orchestrator.initialize())
+                        if not init_success:
+                            st.error("❌ Orchestrator Initialisierung fehlgeschlagen")
+                            break
+                        self._orchestrator_initialized = True
+                    except Exception as init_error:
+                        st.error(f"❌ Fehler bei Orchestrator Initialisierung: {str(init_error)}")
+                        break
                 
-                # Run async search
                 try:
-                    # ÄNDERUNG 23.06.2025: Verwende Event Loop Manager für konsistenten Event Loop
-                    results = run_async(
+                    results = streamlit_run_async(
                         self._search_single_mine(
                             mine_data,
                             selected_agents,
-                            mine_status,
                             cancellation_token
                         )
                     )
-                    
                     if results:
                         all_results.extend(results)
-                        
                 except CancellationException:
                     st.warning("🛑 Search cancelled")
                     break
                 except Exception as e:
                     st.error(f"❌ Error searching {mine_data['mine_name']}: {str(e)}")
-            
-            # Clear status and show completion
             status_container.empty()
-            
             if cancellation_token.is_cancelled():
                 st.warning("🛑 Search was cancelled")
             elif all_results:
@@ -197,66 +215,57 @@ class SearchFormComponent:
                 st.balloons()
             else:
                 st.warning("⚠️ No results found")
-            
             return all_results
-            
         finally:
             st.session_state.search_in_progress = False
             st.session_state.cancellation_token = None
     
     async def _search_single_mine(self, mine_data: Dict, selected_agents: List[str],
-                                 status_placeholder, cancellation_token) -> List:
+                                 cancellation_token) -> List:
         """Sucht eine einzelne Mine"""
-        
-        # Status callback
+        # Vor JEDEM Zugriff auf error_details initialisieren
+        if 'error_details' not in st.session_state:
+            st.session_state.error_details = []
+        # Status-Callback: Nur Status in Session-State schreiben, keine UI-Elemente!
         def status_callback(message):
-            if status_placeholder:
-                with status_placeholder.container():
-                    st.write(f"**{mine_data['mine_name']}**: {message}")
-        
-        # Use existing orchestrator
+            try:
+                if 'status_updates' not in st.session_state:
+                    st.session_state.status_updates = []
+                from datetime import datetime
+                st.session_state.status_updates.append({
+                    'mine': mine_data['mine_name'],
+                    'message': message,
+                    'timestamp': datetime.now()
+                })
+            except Exception as e:
+                print(f"[Status-Callback] Fehler beim Status-Update: {e}")
         if not self.orchestrator:
             raise Exception("Orchestrator not initialized")
-        
-        # Set status callback for this mine
         self.orchestrator.status_callback = status_callback
-        
-        # Create query
         query = MineQuery(
             mine_name=mine_data['mine_name'],
             region=mine_data['region'],
             country=mine_data['country'],
             languages=["en", "fr", "es", "de"],
             required_fields=[
-                # Core fields
                 "betreiber", "operator", "owner",
                 "koordinaten", "coordinates", "location",
                 "rohstofftyp", "commodity", "mineral",
                 "aktivitaetsstatus", "status",
-                
-                # Financial/Environmental
                 "sanierungskosten", "remediation_costs",
                 "environmental_liability", "restoration_costs",
-                
-                # Production
                 "production_start", "production_end",
                 "reserve", "resource",
-                
-                # Technical
                 "mining_method", "processing",
                 "capacity", "recovery_rate"
             ]
         )
-        
-        # Search parameters
         search_params = {
             "enhanced": True,
             "agent_types": selected_agents,
             "include_sources": True,
             "cancellation_token": cancellation_token
         }
-        
-        # Perform search
         try:
             status_callback(f"🔍 Starting search for {query.mine_name}")
             results = await self.orchestrator.search_mine(query, search_params)
@@ -268,7 +277,12 @@ class SearchFormComponent:
             import traceback
             error_details = traceback.format_exc()
             status_callback(f"❌ Error: {str(e)}")
-            if status_placeholder:
-                with status_placeholder.container():
-                    st.error(f"Full error:\n{error_details}")
+            # Defensive Initialisierung auch im Exception-Handler
+            if 'error_details' not in st.session_state:
+                st.session_state.error_details = []
+            st.session_state.error_details.append({
+                'mine': mine_data['mine_name'],
+                'error': error_details,
+                'timestamp': datetime.now()
+            })
             return []
