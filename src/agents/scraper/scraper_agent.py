@@ -16,6 +16,7 @@ from ..base_agent import BaseAgent, MineQuery, SearchResult, AgentStatus
 from ..rate_limiter import RateLimiter
 from src.core.logger import get_logger, PerformanceLogger
 from ..enhanced_search import get_mining_search_queries, get_mining_domains
+from src.utils.session_manager import SessionManager
 
 from .extractors import DataExtractor
 from .sources import MiningSourceManager
@@ -50,15 +51,17 @@ class ScraperAgent(BaseAgent):
         # Data Extractor
         self.extractor = DataExtractor(self.logger)
         
-        # Session wird bei Bedarf erstellt
-        self._session = None
+        # Session Manager für zentrale Session-Verwaltung
+        self._session_manager = None
+        self._robust_session = None
         
     async def initialize(self) -> bool:
         """Initialisiert den Scraper Agent"""
         try:
-            # Session wird erst bei Bedarf erstellt (lazy initialization)
-            self._session = None
-            self.logger.info("Scraper Agent initialisiert (Session wird bei Bedarf erstellt)")
+            # ÄNDERUNG 25.06.2025: Verwende SessionManager Instanz
+            self._session_manager = SessionManager()
+            self._robust_session = await self._session_manager.get_robust_session(f"scraper_{self.name}", timeout=self.timeout.total)
+            self.logger.info("Scraper Agent mit SessionManager initialisiert")
             return True
             
         except Exception as e:
@@ -244,7 +247,21 @@ class ScraperAgent(BaseAgent):
         
         for attempt in range(max_retries):
             try:
-                async with self._session.get(url) as response:
+                # ÄNDERUNG 25.06.2025: Rotiere User-Agent für jede Request
+                self.current_ua_index = (self.current_ua_index + 1) % len(self.user_agents)
+                user_agent = self.user_agents[self.current_ua_index]
+                
+                headers = {
+                    'User-Agent': user_agent,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9,de;q=0.8',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'DNT': '1',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1'
+                }
+                
+                async with self._robust_session.request('GET', url, headers=headers) as response:
                     if response.status == 200:
                         return await response.text()
                     elif response.status == 429:  # Rate limit
@@ -265,34 +282,29 @@ class ScraperAgent(BaseAgent):
         return None
     
     async def _ensure_session(self):
-        """ÄNDERUNG 20.06.2025: Stellt sicher, dass Session verfügbar ist"""
-        if not hasattr(self, '_session') or not self._session or self._session.closed:
-            # Schließe alte Session falls vorhanden aber nicht geschlossen
-            if hasattr(self, '_session') and self._session and not self._session.closed:
+        """ÄNDERUNG 25.06.2025: Stellt sicher, dass Session über SessionManager verfügbar ist"""
+        # Prüfe ob Session existiert und gültig ist
+        if (not hasattr(self, '_robust_session') or self._robust_session is None or 
+            not hasattr(self, '_session_manager') or self._session_manager is None):
+            self.logger.info("Session wird neu initialisiert")
+            if not hasattr(self, '_session_manager') or self._session_manager is None:
+                self._session_manager = SessionManager()
+            self._robust_session = await self._session_manager.get_robust_session(f"scraper_{self.name}", timeout=self.timeout.total)
+        else:
+            # Prüfe ob die Session noch gültig ist
+            if self._robust_session is not None:
                 try:
-                    await self._session.close()
+                    session = await self._robust_session.get_session()
+                    if session.closed:
+                        self.logger.info("Session war geschlossen, erstelle neue")
+                        self._robust_session = await self._session_manager.get_robust_session(f"scraper_{self.name}", timeout=self.timeout.total)
                 except Exception as e:
-                    self.logger.warning(f"Fehler beim Schließen alter Session: {e}")
-            
-            # Rotiere User-Agent
-            self.current_ua_index = (self.current_ua_index + 1) % len(self.user_agents)
-            user_agent = self.user_agents[self.current_ua_index]
-            
-            # Erstelle neue Session mit Timeout und Connection Limit
-            self._session = aiohttp.ClientSession(
-                headers={
-                    'User-Agent': user_agent,
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.9,de;q=0.8',
-                    'Accept-Encoding': 'gzip, deflate, br',
-                    'DNT': '1',
-                    'Connection': 'keep-alive',
-                    'Upgrade-Insecure-Requests': '1'
-                },
-                timeout=self.timeout,
-                connector=aiohttp.TCPConnector(limit=10, limit_per_host=5)
-            )
-            self.logger.debug("Neue Session erstellt")
+                    self.logger.warning(f"Session-Check fehlgeschlagen: {e}, erstelle neue")
+                    self._robust_session = await self._session_manager.get_robust_session(f"scraper_{self.name}", timeout=self.timeout.total)
+            else:
+                # Session ist None, erstelle neue
+                self.logger.info("Session war None, erstelle neue")
+                self._robust_session = await self._session_manager.get_robust_session(f"scraper_{self.name}", timeout=self.timeout.total)
     
     async def _scrape_page(self, url: str, query: MineQuery) -> List[SearchResult]:
         """Scraped eine einzelne Seite nach Mining-Informationen"""
@@ -400,13 +412,22 @@ class ScraperAgent(BaseAgent):
         return results
     
     async def cleanup(self):
-        """ÄNDERUNG 19.06.2025: Explizite cleanup Methode für Session-Management"""
-        try:
-            if hasattr(self, '_session') and self._session and not self._session.closed:
-                await self._session.close()
+        """ÄNDERUNG 25.06.2025: Cleanup mit SessionManager"""
+        # Session cleanup
+        if hasattr(self, '_session_manager') and self._session_manager:
+            try:
+                await self._session_manager.close_session(f"scraper_{self.name}")
                 self.logger.debug("Session erfolgreich geschlossen")
+            except Exception as e:
+                self.logger.warning(f"Fehler beim Session Cleanup: {e}")
+        
+        # Setze Session auf None
+        self._robust_session = None
+        
+        # Rufe parent cleanup auf
+        try:
+            await super().cleanup()
         except Exception as e:
-            self.logger.warning(f"Fehler beim Schließen der Session: {e}")
-        finally:
-            self._session = None
-            await super().cleanup()  # Rufe parent cleanup auf
+            self.logger.warning(f"Fehler beim parent cleanup: {e}")
+        
+        self.logger.info("Scraper Agent beendet")

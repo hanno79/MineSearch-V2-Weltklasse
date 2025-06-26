@@ -66,8 +66,21 @@ class SourceDiscoveryService:
         
         # 1. Use specialized source discovery
         try:
-            sources = await discovery.discover_sources(query)
-            discovered_sources.extend(sources)
+            # ÄNDERUNG 26.06.2025: Agenten an discover_sources übergeben
+            sources = await discovery.discover_sources(query, agents)
+            # Konvertiere DiscoveredSource zu SourceInfo
+            for source in sources:
+                source_info = SourceInfo(
+                    url=source.url,
+                    source_type=source.source_type.value if hasattr(source.source_type, 'value') else str(source.source_type),
+                    relevance_score=source.relevance_score,
+                    found_by_agents=[source.discovered_by],
+                    applicable_mines=[query.mine_name],
+                    discovered_at=datetime.now(),
+                    meta_data={'keywords': source.keywords_found, 'language': source.language},
+                    discovered_by=source.discovered_by
+                )
+                discovered_sources.append(source_info)
             self._report_status(
                 f"✅ Basis-Discovery: {len(sources)} Quellen gefunden",
                 status_callback

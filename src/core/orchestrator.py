@@ -3,6 +3,7 @@ Author: rahn
 Datum: 22.06.2025
 Version: 2.0
 Beschreibung: Refactored MineSearch Orchestrator - koordiniert alle Komponenten
+# ÄNDERUNG 27.06.2025: SessionManager wird explizit übergeben
 """
 from typing import List, Dict, Any, Optional, Callable
 import asyncio
@@ -18,19 +19,21 @@ from .agent_manager import AgentManager
 from .search_executor import SearchExecutor
 from .source_discovery_service import SourceDiscoveryService
 from .search_strategy_manager import SearchStrategyManager
+from src.utils.safe_dict_access import safe_get, safe_nested_get, ensure_dict, ensure_list
 from .source_manager import SourceManager
 
 
 class MineSearchOrchestratorV2:
     """Refactored Orchestrator - koordiniert alle Such-Komponenten"""
     
-    def __init__(self, config: Config, status_callback: Optional[Callable[[str], None]] = None):
+    def __init__(self, config: Config, session_manager, status_callback: Optional[Callable[[str], None]] = None):
         self.config = config
+        self.session_manager = session_manager
         self.logger = get_logger("orchestrator")
         self.status_callback = status_callback
         
         # Initialize components
-        self.agent_manager = AgentManager(config)
+        self.agent_manager = AgentManager(config, session_manager)
         self.search_executor = SearchExecutor()
         self.source_manager = SourceManager()
         self.source_discovery = SourceDiscoveryService(self.source_manager)
@@ -99,10 +102,10 @@ class MineSearchOrchestratorV2:
         search_params = search_params or {}
         
         # Determine strategy
-        strategy = search_params.get('strategy', 'staged')
+        strategy = safe_get(search_params, 'strategy', 'staged')
         
         # Get active agents
-        agent_types = search_params.get('agent_types', [])
+        agent_types = safe_get(search_params, 'agent_types', [])
         if agent_types:
             self.agent_manager.set_active_agents(agent_types)
         
@@ -113,7 +116,7 @@ class MineSearchOrchestratorV2:
             return []
         
         # Get cancellation token
-        cancellation_token = search_params.get('cancellation_token')
+        cancellation_token = safe_get(search_params, 'cancellation_token')
         
         try:
             # Execute search with chosen strategy
@@ -130,7 +133,7 @@ class MineSearchOrchestratorV2:
             aggregated_results = self.aggregator.aggregate_results(results)
             
             # Save to database if enabled
-            if search_params.get('save_to_db', True):
+            if safe_get(search_params, 'save_to_db', True):
                 await self._save_results_to_db(query, aggregated_results)
             
             return aggregated_results
@@ -166,7 +169,11 @@ class MineSearchOrchestratorV2:
         cancellation_token=None
     ) -> List:
         """Entdeckt Quellen für eine Mine"""
-        agents = self.agent_manager.get_active_agents()
+        # ÄNDERUNG 26.06.2025: Verwende ALLE verfügbaren Agenten für Source Discovery,
+        # nicht nur die vom User ausgewählten, um maximale Quellenabdeckung zu erreichen
+        agents = self.agent_manager.get_all_agents()
+        
+        self.logger.info(f"Source Discovery mit {len(agents)} Agenten (statt nur {len(self.agent_manager.get_active_agents())} aktiven)")
         
         sources = await self.source_discovery.discover_sources(
             query=query,
@@ -191,7 +198,7 @@ class MineSearchOrchestratorV2:
         for agent_type, stats in agent_stats.items():
             combined_stats[agent_type] = {
                 **stats,
-                'search_history': search_stats.get(stats.get('name', agent_type), [])
+                'search_history': safe_get(search_stats, safe_get(stats, 'name', agent_type), [])
             }
         
         return combined_stats
@@ -199,15 +206,43 @@ class MineSearchOrchestratorV2:
     async def cleanup(self):
         """Räumt alle Ressourcen auf"""
         self._report_status("🧹 Räume Orchestrator auf...")
+        self.logger.info("Starte Orchestrator-Cleanup...")
         
-        # ÄNDERUNG 23.06.2025: Schließe alle Sessions vor dem Cleanup
-        from .async_utils import get_session_manager
-        session_manager = get_session_manager()
-        await session_manager.close_all()
-        
-        await self.agent_manager.cleanup_agents()
-        self._initialized = False
-        self._report_status("✅ Orchestrator aufgeräumt")
+        try:
+            # ÄNDERUNG 23.06.2025: Schließe alle Sessions vor dem Cleanup
+            from src.utils.session_manager import SessionManager
+            session_manager = SessionManager()
+            await session_manager.close_all()
+            
+            # Räume Agent Manager auf (kümmert sich um alle Agenten)
+            await self.agent_manager.cleanup_agents()
+            
+            # Zusätzliche Cleanup-Aufgaben für einzelne Agenten
+            # Falls der agent_manager einige Agenten nicht erfasst hat
+            cleanup_tasks = []
+            for agent_name, agent in self.agents.items():
+                if hasattr(agent, 'cleanup') and agent not in self.agent_manager.agents.values():
+                    self.logger.debug(f"Zusätzlicher Cleanup für {agent_name}")
+                    cleanup_tasks.append(agent.cleanup())
+            
+            if cleanup_tasks:
+                # Führe zusätzliche Cleanups parallel aus
+                results = await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+                for i, result in enumerate(results):
+                    if isinstance(result, Exception):
+                        self.logger.warning(f"Cleanup-Fehler bei zusätzlichem Agent: {result}")
+            
+            # Setze Initialisierungsstatus zurück
+            self._initialized = False
+            
+            self._report_status("✅ Orchestrator erfolgreich aufgeräumt")
+            self.logger.info("Orchestrator-Cleanup abgeschlossen")
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Orchestrator-Cleanup: {e}")
+            self._report_status(f"⚠️ Warnung beim Cleanup: {str(e)}")
+            # Trotzdem als nicht initialisiert markieren
+            self._initialized = False
     
     def _get_staged_search(self):
         """Holt Staged Search Strategie"""
@@ -263,25 +298,6 @@ class MineSearchOrchestratorV2:
     def _determine_source_type(self, url: str, field_name: str = "") -> str:
         """Kompatibilität: Delegiert an SourceDiscoveryService"""
         return self.source_discovery._determine_source_type(url)
-    
-    async def cleanup(self):
-        """ÄNDERUNG 23.06.2025: Cleanup-Methode für sauberes Aufräumen"""
-        self.logger.info("Räume Orchestrator-Ressourcen auf...")
-        
-        # Räume alle Agenten auf
-        cleanup_tasks = []
-        for agent_name, agent in self.agents.items():
-            if hasattr(agent, 'cleanup'):
-                cleanup_tasks.append(agent.cleanup())
-        
-        if cleanup_tasks:
-            # Führe alle Cleanups parallel aus
-            results = await asyncio.gather(*cleanup_tasks, return_exceptions=True)
-            for agent_name, result in zip(self.agents.keys(), results):
-                if isinstance(result, Exception):
-                    self.logger.warning(f"Cleanup-Fehler bei {agent_name}: {result}")
-        
-        self.logger.info("Orchestrator-Cleanup abgeschlossen")
 
 
 # Kompatibilitäts-Klasse

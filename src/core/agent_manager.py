@@ -3,6 +3,7 @@ Author: rahn
 Datum: 22.06.2025
 Version: 1.0
 Beschreibung: Agent Manager für MineSearch - verwaltet Agent-Initialisierung und -Status
+# ÄNDERUNG 27.06.2025: SessionManager wird explizit übergeben
 """
 import asyncio
 from typing import Dict, List, Optional, Any
@@ -11,6 +12,7 @@ from datetime import datetime
 from src.agents.base_agent import BaseAgent, AgentStatus
 from src.agents.factory import AgentFactory
 from src.agents.openrouter.models import ModelRegistry
+from src.agents.openrouter.utils import parse_model_id, extract_model_key_from_agent_type, find_model_by_key
 from .config import Config
 from .logger import get_logger
 
@@ -18,8 +20,9 @@ from .logger import get_logger
 class AgentManager:
     """Verwaltet die Erstellung, Initialisierung und den Status von Agenten"""
     
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, session_manager):
         self.config = config
+        self.session_manager = session_manager
         self.agents: Dict[str, BaseAgent] = {}
         self.active_agents: List[str] = []
         self.logger = get_logger("agent_manager")
@@ -90,7 +93,7 @@ class AgentManager:
             if agent_type.startswith("openrouter_"):
                 return self._create_openrouter_agent(agent_type)
             else:
-                return AgentFactory.create_agent(agent_type, self.config)
+                return AgentFactory.create_agent(agent_type, self.config, session_manager=self.session_manager)
         except Exception as e:
             self.logger.error(f"Fehler beim Erstellen von Agent {agent_type}: {e}")
             return None
@@ -102,16 +105,12 @@ class AgentManager:
         model_suffix = agent_type.replace("openrouter_", "")
         model_id = None
         
-        # Search in both FREE_MODELS and PREMIUM_MODELS
+        # Search in both FREE_MODELS and PREMIUM_MODELS using robust parser
         all_models = {**ModelRegistry.get_free_models(), **ModelRegistry.get_premium_models()}
-        for mid, model in all_models.items():
-            model_key = mid.split('/')[-1].split(':')[0]
-            if model_key == model_suffix:
-                model_id = mid
-                break
+        model_id, _ = find_model_by_key(model_suffix, all_models)
         
         if model_id:
-            return AgentFactory.create_agent(agent_type, self.config, model_id=model_id)
+            return AgentFactory.create_agent(agent_type, self.config, session_manager=self.session_manager, model_id=model_id)
         else:
             self.logger.warning(f"Model ID not found for {agent_type}")
             return None
@@ -133,6 +132,10 @@ class AgentManager:
     def get_active_agents(self) -> List[BaseAgent]:
         """Gibt alle aktiven Agenten zurück"""
         return [self.agents[agent_type] for agent_type in self.active_agents]
+    
+    def get_all_agents(self) -> List[BaseAgent]:
+        """Gibt alle verfügbaren Agenten zurück (nicht nur die aktiven)"""
+        return list(self.agents.values())
     
     def set_active_agents(self, agent_types: List[str]):
         """Setzt die Liste der aktiven Agenten"""
