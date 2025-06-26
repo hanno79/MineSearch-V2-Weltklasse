@@ -34,7 +34,12 @@ class ResearchPhaseManager:
             name: agent for name, agent in self.agents.items()
             if name in ['scraper', 'brightdata', 'scrapingbee', 'apify', 'firecrawl']
         }
-        self.web_crawler = DeepWebCrawler(scraper_agents)
+        # ÄNDERUNG 23.06.2025: Korrektur der DeepWebCrawler Initialisierung
+        self.web_crawler = DeepWebCrawler(
+            name="premium_web_crawler",
+            config={},
+            scraper_agents=scraper_agents
+        )
         
         # Cache für Quellen
         self.source_cache = {}

@@ -9,7 +9,8 @@ from typing import List, Dict, Any, Optional, Union
 from datetime import datetime
 import re
 import hashlib
-from ..base_agent import SearchResult, MineQuery
+from ..base_agent import SearchResult
+from src.utils.safe_dict_access import safe_get, safe_nested_get, ensure_dict, ensure_list, MineQuery
 import logging
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,7 @@ class ResultProcessor:
         
         # SearchResult erwartet spezifische Felder
         return SearchResult(
-            mine_name=metadata.get('mine_name', ''),
+            mine_name=safe_get(metadata, 'mine_name', ''),
             field_name='general_info',  # Wird von Subklassen überschrieben
             value={
                 'title': self._clean_text(title),
@@ -73,7 +74,7 @@ class ResultProcessor:
             },
             source=self.agent_name,
             source_url=url,
-            source_date=metadata.get('source_date'),
+            source_date=safe_get(metadata, 'source_date'),
             confidence_score=self._normalize_confidence(confidence),
             agent_name=self.agent_name,
             timestamp=datetime.now(),
@@ -253,7 +254,7 @@ class ResultProcessor:
             "diamond": ["diamond", "diamant", "diamantmine", "diamond mine"],
         }
         
-        return keywords_map.get(mining_type.lower(), [mining_type.lower()])
+        return safe_get(keywords_map, mining_type.lower(), [mining_type.lower()])
     
     def deduplicate_across_sources(self, 
                                   all_results: List[SearchResult]) -> List[SearchResult]:

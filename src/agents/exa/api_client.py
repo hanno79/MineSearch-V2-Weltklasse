@@ -10,6 +10,7 @@ import asyncio
 from typing import Dict, Any, Optional, List
 from ..rate_limiter import RateLimiter
 from src.core.logger import get_logger
+from .utils import normalize_domains_for_exa
 
 class ExaAPIClient:
     """API Client für Exa Search Calls"""
@@ -21,6 +22,8 @@ class ExaAPIClient:
         self.rate_limiter = RateLimiter(rate=20, per=60.0)  # 20 Anfragen pro Minute
         self.logger = get_logger(__name__)
         self.timeout = aiohttp.ClientTimeout(total=120)
+        # ÄNDERUNG 24.06.2025: Premium Exa Research Model
+        self.model = "exa-research-pro"
         
     async def search(self, query_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Führt eine Suche über Exa API durch"""
@@ -30,6 +33,18 @@ class ExaAPIClient:
             "x-api-key": self.api_key,
             "Content-Type": "application/json"
         }
+        
+        # ÄNDERUNG 24.06.2025: Model-Parameter hinzufügen für exa-research-pro
+        if "model" not in query_config:
+            query_config["model"] = self.model
+            query_config["enhanced_search"] = True
+        
+        # ÄNDERUNG 24.06.2025: Bereinige Domains auf Basis-Domains mit neuer Utility
+        if "include_domains" in query_config:
+            query_config["include_domains"] = normalize_domains_for_exa(
+                query_config["include_domains"], 
+                max_domains=20
+            )
         
         try:
             async with self.session.post(
@@ -123,3 +138,4 @@ class ExaAPIClient:
         except Exception as e:
             self.logger.error(f"Exa contents Fehler: {e}")
             return None
+    

@@ -433,10 +433,15 @@ class SidebarComponent:
         ])
         
         # Select agents
+        default_agents = []
+        if "perplexity" in available_agents:
+            default_agents.append("perplexity")
+        if "perplexity_deep" in available_agents:
+            default_agents.append("perplexity_deep")
         selected_agents = st.multiselect(
             "Select Agents",
             available_agents,
-            default=["tavily", "perplexity"] if "tavily" in available_agents else [],
+            default=default_agents,
             help="Choose which agents to use for the search"
         )
         

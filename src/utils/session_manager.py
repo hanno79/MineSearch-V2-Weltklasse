@@ -33,12 +33,9 @@ class RobustSession:
         
     async def _create_session(self) -> aiohttp.ClientSession:
         """Erstellt eine neue Session mit robusten Einstellungen"""
-        timeout = aiohttp.ClientTimeout(
-            total=self.timeout,
-            connect=10,
-            sock_connect=10,
-            sock_read=self.timeout
-        )
+        # ÄNDERUNG 26.06.2025: Erstelle Session ohne default timeout,
+        # um 'Timeout context manager should be used inside a task' zu vermeiden
+        timeout = None  # Timeout wird pro Request gesetzt
         
         connector = aiohttp.TCPConnector(
             limit=self.connector_limit,
@@ -113,15 +110,34 @@ class RobustSession:
         """Context Manager für robuste Requests mit automatischer Session-Verwaltung"""
         session = await self.get_session()
         
-        # Überschreibe Timeout falls in kwargs angegeben
+        # ÄNDERUNG 26.06.2025: Verbesserte Timeout-Behandlung
+        # Setze Timeout nur wenn wir in einem Task sind
         if 'timeout' in kwargs:
             timeout_value = kwargs.pop('timeout')
             if isinstance(timeout_value, (int, float)):
-                kwargs['timeout'] = aiohttp.ClientTimeout(total=timeout_value)
+                try:
+                    # Prüfe ob wir in einem Task sind
+                    asyncio.current_task()
+                    kwargs['timeout'] = aiohttp.ClientTimeout(total=timeout_value)
+                except RuntimeError:
+                    # Nicht in einem Task, verwende Session ohne Timeout
+                    logger.debug("Nicht in einem Task, verwende Request ohne Timeout")
+                    pass
+        
+        # ÄNDERUNG 26.06.2025: Unterstütze Cancellation Token
+        cancellation_token = kwargs.pop('cancellation_token', None)
         
         try:
+            # Prüfe Cancellation vor Request
+            if cancellation_token and cancellation_token.is_cancelled():
+                raise asyncio.CancelledError("Request cancelled before execution")
+                
             async with session.request(method, url, **kwargs) as response:
                 yield response
+                
+        except asyncio.CancelledError:
+            logger.info(f"Request zu {url} wurde abgebrochen")
+            raise
         except aiohttp.ClientError as e:
             # Bei bestimmten Fehlern Session neu erstellen
             if isinstance(e, (aiohttp.ServerDisconnectedError, aiohttp.ClientOSError)):
@@ -145,6 +161,8 @@ class SessionManager:
         self._cleanup_task: Optional[asyncio.Task] = None
         # Verwende WeakValueDictionary für automatisches Cleanup
         self._weak_sessions = weakref.WeakValueDictionary()
+        # ÄNDERUNG 26.06.2025: Track Cancellation Tokens für Sessions
+        self._cancellation_tokens: Dict[str, Any] = {}
         
     async def get_session(self, agent_id: str, **session_kwargs) -> aiohttp.ClientSession:
         logger.debug(f"[SessionManager] get_session({agent_id}) aufgerufen im Loop {id(asyncio.get_event_loop())}")
@@ -164,6 +182,15 @@ class SessionManager:
                 self._weak_sessions[agent_id] = self._sessions[agent_id]
                 
             return self._sessions[agent_id]
+    
+    def register_cancellation_token(self, agent_id: str, token):
+        """ÄNDERUNG 26.06.2025: Registriert einen Cancellation Token für einen Agenten"""
+        self._cancellation_tokens[agent_id] = token
+    
+    async def cancel_agent_session(self, agent_id: str, reason: str = "Cancelled"):
+        """ÄNDERUNG 26.06.2025: Bricht die Session eines Agenten ab und schließt sie"""
+        logger.info(f"Breche Session für {agent_id} ab: {reason}")
+        await self.close_session(agent_id)
     
     async def close_session(self, agent_id: str):
         logger.debug(f"[SessionManager] close_session({agent_id}) im Loop {id(asyncio.get_event_loop())}")
@@ -185,6 +212,7 @@ class SessionManager:
             if close_tasks:
                 await asyncio.gather(*close_tasks, return_exceptions=True)
             self._sessions.clear()
+            self._cancellation_tokens.clear()  # ÄNDERUNG: Clear tokens
             logger.info("Alle Sessions geschlossen")
     
     async def start_cleanup_task(self):
@@ -209,15 +237,25 @@ class SessionManager:
                 async with self._lock:
                     to_remove = []
                     for agent_id in list(self._sessions.keys()):
-                        if agent_id not in self._weak_sessions:
+                        # ÄNDERUNG: Prüfe auch ob Cancellation Token gesetzt und abgebrochen wurde
+                        is_cancelled = False
+                        if agent_id in self._cancellation_tokens:
+                            token = self._cancellation_tokens[agent_id]
+                            if hasattr(token, 'is_cancelled') and token.is_cancelled():
+                                is_cancelled = True
+                                
+                        if agent_id not in self._weak_sessions or is_cancelled:
                             to_remove.append(agent_id)
+                            
                     for agent_id in to_remove:
-                        logger.debug(f"Cleanup: Entferne nicht mehr referenzierte Session {agent_id}")
+                        logger.debug(f"Cleanup: Entferne {'abgebrochene' if agent_id in self._cancellation_tokens else 'nicht mehr referenzierte'} Session {agent_id}")
                         try:
                             await self._sessions[agent_id].close()
                         except:
                             pass
                         del self._sessions[agent_id]
+                        if agent_id in self._cancellation_tokens:
+                            del self._cancellation_tokens[agent_id]
             except asyncio.CancelledError:
                 logger.debug(f"[SessionManager] _periodic_cleanup() abgebrochen im Loop {id(asyncio.get_event_loop())}")
                 break

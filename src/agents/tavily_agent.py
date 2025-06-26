@@ -18,7 +18,10 @@ from .rate_limiter import RateLimiter
 from .enhanced_search import get_mining_search_queries, get_mining_domains
 from .search_strategies import SearchStrategies
 from src.core.logger import get_logger, PerformanceLogger
+from src.utils.safe_dict_access import safe_get, safe_nested_get, ensure_dict, ensure_list
 from src.utils.retry_utils import async_retry
+from src.core.monitoring import record_api_call
+from src.utils.session_manager import SessionManager
 
 
 class TavilyAgent(BaseAgent):
@@ -28,22 +31,28 @@ class TavilyAgent(BaseAgent):
         super().__init__(name, config)
         self.api_key = config['api_config'].tavily_key
         self.base_url = "https://api.tavily.com/search"
-        self._rate_limiter = RateLimiter(rate=30, per=60.0)  # 30 Anfragen pro Minute
+        # ÄNDERUNG 23.06.2025: Reduzierte Rate Limits zur Vermeidung von API-Limit Fehlern
+        self._rate_limiter = RateLimiter(rate=5, per=60.0)  # Nur 5 Anfragen pro Minute
         self.logger = get_logger(f"agent.{name}", agent_type="tavily")
         self.search_builder = SearchStrategies()
         self.perf_logger = PerformanceLogger(self.logger)
+        # Request-Cache zur Vermeidung von Duplikaten
+        self._request_cache = {}
+        self._cache_ttl = 300  # 5 Minuten Cache
         
     async def _ensure_session(self):
-        """ÄNDERUNG 23.06.2025: Nutzt globalen Session Manager"""
-        from src.core.async_utils import get_session_manager
-        session_manager = get_session_manager()
-        self._session = await session_manager.get_session(f"tavily_{self.name}")
+        """ÄNDERUNG 25.06.2025: Nutzt robustes Session Management"""
+        if not hasattr(self, '_robust_session') or not hasattr(self, '_session_manager'):
+            if not hasattr(self, '_session_manager'):
+                self._session_manager = SessionManager()
+            self._robust_session = await self._session_manager.get_robust_session(f"tavily_{self.name}", timeout=60)
     
     async def initialize(self) -> bool:
         """Initialisiert den Agenten"""
         try:
-            # ÄNDERUNG 23.06.2025: Nutze Session Manager
-            await self._ensure_session()
+            # ÄNDERUNG 25.06.2025: Nutze robustes Session Management mit SessionManager Instanz
+            self._session_manager = SessionManager()
+            self._robust_session = await self._session_manager.get_robust_session(f"tavily_{self.name}", timeout=60)
             
             is_valid = await self.validate_credentials()
             if not is_valid:
@@ -59,8 +68,10 @@ class TavilyAgent(BaseAgent):
     
     async def cleanup(self):
         """Räumt Ressourcen auf"""
-        if hasattr(self, '_session') and self._session:
-            await self._session.close()
+        # ÄNDERUNG 25.06.2025: Nutze SessionManager für Cleanup
+        if hasattr(self, '_session_manager'):
+            await self._session_manager.close_session(f"tavily_{self.name}")
+        self.logger.info("Tavily Agent beendet")
     
     async def validate_credentials(self) -> bool:
         """Validiert API-Key mit Test-Anfrage"""
@@ -79,10 +90,11 @@ class TavilyAgent(BaseAgent):
                 "max_results": 1
             }
             
-            async with self._session.post(
+            async with self._robust_session.request(
+                'POST',
                 self.base_url,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=10)
+                timeout=10
             ) as response:
                 return response.status == 200
                 
@@ -94,6 +106,186 @@ class TavilyAgent(BaseAgent):
         """Alias für search_mine - für Kompatibilität mit Source Discovery"""
         return await self.search_mine(query)
     
+    def _optimize_query_length(self, query: str, max_length: int = 395) -> str:
+        """
+        ÄNDERUNG 24.06.2025: Zentrale Query-Optimierung für Tavily 400-Zeichen-Limit
+        Intelligente Kürzung ohne Informationsverlust
+        """
+        # Bereinige Query zuerst
+        query = self._clean_query(query)
+        
+        if len(query) <= max_length:
+            return query
+        
+        # Strategie 1: Entferne Duplikate und Redundanzen
+        query = self._remove_redundancies(query)
+        if len(query) <= max_length:
+            return query
+        
+        # Strategie 2: Priorisiere wichtige Komponenten
+        components = self._extract_query_components(query)
+        optimized = self._rebuild_query(components, max_length)
+        
+        # Sicherstellen dass Query nicht zu kurz wird
+        if len(optimized) < 20:
+            # Fallback: Harte Kürzung mit Ellipsis
+            return query[:max_length-3] + "..."
+        
+        return optimized
+    
+    def _clean_query(self, query: str) -> str:
+        """Bereinigt Query von überflüssigen Zeichen und Leerzeichen"""
+        # Entferne mehrfache Leerzeichen
+        query = ' '.join(query.split())
+        # Entferne überflüssige Anführungszeichen
+        query = re.sub(r'""', '"', query)
+        # Entferne leere Klammern
+        query = re.sub(r'\(\s*\)', '', query)
+        query = re.sub(r'\[\s*\]', '', query)
+        return query.strip()
+    
+    def _remove_redundancies(self, query: str) -> str:
+        """Entfernt redundante Begriffe aus Query"""
+        # Extrahiere alle Wörter in Anführungszeichen
+        quoted_terms = re.findall(r'"([^"]+)"', query)
+        
+        # Finde und entferne Duplikate (case-insensitive)
+        seen = set()
+        for term in quoted_terms:
+            normalized = term.lower().strip()
+            if normalized in seen:
+                # Entferne das Duplikat
+                query = query.replace(f'"{term}"', '', 1)
+            else:
+                seen.add(normalized)
+        
+        # Entferne doppelte Wörter außerhalb von Anführungszeichen
+        words = []
+        seen_words = set()
+        in_quotes = False
+        current_word = ""
+        
+        for char in query + " ":
+            if char == '"':
+                in_quotes = not in_quotes
+                current_word += char
+            elif char == ' ' and not in_quotes:
+                if current_word:
+                    word_lower = current_word.lower()
+                    if word_lower not in seen_words or current_word.startswith('"'):
+                        words.append(current_word)
+                        if not current_word.startswith('"'):
+                            seen_words.add(word_lower)
+                    current_word = ""
+            else:
+                current_word += char
+        
+        return ' '.join(words)
+    
+    def _extract_query_components(self, query: str) -> dict:
+        """Extrahiert und priorisiert Query-Komponenten"""
+        components = {
+            'mine_name': '',
+            'location': '',
+            'country': '',
+            'primary_terms': [],
+            'secondary_terms': [],
+            'site_restrictions': [],
+            'operators': []
+        }
+        
+        # Extrahiere Mine-Name (höchste Priorität)
+        mine_match = re.search(r'"([^"]+)"\s*(?:mine)?', query)
+        if mine_match:
+            components['mine_name'] = mine_match.group(0)
+            query = query.replace(mine_match.group(0), '')
+        
+        # Extrahiere Site-Restriktionen
+        site_matches = re.findall(r'site:\S+', query)
+        components['site_restrictions'] = site_matches[:2]  # Max 2 Sites
+        for site in site_matches:
+            query = query.replace(site, '')
+        
+        # Extrahiere OR-Operatoren
+        or_matches = re.findall(r'\bOR\b', query)
+        components['operators'] = or_matches[:2]  # Max 2 OR
+        
+        # Extrahiere Länder und Regionen
+        location_keywords = ['Canada', 'Quebec', 'Ontario', 'Australia', 'USA', 'Chile']
+        for loc in location_keywords:
+            if loc in query:
+                components['location'] = loc
+                components['country'] = loc if loc in ['Canada', 'Australia', 'USA', 'Chile'] else 'Canada'
+                break
+        
+        # Kategorisiere verbleibende Begriffe
+        remaining_words = query.split()
+        priority_keywords = ['operator', 'coordinates', 'GPS', 'production', 'closure', 'costs', 
+                           'environmental', 'report', 'assessment', 'NI 43-101', 'annual']
+        
+        for word in remaining_words:
+            if word.lower() in [k.lower() for k in priority_keywords]:
+                components['primary_terms'].append(word)
+            elif len(word) > 3 and word not in components['operators']:
+                components['secondary_terms'].append(word)
+        
+        return components
+    
+    def _rebuild_query(self, components: dict, max_length: int) -> str:
+        """Baut optimierte Query aus Komponenten"""
+        # Beginne mit Mine-Name (essential)
+        parts = []
+        if components['mine_name']:
+            parts.append(components['mine_name'])
+        
+        # Füge Location hinzu wenn Platz
+        current_length = len(' '.join(parts))
+        if components['location'] and current_length + len(components['location']) + 1 < max_length - 50:
+            parts.append(components['location'])
+        
+        # Füge primäre Begriffe hinzu
+        current_length = len(' '.join(parts))
+        for term in components['primary_terms'][:5]:  # Max 5 primäre Begriffe
+            if current_length + len(term) + 1 < max_length - 20:
+                parts.append(term)
+                current_length += len(term) + 1
+        
+        # Füge Site-Restriktionen hinzu wenn Platz
+        current_length = len(' '.join(parts))
+        for site in components['site_restrictions'][:1]:  # Max 1 Site
+            if current_length + len(site) + 1 < max_length:
+                # Füge auch OR hinzu wenn vorhanden
+                if components['operators'] and 'OR' in components['operators']:
+                    parts.append(site)
+                    parts.append('OR')
+                    current_length += len(site) + 4
+                else:
+                    parts.append(site)
+                    current_length += len(site) + 1
+        
+        # Füge weitere Site-Restriktionen hinzu wenn OR vorhanden
+        if len(components['site_restrictions']) > 1 and 'OR' in components.get('operators', []):
+            for site in components['site_restrictions'][1:2]:  # Noch eine Site
+                if current_length + len(site) + 1 < max_length:
+                    parts.append(site)
+                    current_length += len(site) + 1
+        
+        # Füge sekundäre Begriffe hinzu wenn noch Platz
+        current_length = len(' '.join(parts))
+        for term in components['secondary_terms'][:3]:  # Max 3 sekundäre Begriffe
+            if current_length + len(term) + 1 < max_length:
+                parts.append(term)
+                current_length += len(term) + 1
+            else:
+                break
+        
+        return ' '.join(parts)
+    
+    def _create_query_hash(self, query: str) -> str:
+        """Erstellt einen Hash für Query-Caching"""
+        import hashlib
+        return hashlib.md5(query.encode()).hexdigest()[:10]
+
     async def search_mine(self, query: MineQuery) -> List[SearchResult]:
         """Führt Suche mit Tavily durch"""
         results = []
@@ -109,32 +301,83 @@ class TavilyAgent(BaseAgent):
                 query.required_fields
             )
             
-            # Execute multiple enhanced queries (increased limit for broader search)
-            query_limit = min(30, len(enhanced_queries))  # Increased from 15 to 30
+            # ÄNDERUNG 23.06.2025: Reduzierte Query-Anzahl zur Vermeidung von API-Limits
+            query_limit = min(5, len(enhanced_queries))  # Reduziert auf max. 5 Queries
             self.logger.info(f"Tavily executing {query_limit} enhanced queries from {len(enhanced_queries)} total")
             
-            for idx, search_query in enumerate(enhanced_queries[:query_limit]):
-                self.logger.info(f"Tavily Enhanced Search {idx+1}/{query_limit}: {search_query[:100]}...")
+            for idx, original_query in enumerate(enhanced_queries[:query_limit]):
+                # ÄNDERUNG 24.06.2025: Prüfe Query-Länge VOR Verarbeitung
+                if len(original_query) > 380:
+                    self.logger.warning(f"Query {idx+1} zu lang ({len(original_query)} Zeichen): {original_query[:100]}...")
+                    # Kürze Query auf sicheres Maximum
+                    original_query = original_query[:377] + "..."
                 
-                response = await self._make_enhanced_api_call(search_query, query)
-                if response:
-                    parsed_results = self._parse_response(response, query, f"enhanced_{idx+1}")
-                    results.extend(parsed_results)
+                # ÄNDERUNG 24.06.2025: Optimiere Query-Länge
+                search_query = self._optimize_query_length(original_query)
+                
+                # Nur eine optimierte Query pro enhanced query
+                for part_idx, search_query in enumerate([search_query]):
+                    # Check Cache
+                    cache_key = f"{query.mine_name}_{search_query[:50]}_{part_idx}"
+                    if cache_key in self._request_cache:
+                        cached_time, cached_response = self._request_cache[cache_key]
+                        if (datetime.now() - cached_time).seconds < self._cache_ttl:
+                            self.logger.info(f"Using cached response for query {idx+1} part {part_idx+1}")
+                            parsed_results = self._parse_response(cached_response, query, f"enhanced_{idx+1}_p{part_idx+1}_cached")
+                            results.extend(parsed_results)
+                            continue
                     
-                await asyncio.sleep(0.3)  # Reduced pause for faster execution
+                    self.logger.info(f"Tavily Enhanced Search {idx+1}/{query_limit} Part {part_idx+1}/1: {search_query[:100]}...")
+                    
+                    response = await self._make_enhanced_api_call(search_query, query)
+                    if response:
+                        # Cache successful response
+                        self._request_cache[cache_key] = (datetime.now(), response)
+                        parsed_results = self._parse_response(response, query, f"enhanced_{idx+1}_p{part_idx+1}")
+                        results.extend(parsed_results)
+                    
+                    await asyncio.sleep(1.5)  # Pause zwischen Query-Teilen
+                    
+                await asyncio.sleep(2.0)  # Erhöhte Pause zwischen Haupt-Requests
             
-            # Also run original specialized queries
+            # ÄNDERUNG 23.06.2025: Begrenzte spezialisierte Queries
             search_queries = self._create_search_queries(query)
             
+            # Nur die wichtigsten 2 spezialisierten Queries ausführen
+            priority_queries = ['comprehensive', 'government']
+            executed_specialized = 0
+            
             for search_type, search_query in search_queries.items():
+                if executed_specialized >= 2 or search_type not in priority_queries:
+                    continue
+                
+                # ÄNDERUNG 24.06.2025: Prüfe Query-Länge für spezialisierte Queries
+                if len(search_query) > 380:
+                    self.logger.warning(f"Spezialisierte Query '{search_type}' zu lang ({len(search_query)} Zeichen)")
+                    search_query = search_query[:377] + "..."
+                    
+                # Check Cache für spezialisierte Queries
+                cache_key = f"{query.mine_name}_{search_type}"
+                if cache_key in self._request_cache:
+                    cached_time, cached_response = self._request_cache[cache_key]
+                    if (datetime.now() - cached_time).seconds < self._cache_ttl:
+                        self.logger.info(f"Using cached response for {search_type}")
+                        parsed_results = self._parse_response(cached_response, query, f"{search_type}_cached")
+                        results.extend(parsed_results)
+                        executed_specialized += 1
+                        continue
+                
                 self.logger.info(f"Tavily-Spezialisierte Suche: {search_type}")
                 
                 response = await self._make_enhanced_api_call(search_query, query)
                 if response:
+                    # Cache successful response
+                    self._request_cache[cache_key] = (datetime.now(), response)
                     parsed_results = self._parse_response(response, query, search_type)
                     results.extend(parsed_results)
+                    executed_specialized += 1
                     
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(3.0)  # Längere Pause für API-Schonung
             
             self.perf_logger.end_timer(
                 f"tavily_search_{query.mine_name}",
@@ -175,9 +418,9 @@ class TavilyAgent(BaseAgent):
             # Konvertiere Liste von Queries zu Dict
             for idx, query_item in enumerate(specialized_queries):
                 if isinstance(query_item, dict):
-                    field = query_item.get('field', f'query_{idx}')
-                    query_text = query_item.get('query', '')
-                    priority = query_item.get('priority', 'medium')
+                    field = safe_get(query_item, 'field', f'query_{idx}')
+                    query_text = safe_get(query_item, 'query', '')
+                    priority = safe_get(query_item, 'priority', 'medium')
                     
                     if query_text:
                         queries[f'{field}_{priority}'] = query_text
@@ -199,21 +442,42 @@ class TavilyAgent(BaseAgent):
             self.logger.error(f"Unerwarteter Typ für specialized_queries: {type(specialized_queries)}")
             # Fallback zu leerer Query-Liste
         
-        # Füge generelle Queries hinzu
-        queries['comprehensive'] = f'"{query.mine_name}" mine {" ".join(query.required_fields)} {query.region} {query.country}'
+        # ÄNDERUNG 24.06.2025: Optimierte Query-Erstellung für Tavily (max 380 chars)
+        # Basis-Query (kompakt)
+        base_query = f'"{query.mine_name}" mine {query.region} {query.country}'
         
-        # ÄNDERUNG 21.06.2025: Nutze site_recommendations statt gov_sites_by_country
-        # Hole länderspezifische Seiten über get_site_recommendations
-        if query.country.lower() == 'canada':
-            gov_sites = ['nrcan.gc.ca', 'mern.gouv.qc.ca', 'mining.ca', 'ec.gc.ca']
-            site_filter = " OR ".join([f"site:{site}" for site in gov_sites])
-            queries['government'] = f'"{query.mine_name}" ({site_filter})'
+        # Optimiere alle Queries mit zentraler Funktion
+        optimized_queries = {}
+        for key, q in queries.items():
+            optimized_queries[key] = self._optimize_query_length(q, max_length=395)
         
-        return queries
+        # Basis-Query (immer dabei)
+        if len(base_query) < 350 and query.required_fields:
+            optimized_queries['comprehensive'] = self._optimize_query_length(
+                f'{base_query} {query.required_fields[0]}', max_length=395
+            )
+        else:
+            optimized_queries['comprehensive'] = self._optimize_query_length(base_query, max_length=395)
+        
+        # Government Query (nur wenn sinnvoll)
+        if query.country.lower() == 'canada' and len(base_query) < 250:
+            gov_query = f'{base_query} site:gc.ca OR site:gouv.qc.ca'
+            optimized_queries['government'] = self._optimize_query_length(gov_query, max_length=395)
+        
+        return optimized_queries
     
     async def _make_enhanced_api_call(self, query: str, mine_query: MineQuery) -> Optional[Dict[str, Any]]:
         """Enhanced API call with mining-specific domains"""
         await self._rate_limiter.acquire()
+        import asyncio
+        start_time = asyncio.get_event_loop().time()  # ÄNDERUNG 23.06.2025: Timing für Monitoring
+        
+        # ÄNDERUNG 24.06.2025: Nutze zentrale Query-Optimierung
+        original_length = len(query)
+        query = self._optimize_query_length(query, max_length=395)
+        
+        if original_length > 395:
+            self.logger.info(f"Query optimiert: {original_length} -> {len(query)} Zeichen")
         
         # Extrahiere Feldtyp aus Query-Name für Site-Empfehlungen
         field_type = None
@@ -266,10 +530,11 @@ class TavilyAgent(BaseAgent):
             # Stelle sicher, dass Session verfügbar ist
             await self._ensure_session()
             
-            async with self._session.post(
+            async with self._robust_session.request(
+                'POST',
                 self.base_url,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=60)  # Increased timeout for deeper searches
+                timeout=60  # Increased timeout for deeper searches
             ) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -277,6 +542,14 @@ class TavilyAgent(BaseAgent):
                 else:
                     error_text = await response.text()
                     self.logger.error(f"API Fehler: {response.status} - {error_text}")
+                    
+                    # ÄNDERUNG 23.06.2025: Spezielle Behandlung für Rate Limit Fehler
+                    if response.status == 433:
+                        self.logger.warning("Tavily API Rate Limit erreicht - Agent wird temporär deaktiviert")
+                        self.status = AgentStatus.RATE_LIMITED
+                        # Setze längere Wartezeit
+                        self._rate_limiter = RateLimiter(rate=1, per=120.0)  # Nur 1 Request alle 2 Minuten
+                    
                     return None
                     
         except asyncio.TimeoutError:
@@ -325,10 +598,11 @@ class TavilyAgent(BaseAgent):
             # Stelle sicher, dass Session verfügbar ist
             await self._ensure_session()
             
-            async with self._session.post(
+            async with self._robust_session.request(
+                'POST',
                 self.base_url,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=30
             ) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -336,6 +610,14 @@ class TavilyAgent(BaseAgent):
                 else:
                     error_text = await response.text()
                     self.logger.error(f"API Fehler: {response.status} - {error_text}")
+                    
+                    # ÄNDERUNG 23.06.2025: Spezielle Behandlung für Rate Limit Fehler
+                    if response.status == 433:
+                        self.logger.warning("Tavily API Rate Limit erreicht - Agent wird temporär deaktiviert")
+                        self.status = AgentStatus.RATE_LIMITED
+                        # Setze längere Wartezeit
+                        self._rate_limiter = RateLimiter(rate=1, per=120.0)  # Nur 1 Request alle 2 Minuten
+                    
                     return None
                     
         except asyncio.TimeoutError:
@@ -373,9 +655,9 @@ class TavilyAgent(BaseAgent):
             # Zusätzlich aus einzelnen Suchergebnissen
             if 'results' in response:
                 for result in response['results'][:5]:  # Top 5 Ergebnisse
-                    title = result.get('title', '')
-                    content = result.get('content', '')
-                    url = result.get('url', '')
+                    title = safe_get(result, 'title', '')
+                    content = safe_get(result, 'content', '')
+                    url = safe_get(result, 'url', '')
                     
                     # Extrahiere spezifische Felder
                     extracted = self._extract_from_content(
@@ -464,10 +746,3 @@ class TavilyAgent(BaseAgent):
         """Alias für search_mine - für Kompatibilität mit Source Discovery"""
         return await self.search_mine(query)
     
-    async def cleanup(self):
-        """Räumt Ressourcen auf"""
-        # ÄNDERUNG 23.06.2025: Nutze Session Manager für Cleanup
-        from src.core.async_utils import get_session_manager
-        session_manager = get_session_manager()
-        await session_manager.close_session(f"tavily_{self.name}")
-        self.logger.info("Tavily Agent beendet")

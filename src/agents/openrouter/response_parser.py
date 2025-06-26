@@ -12,6 +12,7 @@ from datetime import datetime
 import logging
 
 from ..base_agent import SearchResult, MineQuery
+from src.utils.safe_dict_access import safe_get, safe_nested_get, ensure_dict, ensure_list
 
 
 class OpenRouterResponseParser:
@@ -127,15 +128,15 @@ class OpenRouterResponseParser:
                     mine_name=query.mine_name,
                     field_name=field_name,
                     value=str(item['value']),
-                    source=item.get('source', f'OpenRouter {self.model_name}'),
+                    source=safe_get(item, 'source', f'OpenRouter {self.model_name}'),
                     source_url=None,
-                    source_date=item.get('date', datetime.now().year),
-                    confidence_score=float(item['confidence']),
+                    source_date=safe_get(item, 'date', datetime.now().year),
+                    confidence_score=float(safe_get(item, 'confidence', 0.5)),
                     agent_name=self.agent_name,
                     timestamp=datetime.now(),
                     metadata={
                         'model': self.model_name,
-                        'date': item.get('date', ''),
+                        'date': safe_get(item, 'date', ''),
                         'search_type': 'llm_mining_search'
                     }
                 )

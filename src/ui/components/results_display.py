@@ -27,8 +27,32 @@ class ResultsDisplayComponent:
         # Results header with count
         st.header(f"📊 Search Results ({len(search_results)} items)")
         
+        # ÄNDERUNG 26.06.2025: Konfidenz-Filter und Qualitäts-Metriken
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            # Konfidenz-Filter Slider
+            confidence_threshold = st.slider(
+                "🎯 Minimum Confidence Score",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.0,
+                step=0.1,
+                help="Filter results by confidence score"
+            )
+        
+        with col2:
+            # Qualitäts-Metriken
+            filtered_results = [r for r in search_results if r.get('confidence_score', 0) >= confidence_threshold]
+            avg_confidence = sum(r.get('confidence_score', 0) for r in filtered_results) / len(filtered_results) if filtered_results else 0
+            
+            st.metric(
+                "Average Confidence",
+                f"{avg_confidence:.1%}",
+                delta=f"{len(filtered_results)}/{len(search_results)} results"
+            )
+        
         # Export buttons
-        self._render_export_buttons(search_results)
+        self._render_export_buttons(filtered_results)
         
         # Display options
         display_mode = st.radio(
@@ -38,11 +62,11 @@ class ResultsDisplayComponent:
         )
         
         if display_mode == "Table View":
-            self._render_table_view(search_results)
+            self._render_table_view(filtered_results)
         elif display_mode == "Card View":
-            self._render_card_view(search_results)
+            self._render_card_view(filtered_results)
         else:
-            self._render_raw_data(search_results)
+            self._render_raw_data(filtered_results)
     
     def _render_export_buttons(self, results: List[Dict]):
         """Export-Funktionalität"""
@@ -123,12 +147,29 @@ class ResultsDisplayComponent:
             cols = ['Mine Name'] + [col for col in df.columns if col != 'Mine Name']
             df = df[cols]
             
-            # Style the dataframe
-            styled_df = df.style.set_properties(**{
-                'background-color': 'white',
-                'color': 'black',
-                'border-color': 'gray'
-            })
+            # ÄNDERUNG 26.06.2025: Farbkodierung für Tabellenansicht hinzufügen
+            # Füge Konfidenz-Spalte hinzu wenn nicht vorhanden
+            if 'confidence_scores' not in df.columns:
+                # Sammle Konfidenz-Scores für jede Mine
+                confidence_data = []
+                for mine_name in df['Mine Name']:
+                    mine_results = [r for r in results if r.get('mine_name') == mine_name]
+                    avg_conf = sum(r.get('confidence_score', 0.5) for r in mine_results) / len(mine_results) if mine_results else 0.5
+                    confidence_data.append(avg_conf)
+                df['Avg Confidence'] = confidence_data
+            
+            # Style the dataframe mit Farbkodierung
+            def color_confidence(val):
+                if isinstance(val, (int, float)):
+                    if val >= 0.8:
+                        return 'background-color: #d4edda'  # Light green
+                    elif val >= 0.6:
+                        return 'background-color: #fff3cd'  # Light yellow
+                    else:
+                        return 'background-color: #f8d7da'  # Light red
+                return ''
+            
+            styled_df = df.style.applymap(color_confidence, subset=['Avg Confidence'] if 'Avg Confidence' in df.columns else [])
             
             # Display with column configuration
             st.dataframe(
@@ -171,22 +212,48 @@ class ResultsDisplayComponent:
         field_name = result.get('field_name', 'Unknown')
         value = result.get('value', 'N/A')
         source = result.get('source', 'Unknown')
+        source_url = result.get('source_url', '')
         confidence = result.get('confidence_score', 0.5)
+        agent_name = result.get('agent_name', 'Unknown')
         
-        # Color based on confidence
+        # ÄNDERUNG 26.06.2025: Verbesserte Farbkodierung und Emojis
         if confidence >= 0.8:
-            color = "green"
+            color = "#28a745"  # Grün
+            emoji = "✅"
+            confidence_text = "High"
         elif confidence >= 0.6:
-            color = "orange"
+            color = "#ffc107"  # Gelb/Orange
+            emoji = "⚠️"
+            confidence_text = "Medium"
         else:
-            color = "red"
+            color = "#dc3545"  # Rot
+            emoji = "❌"
+            confidence_text = "Low"
         
-        # Result card
+        # Mache URLs klickbar
+        if source_url:
+            source_link = f'<a href="{source_url}" target="_blank" style="color: #007bff;">{source}</a>'
+        else:
+            source_link = source
+        
+        # Result card mit verbessertem Styling
         st.markdown(f"""
-        <div style="padding: 10px; border: 1px solid {color}; border-radius: 5px; margin-bottom: 10px;">
-            <strong>{field_name}</strong><br>
-            {value}<br>
-            <small>Source: {source} | Confidence: {confidence:.0%}</small>
+        <div style="padding: 15px; border: 2px solid {color}; border-radius: 8px; margin-bottom: 10px; background-color: rgba(255,255,255,0.9);">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div style="flex: 1;">
+                    <strong style="font-size: 16px;">{field_name}</strong><br>
+                    <span style="font-size: 14px; color: #333;">{value}</span>
+                </div>
+                <div style="text-align: right;">
+                    <span style="font-size: 24px;">{emoji}</span><br>
+                    <small style="color: {color};">{confidence_text}</small>
+                </div>
+            </div>
+            <hr style="margin: 10px 0; border: 0; border-top: 1px solid #eee;">
+            <small style="color: #666;">
+                <strong>Source:</strong> {source_link}<br>
+                <strong>Agent:</strong> {agent_name} | <strong>Confidence:</strong> {confidence:.1%}
+            </small>
         </div>
         """, unsafe_allow_html=True)
     

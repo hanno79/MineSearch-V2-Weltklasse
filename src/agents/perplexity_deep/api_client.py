@@ -9,6 +9,7 @@ import aiohttp
 import json
 from typing import Dict, Any, Optional, List
 from src.core.logger import get_logger
+from src.utils.model_validation import get_model_validator
 
 class PerplexityAPIClient:
     """API Client für Perplexity Deep Research Calls"""
@@ -19,12 +20,13 @@ class PerplexityAPIClient:
         self.base_url = "https://api.perplexity.ai"
         self.logger = get_logger(__name__)
         
-        # ÄNDERUNG 23.06.2025: Verwende gültige Perplexity Modelle
+        # ÄNDERUNG 26.06.2025: Aktualisierte Perplexity Models - verifiziert mit API Test
         self.models = {
-            "deep_research": "sonar-medium-online",  # Verwende sonar-medium als Deep Research
-            "reasoning": "sonar-medium-online",  # Reasoning Modell
-            "online": "sonar-small-online",  # Standard Online Modell  
-            "sonar": "sonar-small-online"  # Sonar für schnelle Suchen
+            "deep_research": "sonar-deep-research",  # Deep research model - braucht ~60s Response Zeit
+            "reasoning": "sonar-reasoning",  # Reasoning model (funktioniert)
+            "online": "sonar",  # Standard online model (funktioniert)
+            "sonar": "sonar",  # Basic model für schnelle Suchen (funktioniert)
+            "pro": "sonar-pro"  # Advanced search model (funktioniert)
         }
     
     async def deep_research_search(self, message: str, system_prompt: str,
@@ -38,6 +40,10 @@ class PerplexityAPIClient:
         # Wähle das richtige Modell
         model_name = self.models.get(model, self.models["online"])
         
+        # ÄNDERUNG 24.06.2025: Validiere Model
+        validator = get_model_validator()
+        model_name = validator.auto_fix_model("perplexity", model_name)
+        
         data = {
             "model": model_name,
             "messages": [
@@ -49,23 +55,24 @@ class PerplexityAPIClient:
             "return_citations": True,
             "search_recency_filter": "month",  # Fokus auf aktuelle Informationen
             "return_images": False,
-            "return_related_questions": True,
-            # Hypothetische Deep Research Parameter
-            "deep_research": {
-                "enabled": True,
-                "max_iterations": 5,
-                "sources_per_iteration": 20,
-                "confidence_threshold": 0.7,
-                "auto_refine": True
-            }
+            "return_related_questions": True
+            # ÄNDERUNG 24.06.2025: Entfernt hypothetische Deep Research Parameter
         }
         
         try:
+            # ÄNDERUNG 24.06.2025: Robustere Session-Prüfung
+            if self.session.closed:
+                self.logger.error("Session ist geschlossen - kann keinen API Call durchführen")
+                return None
+                
+            # ÄNDERUNG 26.06.2025: Erhöhtes Timeout für Deep Research (kann bis zu 60s dauern)
+            timeout_seconds = 180 if model == "deep_research" else 120
+            
             async with self.session.post(
                 f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=data,
-                timeout=aiohttp.ClientTimeout(total=120)
+                timeout=aiohttp.ClientTimeout(total=timeout_seconds)
             ) as response:
                 if response.status == 200:
                     return await response.json()
@@ -74,6 +81,9 @@ class PerplexityAPIClient:
                     self.logger.error(f"Perplexity API Fehler: {response.status} - {error_msg}")
                     return None
                     
+        except aiohttp.ClientError as e:
+            self.logger.error(f"Fehler bei Perplexity API Call (ClientError): {e}")
+            return None
         except Exception as e:
             self.logger.error(f"Fehler bei Perplexity API Call: {e}")
             return None

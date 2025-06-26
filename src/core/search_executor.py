@@ -141,14 +141,41 @@ class SearchExecutor:
             if cancellation_token and cancellation_token.is_cancelled():
                 raise CancellationException("Search cancelled")
             
-            # ÄNDERUNG 23.06.2025: Verwende search_mine statt search
-            # Create task with timeout
-            search_task = asyncio.create_task(agent.search_mine(query))
+            # ÄNDERUNG 26.06.2025: Setze Cancellation Token im Agent
+            if hasattr(agent, 'set_cancellation_token'):
+                agent.set_cancellation_token(cancellation_token)
+                self.logger.debug(f"Cancellation Token gesetzt für {agent.name}")
+            
+            # ÄNDERUNG 26.06.2025: Übergebe cancellation_token an Agent wenn unterstützt
+            if hasattr(agent, 'search_mine_with_cancellation'):
+                # Agent unterstützt direkte Cancellation
+                search_task = asyncio.create_task(
+                    agent.search_mine_with_cancellation(query, cancellation_token)
+                )
+            else:
+                # Legacy: Verwende search_mine ohne direkte Cancellation
+                # Der Agent sollte aber trotzdem den Token prüfen, wenn er gesetzt wurde
+                search_task = asyncio.create_task(agent.search_mine(query))
+            
+            # Register task with global registry if available
+            try:
+                from src.core.global_cancellation_registry import get_global_cancellation_registry
+                registry = get_global_cancellation_registry()
+                search_id = getattr(cancellation_token, 'name', 'unknown')
+                if search_id and search_id != 'unknown':
+                    registry.register_task(search_id.replace('search_', ''), search_task)
+            except:
+                pass  # Registry nicht verfügbar
             
             # Wait with cancellation check
             while not search_task.done():
                 if cancellation_token and cancellation_token.is_cancelled():
                     search_task.cancel()
+                    # Give task time to cancel
+                    try:
+                        await asyncio.wait_for(search_task, timeout=0.1)
+                    except (asyncio.TimeoutError, asyncio.CancelledError):
+                        pass
                     raise CancellationException("Search cancelled")
                 
                 try:
@@ -192,6 +219,18 @@ class SearchExecutor:
         cancellation_token: Optional[CancellationToken]
     ) -> List:
         """Führt Tasks parallel aus"""
+        # ÄNDERUNG 26.06.2025: Bei Cancellation alle Tasks abbrechen
+        if cancellation_token:
+            def cancel_all_tasks():
+                for task in tasks:
+                    if asyncio.iscoroutine(task):
+                        # Task wurde noch nicht gestartet
+                        pass
+                    elif hasattr(task, 'cancel'):
+                        task.cancel()
+            
+            cancellation_token.register_callback(cancel_all_tasks)
+        
         return await asyncio.gather(*tasks, return_exceptions=True)
     
     async def _execute_sequential(

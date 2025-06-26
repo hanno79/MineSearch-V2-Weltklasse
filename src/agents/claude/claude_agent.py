@@ -15,6 +15,8 @@ from ..base_agent import BaseAgent, MineQuery, SearchResult, AgentStatus
 from ..rate_limiter import RateLimiter
 from src.core.logger import get_logger, PerformanceLogger
 from ..enhanced_search import get_mining_search_queries, get_mining_domains
+# ÄNDERUNG 24.06.2025: Nutze robuste Session
+from src.utils.session_manager import SessionManager
 
 from .prompts import ClaudePromptGenerator
 from .response_parser import ClaudeResponseParser
@@ -41,8 +43,9 @@ class ClaudeAgent(BaseAgent):
     async def initialize(self) -> bool:
         """Initialisiert den Agenten"""
         try:
-            # Erstelle Session
-            self._session = aiohttp.ClientSession()
+            # ÄNDERUNG 24.06.2025: Nutze robuste Session mit Session Manager
+            self._session_manager = SessionManager()
+            self._robust_session = await self._session_manager.get_robust_session(f"claude_{self.name}")
             
             # Validiere Credentials
             is_valid = await self.validate_credentials()
@@ -77,14 +80,15 @@ class ClaudeAgent(BaseAgent):
                 "messages": [
                     {"role": "user", "content": "Reply with 'OK' if you receive this."}
                 ],
-                "max_tokens": 10
+                "max_tokens": 16  # ÄNDERUNG 24.06.2025: Minimum 16 für API-Kompatibilität
             }
             
-            async with self._session.post(
+            async with self._robust_session.request(
+                'POST',
                 self.base_url,
                 headers=headers,
                 json=data,
-                timeout=self.timeout
+                timeout=120
             ) as response:
                 if response.status == 200:
                     self.logger.info("Claude API-Key erfolgreich validiert")
@@ -183,11 +187,12 @@ class ClaudeAgent(BaseAgent):
         }
         
         try:
-            async with self._session.post(
+            async with self._robust_session.request(
+                'POST',
                 self.base_url,
                 headers=headers,
                 json=data,
-                timeout=self.timeout
+                timeout=120
             ) as response:
                 if response.status == 200:
                     result = await response.json()
@@ -205,13 +210,13 @@ class ClaudeAgent(BaseAgent):
             return ""
     
     async def cleanup(self):
-        """ÄNDERUNG 19.06.2025: Explizite cleanup Methode für Session-Management"""
+        """ÄNDERUNG 24.06.2025: Nutze robustes Session Management für Cleanup"""
         try:
-            if hasattr(self, '_session') and self._session and not self._session.closed:
-                await self._session.close()
+            if hasattr(self, '_session_manager') and self._session_manager:
+                await self._session_manager.close_session(f"claude_{self.name}")
                 self.logger.debug("Session erfolgreich geschlossen")
         except Exception as e:
             self.logger.warning(f"Fehler beim Schließen der Session: {e}")
         finally:
-            self._session = None
+            self._robust_session = None
             await super().cleanup()  # Rufe parent cleanup auf

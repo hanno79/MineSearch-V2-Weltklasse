@@ -10,10 +10,9 @@ import threading
 from typing import TypeVar, Coroutine, Any, Optional, Callable
 import streamlit as st
 from src.core.logger import get_logger
-import nest_asyncio
-
-# Enable nested event loops
-nest_asyncio.apply()
+# ÄNDERUNG 27.06.2025: nest_asyncio wird nur in main.py angewendet
+# import nest_asyncio
+# nest_asyncio.apply()
 
 logger = get_logger("streamlit_async")
 

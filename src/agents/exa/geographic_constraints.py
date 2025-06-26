@@ -7,6 +7,7 @@ Beschreibung: Geographic Constraints für Exa Search
 
 from typing import List, Dict
 from ..enhanced_search import get_country_specific_domains
+from .utils import normalize_domains_for_exa
 
 class GeographicConstraintBuilder:
     """Erstellt geografische Einschränkungen für Exa Search"""
@@ -91,6 +92,7 @@ class GeographicConstraintBuilder:
     def get_region_specific_domains(self, country: str, technical: bool = False) -> List[str]:
         """
         ÄNDERUNG 19.06.2025: Gibt länderspezifische Domains zurück
+        ÄNDERUNG 24.06.2025: Nutze normalize_domains_for_exa für konsistente Bereinigung
         """
         # Import von enhanced_search um Duplikation zu vermeiden
         country_domains = get_country_specific_domains(country)
@@ -102,7 +104,8 @@ class GeographicConstraintBuilder:
         # Füge allgemeine Mining-Domains hinzu
         general_domains = ["mining.com", "mindat.org", "infomine.com"]
         
-        # Kombiniere und entferne Duplikate
-        all_domains = list(set(country_domains + general_domains))
+        # Kombiniere alle Domains
+        all_domains = country_domains + general_domains
         
-        return all_domains[:15]  # Maximal 15 Domains
+        # ÄNDERUNG 24.06.2025: Nutze normalize_domains_for_exa für konsistente Bereinigung
+        return normalize_domains_for_exa(all_domains, max_domains=15)

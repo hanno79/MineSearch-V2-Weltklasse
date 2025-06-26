@@ -19,29 +19,44 @@ from .search_strategies import (
 
 def get_mining_search_queries(mine_name: str, region: str = "", country: str = "", 
                            required_fields: Optional[List[str]] = None) -> list:
-    """Generate comprehensive search queries for mining information"""
+    """Generate comprehensive search queries for mining information
+    
+    ÄNDERUNG 24.06.2025: Optimiert für Tavily 400-Zeichen-Limit
+    Alle Queries werden auf maximale Effizienz getrimmt
+    """
     
     # Get all name variants (with and without accents)
     name_variants = get_mine_name_variants(mine_name)
     
     queries = []
     
-    # ÄNDERUNG 23.06.2025: Verstärkte geografische Einschränkungen
-    geo_constraints = create_geographic_constraints(region, country)
-    geo_context = f'"{region}" "{country}"' if region and country else ''
+    # ÄNDERUNG 24.06.2025: Kürzere geografische Kontexte
+    # Verwende nur region ODER country, nicht beide
+    geo_context = region if region and len(region) < len(country) else country
     
-    # Geografische Ausschlüsse für bessere Ergebnisse
-    exclusions = _get_geographic_exclusions(country)
+    # 1. BASIC QUERIES - Kompakt und fokussiert
+    main_name = name_variants[0]
     
-    # 1. BASIC QUERIES - For each name variant mit geografischen Einschränkungen
-    for name in name_variants[:3]:  # Use top 3 variants
-        # English queries mit geografischen Einschränkungen und Ausschlüssen
+    # Nur die wichtigsten Felder, ohne Redundanz
+    if required_fields:
+        # Priorisiere angefragte Felder
+        for field in required_fields[:3]:  # Max 3 Felder
+            if field.lower() in ['operator', 'betreiber']:
+                queries.append(f'"{main_name}" operator {geo_context}')
+            elif field.lower() in ['coordinates', 'koordinaten', 'gps']:
+                queries.append(f'"{main_name}" GPS coordinates')
+            elif field.lower() in ['production', 'produktion']:
+                queries.append(f'"{main_name}" production tons')
+            elif field.lower() in ['closure', 'sanierung', 'remediation']:
+                queries.append(f'"{main_name}" closure costs')
+            elif field.lower() in ['status']:
+                queries.append(f'"{main_name}" operational status')
+    else:
+        # Standard-Queries wenn keine Felder spezifiziert
         queries.extend([
-            f'"{name}" mine operator owner company {geo_context} {geo_constraints} {exclusions}',
-            f'"{name}" mining coordinates location GPS {geo_context} {geo_constraints} {exclusions}',
-            f'"{name}" commodity mineral resource production {geo_context} {geo_constraints} {exclusions}',
-            f'"{name}" status operational closure {geo_context} {geo_constraints} {exclusions}',
-            f'"{name}" remediation costs environmental {geo_context} {geo_constraints} {exclusions}',
+            f'"{main_name}" mine operator',
+            f'"{main_name}" GPS coordinates',
+            f'"{main_name}" production',
         ])
     
     # 2. MULTILINGUAL QUERIES
@@ -82,46 +97,24 @@ def get_mining_search_queries(mine_name: str, region: str = "", country: str = "
             doc_patterns = get_document_search_patterns(main_name, field)
             queries.extend(doc_patterns[:3])  # Top 3 document patterns per field
     
-    # 6. DETAILED TECHNICAL QUERIES mit geografischen Einschränkungen
+    # 6. DETAILED TECHNICAL QUERIES - Ultra-kompakt
+    # ÄNDERUNG 24.06.2025: Minimale technische Queries
+    year = str(datetime.now().year)
     queries.extend([
-        f'"{main_name}" annual report {datetime.now().year - 1} {datetime.now().year} {geo_context} {geo_constraints}',
-        f'"{main_name}" environmental impact assessment EIA {geo_context} {geo_constraints}',
-        f'"{main_name}" feasibility study technical report {geo_context} {geo_constraints}',
-        f'"{main_name}" NI 43-101 JORC resource estimate {geo_context} {geo_constraints}',
-        f'"{main_name}" tailings dam waste management {geo_context} {geo_constraints}',
-        f'"{main_name}" water usage environmental monitoring {geo_context} {geo_constraints}',
-        f'"{main_name}" community relations social impact {geo_context} {geo_constraints}',
-        f'"{main_name}" processing plant mill capacity {geo_context} {geo_constraints}',
+        f'"{main_name}" annual report {year}',
+        f'"{main_name}" environmental assessment',
+        f'"{main_name}" NI 43-101',
     ])
     
-    # 7. REGIONAL QUERIES with more variations und Ausschlüssen
-    if region:
-        region_variants = [region, region.lower(), region.upper()]
-        for variant in region_variants[:2]:
-            queries.extend([
-                f'"{mine_name}" {variant} {country} mining operation {geo_constraints}',
-                f'{variant} {country} mines "{mine_name}" production data {geo_constraints}',
-                f'{variant} {country} mining registry "{mine_name}" {geo_constraints}',
-                f'{variant} {country} mining department "{mine_name}" {geo_constraints}',
-                f'"{mine_name}" {variant} {country} environmental report {geo_constraints}',
-                f'"{mine_name}" {variant} {country} mining news {geo_constraints}',
-            ])
+    # 7. REGIONAL QUERIES - Nur wenn wirklich nötig
+    # ÄNDERUNG 24.06.2025: Nur eine regionale Query
+    if region and len(f'"{mine_name}" {region} mining') < 100:
+        queries.append(f'"{mine_name}" {region} mining')
     
-    # 8. ACADEMIC AND RESEARCH QUERIES mit geografischen Einschränkungen
-    queries.extend([
-        f'site:scholar.google.com "{main_name}" mine {geo_context}',
-        f'site:researchgate.net "{main_name}" mining {geo_context}',
-        f'"{main_name}" thesis dissertation mining {geo_context} {geo_constraints}',
-        f'"{main_name}" university research mining {geo_context} {geo_constraints}'
-    ])
-    
-    # 9. FINANCIAL AND INVESTMENT QUERIES mit geografischen Einschränkungen
-    queries.extend([
-        f'"{main_name}" stock price mining investment {geo_context} {geo_constraints}',
-        f'"{main_name}" market cap valuation mining {geo_context} {geo_constraints}',
-        f'"{main_name}" investor presentation mining {geo_context} {geo_constraints}',
-        f'"{main_name}" quarterly earnings mining {geo_context} {geo_constraints}'
-    ])
+    # 8. ACADEMIC AND FINANCIAL - Kombiniert und gekürzt
+    # ÄNDERUNG 24.06.2025: Nur essenzielle Queries
+    if any(f in str(required_fields).lower() for f in ['financial', 'investor', 'cost']):
+        queries.append(f'"{main_name}" financial report')
     
     # 10. EXPANDED SITE-SPECIFIC SEARCHES
     all_domains = get_mining_domains() + (get_country_specific_domains(country) if country else [])
@@ -143,9 +136,17 @@ def get_mining_search_queries(mine_name: str, region: str = "", country: str = "
     seen = set()
     unique_queries = []
     for q in queries:
-        if q not in seen:
+        if q not in seen and len(q) < 400:  # Strikte Längenbegrenzung
             seen.add(q)
             unique_queries.append(q)
+    
+    # ÄNDERUNG 24.06.2025: Finale Validierung
+    # Logge zu lange Queries
+    for q in queries:
+        if len(q) >= 400:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Query zu lang und wurde entfernt ({len(q)} chars): {q[:50]}...")
     
     return unique_queries
 

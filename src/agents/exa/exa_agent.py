@@ -16,6 +16,11 @@ from .query_builder import ExaQueryBuilder
 from .result_parser import ExaResultParser
 from .geographic_constraints import GeographicConstraintBuilder
 from src.core.logger import get_logger, PerformanceLogger
+from src.utils.safe_dict_access import safe_get, safe_nested_get, ensure_dict, ensure_list
+# ÄNDERUNG 24.06.2025: Nutze Session Manager
+from src.utils.session_manager import SessionManager
+# ÄNDERUNG 24.06.2025: Importiere Domain-Bereinigung
+from .utils import normalize_domains_for_exa
 
 class ExaAgent(BaseAgent):
     """Exa AI Agent für semantische Suche"""
@@ -37,7 +42,9 @@ class ExaAgent(BaseAgent):
     async def initialize(self) -> bool:
         """Initialisiert den Agenten"""
         try:
-            self._session = aiohttp.ClientSession()
+            # ÄNDERUNG 24.06.2025: Nutze Session Manager statt direkte Session
+            session_manager = SessionManager()
+            self._session = await session_manager.get_session(f"exa_{self.name}")
             self.api_client = ExaAPIClient(self.api_key, self._session)
             
             is_valid = await self.validate_credentials()
@@ -160,8 +167,11 @@ class ExaAgent(BaseAgent):
                 )
             )
             
-            # Entferne Duplikate und limitiere
-            query_config['include_domains'] = list(set(query_config['include_domains']))[:20]
+            # ÄNDERUNG 24.06.2025: Nutze normalize_domains_for_exa für konsistente Bereinigung
+            query_config['include_domains'] = normalize_domains_for_exa(
+                query_config['include_domains'], 
+                max_domains=20
+            )
         
         # Füge Mining-spezifische Queries hinzu
         mining_queries = self.query_builder.create_mining_specific_queries(query)
@@ -182,12 +192,12 @@ class ExaAgent(BaseAgent):
         if 'results' in contents:
             for content in contents['results']:
                 enhanced_result = {
-                    'id': content.get('id', ''),
-                    'url': content.get('url', ''),
-                    'title': content.get('title', ''),
-                    'snippet': content.get('text', '')[:500] if 'text' in content else '',
-                    'text': content.get('text', ''),
-                    'highlights': content.get('highlights', [])
+                    'id': safe_get(content, 'id', ''),
+                    'url': safe_get(content, 'url', ''),
+                    'title': safe_get(content, 'title', ''),
+                    'snippet': safe_get(content, 'text', '')[:500] if 'text' in content else '',
+                    'text': safe_get(content, 'text', ''),
+                    'highlights': safe_get(content, 'highlights', [])
                 }
                 enhanced_response['results'].append(enhanced_result)
         
@@ -195,8 +205,9 @@ class ExaAgent(BaseAgent):
     
     async def cleanup(self):
         """Räumt Ressourcen auf"""
-        if hasattr(self, '_session') and self._session:
-            await self._session.close()
+        # ÄNDERUNG 24.06.2025: Nutze Session Manager für Cleanup
+        session_manager = SessionManager()
+        await session_manager.close_session(f"exa_{self.name}")
         self.logger.info("Exa Agent beendet")
     
     async def __aenter__(self):

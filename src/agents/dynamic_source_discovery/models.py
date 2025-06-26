@@ -36,3 +36,4 @@ class DiscoveredSource:
     keywords_found: List[str]
     depth_to_explore: int  # Wie tief soll gecrawlt werden
     priority: int
+    discovered_by: str = "unknown"  # ÄNDERUNG 25.06.2025: Neues Attribut für Tracking

@@ -1,0 +1,447 @@
+
+  You can now view your Streamlit app in your browser.
+
+  URL: http://localhost:8501
+
+08:54:13 - src.core.database - [32mINFO[0m - Datenbank initialisiert: data/minesearch.db (WAL-Mode aktiviert)
+08:54:13 - src.core.database - [32mINFO[0m - Datenbank initialisiert: data/minesearch.db (WAL-Mode aktiviert)
+09:02:20 - orchestrator - [32mINFO[0m - 🚀 Initialisiere MineSearch Orchestrator V2...
+09:02:20 - agent_manager - [32mINFO[0m - Initialisiere Agent Manager...
+09:02:20 - agent_manager - [32mINFO[0m - Gefunden: 33 verfügbare Agenten
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: DeepSeek Chat (Free)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: Qwen 2.5 72B (Free)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: Mistral 7B Instruct (Free)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: Llama 3.2 90B Vision (Free)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: Gemma 2 27B (Free)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: Hermes 3 Llama 70B (Free)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: Claude 3.5 Sonnet (Latest) (Premium)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: Claude 3 Opus (Premium)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: Gemini 1.5 Pro (Premium)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: Grok 2 (Latest) (Premium)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: GPT-4o (Premium)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: GPT-4o (Latest) (Premium)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: OpenAI o1 (Premium)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: OpenAI o1 Preview (Premium)
+09:02:20 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - Initialized OpenRouter agent with model: Llama 3.1 405B (Premium)
+09:02:20 - agent.browser - [32mINFO[0m - Docker-Umgebung erkannt - nutze optimierte Browser-Args
+09:02:20 - pdf_processor - [32mINFO[0m - Verfügbare PDF-Bibliotheken: PyPDF2, pdfplumber
+09:02:20 - agent_manager - [32mINFO[0m - Initialisiere claude...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere gpt4...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere perplexity...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere scraper...
+09:02:21 - agent.scraper - [32mINFO[0m - Scraper Agent mit SessionManager initialisiert
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere tavily...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere exa...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere apify...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere scrapingbee...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere firecrawl...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere brightdata...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_deepseek-chat...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_qwen-2.5-72b-instruct...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_mistral-7b-instruct...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_llama-3.2-90b-vision-instruct...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_gemma-2-27b-it...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_hermes-3-llama-3.1-70b...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_claude-3.5-sonnet-20241022...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_claude-3-opus...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_gemini-pro-1.5...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_grok-2-1212...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_gpt-4o...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_gpt-4o-2024-11-20...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_o1...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_o1-preview...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere openrouter_llama-3.1-405b-instruct...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere deepseek...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere deepseek_reasoner...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere deepseek_coder...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere deep_web_crawler...
+09:02:21 - agent.deep_web_crawler - [32mINFO[0m - Deep Web Crawler Agent initialisiert
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere browser...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere document_finder...
+09:02:21 - agent.document_finder - [32mINFO[0m - Document Finder Agent initialisiert
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere perplexity_deep...
+09:02:21 - agent_manager - [32mINFO[0m - Initialisiere premium_mining...
+09:02:21 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:21 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:21 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:21 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:21 - agent.apify - [32mINFO[0m - Apify Agent erfolgreich initialisiert
+09:02:21 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:21 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:21 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:21 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:21 - agent.browser - [32mINFO[0m - Browser erfolgreich gestartet
+09:02:21 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:21 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:21 - agent.browser - [32mINFO[0m - Browser Agent erfolgreich initialisiert
+09:02:21 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:21 - agent.deepseek - [32mINFO[0m - DeepSeek Research Agent (chat) successfully initialized
+09:02:21 - agent.gpt4 - [32mINFO[0m - GPT-4 Agent erfolgreich initialisiert
+09:02:21 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:22 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:22 - agent.perplexity - [32mINFO[0m - Perplexity API-Key erfolgreich validiert
+09:02:22 - agent.perplexity - [32mINFO[0m - Perplexity Agent erfolgreich initialisiert
+09:02:22 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:22 - agent.claude - [32mINFO[0m - Claude API-Key erfolgreich validiert
+09:02:22 - agent.claude - [32mINFO[0m - Claude Agent erfolgreich initialisiert
+09:02:22 - src.agents.openrouter.openrouter_agent - [32mINFO[0m - OpenRouter API credentials validated successfully
+09:02:23 - agent.tavily - [32mINFO[0m - Tavily Agent erfolgreich initialisiert
+09:02:24 - agent.exa - [32mINFO[0m - Exa Agent erfolgreich initialisiert
+09:02:38 - agent.firecrawl - [32mINFO[0m - Firecrawl API-Key erfolgreich validiert
+09:02:38 - agent.firecrawl - [32mINFO[0m - Firecrawl Agent erfolgreich initialisiert
+09:02:38 - agent_manager - [32mINFO[0m - ✅ 33/33 Agenten erfolgreich initialisiert
+09:02:38 - agent_manager - [32mINFO[0m - Aktive Agenten: claude, gpt4, perplexity, scraper, tavily, exa, apify, scrapingbee, firecrawl, brightdata, openrouter_deepseek-chat, openrouter_qwen-2.5-72b-instruct, openrouter_mistral-7b-instruct, openrouter_llama-3.2-90b-vision-instruct, openrouter_gemma-2-27b-it, openrouter_hermes-3-llama-3.1-70b, openrouter_claude-3.5-sonnet-20241022, openrouter_claude-3-opus, openrouter_gemini-pro-1.5, openrouter_grok-2-1212, openrouter_gpt-4o, openrouter_gpt-4o-2024-11-20, openrouter_o1, openrouter_o1-preview, openrouter_llama-3.1-405b-instruct, deepseek, deepseek_reasoner, deepseek_coder, deep_web_crawler, browser, document_finder, perplexity_deep, premium_mining
+09:02:38 - orchestrator - [32mINFO[0m - ✅ Orchestrator erfolgreich initialisiert
+2025-06-26 09:02:38.404 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.404 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.404 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.404 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.404 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.404 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.404 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+[Status-Callback] Fehler beim Status-Update: st.session_state has no attribute "status_updates". Did you forget to initialize it? More info: https://docs.streamlit.io/library/advanced-features/session-state#initialization
+09:02:38 - agent_manager - [32mINFO[0m - Aktive Agenten gesetzt: ['perplexity', 'perplexity_deep']
+09:02:38 - strategy_manager - [32mINFO[0m - Verwende Such-Strategie: staged
+2025-06-26 09:02:38.405 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.405 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.405 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.405 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+[Status-Callback] Fehler beim Status-Update: st.session_state has no attribute "status_updates". Did you forget to initialize it? More info: https://docs.streamlit.io/library/advanced-features/session-state#initialization
+09:02:38 - staged_search - [32mINFO[0m - Starte Staged Search für Lac Expanse
+09:02:38 - source_discovery - [32mINFO[0m - 🔍 PHASE 0: QUELLEN-DISCOVERY
+2025-06-26 09:02:38.405 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.405 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.406 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.406 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+[Status-Callback] Fehler beim Status-Update: st.session_state has no attribute "status_updates". Did you forget to initialize it? More info: https://docs.streamlit.io/library/advanced-features/session-state#initialization
+09:02:38 - source_discovery - [32mINFO[0m - Suche Datenquellen für Lac Expanse...
+2025-06-26 09:02:38.406 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.406 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.406 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:02:38.406 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+[Status-Callback] Fehler beim Status-Update: st.session_state has no attribute "status_updates". Did you forget to initialize it? More info: https://docs.streamlit.io/library/advanced-features/session-state#initialization
+09:02:38 - agent.dynamic_source_discovery - [32mINFO[0m - 
+🔍 Starte dynamische Quellenentdeckung für Canada
+09:02:38 - agent.dynamic_source_discovery - [32mINFO[0m - 📝 Erstellt 36 Suchanfragen
+09:02:38 - agent.dynamic_source_discovery - [32mINFO[0m - 🔍 Verfügbare Agenten: ['perplexity', 'perplexity_deep_research']
+09:02:38 - agent.dynamic_source_discovery - [32mINFO[0m - ✅ Nutze perplexity für Quellensuche (Status: AgentStatus.READY)
+09:02:38 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 1/3: "Canada mining ministry" mine operator...
+09:03:19 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:03:19 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:03:22 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 2/3: "Canada mining ministry" GPS coordinates...
+09:03:34 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = described
+09:03:37 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 3/3: "Canada mining ministry" production...
+09:04:17 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:04:17 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:04:20 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:04:33 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:04:54 - agent.perplexity - [32mINFO[0m - Operation completed: perplexity_search_Canada mining ministry
+09:04:54 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 1/3: "Canada natural resources department" mine operator...
+09:05:09 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = described
+09:05:12 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 2/3: "Canada natural resources department" GPS coordinates...
+09:05:28 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 3/3: "Canada natural resources department" production...
+09:06:00 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:06:03 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:06:20 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:06:21 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:06:44 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = can
+09:06:45 - agent.perplexity - [32mINFO[0m - Operation completed: perplexity_search_Canada natural resources department
+09:06:45 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 1/3: "Canada mining regulation authority" mine operator...
+09:07:17 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:07:17 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:07:20 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 2/3: "Canada mining regulation authority" GPS coordinates...
+09:07:32 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:07:32 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:07:35 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 3/3: "Canada mining regulation authority" production...
+09:07:38 - streamlit_async - [31mERROR[0m - Error in async operation: 
+09:07:38 - streamlit_async - [31mERROR[0m - Fehler beim Ausführen der async Funktion: 
+2025-06-26 09:07:38.531 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.532 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.532 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.532 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.532 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.532 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.532 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+[Status-Callback] Fehler beim Status-Update: st.session_state has no attribute "status_updates". Did you forget to initialize it? More info: https://docs.streamlit.io/library/advanced-features/session-state#initialization
+09:07:38 - agent_manager - [32mINFO[0m - Aktive Agenten gesetzt: ['perplexity', 'perplexity_deep']
+09:07:38 - strategy_manager - [32mINFO[0m - Verwende Such-Strategie: staged
+2025-06-26 09:07:38.533 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.533 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.533 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.533 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+[Status-Callback] Fehler beim Status-Update: st.session_state has no attribute "status_updates". Did you forget to initialize it? More info: https://docs.streamlit.io/library/advanced-features/session-state#initialization
+09:07:38 - staged_search - [32mINFO[0m - Starte Staged Search für Éléonore
+09:07:38 - source_discovery - [32mINFO[0m - 🔍 PHASE 0: QUELLEN-DISCOVERY
+2025-06-26 09:07:38.533 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.533 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.533 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.533 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+[Status-Callback] Fehler beim Status-Update: st.session_state has no attribute "status_updates". Did you forget to initialize it? More info: https://docs.streamlit.io/library/advanced-features/session-state#initialization
+09:07:38 - source_discovery - [32mINFO[0m - Suche Datenquellen für Éléonore...
+2025-06-26 09:07:38.533 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.533 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.534 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+2025-06-26 09:07:38.534 Thread 'Thread-8 (_run_loop)': missing ScriptRunContext
+[Status-Callback] Fehler beim Status-Update: st.session_state has no attribute "status_updates". Did you forget to initialize it? More info: https://docs.streamlit.io/library/advanced-features/session-state#initialization
+09:07:38 - agent.dynamic_source_discovery - [32mINFO[0m - 
+🔍 Starte dynamische Quellenentdeckung für Canada
+09:07:38 - agent.dynamic_source_discovery - [32mINFO[0m - 📝 Erstellt 36 Suchanfragen
+09:07:38 - agent.dynamic_source_discovery - [32mINFO[0m - 🔍 Verfügbare Agenten: ['perplexity', 'perplexity_deep_research']
+09:07:38 - agent.dynamic_source_discovery - [32mINFO[0m - ✅ Nutze perplexity für Quellensuche (Status: AgentStatus.READY)
+09:07:38 - agent.perplexity - [32mINFO[0m - Using cached response for query 1
+09:07:38 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:07:38 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:07:38 - agent.perplexity - [32mINFO[0m - Using cached response for query 2
+09:07:38 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = described
+09:07:38 - agent.perplexity - [32mINFO[0m - Using cached response for query 3
+09:07:38 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:07:38 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:07:38 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:07:54 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:07:54 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:07:57 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:08:00 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:08:01 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:08:14 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = specified
+09:08:15 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:08:32 - agent.perplexity - [32mINFO[0m - Operation completed: perplexity_search_Canada mining ministry
+09:08:32 - agent.perplexity - [32mINFO[0m - Using cached response for query 1
+09:08:32 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = described
+09:08:32 - agent.perplexity - [32mINFO[0m - Using cached response for query 2
+09:08:32 - agent.perplexity - [32mINFO[0m - Using cached response for query 3
+09:08:32 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:08:32 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:08:40 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = that
+09:08:41 - agent.perplexity - [32mINFO[0m - Operation completed: perplexity_search_Canada mining regulation authority
+09:08:41 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 1/3: "Quebec mining department" mine operator...
+09:08:50 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = corresponds
+09:08:51 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:08:58 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 2/3: "Quebec mining department" GPS coordinates...
+09:09:10 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:09:10 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:09:13 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 3/3: "Quebec mining department" production...
+09:09:31 - agent.perplexity - [32mINFO[0m - Operation completed: perplexity_search_Canada natural resources department
+09:09:31 - agent.perplexity - [32mINFO[0m - Using cached response for query 1
+09:09:31 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:09:31 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:09:31 - agent.perplexity - [32mINFO[0m - Using cached response for query 2
+09:09:31 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:09:31 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:09:31 - agent.perplexity - [32mINFO[0m - Using cached response for query 3
+09:09:31 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:09:31 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:09:31 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:09:36 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:09:36 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = - production
+09:09:39 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:09:54 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:09:55 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:09:59 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:09:59 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = produced
+09:10:00 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:10:15 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:10:16 - agent.perplexity - [32mINFO[0m - Operation completed: perplexity_search_Canada mining regulation authority
+09:10:16 - agent.perplexity - [32mINFO[0m - Using cached response for query 1
+09:10:16 - agent.perplexity - [32mINFO[0m - Using cached response for query 2
+09:10:16 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:10:16 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:10:16 - agent.perplexity - [32mINFO[0m - Using cached response for query 3
+09:10:16 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:10:16 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = - production
+09:10:16 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:10:33 - agent.perplexity - [32mINFO[0m - Operation completed: perplexity_search_Quebec mining department
+09:10:33 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 1/3: "Canada geological survey" mine operator...
+09:10:37 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:10:38 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:11:01 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:11:01 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = specific numbers
+09:11:02 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 1/3: "Canada geological survey" mine operator...
+09:11:04 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:11:04 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:11:07 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 2/3: "Canada geological survey" GPS coordinates...
+09:11:18 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:11:18 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not available
+09:11:21 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 2/3: "Canada geological survey" GPS coordinates...
+09:11:23 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:11:26 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 3/3: "Canada geological survey" production...
+09:11:43 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:11:43 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = - workforce
+09:11:46 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:11:50 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:11:50 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = - workforce
+09:11:53 - agent.perplexity - [32mINFO[0m - Using cached response for query 3
+09:11:53 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:11:53 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = - workforce
+09:11:53 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:12:02 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:12:19 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:12:20 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:12:20 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:12:21 - agent.perplexity - [32mINFO[0m - Operation completed: perplexity_search_Canada geological survey
+09:12:21 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 1/3: "Canada mining association" mine operator...
+09:12:38 - streamlit_async - [31mERROR[0m - Error in async operation: 
+09:12:38 - streamlit_async - [31mERROR[0m - Fehler beim Ausführen der async Funktion: 
+09:12:46 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:12:47 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 1/3: "Canada mining association" mine operator...
+09:12:49 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:12:49 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = (minerals/metals mined)
+09:12:52 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 2/3: "Canada mining association" GPS coordinates...
+09:13:22 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:13:22 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = (minerals/metals mined)
+09:13:24 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:13:24 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = (minerals/metals mined)
+09:13:25 - agent.perplexity - [32mINFO[0m - Using cached response for query 2
+09:13:25 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:13:25 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = (minerals/metals mined)
+09:13:25 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 3/3: "Canada mining association" production...
+09:13:27 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 3/3: "Canada mining association" production...
+09:14:02 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:14:02 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = - production
+09:14:05 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:14:10 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:14:10 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = (what minerals/metals are mined)
+09:14:13 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:14:19 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:14:20 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:14:26 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = attributed
+09:14:27 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:14:58 - agent.perplexity - [32mINFO[0m - Operation completed: perplexity_search_Canada mining association
+09:14:58 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 1/3: "Canada mining chamber" mine operator...
+09:15:07 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 1/3: "Canada mining chamber" mine operator...
+09:15:20 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 2/3: "Canada mining chamber" GPS coordinates...
+09:15:25 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:15:25 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = (minerals/metals) -> but personalization doesn't have this, so we must skip it?
+09:15:28 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 2/3: "Canada mining chamber" GPS coordinates...
+09:15:40 - session_manager - [33mWARNING[0m - Connection Error für perplexity_perplexity, erstelle neue Session
+09:15:40 - agent.perplexity - [31mERROR[0m - API Anfrage Fehler: ClientOSError: [Errno 1] [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2712)
+09:15:43 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 3/3: "Canada mining chamber" production...
+09:15:45 - session_manager - [33mWARNING[0m - Connection Error für perplexity_perplexity, erstelle neue Session
+09:15:45 - agent.perplexity - [31mERROR[0m - API Anfrage Fehler: ClientOSError: [Errno 1] [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2712)
+09:15:48 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 3/3: "Canada mining chamber" production...
+09:16:12 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:16:12 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:16:15 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:16:18 - session_manager - [33mWARNING[0m - Connection Error für perplexity_perplexity, erstelle neue Session
+09:16:18 - agent.perplexity - [31mERROR[0m - API Anfrage Fehler: ClientOSError: [Errno 1] [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2712)
+09:16:21 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:16:31 - session_manager - [33mWARNING[0m - Connection Error für perplexity_perplexity, erstelle neue Session
+09:16:31 - agent.perplexity - [31mERROR[0m - API Anfrage Fehler: ClientOSError: [Errno 1] [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2712)
+09:16:32 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:16:39 - session_manager - [33mWARNING[0m - Connection Error für perplexity_perplexity, erstelle neue Session
+09:16:39 - agent.perplexity - [31mERROR[0m - API Anfrage Fehler: ClientOSError: [Errno 1] [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2712)
+09:16:40 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:17:02 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:17:03 - agent.perplexity - [32mINFO[0m - Operation completed: perplexity_search_Canada mining chamber
+09:17:03 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 1/3: "Canada mineral council" mine operator...
+09:17:04 - session_manager - [33mWARNING[0m - Connection Error für perplexity_perplexity, erstelle neue Session
+09:17:04 - agent.perplexity - [31mERROR[0m - API Anfrage Fehler: ClientOSError: [Errno 1] [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2712)
+09:17:05 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 1/3: "Canada mineral council" mine operator...
+09:17:17 - session_manager - [33mWARNING[0m - Connection Error für perplexity_perplexity, erstelle neue Session
+09:17:17 - agent.perplexity - [31mERROR[0m - API Anfrage Fehler: ClientOSError: [Errno 1] [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2712)
+09:17:20 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 2/3: "Canada mineral council" GPS coordinates...
+09:17:23 - session_manager - [33mWARNING[0m - Connection Error für perplexity_perplexity, erstelle neue Session
+09:17:23 - agent.perplexity - [31mERROR[0m - API Anfrage Fehler: ClientOSError: [Errno 1] [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2712)
+09:17:26 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 2/3: "Canada mineral council" GPS coordinates...
+09:17:34 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:17:34 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = not found
+09:17:37 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 3/3: "Canada mineral council" production...
+09:17:58 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = mentioned
+09:17:59 - session_manager - [33mWARNING[0m - Connection Error für perplexity_perplexity, erstelle neue Session
+09:17:59 - agent.perplexity - [31mERROR[0m - API Anfrage Fehler: ClientOSError: [Errno 1] [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2712)
+09:18:01 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:18:02 - agent.perplexity - [32mINFO[0m - Using cached response for query 3
+09:18:02 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = mentioned
+09:18:02 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:18:28 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:18:36 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:18:37 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: environmental
+09:19:10 - agent.perplexity - [32mINFO[0m - Operation completed: perplexity_search_Canada mineral council
+09:19:10 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 1/3: "Quebec mining companies" mine operator...
+09:19:27 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = likely
+09:19:27 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = - production (annual production volumes)
+09:19:30 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 2/3: "Quebec mining companies" GPS coordinates...
+09:19:36 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:19:37 - agent.perplexity - [32mINFO[0m - Using cached response for query 1
+09:19:37 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = likely
+09:19:37 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = - production (annual production volumes)
+09:19:37 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 2/3: "Quebec mining companies" GPS coordinates...
+09:20:03 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 3/3: "Quebec mining companies" production...
+09:20:15 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = not
+09:20:15 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = (minerals/metals mined)
+09:20:18 - agent.perplexity - [32mINFO[0m - Perplexity-Suche 3/3: "Quebec mining companies" production...
+09:20:23 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = the
+09:20:23 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = (minerals/metals mined)
+09:20:26 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+09:20:48 - agent.perplexity - [32mINFO[0m - Gefunden: aktivitaetsstatus = the
+09:20:48 - agent.perplexity - [32mINFO[0m - Gefunden: rohstofftyp = copper and gold (from [4])
+09:20:51 - agent.perplexity - [32mINFO[0m - Perplexity-Spezialisierte Suche: general
+  Stopping...
+09:21:19 - asyncio - [31mERROR[0m - Task was destroyed but it is pending!
+task: <Task pending name='Task-781' coro=<SearchFormComponent._search_single_mine() running at /app/src/ui/components/search_form.py:271> wait_for=<Future pending cb=[Task.__wakeup()]> cb=[_chain_future.<locals>._call_set_state() at /usr/local/lib/python3.10/asyncio/futures.py:392]>
+09:21:19 - asyncio - [31mERROR[0m - Task was destroyed but it is pending!
+task: <Task pending name='Task-811' coro=<SearchFormComponent._search_single_mine() running at /app/src/ui/components/search_form.py:271> wait_for=<Future pending cb=[Task.__wakeup()]> cb=[_chain_future.<locals>._call_set_state() at /usr/local/lib/python3.10/asyncio/futures.py:392]>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc419a80>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc41a140>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc41b130>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc41b820>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc3340a0>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc334910>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc334dc0>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc335480>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc3359c0>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc335f90>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc336530>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc336ad0>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc337070>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc337610>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc337bb0>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc348190>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc348730>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc348cd0>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc349270>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc349810>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc349db0>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc34a350>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc34a740>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc34add0>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc34b490>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc34bb50>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc2c9840>
+09:21:19 - asyncio - [31mERROR[0m - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7824cc367520>
+Beende existierende Prozesse...
+Starte MineSearch...
+Führe aus: /app/venv/bin/python -m streamlit run src/ui/main.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true --browser.gatherUsageStats=false --theme.base=dark
+
+MineSearch wird gestartet...
+Öffnen Sie: http://localhost:8501
+
+Drücken Sie Ctrl+C zum Beenden
+

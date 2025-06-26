@@ -70,11 +70,11 @@ def get_country_specific_domains(country: str) -> List[str]:
     country_domains = {
         "canada": [
             "nrcan.gc.ca",
-            "ontario.ca/page/mines-and-minerals",
-            "gov.bc.ca/gov/content/industry/mineral-exploration-mining",
-            "gouv.qc.ca/en/mining",
-            "gov.mb.ca/iem/mines",
-            "gov.sk.ca/business/agriculture-natural-resources/mineral-exploration-and-mining",
+            "ontario.ca",  # ÄNDERUNG 24.06.2025: Nur Basis-Domains ohne Pfade
+            "gov.bc.ca",
+            "gouv.qc.ca",
+            "gov.mb.ca",
+            "gov.sk.ca",
             "miningnorth.com",
             "oma.on.ca",
             "mining.ca",
@@ -82,7 +82,7 @@ def get_country_specific_domains(country: str) -> List[str]:
         ],
         "australia": [
             "ga.gov.au",
-            "industry.gov.au/mining",
+            "industry.gov.au",  # ÄNDERUNG 24.06.2025: Nur Basis-Domains
             "dmp.wa.gov.au",
             "resources.qld.gov.au",
             "energymining.sa.gov.au",
@@ -93,10 +93,10 @@ def get_country_specific_domains(country: str) -> List[str]:
         ],
         "usa": [
             "usgs.gov",
-            "blm.gov/programs/energy-and-minerals/mining-and-minerals",
+            "blm.gov",  # ÄNDERUNG 24.06.2025: Nur Basis-Domains
             "msha.gov",
             "osmre.gov",
-            "epa.gov/superfund",
+            "epa.gov",
             "nma.org",
             "smenet.org"
         ],
@@ -108,14 +108,14 @@ def get_country_specific_domains(country: str) -> List[str]:
             "minmineria.cl"
         ],
         "peru": [
-            "gob.pe/minem",
+            "gob.pe",  # ÄNDERUNG 24.06.2025: Nur Basis-Domains
             "ingemmet.gob.pe",
             "osinergmin.gob.pe",
             "oefa.gob.pe",
             "snmpe.org.pe"
         ],
         "brazil": [
-            "gov.br/anm",
+            "gov.br",  # ÄNDERUNG 24.06.2025: Nur Basis-Domains
             "mme.gov.br",
             "ibram.org.br",
             "dnpm.gov.br"
@@ -124,10 +124,10 @@ def get_country_specific_domains(country: str) -> List[str]:
             "dmr.gov.za",
             "mineralscouncil.org.za",
             "geoscience.org.za",
-            "wits.ac.za/wmi"
+            "wits.ac.za"  # ÄNDERUNG 24.06.2025: Nur Basis-Domain
         ],
         "mexico": [
-            "gob.mx/se/acciones-y-programas/mineria",
+            "gob.mx",  # ÄNDERUNG 24.06.2025: Nur Basis-Domains
             "sgm.gob.mx",
             "camimex.org.mx"
         ],

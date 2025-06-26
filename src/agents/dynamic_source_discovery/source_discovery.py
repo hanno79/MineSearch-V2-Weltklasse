@@ -109,10 +109,30 @@ class DynamicSourceDiscovery:
     
     def _select_search_agent(self):
         """Wählt den besten verfügbaren Such-Agent"""
-        for agent_name in ['tavily', 'perplexity', 'exa']:
+        # ÄNDERUNG 23.06.2025: Erweiterte Agent-Suche mit Debug-Logging
+        self.logger.info(f"🔍 Verfügbare Agenten: {list(self.agents.keys())}")
+        
+        # Priorisierte Agenten für Quellensuche
+        priority_agents = ['tavily', 'perplexity', 'exa', 'perplexity_deep']
+        
+        for agent_name in priority_agents:
             if agent_name in self.agents and self.agents[agent_name]:
-                self.logger.info(f"✅ Nutze {agent_name} für Quellensuche")
-                return self.agents[agent_name]
+                agent = self.agents[agent_name]
+                # Prüfe ob Agent initialisiert ist
+                if hasattr(agent, 'status') and agent.status:
+                    self.logger.info(f"✅ Nutze {agent_name} für Quellensuche (Status: {agent.status})")
+                    return agent
+                else:
+                    self.logger.info(f"✅ Nutze {agent_name} für Quellensuche")
+                    return agent
+        
+        # Fallback: Nutze ersten verfügbaren Agent
+        if self.agents:
+            first_agent = list(self.agents.values())[0]
+            self.logger.warning(f"⚠️ Nutze Fallback-Agent: {list(self.agents.keys())[0]}")
+            return first_agent
+            
+        self.logger.error("❌ Keine Agenten verfügbar für Quellensuche")
         return None
     
     async def _execute_discovery_search(self, queries: List[str], 
@@ -125,8 +145,9 @@ class DynamicSourceDiscovery:
         all_results = []
         
         if not search_agent:
-            self.logger.info(f"🔍 Dynamische Quellensuche für {len(queries)} Anfragen...")
-            return []
+            # ÄNDERUNG 23.06.2025: Verwende Fallback-Quellen wenn kein Agent verfügbar
+            self.logger.warning("⚠️ Kein Such-Agent verfügbar für Quellenentdeckung")
+            return self._get_fallback_sources()
         
         # Führe Suchen mit übergebenem Agent durch
         for query in queries[:10]:  # Limitiere auf 10 Anfragen pro Phase
@@ -194,3 +215,39 @@ class DynamicSourceDiscovery:
             "focus_areas": self.pattern_manager.get_focus_areas(source.source_type),
             "extraction_hints": self.pattern_manager.get_extraction_hints(source.source_type)
         }
+    
+    def _get_fallback_sources(self) -> List[Dict[str, Any]]:
+        """
+        ÄNDERUNG 23.06.2025: Gibt Fallback-Quellen zurück wenn keine Agenten verfügbar
+        """
+        # Minimale Standard-Quellen für Mining-Recherche
+        fallback_sources = [
+            {
+                'url': 'https://www.mining.com',
+                'title': 'Mining.com - Global Mining News',
+                'snippet': 'Leading global mining news and analysis'
+            },
+            {
+                'url': 'https://www.mining-technology.com',
+                'title': 'Mining Technology',
+                'snippet': 'Mining news, mining projects and companies'
+            },
+            {
+                'url': 'https://www.nrcan.gc.ca',
+                'title': 'Natural Resources Canada',
+                'snippet': 'Canadian government mining information'
+            },
+            {
+                'url': 'https://mern.gouv.qc.ca',
+                'title': 'Quebec Mining Ministry',
+                'snippet': 'Quebec provincial mining resources'
+            },
+            {
+                'url': 'https://www.infomine.com',
+                'title': 'InfoMine',
+                'snippet': 'Mining intelligence and technology'
+            }
+        ]
+        
+        self.logger.info(f"📌 Verwende {len(fallback_sources)} Fallback-Quellen")
+        return fallback_sources

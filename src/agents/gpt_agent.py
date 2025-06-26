@@ -14,7 +14,10 @@ from datetime import datetime
 from .base_agent import BaseAgent, MineQuery, SearchResult, AgentStatus
 from .rate_limiter import RateLimiter
 from src.core.logger import get_logger, PerformanceLogger
+from src.utils.safe_dict_access import safe_get, safe_nested_get, ensure_dict, ensure_list
 from .enhanced_search import get_mining_search_queries, get_mining_domains
+# ÄNDERUNG 25.06.2025: Nutze robustes Session Management
+from src.utils.session_manager import SessionManager
 
 
 class GPTAgent(BaseAgent):
@@ -33,8 +36,9 @@ class GPTAgent(BaseAgent):
     async def initialize(self) -> bool:
         """Initialisiert den Agenten"""
         try:
-            # Erstelle Session
-            self._session = aiohttp.ClientSession()
+            # ÄNDERUNG 25.06.2025: Nutze robustes Session Management mit SessionManager Instanz
+            self._session_manager = SessionManager()
+            self._robust_session = await self._session_manager.get_robust_session(f"gpt_{self.name}", timeout=120)
             
             # Validiere Credentials
             is_valid = await self.validate_credentials()
@@ -67,14 +71,15 @@ class GPTAgent(BaseAgent):
             payload = {
                 "model": self.model,
                 "messages": [{"role": "user", "content": "test"}],
-                "max_tokens": 10
+                "max_tokens": 16  # ÄNDERUNG 24.06.2025: Minimum 16 für API-Kompatibilität
             }
             
-            async with self._session.post(
+            async with self._robust_session.request(
+                'POST',
                 self.base_url,
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=10)
+                timeout=10
             ) as response:
                 return response.status == 200
                 
@@ -413,11 +418,12 @@ Focus on official, verifiable data from authoritative sources."""
         }
         
         try:
-            async with self._session.post(
+            async with self._robust_session.request(
+                'POST',
                 self.base_url,
                 headers=headers,
                 json=payload,
-                timeout=self.timeout
+                timeout=120
             ) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -448,18 +454,18 @@ Focus on official, verifiable data from authoritative sources."""
                     data = json.loads(content)
                     if 'results' in data:
                         for item in data['results']:
-                            if item.get('value') and item['value'] != 'nichts gefunden':
+                            if safe_get(item, 'value') and safe_get(item, 'value') != 'nichts gefunden':
                                 # ÄNDERUNG 20.06.2025: Korrekte Parameter für SearchResult
                                 confidence_mapping = {'high': 0.9, 'medium': 0.7, 'low': 0.5}
-                                confidence_score = confidence_mapping.get(item.get('confidence', 'medium'), 0.7)
+                                confidence_score = confidence_mapping.get(safe_get(item, 'confidence', 'medium'), 0.7)
                                 
                                 result = SearchResult(
                                     mine_name=query.mine_name,
-                                    field_name=item.get('field_name', ''),
-                                    value=item.get('value'),
-                                    source=item.get('source', 'GPT-4'),
-                                    source_url=item.get('source_url', ''),
-                                    source_date=item.get('source_date', datetime.now().year),
+                                    field_name=safe_get(item, 'field_name', ''),
+                                    value=safe_get(item, 'value'),
+                                    source=safe_get(item, 'source', 'GPT-4'),
+                                    source_url=safe_get(item, 'source_url', ''),
+                                    source_date=safe_get(item, 'source_date', datetime.now().year),
                                     confidence_score=confidence_score,
                                     agent_name=self.name,
                                     timestamp=datetime.now(),
@@ -480,6 +486,7 @@ Focus on official, verifiable data from authoritative sources."""
     
     async def cleanup(self):
         """Räumt Ressourcen auf"""
-        if hasattr(self, '_session') and self._session:
-            await self._session.close()
+        # ÄNDERUNG 25.06.2025: Nutze SessionManager für Cleanup
+        if hasattr(self, '_session_manager'):
+            await self._session_manager.close_session(f"gpt_{self.name}")
         self.logger.info("GPT-4 Agent beendet")

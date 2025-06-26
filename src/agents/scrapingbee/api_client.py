@@ -9,6 +9,8 @@ import aiohttp
 import asyncio
 from typing import Dict, Any, Optional
 from urllib.parse import quote, urlencode
+# ÄNDERUNG 24.06.2025: Nutze Session Manager
+from src.utils.session_manager import SessionManager
 
 
 class ScrapingBeeAPIClient:
@@ -23,7 +25,9 @@ class ScrapingBeeAPIClient:
     
     async def initialize(self):
         """Initialisiert den API Client"""
-        self._session = aiohttp.ClientSession()
+        # ÄNDERUNG 24.06.2025: Nutze Session Manager statt direkte Session
+        session_manager = SessionManager()
+        self._session = await session_manager.get_session("scrapingbee_api_client")
     
     async def validate_credentials(self) -> bool:
         """Validiert API-Key"""
@@ -106,5 +110,6 @@ class ScrapingBeeAPIClient:
     
     async def cleanup(self):
         """Räumt Ressourcen auf"""
-        if self._session:
-            await self._session.close()
+        # ÄNDERUNG 24.06.2025: Nutze Session Manager für Cleanup
+        session_manager = SessionManager()
+        await session_manager.close_session("scrapingbee_api_client")

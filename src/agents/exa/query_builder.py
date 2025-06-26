@@ -6,8 +6,10 @@ Beschreibung: Query Builder für Exa Search
 """
 
 from typing import Dict, List, Any
+from urllib.parse import urlparse
 from ..base_agent import MineQuery
 from ..enhanced_search import get_mining_search_queries, get_mining_domains
+from .utils import normalize_domains_for_exa, extract_base_domain
 
 class ExaQueryBuilder:
     """Erstellt semantische Suchanfragen für Exa"""
@@ -74,13 +76,16 @@ class ExaQueryBuilder:
         
         mining_domains = get_mining_domains()
         
+        # ÄNDERUNG 24.06.2025: Nutze neue Utility für Domain-Bereinigung
+        cleaned_domains = normalize_domains_for_exa(mining_domains, max_domains=20)
+        
         # Erstelle Queries für Top Mining-Suchbegriffe
         for idx, mining_query in enumerate(mining_queries[:10]):
             queries.append({
                 "query": mining_query,
                 "num_results": 15,
                 "use_autoprompt": True,
-                "include_domains": mining_domains[:20],  # Top Mining-Domains
+                "include_domains": cleaned_domains,  # Top Mining-Domains (bereits bereinigt und limitiert)
                 "category": "research"
             })
         
@@ -129,4 +134,6 @@ class ExaQueryBuilder:
         # Kombiniere Domains
         all_domains = base_domains + country_domains.get(country, [])
         
-        return list(set(all_domains))[:20]  # Max 20 Domains
+        # ÄNDERUNG 24.06.2025: Nutze normalize_domains_for_exa für konsistente Bereinigung
+        return normalize_domains_for_exa(all_domains, max_domains=20)
+    

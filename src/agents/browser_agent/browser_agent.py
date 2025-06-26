@@ -15,6 +15,8 @@ from ..base_agent import BaseAgent, MineQuery, SearchResult, AgentStatus
 from src.core.logger import get_logger
 from .models import BrowserConfig, ScrapeResult, PortalConfig, NavigationStep
 from .page_analyzer import PageAnalyzer
+from .docker_config import DockerBrowserConfig
+from .fallback_scraper import FallbackScraper
 
 
 class BrowserAgent(BaseAgent):
@@ -24,14 +26,23 @@ class BrowserAgent(BaseAgent):
         super().__init__(name, config)
         self.logger = get_logger(f"agent.{name}", agent_type="browser")
         
-        # Browser Konfiguration
+        # Browser Konfiguration mit Docker-Unterstützung
         browser_config = config.get('browser_config', {})
+        
+        # Nutze Docker-optimierte Viewport-Einstellungen
+        viewport = DockerBrowserConfig.get_viewport_config()
+        
         self.browser_config = BrowserConfig(
             headless=browser_config.get('headless', True),
             timeout=browser_config.get('timeout', 30000),
-            viewport_width=browser_config.get('viewport_width', 1920),
-            viewport_height=browser_config.get('viewport_height', 1080)
+            viewport_width=browser_config.get('viewport_width', viewport['width']),
+            viewport_height=browser_config.get('viewport_height', viewport['height'])
         )
+        
+        # Überschreibe Args mit Docker-optimierten wenn nötig
+        if DockerBrowserConfig.is_docker():
+            self.browser_config.args = DockerBrowserConfig.get_browser_args()
+            self.logger.info("Docker-Umgebung erkannt - nutze optimierte Browser-Args")
         
         # Playwright Objekte
         self.playwright = None
@@ -44,6 +55,10 @@ class BrowserAgent(BaseAgent):
         # Government Portals
         self.government_portals = self._load_government_portals()
         
+        # Fallback Scraper für wenn Playwright nicht verfügbar
+        self.fallback_scraper = None
+        self.use_fallback = False
+        
     async def initialize(self) -> bool:
         """Initialisiert Playwright und Browser"""
         try:
@@ -52,15 +67,45 @@ class BrowserAgent(BaseAgent):
                 from playwright.async_api import async_playwright
                 self.playwright = await async_playwright().start()
             except ImportError:
-                self.logger.error("Playwright nicht installiert. Bitte 'pip install playwright' ausführen")
-                self.status = AgentStatus.DISABLED
-                return False
+                self.logger.error(
+                    "Playwright nicht installiert. Bitte folgende Befehle ausführen:\n"
+                    "1. pip install playwright\n"
+                    "2. playwright install chromium"
+                )
+                self.logger.warning("Aktiviere Fallback-Modus ohne Playwright")
+                self.use_fallback = True
+                self.status = AgentStatus.READY  # Trotzdem als Ready markieren
+                return True  # Erfolgreich mit Fallback
             
-            # Browser starten
-            self.browser = await self.playwright.chromium.launch(
-                headless=self.browser_config.headless,
-                args=self.browser_config.args
-            )
+            # Browser starten mit Docker-Konfiguration
+            launch_config = DockerBrowserConfig.get_browser_config()
+            launch_config['headless'] = self.browser_config.headless
+            
+            try:
+                self.browser = await self.playwright.chromium.launch(**launch_config)
+                self.logger.info("Browser erfolgreich gestartet")
+            except Exception as launch_error:
+                # Diagnose bei Fehler
+                self.logger.error(f"Browser-Start fehlgeschlagen: {launch_error}")
+                
+                # Führe Diagnose durch
+                diagnosis = DockerBrowserConfig.diagnose()
+                self.logger.error(f"Diagnose-Info: {json.dumps(diagnosis, indent=2)}")
+                
+                # Versuche alternativen Start
+                self.logger.info("Versuche alternativen Browser-Start...")
+                fallback_config = {
+                    'headless': True,
+                    'args': ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
+                }
+                try:
+                    self.browser = await self.playwright.chromium.launch(**fallback_config)
+                except Exception as final_error:
+                    self.logger.error(f"Auch Fallback-Start fehlgeschlagen: {final_error}")
+                    self.logger.warning("Wechsle zu reinem Fallback-Modus ohne Browser")
+                    self.use_fallback = True
+                    self.status = AgentStatus.READY
+                    return True
             
             # Browser-Kontext erstellen
             self.context = await self.browser.new_context(
@@ -72,12 +117,12 @@ class BrowserAgent(BaseAgent):
                 locale=self.browser_config.locale
             )
             
-            self.status = AgentStatus.ACTIVE
+            self.status = AgentStatus.READY
             self.logger.info("Browser Agent erfolgreich initialisiert")
             return True
             
         except Exception as e:
-            self.logger.error(f"Fehler bei Browser-Initialisierung: {e}")
+            self.logger.error(f"Fehler bei Browser-Initialisierung: {str(e)}")
             self.status = AgentStatus.ERROR
             return False
     
@@ -92,6 +137,11 @@ class BrowserAgent(BaseAgent):
     async def search_mine(self, query: MineQuery) -> List[SearchResult]:
         """Führt Browser-basierte Suche durch"""
         results = []
+        
+        # Nutze Fallback wenn nötig
+        if self.use_fallback:
+            self.logger.info("Nutze Fallback-Scraper ohne Browser-Rendering")
+            return await self._search_with_fallback(query)
         
         # Nutze entdeckte Quellen wenn verfügbar
         discovered_sources = getattr(query, 'discovered_sources', None)
@@ -129,6 +179,11 @@ class BrowserAgent(BaseAgent):
         """Scrapt eine dynamische Website"""
         results = []
         page = None
+        
+        # ÄNDERUNG 24.06.2025: Robuste Browser-Prüfung
+        if not self.context or not self.browser:
+            self.logger.error("Browser nicht initialisiert - überspringe dynamisches Scraping")
+            return results
         
         try:
             # Neue Seite öffnen
@@ -190,6 +245,12 @@ class BrowserAgent(BaseAgent):
         results = []
         page = None
         
+        # ÄNDERUNG 23.06.2025: Prüfe ob Browser initialisiert ist
+        # ÄNDERUNG 24.06.2025: Prüfe Browser-Verfügbarkeit vor Portal-Suche
+        if not self.context or not self.browser:
+            self.logger.error("Browser nicht initialisiert - überspringe Portal-Suche")
+            return results
+            
         try:
             page = await self.context.new_page()
             
@@ -351,6 +412,39 @@ class BrowserAgent(BaseAgent):
                 }
             )
         ]
+    
+    async def _search_with_fallback(self, query: MineQuery) -> List[SearchResult]:
+        """Fallback-Suche ohne Browser-Rendering"""
+        results = []
+        
+        async with FallbackScraper(self.logger) as scraper:
+            # Sammle URLs zum Scrapen
+            urls_to_scrape = []
+            
+            # Nutze entdeckte Quellen
+            discovered_sources = getattr(query, 'discovered_sources', [])
+            for source in discovered_sources[:10]:  # Max 10 Quellen
+                urls_to_scrape.append(source.url)
+            
+            # Füge bekannte Government-Portale hinzu
+            for portal in self.government_portals:
+                if portal.country.lower() == query.country.lower():
+                    search_url = f"{portal.base_url}{portal.search_path}?q={query.mine_name}"
+                    urls_to_scrape.append(search_url)
+            
+            # Führe Fallback-Scraping durch
+            if urls_to_scrape:
+                fallback_results = await scraper.search_with_fallback(
+                    urls_to_scrape, query.mine_name
+                )
+                results.extend(fallback_results)
+        
+        # Update Statistiken
+        self.stats['total_requests'] += 1
+        self.stats['successful_requests'] += 1 if results else 0
+        self.stats['total_fields_found'] += len(results)
+        
+        return results
     
     async def cleanup(self):
         """Cleanup Browser-Ressourcen"""

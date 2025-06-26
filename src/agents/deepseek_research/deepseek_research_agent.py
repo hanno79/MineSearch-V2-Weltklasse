@@ -11,8 +11,11 @@ from typing import List, Dict, Any, Optional
 
 from ..base_agent import BaseAgent, MineQuery, SearchResult, AgentStatus
 from ..rate_limiter import RateLimiter
+from src.utils.safe_dict_access import safe_get, safe_nested_get, ensure_dict, ensure_list
 from ..enhanced_search import get_mining_search_queries, get_mining_domains, get_country_specific_domains
 from src.core.logger import get_logger, PerformanceLogger
+# ÄNDERUNG 24.06.2025: Nutze Session Manager
+from src.utils.session_manager import SessionManager
 from .models import DeepSeekModel, ModelConfig, ResearchContext, ResearchStep
 from .research_processor import ResearchProcessor
 
@@ -28,7 +31,7 @@ class DeepSeekResearchAgent(BaseAgent):
         self.model_config = ModelConfig.get_models()[model_type]
         
         # Check if using direct API or OpenRouter
-        self.use_openrouter = config.get('use_openrouter', True)
+        self.use_openrouter = safe_get(config, 'use_openrouter', True)
         
         if self.use_openrouter:
             self.api_key = config['api_config'].openrouter_key
@@ -36,7 +39,7 @@ class DeepSeekResearchAgent(BaseAgent):
             self.model = f"deepseek/{self.model_config.id}"
         else:
             # Direct DeepSeek API (wenn verfügbar)
-            self.api_key = config['api_config'].get('deepseek_key')
+            self.api_key = safe_get(config['api_config'], 'deepseek_key')
             self.base_url = "https://api.deepseek.com/v1/chat/completions"
             self.model = self.model_config.id
         
@@ -51,7 +54,9 @@ class DeepSeekResearchAgent(BaseAgent):
     async def initialize(self) -> bool:
         """Initialize the agent"""
         try:
-            self._session = aiohttp.ClientSession()
+            # ÄNDERUNG 24.06.2025: Nutze Session Manager statt direkte Session
+            session_manager = SessionManager()
+            self._session = await session_manager.get_session(f"deepseek_{self.name}")
             
             # Skip validation if no API key
             if not self.api_key:
@@ -89,7 +94,7 @@ class DeepSeekResearchAgent(BaseAgent):
             payload = {
                 "model": self.model,
                 "messages": [{"role": "user", "content": "Test"}],
-                "max_tokens": 10
+                "max_tokens": 16  # ÄNDERUNG 24.06.2025: Minimum 16 für API-Kompatibilität
             }
             
             async with self._session.post(
@@ -312,5 +317,6 @@ Format as structured data."""
     
     async def cleanup(self):
         """Cleanup resources"""
-        if hasattr(self, '_session') and self._session:
-            await self._session.close()
+        # ÄNDERUNG 24.06.2025: Nutze Session Manager für Cleanup
+        session_manager = SessionManager()
+        await session_manager.close_session(f"deepseek_{self.name}")

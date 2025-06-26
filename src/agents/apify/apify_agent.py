@@ -14,6 +14,8 @@ from ..base_agent import BaseAgent, MineQuery, SearchResult, AgentStatus
 from ..rate_limiter import RateLimiter
 from src.core.logger import get_logger, PerformanceLogger
 from ..enhanced_search import get_mining_search_queries, get_mining_domains
+# ÄNDERUNG 24.06.2025: Nutze Session Manager
+from src.utils.session_manager import SessionManager
 
 from .actors import ApifyActorManager
 from .result_processor import ApifyResultProcessor
@@ -34,7 +36,9 @@ class ApifyAgent(BaseAgent):
     async def initialize(self) -> bool:
         """Initialisiert den Agenten"""
         try:
-            self._session = aiohttp.ClientSession()
+            # ÄNDERUNG 24.06.2025: Nutze Session Manager statt direkte Session
+            session_manager = SessionManager()
+            self._session = await session_manager.get_session(f"apify_{self.name}")
             
             # Initialisiere Manager-Komponenten
             self.actor_manager = ApifyActorManager(
@@ -229,6 +233,7 @@ class ApifyAgent(BaseAgent):
     
     async def cleanup(self):
         """Räumt Ressourcen auf"""
-        if hasattr(self, '_session') and self._session:
-            await self._session.close()
+        # ÄNDERUNG 24.06.2025: Nutze Session Manager für Cleanup
+        session_manager = SessionManager()
+        await session_manager.close_session(f"apify_{self.name}")
         self.logger.info("Apify Agent beendet")

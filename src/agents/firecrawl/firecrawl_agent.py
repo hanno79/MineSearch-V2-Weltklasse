@@ -15,6 +15,8 @@ import re
 from ..base_agent import BaseAgent, MineQuery, SearchResult, AgentStatus
 from ..rate_limiter import RateLimiter
 from src.core.logger import get_logger, PerformanceLogger
+# ÄNDERUNG 24.06.2025: Nutze Session Manager
+from src.utils.session_manager import SessionManager
 
 from .url_builder import FirecrawlURLBuilder
 from .extractors import FirecrawlDataExtractor
@@ -27,7 +29,8 @@ class FirecrawlAgent(BaseAgent):
         super().__init__(name, config)
         self.api_key = config['api_config'].firecrawl_key
         self.base_url = "https://api.firecrawl.dev/v1"
-        self._rate_limiter = RateLimiter(rate=20, per=60.0)  # 20 Anfragen pro Minute
+        # ÄNDERUNG 24.06.2025: Reduziertes Rate Limit für Firecrawl (max 10/min laut Logs)
+        self._rate_limiter = RateLimiter(rate=8, per=60.0)  # 8 Anfragen pro Minute mit Puffer
         self.logger = get_logger(f"agent.{name}", agent_type="firecrawl")
         self.perf_logger = PerformanceLogger(self.logger)
         
@@ -38,7 +41,9 @@ class FirecrawlAgent(BaseAgent):
     async def initialize(self) -> bool:
         """Initialisiert den Agenten"""
         try:
-            self._session = aiohttp.ClientSession()
+            # ÄNDERUNG 24.06.2025: Nutze Session Manager statt direkte Session
+            session_manager = SessionManager()
+            self._session = await session_manager.get_session(f"firecrawl_{self.name}")
             
             is_valid = await self.validate_credentials()
             if not is_valid:
@@ -106,8 +111,8 @@ class FirecrawlAgent(BaseAgent):
                 crawl_results = await self._crawl_website(seed_url, query)
                 results.extend(crawl_results)
                 
-                # Respektiere Rate Limits
-                await asyncio.sleep(2)
+                # ÄNDERUNG 24.06.2025: Längere Pause zwischen Crawls
+                await asyncio.sleep(8)  # Mindestens 8 Sekunden zwischen Requests
             
             # 3. Gezieltes Scraping auf bekannten URLs
             targeted_results = await self._targeted_scraping(query)
@@ -158,34 +163,60 @@ class FirecrawlAgent(BaseAgent):
     
     async def _start_crawl(self, url: str, query: MineQuery) -> Optional[str]:
         """Startet einen Crawl-Job"""
-        await self._rate_limiter.acquire()
+        # ÄNDERUNG 23.06.2025: Retry-Logik für Rate Limiting
+        max_retries = 3
+        base_delay = 5
         
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
+        for attempt in range(max_retries):
+            await self._rate_limiter.acquire()
+            
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            # Crawl-Konfiguration
+            payload = self.url_builder.create_crawl_config(query, url)
+            
+            try:
+                async with self._session.post(
+                    f"{self.base_url}/crawl",
+                    headers=headers,
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    if response.status in [200, 201]:
+                        data = await response.json()
+                        return data.get('jobId')
+                    elif response.status == 429:
+                        # Rate limit erreicht
+                        retry_after = int(response.headers.get('Retry-After', base_delay * (2 ** attempt)))
+                        self.logger.warning(f"Rate limit bei Crawl-Start. Warte {retry_after}s (Versuch {attempt+1}/{max_retries})")
+                        
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(retry_after)
+                            continue
+                        else:
+                            self.logger.error(f"Crawl-Start fehlgeschlagen nach {max_retries} Versuchen")
+                            return None
+                    elif response.status == 402:
+                        # Insufficient credits
+                        self.logger.error("Firecrawl: Unzureichende Credits für Crawl. Agent wird deaktiviert.")
+                        self.status = AgentStatus.DISABLED
+                        return None
+                    else:
+                        error_text = await response.text()
+                        self.logger.error(f"Crawl Start Fehler: {response.status} - {error_text}")
+                        return None
+                        
+            except Exception as e:
+                self.logger.error(f"Crawl Start Exception: {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(base_delay * (2 ** attempt))
+                    continue
+                return None
         
-        # Crawl-Konfiguration
-        payload = self.url_builder.create_crawl_config(query, url)
-        
-        try:
-            async with self._session.post(
-                f"{self.base_url}/crawl",
-                headers=headers,
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=30)
-            ) as response:
-                if response.status in [200, 201]:
-                    data = await response.json()
-                    return data.get('jobId')
-                else:
-                    error_text = await response.text()
-                    self.logger.error(f"Crawl Start Fehler: {response.status} - {error_text}")
-                    return None
-                    
-        except Exception as e:
-            self.logger.error(f"Crawl Start Exception: {e}")
-            return None
+        return None
     
     async def _wait_for_crawl(self, job_id: str, max_wait: int = 120) -> Optional[Dict[str, Any]]:
         """Wartet auf Crawl-Completion"""
@@ -237,43 +268,72 @@ class FirecrawlAgent(BaseAgent):
     
     async def _scrape_single_url(self, url: str, query: MineQuery) -> List[SearchResult]:
         """Scraped eine einzelne URL"""
-        await self._rate_limiter.acquire()
+        # ÄNDERUNG 23.06.2025: Exponential Backoff für Rate Limiting
+        max_retries = 3
+        base_delay = 5
         
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
+        for attempt in range(max_retries):
+            await self._rate_limiter.acquire()
+            
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "url": url,
+                "formats": ["markdown"],
+                "onlyMainContent": True
+            }
+            
+            try:
+                async with self._session.post(
+                    f"{self.base_url}/scrape",
+                    headers=headers,
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        markdown = data.get('data', {}).get('markdown', '')
+                        return self.data_extractor.extract_from_content(markdown, url, query)
+                    elif response.status == 429:
+                        # Rate limit erreicht
+                        retry_after = int(response.headers.get('Retry-After', base_delay * (2 ** attempt)))
+                        self.logger.warning(f"Rate limit erreicht für {url}. Warte {retry_after}s (Versuch {attempt+1}/{max_retries})")
+                        
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(retry_after)
+                            continue
+                        else:
+                            self.logger.error(f"Rate limit nach {max_retries} Versuchen für {url}")
+                            return []
+                    elif response.status == 402:
+                        # Insufficient credits
+                        self.logger.error("Firecrawl: Unzureichende Credits. Agent wird deaktiviert.")
+                        self.status = AgentStatus.DISABLED
+                        return []
+                    else:
+                        error_text = await response.text()
+                        self.logger.error(f"Scrape Fehler ({response.status}): {error_text}")
+                        return []
+                        
+            except Exception as e:
+                self.logger.error(f"Scrape Single URL Fehler: {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(base_delay * (2 ** attempt))
+                    continue
+                return []
         
-        payload = {
-            "url": url,
-            "formats": ["markdown"],
-            "onlyMainContent": True
-        }
-        
-        try:
-            async with self._session.post(
-                f"{self.base_url}/scrape",
-                headers=headers,
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=30)
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    markdown = data.get('data', {}).get('markdown', '')
-                    return self.data_extractor.extract_from_content(markdown, url, query)
-                else:
-                    return []
-                    
-        except Exception as e:
-            self.logger.error(f"Scrape Single URL Fehler: {e}")
-            return []
+        return []
     
     async def cleanup(self):
         """Cleanup der Session"""
         try:
-            if hasattr(self, '_session') and self._session and not self._session.closed:
-                await self._session.close()
-                self.logger.debug("Session erfolgreich geschlossen")
+            # ÄNDERUNG 24.06.2025: Nutze Session Manager für Cleanup
+            session_manager = SessionManager()
+            await session_manager.close_session(f"firecrawl_{self.name}")
+            self.logger.debug("Session erfolgreich geschlossen")
         except Exception as e:
             self.logger.warning(f"Fehler beim Schließen der Session: {e}")
         finally:

@@ -18,6 +18,7 @@ from src.agents.firecrawl_agent import FirecrawlAgent
 from src.agents.brightdata_agent import BrightDataAgent
 from src.agents.openrouter_agent import OpenRouterAgent
 from src.agents.openrouter.models import ModelRegistry
+from src.agents.openrouter.utils import parse_model_id, extract_model_key_from_agent_type, find_model_by_key
 from src.agents.deepseek_research import DeepSeekResearchAgent
 from src.agents.perplexity_deep_agent import PerplexityDeepAgent
 from src.agents.deep_web_crawler_agent import DeepWebCrawlerAgent
@@ -66,14 +67,9 @@ class AgentFactory:
                 # Extrahiere Modell-Suffix aus agent_type (z.B. "openrouter_deepseek-chat" -> "deepseek-chat")
                 model_suffix = agent_type.replace("openrouter_", "")
                 
-                # Suche passende model_id
+                # Suche passende model_id mit robustem Parser
                 all_models = {**ModelRegistry.get_free_models(), **ModelRegistry.get_premium_models()}
-                for mid, model in all_models.items():
-                    # Handle models with :free suffix
-                    model_key = mid.split('/')[-1].split(':')[0]
-                    if model_key == model_suffix:
-                        model_id = mid
-                        break
+                model_id, _ = find_model_by_key(model_suffix, all_models)
             
             if model_id and config.api.openrouter_key:
                 # ÄNDERUNG 19.06.2025: Fix für BaseAgent config requirement
@@ -143,9 +139,13 @@ class AgentFactory:
                 "process_pdfs": True
             }
         # ÄNDERUNG 22.06.2025: Fix für PerplexityDeepAgent - erwartet andere Parameter
+        # ÄNDERUNG 25.06.2025: SessionManager hinzugefügt
         elif agent_type == "perplexity_deep":
+            from src.utils.session_manager import SessionManager
+            session_manager = SessionManager()
             return agent_class(
                 api_key=config.api.perplexity_key,
+                session_manager=session_manager,
                 use_deep_research=True
             )
         # ÄNDERUNG 22.06.2025: PremiumMiningResearch benötigt alle verfügbaren Agenten
@@ -192,8 +192,9 @@ class AgentFactory:
             # Include both free and premium models
             all_models = {**ModelRegistry.get_free_models(), **ModelRegistry.get_premium_models()}
             for model_id in all_models:
-                # Handle models with :free suffix
-                model_key = f"openrouter_{model_id.split('/')[-1].split(':')[0]}"
+                # Handle models with :free suffix using robust parser
+                parsed = parse_model_id(model_id)
+                model_key = f"openrouter_{parsed['model_key']}"
                 available[model_key] = True
             
             # DeepSeek models via OpenRouter

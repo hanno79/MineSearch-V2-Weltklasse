@@ -19,7 +19,11 @@ class DeepWebCrawlerAgent(BaseAgent):
     
     def __init__(self, name: str, config: Dict[str, Any]):
         super().__init__(name, config)
-        self.crawler = DeepWebCrawler(name, config)
+        
+        # ÄNDERUNG 23.06.2025: Erstelle Default Scraper-Konfiguration
+        default_scrapers = self._get_default_scrapers(config)
+        self.crawler = DeepWebCrawler(name, config, scraper_agents=default_scrapers)
+        
         self.logger = get_logger(f"agent.{name}", agent_type="deep_crawler")
         self.max_depth = config.get('crawler_config', {}).get('max_depth', 3)
         self.max_pages = config.get('crawler_config', {}).get('max_pages', 100)
@@ -156,3 +160,16 @@ class DeepWebCrawlerAgent(BaseAgent):
         self.crawler.queued_urls.clear()
         self.crawler.results.clear()
         self.logger.info("Deep Web Crawler Agent beendet")
+    
+    def _get_default_scrapers(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        ÄNDERUNG 23.06.2025: Erstellt Default Scraper-Konfiguration
+        """
+        # Erstelle einen minimalen Scraper falls keine anderen verfügbar sind
+        try:
+            from .scraper_agent import ScraperAgent
+            default_scraper = ScraperAgent("default_scraper", config)
+            return {"scraper": default_scraper}
+        except Exception:
+            # Fallback: Leeres Dict - wird später vom Agent Manager gesetzt
+            return {}

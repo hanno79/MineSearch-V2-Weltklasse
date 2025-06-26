@@ -1,18 +1,24 @@
 """
 Author: rahn
 Datum: 23.06.2025
-Version: 1.2
+Version: 1.3
 Beschreibung: Search Form Komponente für MineSearch UI
 ÄNDERUNG 23.06.2025: Event Loop Fix mit async_utils
+ÄNDERUNG 27.06.2025: SearchProgress Integration
 """
 import streamlit as st
 from typing import Dict, List, Optional, Callable
 import time
+from concurrent.futures import ThreadPoolExecutor
 from src.agents.base_agent import MineQuery
 from src.core.orchestrator import MineSearchOrchestratorV2
 from src.core.cancellation import CancellationToken, CancellationException
 from src.utils.streamlit_async_wrapper import streamlit_run_async
+from src.ui.components.search_progress import SearchProgressComponent
+from src.ui.components.live_progress import LiveProgressComponent
+from src.core.global_cancellation_registry import get_global_cancellation_registry, RegisteredSearch
 from datetime import datetime
+import uuid
 
 
 class SearchFormComponent:
@@ -24,19 +30,18 @@ class SearchFormComponent:
         self.cancellation_token = None
         self.orchestrator = None
         self._orchestrator_initialized = False
+        self.progress_component = SearchProgressComponent()
+        self.live_progress = LiveProgressComponent()
         
     def render(self, mines_to_search: List[Dict], selected_agents: List[str], 
                advanced_options: Dict) -> Optional[List]:
         """Rendert das Such-Formular und führt Suche aus"""
         
-        # Session-State-Initialisierung für Status-Updates und Fehlerdetails
+        # ÄNDERUNG 27.06.2025: Session State wird nur in main.py initialisiert
+        # Nur prüfen ob Session State existiert
         if 'status_updates' not in st.session_state:
-            st.session_state.status_updates = []
-        if 'error_details' not in st.session_state:
-            st.session_state.error_details = []
-        # Initialize cancellation token in session state if needed
-        if 'cancellation_token' not in st.session_state:
-            st.session_state.cancellation_token = None
+            st.error("Session State nicht initialisiert. Bitte Seite neu laden.")
+            st.stop()
         
         # Orchestrator IMMER frisch initialisieren
         from src.core.orchestrator import MineSearchOrchestratorV2
@@ -83,12 +88,27 @@ class SearchFormComponent:
                 )
                 
                 if cancel_clicked:
-                    # ÄNDERUNG 23.06.2025: Robustere Cancel-Implementierung
+                    # ÄNDERUNG 26.06.2025: Verwende Global Registry für Cancel
+                    registry = get_global_cancellation_registry()
+                    
+                    # Cancel via Registry
+                    if st.session_state.get('search_id'):
+                        cancelled = registry.cancel_search(st.session_state.search_id, "User clicked cancel")
+                        if cancelled:
+                            st.success("✅ Suche wurde abgebrochen")
+                        else:
+                            st.warning("⚠️ Keine aktive Suche gefunden")
+                    
+                    # Legacy: Cancel via session state token
                     if st.session_state.get('cancellation_token'):
                         st.session_state.cancellation_token.cancel()
+                    
+                    # Reset states
                     st.session_state.search_cancelled = True
                     st.session_state.search_in_progress = False
-                    st.warning("🛑 Suche wird abgebrochen...")
+                    st.session_state.active_search_task = None
+                    st.session_state.search_id = None
+                    
                     st.rerun()
             
             with col3:
@@ -141,9 +161,14 @@ class SearchFormComponent:
             st.session_state.status_updates = []
         if 'error_details' not in st.session_state:
             st.session_state.error_details = []
-        # Create new cancellation token and store in session state
+        
+        # ÄNDERUNG 26.06.2025: Erstelle eindeutige Search ID und registriere in Global Registry
+        search_id = str(uuid.uuid4())
+        st.session_state.search_id = search_id
+        
+        # Create new cancellation token with search ID
         from src.core.cancellation import CancellationToken
-        cancellation_token = CancellationToken()
+        cancellation_token = CancellationToken(name=f"search_{search_id}")
         st.session_state.cancellation_token = cancellation_token
         st.session_state.search_cancelled = False  # Reset cancel flag
         
@@ -159,27 +184,32 @@ class SearchFormComponent:
             # Show search info
             with status_container.container():
                 st.info(f"🔍 Searching {len(mines_to_search)} mines with {len(selected_agents)} agents...")
+                
+                # Progress Component Container mit Auto-Refresh
+                progress_placeholder = st.empty()
+                
+                # Legacy progress bar
                 progress_bar = st.progress(0)
-                status_text = st.empty()
                 cancel_hint = st.empty()
                 cancel_hint.info("💡 Tipp: Drücke F5 oder aktualisiere die Seite, um die Suche abzubrechen")
             all_results = []
+            
+            # Reset progress component
+            self.progress_component.reset()
+            
             for idx, mine_data in enumerate(mines_to_search):
                 if cancellation_token.is_cancelled() or st.session_state.get('search_cancelled', False):
                     st.warning("🛑 Search cancelled by user")
                     break
-                time.sleep(0.1)
+                
+                # Update progress tracking
                 progress = (idx + 1) / len(mines_to_search)
                 progress_bar.progress(progress)
-                status_message = f"Searching mine {idx + 1} of {len(mines_to_search)}"
-                if idx % 3 == 0:
-                    status_message += " | 💡 Tipp: F5 drücken zum Abbrechen"
-                status_text.text(status_message)
-                # Status-Updates ausgeben (thread-sicher)
-                if st.session_state.status_updates:
-                    with st.expander("Status Updates", expanded=True):
-                        for update in st.session_state.status_updates[-10:]:
-                            st.write(f"{update['timestamp']}: {update['mine']} - {update['message']}")
+                
+                # Reset mine search flag
+                st.session_state.mine_search_completed = False
+                st.session_state.current_search_mine = mine_data.get('mine_name', 'Unknown')
+                
                 # Initialize orchestrator once
                 if not self._orchestrator_initialized:
                     try:
@@ -192,16 +222,91 @@ class SearchFormComponent:
                         st.error(f"❌ Fehler bei Orchestrator Initialisierung: {str(init_error)}")
                         break
                 
+                # Set context for status callback
+                self.current_mine_index = idx
+                self.total_mines = len(mines_to_search)
+                
+                # ÄNDERUNG 26.06.2025: Verwende asyncio.Task statt ThreadPoolExecutor
+                # Dies ermöglicht echte Cancellation
                 try:
-                    results = streamlit_run_async(
-                        self._search_single_mine(
-                            mine_data,
-                            selected_agents,
-                            cancellation_token
-                        )
+                    # Erstelle Coroutine
+                    search_coro = self._search_single_mine(
+                        mine_data,
+                        selected_agents,
+                        cancellation_token
                     )
-                    if results:
-                        all_results.extend(results)
+                    
+                    # Verwende RegisteredSearch Context Manager
+                    with RegisteredSearch(search_id, cancellation_token) as registered_search:
+                        # Erstelle Task mit streamlit_run_async
+                        import asyncio
+                        
+                        # Wrapper für async execution
+                        async def search_wrapper():
+                            try:
+                                return await search_coro
+                            except asyncio.CancelledError:
+                                logger.info(f"Suche {mine_data['mine_name']} wurde abgebrochen")
+                                raise
+                        
+                        # Führe Search aus mit Polling
+                        search_completed = False
+                        search_results = None
+                        search_error = None
+                        
+                        # Start search in background
+                        from src.utils.streamlit_async_wrapper import StreamlitEventLoopManager
+                        loop_manager = StreamlitEventLoopManager()
+                        
+                        # Erstelle Future für async operation
+                        import concurrent.futures
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                            # Submit the coroutine to run
+                            future = executor.submit(loop_manager.run_coroutine, search_wrapper())
+                            
+                            # Polling loop mit verbesserter Cancellation
+                            update_counter = 0
+                            while not future.done():
+                                # Update LiveProgress
+                                with progress_placeholder:
+                                    self.live_progress.render_with_polling(True)
+                                
+                                # Check multiple cancellation sources
+                                is_cancelled = (
+                                    cancellation_token.is_cancelled() or 
+                                    st.session_state.get('search_cancelled', False) or
+                                    not st.session_state.get('search_in_progress', True)
+                                )
+                                
+                                if is_cancelled:
+                                    # Cancel via registry (will handle everything)
+                                    registry = get_global_cancellation_registry()
+                                    registry.cancel_search(search_id, "Cancellation detected in polling loop")
+                                    # Give time for cancellation to propagate
+                                    time.sleep(0.1)
+                                    break
+                                    
+                                time.sleep(0.5)  # Polling interval
+                                update_counter += 1
+                                
+                                # Prevent infinite polling (max 5 minutes)
+                                if update_counter > 600:
+                                    st.warning("⏱️ Suche dauert länger als erwartet...")
+                                    registry = get_global_cancellation_registry()
+                                    registry.cancel_search(search_id, "Timeout")
+                                    break
+                            
+                            # Get results
+                            try:
+                                if not cancellation_token.is_cancelled():
+                                    results = future.result(timeout=1)
+                                    if results:
+                                        all_results.extend(results)
+                            except concurrent.futures.TimeoutError:
+                                st.error("⏱️ Timeout beim Abrufen der Ergebnisse")
+                            except Exception as e:
+                                if "CancelledError" not in str(e):
+                                    st.error(f"❌ Error getting results: {str(e)}")
                 except CancellationException:
                     st.warning("🛑 Search cancelled")
                     break
@@ -217,8 +322,16 @@ class SearchFormComponent:
                 st.warning("⚠️ No results found")
             return all_results
         finally:
+            # ÄNDERUNG 26.06.2025: Cleanup via Registry
+            registry = get_global_cancellation_registry()
+            if search_id and registry.is_search_active(search_id):
+                # Normale Beendigung - entferne aus Registry
+                registry.cleanup_finished_searches()
+            
             st.session_state.search_in_progress = False
             st.session_state.cancellation_token = None
+            st.session_state.search_id = None
+            st.session_state.active_search_task = None
     
     async def _search_single_mine(self, mine_data: Dict, selected_agents: List[str],
                                  cancellation_token) -> List:
@@ -227,7 +340,7 @@ class SearchFormComponent:
         if 'error_details' not in st.session_state:
             st.session_state.error_details = []
         # Status-Callback: Nur Status in Session-State schreiben, keine UI-Elemente!
-        def status_callback(message):
+        def status_callback(message, phase=None, agent=None, partial_results=None):
             try:
                 if 'status_updates' not in st.session_state:
                     st.session_state.status_updates = []
@@ -235,8 +348,33 @@ class SearchFormComponent:
                 st.session_state.status_updates.append({
                     'mine': mine_data['mine_name'],
                     'message': message,
+                    'phase': phase,
+                    'agent': agent,
+                    'partial_results': partial_results,
                     'timestamp': datetime.now()
                 })
+                
+                # Update live progress in session state (thread-safe)
+                if 'live_progress' not in st.session_state:
+                    st.session_state.live_progress = {
+                        'results_found': 0
+                    }
+                
+                st.session_state.live_progress.update({
+                    'current_mine': mine_data['mine_name'],
+                    'mine_index': getattr(self, 'current_mine_index', 0),
+                    'total_mines': getattr(self, 'total_mines', 1),
+                    'phase': phase or st.session_state.live_progress.get('phase', 'Initialisierung'),
+                    'agent': agent or st.session_state.live_progress.get('agent', ''),
+                    'status_message': message,
+                    'partial_results': partial_results or []
+                })
+                
+                # Count total results found
+                if partial_results:
+                    current_count = st.session_state.live_progress.get('results_found', 0)
+                    st.session_state.live_progress['results_found'] = current_count + len(partial_results)
+                        
             except Exception as e:
                 print(f"[Status-Callback] Fehler beim Status-Update: {e}")
         if not self.orchestrator:

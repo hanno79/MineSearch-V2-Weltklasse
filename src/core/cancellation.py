@@ -62,12 +62,19 @@ class CancellationToken:
                 loop = asyncio.get_running_loop()
                 loop.call_soon_threadsafe(self._event.set)
             except RuntimeError:
-                # Kein Event Loop im aktuellen Thread - versuche Event Loop Manager
+                # Kein Event Loop im aktuellen Thread - setze Event direkt
+                try:
+                    self._event.set()
+                except:
+                    pass
+                    
+                # Versuche Event Loop Manager
                 try:
                     from .event_loop_manager import get_event_loop_manager
                     manager = get_event_loop_manager()
-                    if manager.is_running():
-                        manager.get_loop().call_soon_threadsafe(self._event.set)
+                    loop = manager.get_or_create_loop()
+                    if loop and not loop.is_closed():
+                        loop.call_soon_threadsafe(self._event.set)
                 except:
                     # Event Loop Manager nicht verfügbar
                     pass
@@ -161,14 +168,26 @@ class CancellationToken:
         ÄNDERUNG 21.06.2025: Cleanup-Methode für sauberes Beenden von Tasks
         """
         # Setze Event um wartende Tasks zu beenden
-        self._event.set()
+        try:
+            self._event.set()
+        except:
+            pass
+            
         # Markiere als abgebrochen für sauberen Cleanup
         with self._lock:
             if not self._cancelled:
                 self._cancelled = True
                 self._cancel_time = datetime.now()
                 self._cancel_reason = "Cleanup"
-            logger.debug(f"CancellationToken '{self.name}' reset")
+            
+            # Führe alle Cleanup Callbacks aus
+            for callback in self._callbacks:
+                try:
+                    callback()
+                except Exception as e:
+                    logger.error(f"Error in cleanup callback: {e}")
+                    
+            logger.debug(f"CancellationToken '{self.name}' cleanup complete")
 
 
 class CancellationException(Exception):

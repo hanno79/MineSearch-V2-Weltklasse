@@ -43,14 +43,15 @@ class ModelRegistry:
                 context_length=200000,
                 description="Claude's most powerful model for complex tasks"
             ),
-            "google/gemini-2.0-flash-exp:free": OpenRouterModel(
-                id="google/gemini-2.0-flash-exp:free",
-                name="Gemini 2.0 Flash (Free)",
-                provider="Google",
-                is_free=True,
-                context_length=1048576,
-                description="Google's latest Gemini 2.0 Flash with 1M context"
-            ),
+            # ÄNDERUNG 24.06.2025: Model von OpenRouter API nicht mehr unterstützt
+            # "google/gemini-2.0-flash-exp": OpenRouterModel(
+            #     id="google/gemini-2.0-flash-exp",
+            #     name="Gemini 2.0 Flash (Free)",
+            #     provider="Google",
+            #     is_free=True,
+            #     context_length=1048576,
+            #     description="Google's latest Gemini 2.0 Flash with 1M context"
+            # ),
             "google/gemini-pro-1.5": OpenRouterModel(
                 id="google/gemini-pro-1.5",
                 name="Gemini 1.5 Pro",
@@ -59,14 +60,24 @@ class ModelRegistry:
                 context_length=2097152,
                 description="Google's Gemini Pro with 2M context window"
             ),
-            "google/gemini-2.0-flash-thinking-exp-1219:free": OpenRouterModel(
-                id="google/gemini-2.0-flash-thinking-exp-1219:free",
-                name="Gemini 2.0 Flash Thinking (Free)",
-                provider="Google",
-                is_free=True,
-                context_length=65536,
-                description="Reasoning model for complex problem solving"
-            ),
+            # ÄNDERUNG 24.06.2025: Model von OpenRouter API nicht mehr unterstützt
+            # "google/gemini-2.0-flash-thinking-exp": OpenRouterModel(
+            #     id="google/gemini-2.0-flash-thinking-exp",
+            #     name="Gemini 2.0 Flash Thinking",
+            #     provider="Google",
+            #     is_free=False,
+            #     context_length=65536,
+            #     description="Reasoning model for complex problem solving"
+            # ),
+            # ÄNDERUNG 24.06.2025: Model von OpenRouter API nicht mehr unterstützt
+            # "google/gemini-2.0-flash-thinking-exp:free": OpenRouterModel(
+            #     id="google/gemini-2.0-flash-thinking-exp:free",
+            #     name="Gemini 2.0 Flash Thinking (Free)",
+            #     provider="Google",
+            #     is_free=True,
+            #     context_length=65536,
+            #     description="Free tier reasoning model for complex problem solving"
+            # ),
             "x-ai/grok-2-1212": OpenRouterModel(
                 id="x-ai/grok-2-1212",
                 name="Grok 2 (Latest)",
@@ -145,13 +156,13 @@ class ModelRegistry:
                 context_length=32768,
                 description="Mistral's efficient 7B instruction model"
             ),
-            "meta-llama/llama-3.2-90b-instruct": OpenRouterModel(
-                id="meta-llama/llama-3.2-90b-instruct",
-                name="Llama 3.2 90B",
+            "meta-llama/llama-3.2-90b-vision-instruct": OpenRouterModel(
+                id="meta-llama/llama-3.2-90b-vision-instruct",
+                name="Llama 3.2 90B Vision",
                 provider="Meta",
                 is_free=True,
                 context_length=128000,
-                description="Meta's latest 90B Llama model"
+                description="Meta's latest 90B Llama model with vision capabilities"
             ),
             "google/gemma-2-27b-it": OpenRouterModel(
                 id="google/gemma-2-27b-it",

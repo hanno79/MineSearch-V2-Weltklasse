@@ -48,6 +48,11 @@ class AgentManager:
                 agent = self._create_agent(agent_type)
                 if agent:
                     self.agents[agent_type] = agent
+                    # ÄNDERUNG 26.06.2025: Registriere Cancellation Cleanup
+                    if hasattr(agent, 'set_cancellation_cleanup'):
+                        async def cleanup_on_cancel(agent_id=agent_type):
+                            await self.session_manager.cancel_agent_session(agent_id, "Search cancelled")
+                        agent.set_cancellation_cleanup(cleanup_on_cancel)
                     init_tasks.append(self._init_agent(agent_type, agent))
         
         # Initialisiere alle Agenten parallel

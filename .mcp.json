@@ -1,0 +1,53 @@
+{
+  "version": "1.0",
+  "servers": {
+    "filesystem": {
+      "description": "Datei-System Operationen für MineSearch Projekt",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/app"],
+      "transport": "stdio",
+      "scope": "project"
+    },
+    "github": {
+      "description": "GitHub Integration für Repository-Verwaltung",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "transport": "stdio",
+      "scope": "project",
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "memory": {
+      "description": "Persistenter Speicher für Projekt-Kontext",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "transport": "stdio",
+      "scope": "project"
+    },
+    "taskmanager": {
+      "description": "Task-Management und To-Do-Listen Verwaltung",
+      "url": "https://server.smithery.ai/@kazuph/mcp-taskmanager/mcp?api_key=4b9fe93e-542f-464a-99be-6df27bb558ef",
+      "transport": "sse",
+      "scope": "project"
+    },
+    "context7": {
+      "description": "Kontext-Management und Speicher für langfristige Projekt-Informationen",
+      "url": "https://server.smithery.ai/@upstash/context7-mcp/mcp?api_key=4b9fe93e-542f-464a-99be-6df27bb558ef",
+      "transport": "sse",
+      "scope": "project"
+    },
+    "playwright": {
+      "description": "Browser-Automatisierung und Web-Testing mit Playwright",
+      "url": "https://server.smithery.ai/@cloudflare/playwright-mcp/mcp?api_key=4b9fe93e-542f-464a-99be-6df27bb558ef",
+      "transport": "sse",
+      "scope": "project"
+    },
+    "puppeteer": {
+      "command": "node",
+      "args": [
+        "/usr/lib/node_modules/@modelcontextprotocol/server-puppeteer/dist/index.js"
+      ]
+    }
+  }
+}

@@ -15,6 +15,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 from .base_agent import BaseAgent, MineQuery, SearchResult, AgentStatus
+from src.core.cancellation import CancellationException
 from .rate_limiter import RateLimiter
 from .enhanced_search import get_mining_search_queries, get_mining_domains
 from src.core.logger import get_logger, PerformanceLogger
@@ -177,6 +178,10 @@ class PerplexityAgent(BaseAgent):
         self.perf_logger.start_timer(f"perplexity_search_{query.mine_name}")
         
         try:
+            # ÄNDERUNG 26.06.2025: Prüfe Cancellation Token zu Beginn
+            if self._cancellation_token and self._cancellation_token.is_cancelled():
+                self.logger.info("Suche wurde abgebrochen (vor Start)")
+                raise CancellationException("Search cancelled")
             # Get enhanced search queries
             search_queries = get_mining_search_queries(query.mine_name, query.region, query.country)
             mining_domains = get_mining_domains()
@@ -186,6 +191,11 @@ class PerplexityAgent(BaseAgent):
             
             # Execute searches with different query strategies
             for idx, search_query in enumerate(priority_queries):
+                # ÄNDERUNG 26.06.2025: Prüfe Cancellation vor jeder Query
+                if self._cancellation_token and self._cancellation_token.is_cancelled():
+                    self.logger.info(f"Suche abgebrochen nach {idx} Queries")
+                    raise CancellationException("Search cancelled during query execution")
+                
                 # Check Cache
                 cache_key = f"{query.mine_name}_{search_query[:50]}"
                 if cache_key in self._request_cache:
@@ -214,6 +224,10 @@ class PerplexityAgent(BaseAgent):
             # Also use original specialized prompts
             prompts = self._create_prompts(query)
             for search_type, prompt in prompts.items():
+                # ÄNDERUNG 26.06.2025: Prüfe Cancellation vor spezialisierten Suchen
+                if self._cancellation_token and self._cancellation_token.is_cancelled():
+                    self.logger.info(f"Suche abgebrochen vor {search_type} Suche")
+                    raise CancellationException("Search cancelled during specialized search")
                 self.logger.info(f"Perplexity-Spezialisierte Suche: {search_type}")
                 
                 response = await self._make_api_call(prompt)
@@ -233,6 +247,15 @@ class PerplexityAgent(BaseAgent):
             self.stats['successful_requests'] += 1 if results else 0
             self.stats['total_fields_found'] += len(results)
             
+        except CancellationException:
+            # ÄNDERUNG 26.06.2025: Bei Abbruch keine Fehler loggen
+            self.logger.info("Perplexity-Suche wurde abgebrochen")
+            self.perf_logger.end_timer(
+                f"perplexity_search_{query.mine_name}",
+                results_found=len(results),
+                status="cancelled"
+            )
+            raise
         except Exception as e:
             self.logger.error(f"Fehler bei Suche: {e}")
             self.stats['failed_requests'] += 1
@@ -362,6 +385,11 @@ Find official data on:
     
     async def _make_api_call(self, prompt: str) -> Optional[Dict[str, Any]]:
         """Macht API-Aufruf zu Perplexity"""
+        # ÄNDERUNG 26.06.2025: Prüfe Cancellation vor API Call
+        if self._cancellation_token and self._cancellation_token.is_cancelled():
+            self.logger.info("API Call abgebrochen (vor Request)")
+            raise CancellationException("API call cancelled")
+        
         loop_id = id(asyncio.get_running_loop())
         self.logger.debug(f"[PerplexityAgent] _make_api_call im Loop {loop_id}")
         await self._rate_limiter.acquire()
@@ -409,12 +437,14 @@ Find official data on:
             # Stelle sicher, dass Session verfügbar ist
             await self._ensure_session()
             
+            # ÄNDERUNG 26.06.2025: Übergebe Cancellation Token an Request
             async with self._robust_session.request(
                 'POST',
                 self.base_url,
                 headers=headers,
                 json=payload,
-                timeout=90  # Extended timeout for deeper searches
+                timeout=90,  # Extended timeout for deeper searches
+                cancellation_token=self._cancellation_token
             ) as response:
                 if response.status == 200:
                     # ÄNDERUNG 20.06.2025: Sicheres JSON-Parsing
@@ -444,7 +474,7 @@ Find official data on:
         except asyncio.CancelledError:
             # Propagiere Cancellation
             self.logger.debug("API Anfrage wurde abgebrochen")
-            raise
+            raise CancellationException("API request cancelled")
         except Exception as e:
             self.logger.error(f"API Anfrage Fehler: {type(e).__name__}: {str(e)}")
             # ÄNDERUNG 25.06.2025: Bei Event Loop Fehlern, versuche Session neu zu erstellen

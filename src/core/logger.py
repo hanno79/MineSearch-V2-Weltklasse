@@ -165,6 +165,11 @@ def setup_logging():
 
 def get_logger(name: str, **context) -> StructuredLogger:
     """Factory-Funktion für Logger"""
+    # ÄNDERUNG 27.06.2025: Lazy Loading Initialisierung
+    global _initialized
+    if not _initialized:
+        setup_logging()
+        _initialized = True
     return StructuredLogger(name, context)
 
 
@@ -192,8 +197,5 @@ def log_api_call(logger: StructuredLogger, method: str, url: str,
     )
 
 
-# Initialisiere Logging beim Import
+# ÄNDERUNG 27.06.2025: Lazy Loading - Initialisierung nur bei erstem get_logger() Aufruf
 _initialized = False
-if not _initialized:
-    setup_logging()
-    _initialized = True
