@@ -1,0 +1,298 @@
+/* 
+ * MineSearch 2.0 - Minimalistisches CSS
+ * Keine 10.000 Zeilen CSS Framework - nur das N�tigste
+ */
+
+:root {
+    --primary-color: #2563eb;
+    --success-color: #16a34a;
+    --error-color: #dc2626;
+    --bg-color: #f9fafb;
+    --card-bg: #ffffff;
+    --text-color: #1f2937;
+    --border-color: #e5e7eb;
+    --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header */
+header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 20px 0;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    color: #6b7280;
+    font-size: 1.1rem;
+}
+
+/* Main Content */
+main {
+    flex: 1;
+}
+
+/* Upload Section */
+.upload-section {
+    background: var(--card-bg);
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    margin-bottom: 30px;
+}
+
+.upload-section h2 {
+    margin-bottom: 20px;
+    color: var(--text-color);
+}
+
+/* Search Section */
+.search-section {
+    background: var(--card-bg);
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    margin-bottom: 30px;
+}
+
+.search-section h2 {
+    margin-bottom: 20px;
+    color: var(--text-color);
+}
+
+/* Form Styles */
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+input[type="text"],
+input[type="file"],
+input[type="number"] {
+    width: 100%;
+    padding: 10px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 16px;
+    transition: border-color 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="file"]:focus,
+input[type="number"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.search-button,
+.upload-button,
+.batch-search-button {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 12px 30px;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.search-button:hover,
+.upload-button:hover,
+.batch-search-button:hover {
+    background-color: #1d4ed8;
+}
+
+/* Loading Indicator */
+.htmx-indicator {
+    display: none;
+    text-align: center;
+    padding: 20px;
+}
+
+.htmx-indicator.htmx-request {
+    display: block;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 10px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Results Section */
+.results-section {
+    margin-top: 30px;
+}
+
+.result-card {
+    background: var(--card-bg);
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+}
+
+.result-card h3 {
+    margin-bottom: 15px;
+}
+
+.result-card.success h3 {
+    color: var(--success-color);
+}
+
+.result-card.error h3 {
+    color: var(--error-color);
+}
+
+.result-content {
+    background: var(--bg-color);
+    padding: 15px;
+    border-radius: 4px;
+    margin: 15px 0;
+    overflow-x: auto;
+}
+
+.result-content pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.result-meta {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+    color: #6b7280;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    padding: 30px 0 20px;
+    color: #6b7280;
+    font-size: 14px;
+}
+
+footer a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+footer a:hover {
+    text-decoration: underline;
+}
+
+/* CSV Info Card */
+.csv-info-card {
+    background: var(--bg-color);
+    padding: 20px;
+    border-radius: 4px;
+    margin-top: 20px;
+}
+
+.csv-info-card h3 {
+    color: var(--success-color);
+    margin-bottom: 15px;
+}
+
+/* Batch Results */
+.batch-results {
+    margin-top: 20px;
+}
+
+.results-container {
+    display: grid;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.results-container .result-card {
+    margin-bottom: 0;
+}
+
+.results-container .result-card h4 {
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+}
+
+/* Details Element */
+details {
+    background: var(--bg-color);
+    padding: 10px;
+    border-radius: 4px;
+}
+
+details summary {
+    cursor: pointer;
+    font-weight: 500;
+}
+
+details ul {
+    margin-top: 10px;
+    padding-left: 20px;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+    .container {
+        padding: 10px;
+    }
+    
+    header h1 {
+        font-size: 2rem;
+    }
+    
+    .search-section,
+    .upload-section {
+        padding: 20px;
+    }
+    
+    .result-card {
+        padding: 20px;
+    }
+}

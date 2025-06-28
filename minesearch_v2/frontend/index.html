@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MineSearch 2.0 - Mining Recherche System</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        /* Tab-Navigation Styles */
+        .tab-navigation {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+        
+        .tab-navigation label {
+            cursor: pointer;
+            padding: 10px 20px;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .tab-navigation input[type="radio"] {
+            display: none;
+        }
+        
+        .tab-navigation input[type="radio"]:checked + label {
+            background: #4CAF50;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .search-form {
+            display: none;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .search-form.active {
+            display: block;
+        }
+        
+        .search-mode {
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .unified-search-button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+        }
+        
+        .unified-search-button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 MineSearch 2.0</h1>
+            <p class="subtitle">Einfaches Mining-Recherche-System</p>
+        </header>
+
+        <main>
+            <!-- Globaler Such-Modus -->
+            <section class="search-mode">
+                <div style="margin-bottom: 15px;">
+                    <label for="search_model"><strong>Such-Modell wählen:</strong></label>
+                    <select id="search_model" style="width: 100%; padding: 10px; margin-top: 10px;">
+                        <option value="sonar">⚡ Schnell (30 Sekunden) - Für einfache Anfragen</option>
+                        <option value="sonar-pro" selected>🎯 Standard (60 Sekunden) - Beste Balance</option>
+                        <option value="sonar-deep-research">🌊 Deep Research (30+ Minuten) - Sehr umfassend</option>
+                    </select>
+                </div>
+                
+                <div style="background: #f0f8ff; padding: 12px; border-radius: 5px; margin-top: 10px;">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="two_phase_enabled" style="width: 18px; height: 18px;">
+                        <span><strong>🔍 2-Phasen-Suche aktivieren</strong></span>
+                    </label>
+                    <small style="display: block; margin-top: 8px; margin-left: 28px; color: #555;">
+                        Führt zusätzliche gezielte Suchen zu den besten gefundenen Quellen durch.<br>
+                        Verlängert die Suche um 1-2 Minuten, liefert aber deutlich mehr Quellen und Details.
+                    </small>
+                </div>
+                
+                <small style="display: block; margin-top: 10px; color: #666;">
+                    Diese Einstellungen gelten für beide Such-Methoden (CSV und Einzelsuche)
+                </small>
+            </section>
+
+            <!-- Tab Navigation -->
+            <section class="tab-navigation">
+                <div>
+                    <input type="radio" name="search_method" id="method_csv" value="csv" checked>
+                    <label for="method_csv">📄 CSV-Datei hochladen</label>
+                </div>
+                <div>
+                    <input type="radio" name="search_method" id="method_single" value="single">
+                    <label for="method_single">🔎 Einzelne Mine suchen</label>
+                </div>
+            </section>
+
+            <!-- CSV Upload Form -->
+            <div id="csv_form" class="search-form active">
+                <h2>CSV-Datei mit Minen hochladen</h2>
+                <form id="csv-upload-form" 
+                      hx-post="/api/upload-csv" 
+                      hx-encoding="multipart/form-data"
+                      hx-target="#csv-info"
+                      hx-indicator="#loading">
+                    
+                    <div class="form-group">
+                        <label for="csv_file">Mining CSV Datei auswählen *</label>
+                        <input type="file" 
+                               id="csv_file" 
+                               name="csv_file" 
+                               accept=".csv"
+                               required>
+                        <small>Erwartete Spalten: Name/Mine, Country/Land (optional), Commodity/Rohstoff (optional)</small>
+                    </div>
+
+                    <button type="submit" class="unified-search-button">
+                        CSV hochladen und weiter
+                    </button>
+                </form>
+
+                <!-- CSV Info wird hier eingefügt nach Upload -->
+                <div id="csv-info"></div>
+            </div>
+
+            <!-- Einzelsuche Form -->
+            <div id="single_form" class="search-form">
+                <h2>Einzelne Mine suchen</h2>
+                <form id="single-search-form">
+                    <div class="form-group">
+                        <label for="mine_name">Name der Mine *</label>
+                        <input type="text" 
+                               id="mine_name" 
+                               name="mine_name" 
+                               placeholder="z.B. Grasberg, Canadian Malartic" 
+                               required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="country">Land (optional)</label>
+                        <input type="text" 
+                               id="country" 
+                               name="country" 
+                               placeholder="z.B. Indonesien, Kanada">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="commodity">Rohstoff (optional)</label>
+                        <input type="text" 
+                               id="commodity" 
+                               name="commodity" 
+                               placeholder="z.B. Gold, Kupfer">
+                    </div>
+
+                    <button type="button" 
+                            class="unified-search-button"
+                            onclick="startSingleSearch()">
+                        🔍 Suche starten
+                    </button>
+                </form>
+            </div>
+
+            <!-- Einheitlicher Ladeindikator -->
+            <div id="loading" class="htmx-indicator">
+                <div class="spinner"></div>
+                <p id="loading-text">Suche läuft...</p>
+            </div>
+
+            <!-- Ergebnisbereich -->
+            <section id="results" class="results-section">
+                <!-- Hier werden die Suchergebnisse eingefügt -->
+            </section>
+        </main>
+
+        <footer>
+            <p>MineSearch 2.0 - Radikal vereinfacht | <a href="/health" target="_blank">System Status</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // Tab-Wechsel Handler
+        document.querySelectorAll('input[name="search_method"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                // Alle Forms verstecken
+                document.querySelectorAll('.search-form').forEach(form => {
+                    form.classList.remove('active');
+                });
+                
+                // Gewählte Form anzeigen
+                if (this.value === 'csv') {
+                    document.getElementById('csv_form').classList.add('active');
+                } else {
+                    document.getElementById('single_form').classList.add('active');
+                }
+                
+                // Ergebnisse löschen beim Wechsel
+                document.getElementById('results').innerHTML = '';
+            });
+        });
+
+        // Such-Konfiguration basierend auf Modell und 2-Phasen-Option
+        function getSearchConfig() {
+            const model = document.getElementById('search_model').value;
+            const twoPhase = document.getElementById('two_phase_enabled').checked;
+            
+            // Basis-Konfiguration nach Modell
+            const modelConfigs = {
+                'sonar': {
+                    endpoint: '/api/search',
+                    model: 'sonar',
+                    baseTime: '30 Sekunden',
+                    description: 'Schnelle Suche'
+                },
+                'sonar-pro': {
+                    endpoint: '/api/search',
+                    model: 'sonar-pro',
+                    baseTime: '60 Sekunden',
+                    description: 'Standard-Suche'
+                },
+                'sonar-deep-research': {
+                    endpoint: '/api/search',
+                    model: 'sonar-deep-research',
+                    baseTime: '30+ Minuten',
+                    description: 'Deep Research'
+                }
+            };
+            
+            let config = { ...modelConfigs[model] };
+            
+            // 2-Phasen-Suche anpassen
+            if (twoPhase) {
+                config.endpoint = '/api/enhanced-search';
+                config.loadingText = `${config.description} mit 2-Phasen-Vertiefung läuft (${config.baseTime} + 1-2 Minuten für Quellen-Analyse)...`;
+                config.twoPhase = true;
+            } else {
+                config.loadingText = `${config.description} läuft (${config.baseTime})...`;
+                config.twoPhase = false;
+            }
+            
+            return config;
+        }
+
+        // Einzelsuche starten
+        function startSingleSearch() {
+            const config = getSearchConfig();
+            const formData = new FormData(document.getElementById('single-search-form'));
+            
+            // Loading Text aktualisieren
+            document.getElementById('loading-text').textContent = config.loadingText;
+            document.getElementById('loading').style.display = 'block';
+            
+            // URL-Parameter erstellen
+            const params = new URLSearchParams();
+            for (let [key, value] of formData.entries()) {
+                if (value) params.append(key, value);
+            }
+            if (config.model) params.append('model', config.model);
+            
+            // HTMX-ähnlicher Fetch
+            fetch(config.endpoint + '?' + params.toString(), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(Object.fromEntries(formData))
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                displayResults(data);
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('results').innerHTML = `
+                    <div class="result-card error">
+                        <h3>❌ Fehler bei der Suche</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            });
+        }
+
+        // Ergebnisse anzeigen (vereinheitlicht)
+        function displayResults(response) {
+            const resultsDiv = document.getElementById('results');
+            
+            if (response.success && response.data) {
+                // Strukturierte Daten vorhanden?
+                if (response.data.structured_data) {
+                    resultsDiv.innerHTML = createStructuredResultCard(response.data);
+                } else {
+                    // Fallback für einfache Antworten
+                    resultsDiv.innerHTML = `
+                        <div class="result-card success">
+                            <h3>✓ Suchergebnis für: ${response.data.mine_name}</h3>
+                            <div class="result-content">
+                                <pre>${response.data.content}</pre>
+                            </div>
+                        </div>
+                    `;
+                }
+            } else if (response.error) {
+                resultsDiv.innerHTML = `
+                    <div class="result-card error">
+                        <h3>❌ Fehler bei der Suche</h3>
+                        <p>${response.error}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Strukturierte Ergebnis-Karte erstellen
+        function createStructuredResultCard(data) {
+            let html = `
+                <div class="result-card success">
+                    <h3>✓ ${data.mine_name}</h3>
+                    <div class="result-content">
+            `;
+            
+            // Tabelle mit strukturierten Daten
+            if (data.structured_data) {
+                html += '<table class="data-table">';
+                for (let [key, value] of Object.entries(data.structured_data)) {
+                    if (value) {
+                        html += `
+                            <tr>
+                                <td><strong>${key}</strong></td>
+                                <td>${value}</td>
+                            </tr>
+                        `;
+                    }
+                }
+                html += '</table>';
+            }
+            
+            // Quellen anzeigen
+            if (data.sources && data.sources.length > 0) {
+                html += `
+                    <h4>📚 Gefundene Quellen (${data.source_summary?.total || 0}):</h4>
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px;">
+                `;
+                
+                // URLs
+                const urls = data.sources.filter(s => s.type === 'url');
+                if (urls.length > 0) {
+                    html += '<strong>🌐 Websites:</strong><ul>';
+                    urls.slice(0, 5).forEach(source => {
+                        html += `<li><a href="${source.value}" target="_blank">${source.value}</a></li>`;
+                    });
+                    html += '</ul>';
+                }
+                
+                html += '</div>';
+            }
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            return html;
+        }
+
+        // Anpassung für CSV Batch-Form nach Upload
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            if (evt.detail.pathInfo.requestPath === '/api/upload-csv' && evt.detail.successful) {
+                // Nach erfolgreichem CSV Upload, füge versteckte Felder für Such-Modus hinzu
+                setTimeout(() => {
+                    const batchForm = document.getElementById('batch-form');
+                    if (batchForm) {
+                        // Entferne altes model select (falls vorhanden)
+                        const oldModelSelect = batchForm.querySelector('select[name="model"]');
+                        if (oldModelSelect) {
+                            oldModelSelect.parentElement.remove();
+                        }
+                        
+                        // Füge versteckte Felder hinzu
+                        const config = getSearchConfig();
+                        
+                        // Modell
+                        const modelInput = document.createElement('input');
+                        modelInput.type = 'hidden';
+                        modelInput.name = 'model';
+                        modelInput.value = config.model;
+                        batchForm.appendChild(modelInput);
+                        
+                        // Such-Typ (standard oder enhanced basierend auf 2-Phasen)
+                        const searchTypeInput = document.createElement('input');
+                        searchTypeInput.type = 'hidden';
+                        searchTypeInput.name = 'search_type';
+                        searchTypeInput.value = config.twoPhase ? 'enhanced' : 'standard';
+                        batchForm.appendChild(searchTypeInput);
+                        
+                        // Update Loading Text im Batch Form
+                        const batchLoading = document.getElementById('batch-loading');
+                        if (batchLoading) {
+                            batchLoading.querySelector('p').textContent = config.loadingText;
+                        }
+                    }
+                }, 100);
+            }
+        });
+    </script>
+</body>
+</html>
