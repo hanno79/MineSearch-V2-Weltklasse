@@ -1,4 +1,9 @@
 """
+Author: rahn
+Datum: 27.06.2025
+Version: 1.0
+Beschreibung: Text-Normalisierungs-Utilities für flexible Minensuche
+
 Text normalization utilities for flexible mine name searching
 """
 import unicodedata

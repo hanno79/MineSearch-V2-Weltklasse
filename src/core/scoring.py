@@ -1,5 +1,8 @@
 """
-Scoring-System für Datenaggregation
+Author: rahn
+Datum: 27.06.2025
+Version: 1.0
+Beschreibung: Scoring-System für Datenaggregation
 """
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple

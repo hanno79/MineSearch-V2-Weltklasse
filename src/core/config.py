@@ -1,5 +1,8 @@
 """
-Konfigurationsmanagement für Multi-Agent Mining Research System
+Author: rahn
+Datum: 27.06.2025
+Version: 1.0
+Beschreibung: Konfigurationsmanagement für Multi-Agent Mining Research System
 """
 import os
 from pathlib import Path

@@ -146,6 +146,19 @@ def main():
     st.title("⛏️ MineSearch")
     st.markdown("**Multi-Agent Mining Research System**")
     
+    # Sidebar immer rendern (vor Navigation)
+    try:
+        config = get_config()
+        sidebar = SidebarComponent(config)
+        sidebar_config = sidebar.render()
+    except Exception as e:
+        st.error(f"Fehler in der Sidebar: {e}")
+        sidebar_config = {
+            'mines_to_search': [],
+            'selected_agents': [],
+            'advanced_options': {}
+        }
+    
     # Navigation
     col1, col2, col3 = st.columns([2, 6, 2])
     with col2:
@@ -170,7 +183,6 @@ def main():
             history_page.render()
         except Exception as e:
             st.error(f"Fehler beim Laden der Historie: {e}")
-        return
     
     # Datenbank-Viewer Seite
     elif navigation == "🗄️ Datenbank":
@@ -186,94 +198,81 @@ def main():
             viewer_page.render()
         except Exception as e:
             st.error(f"Fehler beim Laden des Datenbank-Viewers: {e}")
-        return
     
     # Hauptseite - Suche
-    try:
-        # Komponenten initialisieren
-        config = get_config()
-        session_manager = get_session_manager()
+    else:  # navigation == "🔍 Suche"
+        try:
+            # Komponenten initialisieren
+            session_manager = get_session_manager()
         
-        # Lazy DB initialization
-        db = get_database_manager()
-        if not hasattr(db, '_initialized'):
-            with st.spinner("Initialisiere Datenbank..."):
-                db.initialize()
-                db._initialized = True
-        
-        # UI Komponenten
-        sidebar = SidebarComponent(config)
-        search_form = SearchFormComponent(config, session_manager)
-        results_display = ResultsDisplayComponent()
-        metrics_dashboard = MetricsDashboardComponent()
-        
-    except Exception as e:
-        render_error_page(f"Fehler beim Initialisieren: {e}")
-        return
-    
-    # Sidebar rendern
-    try:
-        sidebar_config = sidebar.render()
-    except Exception as e:
-        st.error(f"Fehler in der Sidebar: {e}")
-        sidebar_config = {
-            'mines_to_search': [],
-            'selected_agents': [],
-            'advanced_options': {}
-        }
-    
-    # Hauptbereich
-    if sidebar_config['mines_to_search']:
-        st.info(f"📍 Bereit zur Suche: **{len(sidebar_config['mines_to_search'])}** Mine(n) "
-                f"mit **{len(sidebar_config['selected_agents'])}** Agent(en)")
-    else:
-        st.info("👈 Bitte wählen Sie mindestens eine Mine in der Sidebar aus")
-    
-    # Such-Formular
-    try:
-        search_results = search_form.render(
-            mines_to_search=sidebar_config['mines_to_search'],
-            selected_agents=sidebar_config['selected_agents'],
-            advanced_options=sidebar_config['advanced_options']
-        )
-        
-        if search_results:
-            st.session_state.search_results = search_results
-            st.session_state.search_history.append({
-                'timestamp': datetime.now(),
-                'mine_count': len(sidebar_config['mines_to_search']),
-                'agent_count': len(sidebar_config['selected_agents']),
-                'result_count': len(search_results)
-            })
+            # Lazy DB initialization
+            db = get_database_manager()
+            if not hasattr(db, '_initialized'):
+                with st.spinner("Initialisiere Datenbank..."):
+                    db.initialize()
+                    db._initialized = True
             
-    except Exception as e:
-        st.error(f"Fehler bei der Suche: {e}")
-    
-    # Ergebnisse anzeigen
-    if st.session_state.search_results:
-        st.divider()
-        
-        # Results Display
-        try:
-            results_display.render(st.session_state.search_results)
+            # UI Komponenten (Sidebar bereits oben initialisiert)
+            search_form = SearchFormComponent(config, session_manager)
+            results_display = ResultsDisplayComponent()
+            metrics_dashboard = MetricsDashboardComponent()
+            
         except Exception as e:
-            st.error(f"Fehler beim Anzeigen der Ergebnisse: {e}")
-        
-        # Metrics Dashboard
-        st.divider()
+            render_error_page(f"Fehler beim Initialisieren: {e}")
+            return
+    
+        # Hauptbereich
+        if sidebar_config['mines_to_search']:
+            st.info(f"📍 Bereit zur Suche: **{len(sidebar_config['mines_to_search'])}** Mine(n) "
+                    f"mit **{len(sidebar_config['selected_agents'])}** Agent(en)")
+        else:
+            st.info("👈 Bitte wählen Sie mindestens eine Mine in der Sidebar aus")
+    
+        # Such-Formular
         try:
-            metrics_dashboard.render(
-                st.session_state.search_results,
-                st.session_state.search_history
+            search_results = search_form.render(
+                mines_to_search=sidebar_config['mines_to_search'],
+                selected_agents=sidebar_config['selected_agents'],
+                advanced_options=sidebar_config['advanced_options']
             )
+            
+            if search_results:
+                st.session_state.search_results = search_results
+                st.session_state.search_history.append({
+                    'timestamp': datetime.now(),
+                    'mine_count': len(sidebar_config['mines_to_search']),
+                    'agent_count': len(sidebar_config['selected_agents']),
+                    'result_count': len(search_results)
+                })
+                
         except Exception as e:
-            st.error(f"Fehler beim Anzeigen der Metriken: {e}")
+            st.error(f"Fehler bei der Suche: {e}")
     
-    # Footer
-    st.divider()
-    col1, col2, col3 = st.columns(3)
-    with col2:
-        st.caption(f"MineSearch v3.0 | {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        # Ergebnisse anzeigen
+        if st.session_state.search_results:
+            st.divider()
+            
+            # Results Display
+            try:
+                results_display.render(st.session_state.search_results)
+            except Exception as e:
+                st.error(f"Fehler beim Anzeigen der Ergebnisse: {e}")
+            
+            # Metrics Dashboard
+            st.divider()
+            try:
+                metrics_dashboard.render(
+                    st.session_state.search_results,
+                    st.session_state.search_history
+                )
+            except Exception as e:
+                st.error(f"Fehler beim Anzeigen der Metriken: {e}")
+    
+        # Footer
+        st.divider()
+        col1, col2, col3 = st.columns(3)
+        with col2:
+            st.caption(f"MineSearch v3.0 | {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
 
 # Haupt-Ausführung mit Fehlerbehandlung

@@ -118,9 +118,14 @@ class SearchHandler:
                     'message': message
                 })
         
+        # ÄNDERUNG 27.06.2025: Erstelle SessionManager für Orchestrator
+        from src.utils.session_manager import SessionManager
+        session_manager = SessionManager()
+        
         # Create orchestrator
         orchestrator = MineSearchOrchestrator(
             self.config,
+            session_manager,
             status_callback=mine_status_callback
         )
         

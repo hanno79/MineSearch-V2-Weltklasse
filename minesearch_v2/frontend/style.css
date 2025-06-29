@@ -277,6 +277,36 @@ details ul {
     padding-left: 20px;
 }
 
+/* Data Table Styles */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 14px;
+}
+
+.data-table th,
+.data-table td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.data-table th {
+    background-color: #f0f0f0;
+    font-weight: bold;
+}
+
+.data-table td:first-child {
+    font-weight: 500;
+    width: 30%;
+    background-color: #f8f9fa;
+}
+
+.data-table tr:hover {
+    background-color: #f5f5f5;
+}
+
 /* Responsive Design */
 @media (max-width: 600px) {
     .container {
@@ -294,5 +324,14 @@ details ul {
     
     .result-card {
         padding: 20px;
+    }
+    
+    .data-table {
+        font-size: 12px;
+    }
+    
+    .data-table th,
+    .data-table td {
+        padding: 6px 8px;
     }
 }

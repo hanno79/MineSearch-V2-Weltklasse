@@ -1,8 +1,9 @@
 """
 Author: rahn
 Datum: 25.06.2025
-Version: 1.0
+Version: 1.1
 Beschreibung: Async Wrapper speziell für Streamlit Umgebung
+ÄNDERUNG 27.06.2025: add_script_run_ctx Integration für Threading Fix
 """
 
 import asyncio
@@ -10,9 +11,13 @@ import threading
 from typing import TypeVar, Coroutine, Any, Optional, Callable
 import streamlit as st
 from src.core.logger import get_logger
-# ÄNDERUNG 27.06.2025: nest_asyncio wird nur in main.py angewendet
-# import nest_asyncio
-# nest_asyncio.apply()
+# ÄNDERUNG 27.06.2025: Import add_script_run_ctx für Thread Context
+try:
+    from streamlit.runtime.scriptrunner import add_script_run_ctx
+    HAS_SCRIPT_RUN_CTX = True
+except ImportError:
+    HAS_SCRIPT_RUN_CTX = False
+    logger.warning("add_script_run_ctx nicht verfügbar - Streamlit Version zu alt")
 
 logger = get_logger("streamlit_async")
 
@@ -51,6 +56,13 @@ class StreamlitEventLoopManager:
         
         # Submit coroutine to the loop
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        
+        # ÄNDERUNG 27.06.2025: Add Streamlit context to future
+        if HAS_SCRIPT_RUN_CTX:
+            try:
+                add_script_run_ctx(future)
+            except Exception as e:
+                logger.debug(f"Konnte Script Context nicht hinzufügen: {e}")
         
         try:
             # Wait for result with timeout

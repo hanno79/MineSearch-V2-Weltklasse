@@ -89,7 +89,7 @@ ANFORDERUNGEN:
 - Sorgfältig und konzentriert arbeiten
 
 SPEICHERORT: 
-- Immer in: C:\xampp\htdocs\gines-test-automation\documentation\
+- 
 - Dateiname: chat_summary_[DATUM].txt
 
 ZWECK: Nahtlose Fortsetzung in neuen Chat-Sessions

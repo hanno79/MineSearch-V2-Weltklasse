@@ -1,3 +1,6 @@
 """
-UI Utilities for MineSearch
+Author: rahn
+Datum: 27.06.2025
+Version: 1.0
+Beschreibung: UI Utilities for MineSearch
 """

@@ -7,7 +7,7 @@ Beschreibung: Query-Generierung für Mining-Informationen
 
 from typing import List, Optional
 from datetime import datetime
-from ...utils.text_normalization import get_mine_name_variants, get_french_search_terms
+from src.utils.text_normalization import get_mine_name_variants, get_french_search_terms
 from .domain_manager import get_mining_domains, get_country_specific_domains
 from .search_strategies import (
     get_source_types, 

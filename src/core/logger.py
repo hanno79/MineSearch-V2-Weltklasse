@@ -1,5 +1,8 @@
 """
-Logging-System für Multi-Agent Mining Research System
+Author: rahn
+Datum: 27.06.2025
+Version: 1.0
+Beschreibung: Logging-System für Multi-Agent Mining Research System
 """
 import logging
 import logging.handlers

@@ -58,6 +58,9 @@ class AgentFactory:
     def create_agent(cls, agent_type: str, config: Config, **kwargs) -> Optional[BaseAgent]:
         """Erstellt einen Agenten basierend auf Typ"""
         
+        # ÄNDERUNG 27.06.2025: SessionManager aus kwargs extrahieren
+        session_manager = kwargs.pop('session_manager', None)
+        
         # Handle OpenRouter model types
         if agent_type.startswith("openrouter_"):
             model_id = kwargs.get('model_id')
@@ -120,6 +123,10 @@ class AgentFactory:
             "max_concurrent": config.max_concurrent_requests
         }
         
+        # ÄNDERUNG 27.06.2025: SessionManager hinzufügen wenn vorhanden
+        if session_manager:
+            agent_config["session_manager"] = session_manager
+        
         # ÄNDERUNG 21.06.2025: Spezielle Konfiguration für Deep Web Crawler
         if agent_type == "deep_web_crawler":
             agent_config["crawler_config"] = {
@@ -139,10 +146,12 @@ class AgentFactory:
                 "process_pdfs": True
             }
         # ÄNDERUNG 22.06.2025: Fix für PerplexityDeepAgent - erwartet andere Parameter
-        # ÄNDERUNG 25.06.2025: SessionManager hinzugefügt
+        # ÄNDERUNG 27.06.2025: Verwende übergebenen SessionManager
         elif agent_type == "perplexity_deep":
-            from src.utils.session_manager import SessionManager
-            session_manager = SessionManager()
+            # Verwende übergebenen SessionManager oder erstelle neuen
+            if not session_manager:
+                from src.utils.session_manager import SessionManager
+                session_manager = SessionManager()
             return agent_class(
                 api_key=config.api.perplexity_key,
                 session_manager=session_manager,

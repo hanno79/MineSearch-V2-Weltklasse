@@ -1,5 +1,8 @@
 """
-Datenbank-Schema und Models für Mining Research System
+Author: rahn
+Datum: 27.06.2025
+Version: 1.0
+Beschreibung: Datenbank-Schema und Models für Mining Research System
 """
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean, ForeignKey, JSON, text
 from sqlalchemy.ext.declarative import declarative_base

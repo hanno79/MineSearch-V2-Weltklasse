@@ -1,10 +1,14 @@
 """
 Author: rahn
 Datum: 27.06.2025
-Version: 2.0
+Version: 2.2
 Beschreibung: SessionManager ohne globale Instanz, nur noch pro Event Loop verwendbar
 # ÄNDERUNG 27.06.2025: Globale Instanz entfernt, nur noch explizite SessionManager-Objekte
+# VERSION 2.2: Default-Timeout entfernt - Timeout wird nur noch pro Request gesetzt
 """
+
+# VERSION MARKER für Debugging
+SESSION_MANAGER_VERSION = "2.2-NO-DEFAULT-TIMEOUT-27062025"
 
 import asyncio
 import aiohttp
@@ -33,9 +37,8 @@ class RobustSession:
         
     async def _create_session(self) -> aiohttp.ClientSession:
         """Erstellt eine neue Session mit robusten Einstellungen"""
-        # ÄNDERUNG 26.06.2025: Erstelle Session ohne default timeout,
-        # um 'Timeout context manager should be used inside a task' zu vermeiden
-        timeout = None  # Timeout wird pro Request gesetzt
+        # ÄNDERUNG 27.06.2025: KEIN Default-Timeout mehr - wird pro Request gesetzt
+        # Dies vermeidet RuntimeError: Timeout context manager should be used inside a task
         
         connector = aiohttp.TCPConnector(
             limit=self.connector_limit,
@@ -46,7 +49,7 @@ class RobustSession:
         )
         
         session = aiohttp.ClientSession(
-            timeout=timeout,
+            # timeout=default_timeout,  # ENTFERNT - Timeout wird pro Request gesetzt
             connector=connector,
             connector_owner=True,
             raise_for_status=False
@@ -108,21 +111,22 @@ class RobustSession:
     @asynccontextmanager
     async def request(self, method: str, url: str, **kwargs):
         """Context Manager für robuste Requests mit automatischer Session-Verwaltung"""
+        logger.debug(f"[SESSION MANAGER v{SESSION_MANAGER_VERSION}] Request zu {url}")
         session = await self.get_session()
         
-        # ÄNDERUNG 26.06.2025: Verbesserte Timeout-Behandlung
-        # Setze Timeout nur wenn wir in einem Task sind
+        # ÄNDERUNG 27.06.2025: Vereinfachte Timeout-Behandlung - KEIN ClientTimeout erstellen!
+        # aiohttp akzeptiert Integer/Float direkt als timeout
         if 'timeout' in kwargs:
-            timeout_value = kwargs.pop('timeout')
+            timeout_value = kwargs['timeout']
             if isinstance(timeout_value, (int, float)):
-                try:
-                    # Prüfe ob wir in einem Task sind
-                    asyncio.current_task()
-                    kwargs['timeout'] = aiohttp.ClientTimeout(total=timeout_value)
-                except RuntimeError:
-                    # Nicht in einem Task, verwende Session ohne Timeout
-                    logger.debug("Nicht in einem Task, verwende Request ohne Timeout")
-                    pass
+                # Lasse Integer/Float direkt durch - aiohttp konvertiert intern
+                pass  # kwargs['timeout'] bleibt unverändert
+            elif isinstance(timeout_value, aiohttp.ClientTimeout):
+                # Bereits ein ClientTimeout Objekt, verwende es direkt
+                pass  # kwargs['timeout'] bleibt unverändert
+            elif timeout_value is None:
+                # Entferne None timeout
+                kwargs.pop('timeout', None)
         
         # ÄNDERUNG 26.06.2025: Unterstütze Cancellation Token
         cancellation_token = kwargs.pop('cancellation_token', None)

@@ -1,10 +1,10 @@
 """
 Author: rahn
 Datum: 23.06.2025
-Version: 1.3
+Version: 1.4
 Beschreibung: Search Form Komponente für MineSearch UI
 ÄNDERUNG 23.06.2025: Event Loop Fix mit async_utils
-ÄNDERUNG 27.06.2025: SearchProgress Integration
+ÄNDERUNG 27.06.2025: SearchProgress Integration und add_script_run_ctx
 """
 import streamlit as st
 from typing import Dict, List, Optional, Callable
@@ -19,6 +19,13 @@ from src.ui.components.live_progress import LiveProgressComponent
 from src.core.global_cancellation_registry import get_global_cancellation_registry, RegisteredSearch
 from datetime import datetime
 import uuid
+
+# ÄNDERUNG 27.06.2025: Import add_script_run_ctx für Thread Context
+try:
+    from streamlit.runtime.scriptrunner import add_script_run_ctx
+    HAS_SCRIPT_RUN_CTX = True
+except ImportError:
+    HAS_SCRIPT_RUN_CTX = False
 
 
 class SearchFormComponent:

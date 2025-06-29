@@ -22,7 +22,6 @@ class TestPerplexityAgent(BaseAgentTest):
     def create_agent(self, config):
         """Überschrieben für Perplexity-spezifische Initialisierung"""
         return PerplexityAgent(
-            api_key=config.api.perplexity_key,
             name=self.agent_name,
             config={
                 "api_config": config.api,

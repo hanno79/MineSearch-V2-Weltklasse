@@ -70,6 +70,89 @@ class Config:
     DEFAULT_MODEL = "sonar-pro"
     PERPLEXITY_TEMPERATURE = 0.2
     
+    # Länderspezifische Konfigurationen
+    COUNTRY_CONFIGS = {
+        'kanada': {
+            'languages': ['en', 'fr'],
+            'currency': 'CAD',
+            'regions': ['Quebec', 'Ontario', 'British Columbia', 'Alberta', 
+                       'Manitoba', 'Saskatchewan', 'Nova Scotia', 'New Brunswick', 
+                       'Newfoundland and Labrador', 'Prince Edward Island',
+                       'Northwest Territories', 'Yukon', 'Nunavut'],
+            'mining_terms': {
+                'mine': ['mine', 'site minier'],
+                'operator': ['operator', 'opérateur', 'exploitant'],
+                'commodity': ['commodity', 'produit', 'minerai']
+            }
+        },
+        'canada': {  # Englische Variante
+            'languages': ['en', 'fr'],
+            'currency': 'CAD',
+            'regions': ['Quebec', 'Ontario', 'British Columbia', 'Alberta', 
+                       'Manitoba', 'Saskatchewan', 'Nova Scotia', 'New Brunswick', 
+                       'Newfoundland and Labrador', 'Prince Edward Island',
+                       'Northwest Territories', 'Yukon', 'Nunavut']
+        },
+        'australien': {
+            'languages': ['en'],
+            'currency': 'AUD',
+            'regions': ['Western Australia', 'Queensland', 'New South Wales', 
+                       'Victoria', 'South Australia', 'Tasmania', 
+                       'Northern Territory'],
+            'mining_terms': {
+                'mine': ['mine', 'mining operation'],
+                'operator': ['operator', 'owner'],
+                'commodity': ['commodity', 'mineral']
+            }
+        },
+        'australia': {  # Englische Variante
+            'languages': ['en'],
+            'currency': 'AUD',
+            'regions': ['Western Australia', 'Queensland', 'New South Wales', 
+                       'Victoria', 'South Australia', 'Tasmania', 
+                       'Northern Territory']
+        },
+        'indonesien': {
+            'languages': ['id', 'en'],
+            'currency': 'IDR',
+            'regions': ['Kalimantan', 'Sulawesi', 'Papua', 'Sumatra', 
+                       'Java', 'Nusa Tenggara', 'Maluku'],
+            'mining_terms': {
+                'mine': ['tambang', 'mine'],
+                'operator': ['PT', 'operator', 'perusahaan'],
+                'commodity': ['komoditas', 'mineral', 'bahan galian']
+            }
+        },
+        'indonesia': {  # Englische Variante
+            'languages': ['id', 'en'],
+            'currency': 'IDR',
+            'regions': ['Kalimantan', 'Sulawesi', 'Papua', 'Sumatra', 
+                       'Java', 'Nusa Tenggara', 'Maluku']
+        },
+        'peru': {
+            'languages': ['es', 'en'],
+            'currency': 'PEN',
+            'regions': ['Arequipa', 'Cajamarca', 'Cusco', 'Junín', 
+                       'La Libertad', 'Pasco', 'Áncash', 'Apurímac'],
+            'mining_terms': {
+                'mine': ['mina', 'mine'],
+                'operator': ['operador', 'empresa minera'],
+                'commodity': ['mineral', 'commodity']
+            }
+        },
+        'chile': {
+            'languages': ['es', 'en'],
+            'currency': 'CLP',
+            'regions': ['Antofagasta', 'Atacama', 'Coquimbo', 'Valparaíso',
+                       'O\'Higgins', 'Maule', 'Tarapacá'],
+            'mining_terms': {
+                'mine': ['mina', 'faena minera'],
+                'operator': ['operador', 'compañía minera'],
+                'commodity': ['mineral', 'commodity']
+            }
+        }
+    }
+    
     @classmethod
     def validate(cls):
         """Validiere kritische Konfiguration beim Start"""

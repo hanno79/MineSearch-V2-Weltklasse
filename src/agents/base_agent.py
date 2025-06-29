@@ -1,5 +1,8 @@
 """
-Abstrakte Basis-Klasse für alle Mining Research Agenten
+Author: rahn
+Datum: 27.06.2025
+Version: 1.0
+Beschreibung: Abstrakte Basis-Klasse für alle Mining Research Agenten
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass

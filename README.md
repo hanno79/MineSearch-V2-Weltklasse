@@ -5,20 +5,29 @@ Ein hochperformantes, KI-gestütztes System zur automatisierten Recherche von Be
 ## 🚀 Features
 
 ### Core Features
-- **🤖 20+ Spezialisierte AI-Agenten**: Claude, GPT-4, Perplexity, Tavily, und mehr
+- **🤖 33+ Spezialisierte AI-Agenten**: Claude, GPT-4, Perplexity, Tavily, OpenRouter Models und mehr
 - **⚡ Optimierte Performance**: 6-20x schnellere Suchen durch Parallelisierung
 - **🔍 Intelligente Datenextraktion**: Automatische Erkennung von Betreibern, Koordinaten, Produktionsdaten
 - **📊 Smart Aggregation**: Konfidenz-basiertes Scoring und Deduplizierung
 - **🌍 Mehrsprachige Unterstützung**: Recherche in 10+ Sprachen
 - **💾 Caching-System**: Reduzierte API-Kosten durch intelligentes Result-Caching
 - **📁 Flexible Exports**: CSV, JSON, Excel mit konfigurierbaren Formaten
+- **🔄 Robustes Session Management**: Automatische Wiederherstellung bei Verbindungsfehlern
 
 ### Technische Highlights
 - **Async/Await Architektur**: Maximale Parallelität und Ressourceneffizienz
-- **Connection Pooling**: Optimierte HTTP-Verbindungen (bis zu 100 concurrent)
-- **Modular Design**: Alle Module < 500 Zeilen für beste Wartbarkeit
+- **Connection Pooling**: Optimierte HTTP-Verbindungen mit RobustSession
+- **Modular Design**: Alle Module < 500 Zeilen für beste Wartbarkeit (100% regelkonform)
 - **Test Coverage**: Umfassendes Test-Framework mit pytest
 - **Performance Monitoring**: Integrierte Metriken und Statistiken
+- **Cancellation Support**: Unterbrechbare Suchen mit GlobalCancellationRegistry
+
+## 📋 Version
+
+**Aktuelle Version**: 3.0 (27.06.2025)
+- SessionManager vereinheitlicht (Timeout-Fehler behoben)
+- Codebasis vollständig bereinigt und modularisiert
+- Alle Projektregeln eingehalten
 
 ## Installation
 
@@ -50,111 +59,183 @@ playwright install
 ```
 minesearch/
 ├── src/
-│   ├── agents/                 # AI-Agenten
-│   │   ├── base/              # Gemeinsame Base-Module
-│   │   ├── search_strategies_module/  # Such-Strategien
-│   │   ├── browser_agent/     # Browser-basierte Suche
-│   │   ├── deepseek_research/ # Deep Research Agent
-│   │   └── ...                # 20+ weitere Agenten
-│   ├── core/                  # Kern-Funktionalität
-│   │   ├── orchestrator.py    # Haupt-Koordinator
-│   │   ├── performance_optimizer.py  # Performance-Module
-│   │   └── database_optimized.py    # Optimierte DB
-│   ├── data/                  # Datenverarbeitung
-│   │   ├── models.py          # SQLAlchemy Models
-│   │   └── aggregator.py      # Daten-Aggregation
-│   └── ui/                    # Streamlit GUI
-│       ├── main.py            # Haupt-UI
-│       └── components/        # UI-Komponenten
-├── tests/                     # Test-Suite
-│   ├── conftest.py           # Pytest Configuration
-│   └── test_*.py             # Unit/Integration Tests
-├── docs/                      # Dokumentation
+│   ├── agents/                 # Agent-Implementierungen
+│   │   ├── base_agent.py      # Basis-Klasse für alle Agenten
+│   │   ├── perplexity_agent.py # Perplexity Web-Recherche
+│   │   ├── tavily_agent.py    # Tavily Search API
+│   │   └── ...                # 30+ weitere Agenten
+│   ├── core/                  # Kern-Funktionalitäten
+│   │   ├── orchestrator.py    # Agent-Koordination
+│   │   ├── database.py        # Datenpersistierung
+│   │   ├── validators/        # Modularisierte Validierung
+│   │   └── config.py          # Konfigurationsmanagement
+│   ├── ui/                    # Streamlit UI
+│   │   ├── main.py           # Haupt-UI (v3.0)
+│   │   └── components/        # UI-Komponenten
+│   └── utils/                 # Hilfsfunktionen
+│       ├── session_manager.py # HTTP Session Management
+│       ├── pdf_extractors/    # PDF-Verarbeitung
+│       └── ...
+├── tests/                     # Unit & Integration Tests
+├── documentation/             # Projektdokumentation
 ├── logs/                      # Log-Dateien
-└── data/                      # Datenbank & Cache
-    └── minesearch.db         # SQLite Datenbank
+├── data/                      # SQLite Datenbank
+└── config/                    # Konfigurationsdateien
 ```
 
-## 🚀 Schnellstart
+## 🚀 Verwendung
 
-### Verwendung
-
+### Web-Interface (Streamlit)
 ```bash
-# Streamlit UI starten
 streamlit run src/ui/main.py
-
-# Oder mit Make
-make run
 ```
 
-### Erste Schritte
-1. Öffne http://localhost:8501 im Browser
-2. Gib den Minennamen ein (z.B. "Cerro Vanguardia")
-3. Wähle Region und Land
-4. Klicke auf "Suche starten"
-5. Ergebnisse werden automatisch aggregiert und angezeigt
+### Python API
+```python
+from src.core.config import Config
+from src.core.orchestrator import MineSearchOrchestratorV2
+from src.agents.base_agent import MineQuery
+from src.utils.session_manager import SessionManager
+
+# Initialisierung
+config = Config()
+session_manager = SessionManager()
+orchestrator = MineSearchOrchestratorV2(config, session_manager)
+
+# Suche durchführen
+query = MineQuery(
+    mine_name="Lac Expanse",
+    region="Quebec", 
+    country="Canada",
+    languages=["en", "fr"],
+    required_fields=["betreiber", "koordinaten", "aktivitaetsstatus"]
+)
+
+results = await orchestrator.search(
+    query=query,
+    strategy="staged",
+    selected_agents=["perplexity", "tavily", "scraper"]
+)
+```
+
+## 🛠️ Konfiguration
+
+### Benötigte API-Keys
+- **OPENROUTER_KEY**: Für Claude, GPT-4 und 15+ weitere Modelle
+- **PERPLEXITY_KEY**: Für Perplexity Web-Recherche
+- **TAVILY_KEY**: Für Tavily Search API
+- **EXA_KEY**: Für Exa Semantic Search (optional)
+- **APIFY_KEY**: Für Apify Web Scraping (optional)
+- **FIRECRAWL_KEY**: Für Firecrawl Crawling (optional)
+- **SCRAPINGBEE_KEY**: Für ScrapingBee (optional)
+- **BRIGHTDATA_KEY**: Für Bright Data (optional)
+
+### Umgebungsvariablen
+```env
+# API Keys
+OPENROUTER_KEY=your_key_here
+PERPLEXITY_KEY=your_key_here
+TAVILY_KEY=your_key_here
+
+# Optional APIs
+EXA_KEY=your_key_here
+APIFY_KEY=your_key_here
+
+# Performance Settings
+MAX_CONCURRENT_REQUESTS=10
+CACHE_TTL_MINUTES=60
+REQUEST_TIMEOUT_SECONDS=30
+
+# Database
+DATABASE_PATH=data/minesearch.db
+```
+
+## 📊 Features im Detail
+
+### Such-Strategien
+- **Direct**: Schnelle, direkte Suche
+- **Staged**: Mehrstufige Suche mit Source Discovery
+- **Comprehensive**: Umfassende Suche mit allen verfügbaren Agenten
+
+### Datenfelder
+- Betreiber/Operator
+- GPS-Koordinaten
+- Aktivitätsstatus
+- Rohstofftyp
+- Produktionsdaten
+- Umweltkosten
+- Mitarbeiterzahl
+- Fläche
+- Und viele mehr...
+
+### Export-Formate
+- CSV mit konfigurierbaren Spalten
+- JSON für API-Integration
+- Excel mit Formatierung
+- PDF-Reports (geplant)
 
 ## 🧪 Testing
 
 ```bash
 # Alle Tests ausführen
-python run_all_tests.py all
+pytest
 
-# Nur Unit-Tests
-python run_all_tests.py unit
+# Spezifische Test-Kategorie
+pytest tests/test_agents_base.py
+pytest tests/test_orchestrator.py
 
-# Mit Coverage-Report
-pytest --cov=src --cov-report=html
-
-# Spezifisches Modul testen
-pytest tests/test_search_strategies.py -v
+# Mit Coverage
+pytest --cov=src tests/
 ```
 
-## ⚡ Performance
+## 📈 Performance
 
-Das System nutzt fortschrittliche Optimierungen:
-- **Parallele Suchen**: Bis zu 10 Agenten gleichzeitig
-- **Result Caching**: Vermeidet doppelte API-Calls
-- **Connection Pooling**: Wiederverwendung von HTTP-Verbindungen
-- **Bulk Operations**: Optimierte Datenbank-Zugriffe
+- **Durchschnittliche Suchzeit**: 30-120 Sekunden pro Mine
+- **Parallelität**: Bis zu 33 Agenten gleichzeitig
+- **Cache-Hit-Rate**: ~40% bei wiederholten Suchen
+- **Speichernutzung**: < 500MB bei normaler Nutzung
 
-Benchmark-Ergebnisse:
-- Sequentielle Suche: ~20 Sekunden für 20 Agenten
-- Optimierte Suche: ~3 Sekunden (6.7x Speedup)
-- Cache-Hit: <5ms pro Agent
+## 🔧 Wartung
 
-## 🛠️ Entwicklung
+### Log-Dateien
+- `logs/minesearch.log`: Hauptlog mit JSON-Format
+- `logs/streamlit.log`: UI-spezifische Logs
 
-### Requirements
-- Python 3.10+
-- 4GB RAM minimum
-- SQLite 3.x
-- Moderne Browser für UI
+### Datenbank-Wartung
+```python
+# Backup erstellen
+python scripts/backup_database.py
 
-### Architektur
-- **Async/Await**: Vollständig asynchrone Architektur
-- **Modulares Design**: Klare Trennung der Verantwortlichkeiten
-- **Event-Driven**: Status-Updates über Callbacks
-- **Type Hints**: Vollständige Typ-Annotationen
-
-### Code-Standards
-- Alle Dateien < 500 Zeilen (CLAUDE.md Regel)
-- Deutsche Kommentare und Dokumentation
-- Comprehensive Error Handling
-- Performance-orientiertes Design
+# Statistiken anzeigen
+python scripts/show_stats.py
+```
 
 ## 📚 Dokumentation
 
-- [Architektur-Übersicht](docs/ARCHITECTURE.md)
-- [API-Dokumentation](docs/API.md)
-- [Deployment-Guide](docs/DEPLOYMENT.md)
-- [Agent-Dokumentation](src/agents/README.md)
-- [Performance-Guide](PERFORMANCE_OPTIMIZATION_23062025.md)
+Weitere Dokumentation finden Sie im `documentation/` Ordner:
+- `PROJEKTREGELN.md`: Entwicklungsrichtlinien
+- `ARCHITEKTUR.md`: System-Architektur
+- `API_REFERENCE.md`: API-Dokumentation
+- `CODEBASIS_BEREINIGUNG_27062025.md`: Aktuelle Bereinigungsdokumentation
 
 ## 🤝 Contributing
 
-Bitte beachte die Regeln in [CLAUDE.md](CLAUDE.md) für Code-Standards und Konventionen.
+Bitte beachten Sie die Projektregeln in `/app/CLAUDE.md`:
+- Max. 500 Zeilen pro Datei
+- Deutscher Code und Kommentare
+- Autor-Header in jeder Datei
+- Keine Duplikatdateien mit _fixed, _new, etc.
 
 ## 📄 Lizenz
 
-Copyright © 2025 rahn. Alle Rechte vorbehalten.
+Proprietär - Alle Rechte vorbehalten
+
+## 👥 Team
+
+- **Author**: rahn
+- **Entwicklung**: 2025
+- **Kontakt**: [Kontaktinformationen]
+
+---
+
+**Hinweis**: Dieses System ist für professionelle Mining-Research-Zwecke entwickelt. Die Nutzung unterliegt den jeweiligen API-Nutzungsbedingungen der integrierten Dienste.

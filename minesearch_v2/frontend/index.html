@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>MineSearch 2.0 - Mining Recherche System</title>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=2.0.1">
     <style>
         /* Tab-Navigation Styles */
         .tab-navigation {
@@ -83,9 +86,8 @@
                 <div style="margin-bottom: 15px;">
                     <label for="search_model"><strong>Such-Modell wählen:</strong></label>
                     <select id="search_model" style="width: 100%; padding: 10px; margin-top: 10px;">
-                        <option value="sonar">⚡ Schnell (30 Sekunden) - Für einfache Anfragen</option>
-                        <option value="sonar-pro" selected>🎯 Standard (60 Sekunden) - Beste Balance</option>
-                        <option value="sonar-deep-research">🌊 Deep Research (30+ Minuten) - Sehr umfassend</option>
+                        <option value="sonar-pro" selected>🎯 Standard (60 Sekunden) - Empfohlen für die meisten Suchen</option>
+                        <option value="sonar-deep-research">🌊 Deep Research (30+ Minuten) - Sehr umfassend und detailliert</option>
                     </select>
                 </div>
                 
@@ -100,9 +102,24 @@
                     </small>
                 </div>
                 
+                <div style="background: #f0fdf4; padding: 12px; border-radius: 5px; margin-top: 10px;">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="smart_search_enabled" style="width: 18px; height: 18px;">
+                        <span><strong>🤖 Smart-Search aktivieren</strong></span>
+                    </label>
+                    <small style="display: block; margin-top: 8px; margin-left: 28px; color: #555;">
+                        Beginnt mit schneller Suche und wechselt automatisch zu einem besseren Modell,<br>
+                        wenn weniger als 40% der Daten gefunden wurden. Transparenter Suchverlauf.
+                    </small>
+                </div>
+                
                 <small style="display: block; margin-top: 10px; color: #666;">
                     Diese Einstellungen gelten für beide Such-Methoden (CSV und Einzelsuche)
                 </small>
+                
+                <div id="global-model-warning" style="display: none; margin-top: 10px; padding: 10px; background: #fee; border-radius: 5px; color: #dc2626;">
+                    ⚠️ <strong>Achtung:</strong> Deep Research kann 30+ Minuten pro Mine dauern!
+                </div>
             </section>
 
             <!-- Tab Navigation -->
@@ -200,6 +217,16 @@
     </div>
 
     <script>
+        // Modell-Warnung Handler
+        document.getElementById('search_model').addEventListener('change', function() {
+            const warning = document.getElementById('global-model-warning');
+            if (this.value === 'sonar-deep-research') {
+                warning.style.display = 'block';
+            } else {
+                warning.style.display = 'none';
+            }
+        });
+
         // Tab-Wechsel Handler
         document.querySelectorAll('input[name="search_method"]').forEach(radio => {
             radio.addEventListener('change', function() {
@@ -220,19 +247,14 @@
             });
         });
 
-        // Such-Konfiguration basierend auf Modell und 2-Phasen-Option
+        // Such-Konfiguration basierend auf Modell und Optionen
         function getSearchConfig() {
             const model = document.getElementById('search_model').value;
             const twoPhase = document.getElementById('two_phase_enabled').checked;
+            const smartSearch = document.getElementById('smart_search_enabled').checked;
             
             // Basis-Konfiguration nach Modell
             const modelConfigs = {
-                'sonar': {
-                    endpoint: '/api/search',
-                    model: 'sonar',
-                    baseTime: '30 Sekunden',
-                    description: 'Schnelle Suche'
-                },
                 'sonar-pro': {
                     endpoint: '/api/search',
                     model: 'sonar-pro',
@@ -249,8 +271,14 @@
             
             let config = { ...modelConfigs[model] };
             
-            // 2-Phasen-Suche anpassen
-            if (twoPhase) {
+            // Smart-Search hat Priorität
+            if (smartSearch && model !== 'sonar-deep-research') {
+                config.endpoint = '/api/smart-search';
+                config.loadingText = `Smart-Search läuft (startet mit Schnell, erweitert bei Bedarf automatisch)...`;
+                config.smartSearch = true;
+            }
+            // 2-Phasen-Suche nur wenn Smart-Search deaktiviert UND nicht Deep Research
+            else if (twoPhase && model !== 'sonar-deep-research') {
                 config.endpoint = '/api/enhanced-search';
                 config.loadingText = `${config.description} mit 2-Phasen-Vertiefung läuft (${config.baseTime} + 1-2 Minuten für Quellen-Analyse)...`;
                 config.twoPhase = true;
@@ -304,14 +332,19 @@
 
         // Ergebnisse anzeigen (vereinheitlicht)
         function displayResults(response) {
+            console.log('DisplayResults aufgerufen mit:', response);
             const resultsDiv = document.getElementById('results');
             
             if (response.success && response.data) {
+                console.log('Erfolgreiche Response, structured_data vorhanden:', 'structured_data' in response.data);
+                console.log('Anzahl Felder in structured_data:', Object.keys(response.data.structured_data || {}).length);
+                
                 // Strukturierte Daten vorhanden?
                 if (response.data.structured_data) {
                     resultsDiv.innerHTML = createStructuredResultCard(response.data);
                 } else {
                     // Fallback für einfache Antworten
+                    console.log('Fallback: Keine strukturierten Daten');
                     resultsDiv.innerHTML = `
                         <div class="result-card success">
                             <h3>✓ Suchergebnis für: ${response.data.mine_name}</h3>
@@ -322,6 +355,7 @@
                     `;
                 }
             } else if (response.error) {
+                console.error('Fehler in Response:', response.error);
                 resultsDiv.innerHTML = `
                     <div class="result-card error">
                         <h3>❌ Fehler bei der Suche</h3>
@@ -333,47 +367,175 @@
 
         // Strukturierte Ergebnis-Karte erstellen
         function createStructuredResultCard(data) {
+            console.log('CreateStructuredResultCard aufgerufen mit:', data);
+            console.log('Structured data keys:', Object.keys(data.structured_data || {}));
+            
+            // Datenqualitäts-Anzeige
+            let qualityBadge = '';
+            if (data.data_quality) {
+                const quality = data.data_quality;
+                const color = quality.quality_level === 'Hoch' ? '#10b981' : 
+                             quality.quality_level === 'Mittel' ? '#f59e0b' : '#ef4444';
+                
+                qualityBadge = `
+                    <div style="margin-bottom: 15px; padding: 10px; background: #f3f4f6; border-radius: 5px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="background: ${color}; color: white; padding: 4px 12px; border-radius: 4px; font-weight: bold;">
+                                ${quality.quality_level}
+                            </span>
+                            <span>${quality.filled_fields} von ${quality.total_fields} Feldern gefunden (${quality.completeness_percentage}%)</span>
+                        </div>
+                        ${quality.missing_critical_fields.length > 0 ? 
+                            `<small style="color: #666; margin-top: 5px; display: block;">
+                                Fehlende wichtige Felder: ${quality.missing_critical_fields.join(', ')}
+                            </small>` : ''}
+                    </div>
+                `;
+            }
+            
+            // Suchverlauf anzeigen wenn vorhanden
+            let searchHistory = '';
+            if (data.search_history) {
+                searchHistory = `
+                    <div style="margin-bottom: 10px; padding: 8px; background: #e0f2fe; border-radius: 4px; font-size: 0.9em;">
+                        <strong>Suchverlauf:</strong> 
+                        ${data.search_history.map(h => `${h.model_name} (${h.duration})`).join(' → ')}
+                    </div>
+                `;
+            }
+            
+            // Empfehlung anzeigen wenn vorhanden
+            let recommendation = '';
+            if (data.recommendation) {
+                recommendation = `
+                    <div style="margin-bottom: 10px; padding: 10px; background: #fef3c7; border-radius: 4px;">
+                        💡 ${data.recommendation}
+                    </div>
+                `;
+            }
+            
             let html = `
                 <div class="result-card success">
                     <h3>✓ ${data.mine_name}</h3>
+                    ${searchHistory}
+                    ${qualityBadge}
+                    ${recommendation}
                     <div class="result-content">
             `;
             
-            // Tabelle mit strukturierten Daten
+            // Definiere die Reihenfolge der CSV-Spalten (muss mit Backend übereinstimmen)
+            const csvColumns = [
+                'ID', 'Name', 'Country', 'Region', 'Betreiber', 'x-Koordinate', 
+                'y-Koordinate', 'Aktivitätsstatus',
+                'Restaurationskosten', 'Jahr der Aufnahme der Kosten',
+                'Jahr der Erstellung des Dokumentes', 
+                'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)',
+                'Minentyp (Untertage/ Open-Pit/ usw.)', 'Produktionsstart',
+                'Produktionsende', 'Fördermenge/Jahr', 'Fläche der Mine in qkm',
+                'Quellenangaben'
+            ];
+            
+            // Tabelle mit ALLEN CSV-Spalten und Quellenreferenzen
             if (data.structured_data) {
                 html += '<table class="data-table">';
-                for (let [key, value] of Object.entries(data.structured_data)) {
-                    if (value) {
-                        html += `
-                            <tr>
-                                <td><strong>${key}</strong></td>
-                                <td>${value}</td>
-                            </tr>
-                        `;
+                
+                // Zeige alle Spalten in der definierten Reihenfolge
+                for (let column of csvColumns) {
+                    let value = '-';
+                    let sourceRefs = '';
+                    
+                    // ÄNDERUNG 28.06.2025: Verwende structured_data_with_sources wenn vorhanden
+                    if (data.structured_data_with_sources && data.structured_data_with_sources[column]) {
+                        const sourceData = data.structured_data_with_sources[column];
+                        value = sourceData.value || '-';
+                        
+                        // Formatiere Quellennummern wenn vorhanden
+                        if (sourceData.sources && sourceData.sources.length > 0) {
+                            sourceRefs = ` <span style="color: #6b7280; font-size: 0.85em;">[${sourceData.sources.join(',')}]</span>`;
+                        }
+                    } else {
+                        // Fallback auf structured_data
+                        value = data.structured_data[column] || '-';
                     }
+                    
+                    // Spezielle Formatierung für verschiedene Spaltentypen
+                    let displayValue = value;
+                    let rowStyle = '';
+                    
+                    // ÄNDERUNG 28.06.2025: Quellenspalte anders behandeln (bereits formatiert)
+                    if (column === 'Quellenangaben') {
+                        // Quellen sind bereits nummeriert im Backend, zeige sie als Liste
+                        if (value && value !== '-' && value !== 'Keine spezifischen Quellen dokumentiert') {
+                            const sources = value.split('+++');
+                            displayValue = '<ol style="margin: 0; padding-left: 20px;">';
+                            sources.forEach(src => {
+                                displayValue += `<li style="margin: 2px 0;">${src.replace(/^\[\d+\]\s*/, '')}</li>`;
+                            });
+                            displayValue += '</ol>';
+                        }
+                        // Keine Quellennummern für die Quellenspalte selbst
+                    } else {
+                        // Für alle anderen Spalten: Basis-Formatierung ohne Quellen
+                        displayValue = value;
+                    }
+                    
+                    // Status-Formatierung
+                    if (column === 'Aktivitätsstatus' && value !== '-' && column !== 'Quellenangaben') {
+                        // Extrahiere Kategorie aus Status wie "Geplant/Akquisition abgeschlossen (geplant)"
+                        const categoryMatch = value.match(/\((aktiv|geplant|geschlossen|sonstiges)\)$/);
+                        const category = categoryMatch ? categoryMatch[1] : '';
+                        
+                        // Farbe basierend auf Kategorie
+                        const statusColors = {
+                            'aktiv': '#10b981',
+                            'geplant': '#f59e0b',
+                            'geschlossen': '#ef4444',
+                            'sonstiges': '#6b7280'
+                        };
+                        
+                        const color = statusColors[category] || '#6b7280';
+                        displayValue = `<span style="color: ${color}; font-weight: 500;">${value}</span>`;
+                    }
+                    
+                    // Finanzspalten hervorheben
+                    const finanzSpalten = ['Restaurationskosten', 'Jahr der Aufnahme der Kosten', 'Jahr der Erstellung des Dokumentes'];
+                    if (finanzSpalten.includes(column) && column !== 'Quellenangaben') {
+                        rowStyle = 'background-color: #fef3c7;'; // Leichtes Gelb für Finanzdaten
+                        
+                        // Wenn Restaurationskosten vorhanden, hervorheben
+                        if (column === 'Restaurationskosten' && value !== '-') {
+                            displayValue = `<span style="color: #dc2626; font-weight: bold;">${value}</span>`;
+                        }
+                        
+                        // Wenn keine Daten, Hinweis anzeigen  
+                        else if (value === '-') {
+                            displayValue = `<span style="color: #9ca3af; font-style: italic;">Keine Daten gefunden</span>`;
+                        }
+                    }
+                    
+                    // ÄNDERUNG 28.06.2025: Quellenreferenzen nur bei echten Infos und erlaubten Feldern
+                    const fieldsWithoutSources = ['ID', 'Name', 'Country', 'Region', 'Quellenangaben'];
+                    const isEmptyValue = !value || value === '-' || 
+                                       ['k.a', 'k.a.', 'keine daten', 'nicht gefunden'].includes(value.toLowerCase());
+                    
+                    if (!fieldsWithoutSources.includes(column) && !isEmptyValue) {
+                        displayValue = displayValue + sourceRefs;
+                    }
+                    
+                    html += `
+                        <tr style="${rowStyle}">
+                            <td><strong>${column}</strong></td>
+                            <td>${displayValue}</td>
+                        </tr>
+                    `;
                 }
+                
                 html += '</table>';
             }
             
-            // Quellen anzeigen
-            if (data.sources && data.sources.length > 0) {
-                html += `
-                    <h4>📚 Gefundene Quellen (${data.source_summary?.total || 0}):</h4>
-                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px;">
-                `;
-                
-                // URLs
-                const urls = data.sources.filter(s => s.type === 'url');
-                if (urls.length > 0) {
-                    html += '<strong>🌐 Websites:</strong><ul>';
-                    urls.slice(0, 5).forEach(source => {
-                        html += `<li><a href="${source.value}" target="_blank">${source.value}</a></li>`;
-                    });
-                    html += '</ul>';
-                }
-                
-                html += '</div>';
-            }
+            // ÄNDERUNG 28.06.2025: Quellenverzeichnis entfernt - Quellen sind jetzt in der Tabelle
+            
+            // ÄNDERUNG 28.06.2025: Alte Quellenanzeige entfernt - Quellen sind jetzt in der Tabelle
             
             html += `
                     </div>
@@ -383,6 +545,36 @@
             return html;
         }
 
+        // HTMX Error Handler
+        document.body.addEventListener('htmx:responseError', function(evt) {
+            console.error('HTMX Response Error:', evt.detail);
+            const resultsDiv = document.getElementById('results');
+            if (resultsDiv) {
+                resultsDiv.innerHTML = `
+                    <div class="result-card error">
+                        <h3>❌ Kommunikationsfehler</h3>
+                        <p>Es gab ein Problem bei der Kommunikation mit dem Server.</p>
+                        <details>
+                            <summary>Technische Details</summary>
+                            <pre>${JSON.stringify(evt.detail, null, 2)}</pre>
+                        </details>
+                    </div>
+                `;
+            }
+        });
+
+        // Debug HTMX Requests
+        document.body.addEventListener('htmx:beforeRequest', function(evt) {
+            console.log('HTMX Request gestartet:', evt.detail.pathInfo.requestPath);
+        });
+
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            console.log('HTMX Request abgeschlossen:', evt.detail.pathInfo.requestPath, 'Erfolgreich:', evt.detail.successful);
+            if (!evt.detail.successful) {
+                console.error('HTMX Request fehlgeschlagen:', evt.detail);
+            }
+        });
+
         // Anpassung für CSV Batch-Form nach Upload
         document.body.addEventListener('htmx:afterRequest', function(evt) {
             if (evt.detail.pathInfo.requestPath === '/api/upload-csv' && evt.detail.successful) {
@@ -390,28 +582,49 @@
                 setTimeout(() => {
                     const batchForm = document.getElementById('batch-form');
                     if (batchForm) {
-                        // Entferne altes model select (falls vorhanden)
-                        const oldModelSelect = batchForm.querySelector('select[name="model"]');
-                        if (oldModelSelect) {
-                            oldModelSelect.parentElement.remove();
-                        }
+                        console.log('Batch-Form gefunden, füge Such-Konfiguration hinzu');
+                        
+                        // Entferne altes model select NICHT - behalte es!
+                        // const oldModelSelect = batchForm.querySelector('select[name="model"]');
+                        // if (oldModelSelect) {
+                        //     oldModelSelect.parentElement.remove();
+                        // }
                         
                         // Füge versteckte Felder hinzu
                         const config = getSearchConfig();
                         
-                        // Modell
-                        const modelInput = document.createElement('input');
-                        modelInput.type = 'hidden';
-                        modelInput.name = 'model';
+                        // Modell aus globaler Selectbox übernehmen
+                        let modelInput = batchForm.querySelector('input[name="model"]');
+                        if (!modelInput) {
+                            modelInput = document.createElement('input');
+                            modelInput.type = 'hidden';
+                            modelInput.name = 'model';
+                            batchForm.appendChild(modelInput);
+                        }
                         modelInput.value = config.model;
-                        batchForm.appendChild(modelInput);
                         
-                        // Such-Typ (standard oder enhanced basierend auf 2-Phasen)
-                        const searchTypeInput = document.createElement('input');
-                        searchTypeInput.type = 'hidden';
-                        searchTypeInput.name = 'search_type';
-                        searchTypeInput.value = config.twoPhase ? 'enhanced' : 'standard';
-                        batchForm.appendChild(searchTypeInput);
+                        // Such-Typ hinzufügen - WICHTIG: bei Deep Research immer 'standard'
+                        let searchTypeInput = batchForm.querySelector('input[name="search_type"]');
+                        if (!searchTypeInput) {
+                            searchTypeInput = document.createElement('input');
+                            searchTypeInput.type = 'hidden';
+                            searchTypeInput.name = 'search_type';
+                            batchForm.appendChild(searchTypeInput);
+                        }
+                        // Deep Research sollte NIE enhanced verwenden
+                        if (config.model === 'sonar-deep-research') {
+                            searchTypeInput.value = 'standard';
+                        } else {
+                            searchTypeInput.value = config.twoPhase ? 'enhanced' : 'standard';
+                        }
+                        
+                        console.log('Batch-Form konfiguriert:', {
+                            model: modelInput.value,
+                            searchType: searchTypeInput.value,
+                            twoPhase: config.twoPhase,
+                            smartSearch: config.smartSearch,
+                            isDeepResearch: config.model === 'sonar-deep-research'
+                        });
                         
                         // Update Loading Text im Batch Form
                         const batchLoading = document.getElementById('batch-loading');
