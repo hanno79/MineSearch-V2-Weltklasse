@@ -203,13 +203,24 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         """Suche nach technischen Dokumenten"""
         sources = []
         
+        # ÄNDERUNG 02.07.2025: Erweiterte PDF-Suchpatterns
         # Basis-Suchbegriffe für technische Dokumente
         doc_patterns = [
             f'"{mine_name}" NI 43-101 technical report filetype:pdf',
             f'"{mine_name}" feasibility study filetype:pdf',
             f'"{mine_name}" closure plan filetype:pdf',
             f'"{mine_name}" environmental assessment filetype:pdf',
-            f'"{mine_name}" annual report filetype:pdf'
+            f'"{mine_name}" annual report filetype:pdf',
+            # Neue Patterns für bessere Abdeckung
+            f'"{mine_name}" sustainability report filetype:pdf',
+            f'"{mine_name}" ESG report filetype:pdf',
+            f'"{mine_name}" environmental impact assessment filetype:pdf',
+            f'"{mine_name}" MD&A management discussion analysis filetype:pdf',
+            f'"{mine_name}" financial statements notes filetype:pdf',
+            f'"{mine_name}" asset retirement obligation filetype:pdf',
+            f'"{mine_name}" reclamation plan filetype:pdf',
+            f'"{mine_name}" rehabilitation plan filetype:pdf',
+            f'"{mine_name}" decommissioning plan filetype:pdf'
         ]
         
         # Erstelle Google-ähnliche Suchanfragen
@@ -240,11 +251,12 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         from database import db_manager
         
         # Hole relevante Quellen aus DB
+        # ÄNDERUNG 02.07.2025: Erhöhte Limits für bessere Abdeckung
         db_sources = db_manager.get_sources_for_search(
             country=country,
             region=region,
-            min_reliability=40.0,  # Mindestens 40% Zuverlässigkeit
-            limit=30  # Max 30 zusätzliche Quellen
+            min_reliability=25.0,  # Gesenkt von 40% auf 25% für mehr Quellen
+            limit=50  # Erhöht von 30 auf 50 zusätzliche Quellen
         )
         
         for db_source in db_sources:
@@ -340,7 +352,7 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         return summary
     
     def build_enhanced_prompt(self, mine_name: str, discovered_sources: List[Dict[str, Any]], 
-                            max_sources: int = 15) -> str:
+                            max_sources: int = 25) -> str:
         """Erstelle erweiterten Prompt mit Quellenhinweisen"""
         
         # Basis-Prompt
@@ -472,6 +484,34 @@ class EnhancedSourceDiscovery(SourceDiscovery):
             - Monitoring-Berichte
             """
             prompts.append(gov_prompt)
+        
+        # ÄNDERUNG 02.07.2025: Spezialisierter Finanz-Prompt
+        # 5. Dedizierter Restaurationskosten-Prompt
+        restoration_prompt = f"""
+        SPEZIALISIERTE SUCHE NUR FÜR RESTAURATIONSKOSTEN für Mine "{mine_name}":
+        
+        Suche gezielt nach folgenden Finanzbegriffen und deren Werten:
+        - Asset Retirement Obligation (ARO)
+        - Closure Costs / Mine Closure Costs
+        - Environmental Liability / Environmental Obligations
+        - Restoration Provision / Rehabilitation Provision
+        - Decommissioning Costs / Abandonment Costs
+        - Financial Assurance / Closure Bond / Environmental Bond
+        - Post-closure monitoring costs
+        - Progressive rehabilitation costs
+        
+        Prüfe speziell diese Dokumenttypen:
+        - Annual Reports: Notes to Financial Statements (Note über ARO/Environmental Liabilities)
+        - Sustainability Reports: Environmental Provisions Section
+        - Technical Reports: Section über Closure Costs
+        - MD&A: Diskussion über zukünftige Verpflichtungen
+        
+        WICHTIG: Gib ALLE gefundenen Beträge mit Währung und Jahr an!
+        Beispiel: "$45.3 million CAD (2023)" oder "USD 123 million as of December 2022"
+        
+        Wenn verschiedene Währungen gefunden werden, gib alle an und rechne ggf. um.
+        """
+        prompts.append(restoration_prompt)
         
         return prompts
     

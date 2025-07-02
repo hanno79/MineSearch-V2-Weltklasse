@@ -26,6 +26,8 @@ from search_service import MineSearchService
 from source_discovery import extract_sources_from_content
 from batch_service import BatchService
 from html_utils import create_result_card, create_error_card, create_batch_results_table
+from search_service_multi import multi_search_service
+from providers.registry import provider_registry
 from utils import (
     normalize_accents, 
     generate_name_variants, 
@@ -169,6 +171,86 @@ async def search_mine(request: MineSearchRequest, model: str = "sonar-pro"):
     except Exception as e:
         logger.error(f"Unerwarteter Fehler: {str(e)}")
         raise HTTPException(status_code=500, detail="Interner Serverfehler")
+
+# ÄNDERUNG 02.07.2025: Multi-Model Search Endpoints
+@app.get("/api/models")
+async def get_available_models():
+    """Hole alle verfügbaren Modelle"""
+    try:
+        models = provider_registry.get_all_models()
+        return {
+            "success": True,
+            "models": {
+                model_id: {
+                    "name": config.name,
+                    "description": config.description,
+                    "timeout": config.timeout,
+                    "max_tokens": config.max_tokens,
+                    "supports_web_search": config.supports_web_search,
+                    "is_free": config.is_free
+                }
+                for model_id, config in models.items()
+            }
+        }
+    except Exception as e:
+        logger.error(f"Fehler beim Abrufen der Modelle: {str(e)}")
+        raise HTTPException(status_code=500, detail="Fehler beim Abrufen der Modelle")
+
+class MultiSearchRequest(BaseModel):
+    mine_name: str
+    country: Optional[str] = None
+    commodity: Optional[str] = None
+    region: Optional[str] = None
+    models: List[str]  # Liste von model_ids im Format "provider:model"
+
+@app.post("/api/multi-search")
+async def multi_model_search(request: MultiSearchRequest):
+    """Multi-Model Suche - führt Suche mit mehreren Modellen parallel aus"""
+    try:
+        if not request.models:
+            raise ValueError("Mindestens ein Modell muss ausgewählt werden")
+        
+        # Führe Multi-Model-Suche aus
+        result = await multi_search_service.search_with_multiple_models(
+            model_ids=request.models,
+            mine_name=request.mine_name,
+            country=request.country,
+            commodity=request.commodity,
+            region=request.region
+        )
+        
+        # Speichere Ergebnisse für jedes erfolgreiche Modell
+        if result.get('success') and result.get('results'):
+            try:
+                from database import db_manager
+                for model_id, model_result in result['results'].items():
+                    if model_result.get('success') and model_result.get('data'):
+                        db_manager.save_search_result({
+                            'mine_name': request.mine_name,
+                            'country': request.country,
+                            'region': request.region,
+                            'commodity': request.commodity,
+                            'model_used': model_id,
+                            'search_type': 'multi-model',
+                            'search_duration': model_result['data'].get('search_metadata', {}).get('search_duration'),
+                            'structured_data': model_result['data'].get('structured_data'),
+                            'structured_data_with_sources': model_result['data'].get('structured_data_with_sources'),
+                            'sources': model_result['data'].get('sources'),
+                            'source_index': model_result['data'].get('source_index'),
+                            'data_quality': model_result['data'].get('data_quality'),
+                            'success': True
+                        })
+            except Exception as e:
+                logger.error(f"Fehler beim Speichern der Multi-Model-Ergebnisse: {str(e)}")
+        
+        return result
+    except ValueError as e:
+        logger.error(f"Validierungsfehler: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Fehler bei Multi-Model-Suche: {str(e)}")
+        raise HTTPException(status_code=500, detail="Interner Serverfehler")
+
 @app.post("/api/upload-csv")
 async def upload_csv(csv_file: UploadFile = File(...)):
     """

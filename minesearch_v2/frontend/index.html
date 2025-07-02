@@ -89,11 +89,14 @@
             <!-- Globaler Such-Modus -->
             <section class="search-mode">
                 <div style="margin-bottom: 15px;">
-                    <label for="search_model"><strong>Such-Modell wählen:</strong></label>
-                    <select id="search_model" style="width: 100%; padding: 10px; margin-top: 10px;">
-                        <option value="sonar-pro" selected>🎯 Standard (60 Sekunden) - Empfohlen für die meisten Suchen</option>
-                        <option value="sonar-deep-research">🌊 Deep Research (30+ Minuten) - Sehr umfassend und detailliert</option>
-                    </select>
+                    <label><strong>Such-Modelle wählen:</strong></label>
+                    <div id="model-selection" style="margin-top: 10px; padding: 10px; background: #f9f9f9; border-radius: 5px;">
+                        <!-- Modelle werden dynamisch geladen -->
+                        <p style="color: #666;">Lade verfügbare Modelle...</p>
+                    </div>
+                    <small style="display: block; margin-top: 8px; color: #666;">
+                        Wähle ein oder mehrere Modelle. Bei mehreren Modellen wird die Suche parallel ausgeführt.
+                    </small>
                 </div>
                 
                 <div style="background: #f0f8ff; padding: 12px; border-radius: 5px; margin-top: 10px;">
@@ -352,6 +355,8 @@
     <script>
         // Warte bis DOM geladen ist
         document.addEventListener('DOMContentLoaded', function() {
+            // Lade verfügbare Modelle beim Start
+            loadAvailableModels();
             // Timer-Variablen
             let searchTimerInterval = null;
             let searchStartTime = null;
@@ -403,19 +408,79 @@
                 }
             }
             
-            // Modell-Warnung Handler
-            const searchModelElement = document.getElementById('search_model');
-            if (searchModelElement) {
-                searchModelElement.addEventListener('change', function() {
-                    const warning = document.getElementById('global-model-warning');
-                    if (warning) {
-                        if (this.value === 'sonar-deep-research') {
-                            warning.style.display = 'block';
-                        } else {
-                            warning.style.display = 'none';
-                        }
+            // Funktion zum Laden verfügbarer Modelle
+            async function loadAvailableModels() {
+                try {
+                    const response = await fetch('/api/models');
+                    const data = await response.json();
+                    
+                    if (data.success && data.models) {
+                        const modelSelection = document.getElementById('model-selection');
+                        let html = '';
+                        
+                        // Gruppiere Modelle nach Provider
+                        const modelsByProvider = {};
+                        Object.entries(data.models).forEach(([modelId, modelInfo]) => {
+                            const [provider, model] = modelId.split(':');
+                            if (!modelsByProvider[provider]) {
+                                modelsByProvider[provider] = [];
+                            }
+                            modelsByProvider[provider].push({ id: modelId, ...modelInfo });
+                        });
+                        
+                        // Erstelle Checkboxen für jedes Modell
+                        Object.entries(modelsByProvider).forEach(([provider, models]) => {
+                            html += `<div style="margin-bottom: 15px;">
+                                <strong style="text-transform: capitalize;">${provider}</strong>
+                                <div style="margin-left: 20px; margin-top: 5px;">`;
+                            
+                            models.forEach(model => {
+                                const isDefault = model.id === 'perplexity:sonar-pro' || model.id === 'openrouter:deepseek-free';
+                                const icon = model.is_free ? '🆓' : model.supports_web_search ? '🌐' : '🤖';
+                                const timeInfo = model.timeout > 120 ? ` (${Math.round(model.timeout/60)}+ Min)` : '';
+                                
+                                html += `
+                                    <label style="display: block; margin: 5px 0; cursor: pointer;">
+                                        <input type="checkbox" name="model" value="${model.id}" 
+                                               ${isDefault ? 'checked' : ''}
+                                               style="margin-right: 8px;"
+                                               onchange="updateModelWarning()">
+                                        <span>${icon} ${model.name}${timeInfo} - ${model.description}</span>
+                                    </label>
+                                `;
+                            });
+                            
+                            html += `</div></div>`;
+                        });
+                        
+                        modelSelection.innerHTML = html;
                     }
-                });
+                } catch (error) {
+                    console.error('Fehler beim Laden der Modelle:', error);
+                    document.getElementById('model-selection').innerHTML = 
+                        '<p style="color: red;">Fehler beim Laden der verfügbaren Modelle</p>';
+                }
+            }
+            
+            // Update Modell-Warnung bei Änderungen
+            window.updateModelWarning = function() {
+                const checkedModels = document.querySelectorAll('input[name="model"]:checked');
+                const warning = document.getElementById('global-model-warning');
+                
+                if (warning) {
+                    let hasLongRunning = false;
+                    checkedModels.forEach(checkbox => {
+                        if (checkbox.value.includes('deep-research') || 
+                            checkbox.value.includes('sonar-reasoning')) {
+                            hasLongRunning = true;
+                        }
+                    });
+                    
+                    warning.style.display = hasLongRunning ? 'block' : 'none';
+                    if (hasLongRunning) {
+                        warning.innerHTML = '⚠️ <strong>Achtung:</strong> Einige gewählte Modelle können 30+ Minuten pro Mine dauern!';
+                    }
+                }
             }
 
         // Tab-Wechsel Handler
@@ -450,49 +515,73 @@
             });
         });
 
-        // Such-Konfiguration basierend auf Modell und Optionen
+        // Such-Konfiguration basierend auf gewählten Modellen und Optionen
         function getSearchConfig() {
-            const model = document.getElementById('search_model').value;
+            const selectedModels = Array.from(document.querySelectorAll('input[name="model"]:checked')).map(cb => cb.value);
             const twoPhase = document.getElementById('two_phase_enabled').checked;
             const smartSearch = document.getElementById('smart_search_enabled').checked;
             
-            // Basis-Konfiguration nach Modell
-            const modelConfigs = {
-                'sonar-pro': {
-                    endpoint: '/api/search',
-                    model: 'sonar-pro',
-                    baseTime: '60 Sekunden',
-                    description: 'Standard-Suche'
-                },
-                'sonar-deep-research': {
-                    endpoint: '/api/search',
-                    model: 'sonar-deep-research',
-                    baseTime: '30+ Minuten',
-                    description: 'Deep Research'
-                }
+            if (selectedModels.length === 0) {
+                alert('Bitte wähle mindestens ein Modell aus.');
+                return null;
+            }
+            
+            // Bei mehreren Modellen verwende Multi-Model-Endpunkt
+            if (selectedModels.length > 1) {
+                return {
+                    endpoint: '/api/multi-search',
+                    models: selectedModels,
+                    loadingText: `Multi-Modell-Suche läuft mit ${selectedModels.length} Modellen...`,
+                    isMultiModel: true,
+                    twoPhase: twoPhase,
+                    smartSearch: smartSearch
+                };
+            }
+            
+            // Bei einem Modell wie bisher, aber mit Provider-Präfix
+            const model = selectedModels[0];
+            const isPerplexity = model.startsWith('perplexity:');
+            const modelKey = model.split(':')[1];
+            
+            // Basis-Konfiguration
+            let config = {
+                endpoint: '/api/search',
+                model: modelKey,
+                provider: model.split(':')[0],
+                baseTime: '60 Sekunden',
+                description: 'Standard-Suche',
+                isMultiModel: false
             };
             
-            let config = { ...modelConfigs[model] };
-            
-            // Smart-Search hat Priorität
-            if (smartSearch && model !== 'sonar-deep-research') {
-                config.endpoint = '/api/smart-search';
-                config.loadingText = `Smart-Search läuft (startet mit Schnell, erweitert bei Bedarf automatisch)...`;
-                config.smartSearch = true;
-                config.twoPhase = false; // Explizit false setzen
+            // Spezielle Konfiguration für bekannte Modelle
+            if (model === 'perplexity:sonar-deep-research') {
+                config.baseTime = '30+ Minuten';
+                config.description = 'Deep Research';
             }
-            // 2-Phasen-Suche nur wenn Smart-Search deaktiviert UND nicht Deep Research
-            else if (twoPhase && model !== 'sonar-deep-research') {
-                config.endpoint = '/api/enhanced-search';
-                config.loadingText = `${config.description} mit 2-Phasen-Vertiefung läuft (${config.baseTime} + 1-2 Minuten für Quellen-Analyse)...`;
-                config.twoPhase = true;
+            
+            // Smart-Search und Two-Phase nur für Perplexity
+            if (isPerplexity) {
+                if (smartSearch && modelKey !== 'sonar-deep-research') {
+                    config.endpoint = '/api/smart-search';
+                    config.loadingText = `Smart-Search läuft (startet mit Schnell, erweitert bei Bedarf automatisch)...`;
+                    config.smartSearch = true;
+                    config.twoPhase = false;
+                } else if (twoPhase && modelKey !== 'sonar-deep-research') {
+                    config.endpoint = '/api/enhanced-search';
+                    config.loadingText = `${config.description} mit 2-Phasen-Vertiefung läuft (${config.baseTime} + 1-2 Minuten für Quellen-Analyse)...`;
+                    config.twoPhase = true;
+                } else {
+                    config.loadingText = `${config.description} läuft (${config.baseTime})...`;
+                    config.twoPhase = false;
+                }
             } else {
-                config.loadingText = `${config.description} läuft (${config.baseTime})...`;
+                // Andere Provider unterstützen kein Smart-Search oder Two-Phase
+                config.loadingText = `${config.description} mit ${model} läuft...`;
                 config.twoPhase = false;
+                config.smartSearch = false;
             }
             
-            // Füge searchType hinzu
-            config.searchType = model === 'sonar-deep-research' ? 'deep-research' : 'standard';
+            config.searchType = modelKey === 'sonar-deep-research' ? 'deep-research' : 'standard';
             
             return config;
         }
@@ -500,31 +589,41 @@
         // Einzelsuche starten
         function startSingleSearch() {
             const config = getSearchConfig();
+            if (!config) return; // Abbruch wenn keine Konfiguration
+            
             const formData = new FormData(document.getElementById('single-search-form'));
             
             // Loading Text aktualisieren
             document.getElementById('loading-text').textContent = config.loadingText;
             const loadingDiv = document.getElementById('loading');
             loadingDiv.style.display = 'block';
-            loadingDiv.classList.add('htmx-request'); // Füge HTMX-Klasse hinzu für CSS
+            loadingDiv.classList.add('htmx-request');
             
             // Timer starten
             startSearchTimer();
             
-            // URL-Parameter erstellen
-            const params = new URLSearchParams();
-            for (let [key, value] of formData.entries()) {
-                if (value) params.append(key, value);
+            // Bereite Request-Body vor
+            const requestBody = {
+                mine_name: formData.get('mine_name'),
+                country: formData.get('country'),
+                commodity: formData.get('commodity')
+            };
+            
+            // Multi-Model oder Single-Model Request
+            if (config.isMultiModel) {
+                requestBody.models = config.models;
+            } else {
+                requestBody.model = config.model;
+                requestBody.provider = config.provider;
             }
-            if (config.model) params.append('model', config.model);
             
             // HTMX-ähnlicher Fetch
-            fetch(config.endpoint + '?' + params.toString(), {
+            fetch(config.endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(Object.fromEntries(formData))
+                body: JSON.stringify(requestBody)
             })
             .then(response => response.json())
             .then(data => {
@@ -535,7 +634,7 @@
                 const loadingDiv = document.getElementById('loading');
                 loadingDiv.style.display = 'none';
                 loadingDiv.classList.remove('htmx-request');
-                stopSearchTimer(); // Timer auch bei Fehler stoppen
+                stopSearchTimer();
                 document.getElementById('results').innerHTML = `
                     <div class="result-card error">
                         <h3>❌ Fehler bei der Suche</h3>
@@ -557,6 +656,12 @@
             
             // Timer stoppen
             stopSearchTimer();
+            
+            // Multi-Model-Ergebnisse
+            if (response.results && response.models_searched) {
+                displayMultiModelResults(response);
+                return;
+            }
             
             if (response.success && response.data) {
                 console.log('Erfolgreiche Response, structured_data vorhanden:', 'structured_data' in response.data);
@@ -784,6 +889,48 @@
             
             return html;
         }
+        
+        // Multi-Model-Ergebnisse anzeigen
+        function displayMultiModelResults(response) {
+            const resultsDiv = document.getElementById('results');
+            
+            let html = `
+                <div class="multi-model-results">
+                    <h2>Multi-Modell-Suchergebnisse für: ${response.mine_name}</h2>
+                    <p style="margin: 10px 0; color: #666;">
+                        ${response.models_searched} Modelle wurden parallel durchsucht. 
+                        ${response.country ? `Land: ${response.country}` : ''}
+                    </p>
+            `;
+            
+            // Zeige Ergebnisse für jedes Modell
+            Object.entries(response.results).forEach(([modelId, result]) => {
+                const [provider, modelKey] = modelId.split(':');
+                
+                html += `
+                    <div style="margin: 20px 0; padding: 20px; background: #f9f9f9; border-radius: 8px; border-left: 4px solid ${result.success ? '#10b981' : '#ef4444'};">
+                        <h3 style="margin-bottom: 10px;">
+                            ${result.success ? '✓' : '❌'} ${provider.charAt(0).toUpperCase() + provider.slice(1)} - ${modelKey}
+                        </h3>
+                `;
+                
+                if (result.success && result.data) {
+                    // Verwende die existierende createStructuredResultCard Funktion
+                    html += createStructuredResultCard(result.data);
+                } else {
+                    html += `
+                        <div class="result-card error">
+                            <p>Fehler: ${result.error || 'Unbekannter Fehler'}</p>
+                        </div>
+                    `;
+                }
+                
+                html += `</div>`;
+            });
+            
+            html += `</div>`;
+            resultsDiv.innerHTML = html;
+        }
 
         // HTMX Error Handler
         document.body.addEventListener('htmx:responseError', function(evt) {
@@ -832,16 +979,33 @@
                         
                         // Füge versteckte Felder hinzu
                         const config = getSearchConfig();
+                        if (!config) return;
                         
-                        // Modell aus globaler Selectbox übernehmen
-                        let modelInput = batchForm.querySelector('input[name="model"]');
-                        if (!modelInput) {
-                            modelInput = document.createElement('input');
-                            modelInput.type = 'hidden';
-                            modelInput.name = 'model';
-                            batchForm.appendChild(modelInput);
+                        // Bei Multi-Model: models Array hinzufügen
+                        if (config.isMultiModel) {
+                            // Entferne alte model inputs
+                            batchForm.querySelectorAll('input[name="model"]').forEach(input => input.remove());
+                            batchForm.querySelectorAll('input[name="models"]').forEach(input => input.remove());
+                            
+                            // Füge models Array hinzu
+                            config.models.forEach(model => {
+                                const modelInput = document.createElement('input');
+                                modelInput.type = 'hidden';
+                                modelInput.name = 'models';
+                                modelInput.value = model;
+                                batchForm.appendChild(modelInput);
+                            });
+                        } else {
+                            // Single Model wie bisher
+                            let modelInput = batchForm.querySelector('input[name="model"]');
+                            if (!modelInput) {
+                                modelInput = document.createElement('input');
+                                modelInput.type = 'hidden';
+                                modelInput.name = 'model';
+                                batchForm.appendChild(modelInput);
+                            }
+                            modelInput.value = config.model;
                         }
-                        modelInput.value = config.model;
                         
                         // Such-Typ hinzufügen - WICHTIG: bei Deep Research immer 'standard'
                         let searchTypeInput = batchForm.querySelector('input[name="search_type"]');

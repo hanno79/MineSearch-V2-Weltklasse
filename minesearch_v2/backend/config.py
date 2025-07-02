@@ -35,6 +35,7 @@ class Config:
     
     # API Keys
     PERPLEXITY_API_KEY = os.getenv('PERPLEXITY_API_KEY', '')
+    OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
     
     # Server Einstellungen
     HOST = os.getenv('HOST', '0.0.0.0')
@@ -87,6 +88,40 @@ class Config:
     DEFAULT_MODEL = "sonar-pro"
     PERPLEXITY_TEMPERATURE = 0.2
     
+    # ÄNDERUNG 02.07.2025: Multi-Provider Konfiguration
+    PROVIDERS = {
+        'perplexity': {
+            'enabled': True,
+            'api_key': PERPLEXITY_API_KEY,
+            'models': PERPLEXITY_MODELS
+        },
+        'openrouter': {
+            'enabled': True,
+            'api_key': OPENROUTER_API_KEY,
+            'base_url': 'https://openrouter.ai/api/v1',
+            'models': {
+                'deepseek-free': {
+                    'id': 'deepseek/deepseek-r1',
+                    'name': 'DeepSeek R1 (Kostenlos)',
+                    'timeout': 60,
+                    'max_tokens': 2000,
+                    'description': 'Schnelles Test-Modell ohne Kosten',
+                    'supports_web_search': False,
+                    'is_free': True
+                },
+                'deepseek-chat': {
+                    'id': 'deepseek/deepseek-chat',
+                    'name': 'DeepSeek Chat',
+                    'timeout': 60,
+                    'max_tokens': 3000,
+                    'description': 'Verbessertes Chat-Modell',
+                    'supports_web_search': False,
+                    'is_free': False
+                }
+            }
+        }
+    }
+    
     # Länderspezifische Konfigurationen
     COUNTRY_CONFIGS = {
         'kanada': {
@@ -106,7 +141,14 @@ class Config:
                                     'asset retirement obligation', 'ARO', 'obligation de mise hors service',
                                     'environmental liability', 'passif environnemental', 
                                     'closure bond', 'garantie financière', 'financial assurance',
-                                    'provision for closure', 'provision pour fermeture']
+                                    'provision for closure', 'provision pour fermeture',
+                                    'decommissioning costs', 'site rehabilitation', 'mine closure provision',
+                                    'environmental bond', 'reclamation bond', 'security deposit',
+                                    'restoration provision', 'closure liability', 'post-closure costs',
+                                    'remediation costs', 'environmental obligations', 'closure reserve',
+                                    'rehabilitation provision', 'closure financial guarantee',
+                                    'coûts de déclassement', 'provision pour restauration',
+                                    'garantie de fermeture', 'obligations environnementales']
             },
             'priority_domains': ['mern.gouv.qc.ca', 'nrcan.gc.ca', 'gestim.quebec',
                                'mining.ca', 'sedar.com', 'tse.ca', 'gov.bc.ca']
@@ -128,7 +170,14 @@ class Config:
                                     'asset retirement obligation', 'ARO', 'obligation de mise hors service',
                                     'environmental liability', 'passif environnemental', 
                                     'closure bond', 'garantie financière', 'financial assurance',
-                                    'provision for closure', 'provision pour fermeture']
+                                    'provision for closure', 'provision pour fermeture',
+                                    'decommissioning costs', 'site rehabilitation', 'mine closure provision',
+                                    'environmental bond', 'reclamation bond', 'security deposit',
+                                    'restoration provision', 'closure liability', 'post-closure costs',
+                                    'remediation costs', 'environmental obligations', 'closure reserve',
+                                    'rehabilitation provision', 'closure financial guarantee',
+                                    'coûts de déclassement', 'provision pour restauration',
+                                    'garantie de fermeture', 'obligations environnementales']
             },
             'priority_domains': ['mern.gouv.qc.ca', 'nrcan.gc.ca', 'gestim.quebec',
                                'mining.ca', 'sedar.com', 'tse.ca', 'gov.bc.ca']
@@ -147,7 +196,14 @@ class Config:
                 'restoration_costs': ['restoration costs', 'closure costs', 'reclamation costs',
                                     'rehabilitation costs', 'asset retirement obligation', 'ARO',
                                     'environmental liability', 'closure bond', 'financial assurance',
-                                    'provision for closure', 'mine closure provision']
+                                    'provision for closure', 'mine closure provision',
+                                    'rehabilitation bond', 'environmental security deposit',
+                                    'mine rehabilitation fund', 'closure assurance', 'decommissioning provision',
+                                    'rehabilitation liability', 'environmental rehabilitation obligation',
+                                    'closure cost estimate', 'post-mining land use', 'rehabilitation guarantee',
+                                    'environmental performance bond', 'mine closure liability',
+                                    'progressive rehabilitation', 'final rehabilitation costs',
+                                    'care and maintenance costs', 'ongoing monitoring costs']
             },
             'priority_domains': ['ga.gov.au', 'dmp.wa.gov.au', 'sarig.sa.gov.au', 
                                'minedex.dmirs.wa.gov.au', 'asx.com.au']
@@ -166,7 +222,14 @@ class Config:
                 'restoration_costs': ['restoration costs', 'closure costs', 'reclamation costs',
                                     'rehabilitation costs', 'asset retirement obligation', 'ARO',
                                     'environmental liability', 'closure bond', 'financial assurance',
-                                    'provision for closure', 'mine closure provision']
+                                    'provision for closure', 'mine closure provision',
+                                    'rehabilitation bond', 'environmental security deposit',
+                                    'mine rehabilitation fund', 'closure assurance', 'decommissioning provision',
+                                    'rehabilitation liability', 'environmental rehabilitation obligation',
+                                    'closure cost estimate', 'post-mining land use', 'rehabilitation guarantee',
+                                    'environmental performance bond', 'mine closure liability',
+                                    'progressive rehabilitation', 'final rehabilitation costs',
+                                    'care and maintenance costs', 'ongoing monitoring costs']
             },
             'priority_domains': ['ga.gov.au', 'dmp.wa.gov.au', 'sarig.sa.gov.au', 
                                'minedex.dmirs.wa.gov.au', 'asx.com.au']
@@ -184,7 +247,15 @@ class Config:
                 'restoration_costs': ['biaya reklamasi', 'biaya penutupan tambang', 'restoration costs',
                                     'jaminan reklamasi', 'dana jaminan', 'closure costs',
                                     'kewajiban lingkungan', 'environmental liability',
-                                    'provisi penutupan tambang', 'closure provision']
+                                    'provisi penutupan tambang', 'closure provision',
+                                    'biaya rehabilitasi', 'dana cadangan reklamasi',
+                                    'jaminan pasca tambang', 'biaya pemulihan lingkungan',
+                                    'kewajiban reklamasi', 'dana jaminan lingkungan',
+                                    'biaya pengelolaan pasca tambang', 'jaminan kinerja lingkungan',
+                                    'cadangan biaya penutupan', 'kewajiban rehabilitasi',
+                                    'biaya revegetasi', 'dana pemulihan lahan',
+                                    'post-mining obligation', 'environmental bond',
+                                    'rehabilitation fund', 'closure financial guarantee']
             },
             'priority_domains': ['esdm.go.id', 'minerba.esdm.go.id', 'modi.esdm.go.id',
                                'idx.co.id', 'ptba.co.id', 'antam.com']
@@ -202,7 +273,15 @@ class Config:
                 'restoration_costs': ['biaya reklamasi', 'biaya penutupan tambang', 'restoration costs',
                                     'jaminan reklamasi', 'dana jaminan', 'closure costs',
                                     'kewajiban lingkungan', 'environmental liability',
-                                    'provisi penutupan tambang', 'closure provision']
+                                    'provisi penutupan tambang', 'closure provision',
+                                    'biaya rehabilitasi', 'dana cadangan reklamasi',
+                                    'jaminan pasca tambang', 'biaya pemulihan lingkungan',
+                                    'kewajiban reklamasi', 'dana jaminan lingkungan',
+                                    'biaya pengelolaan pasca tambang', 'jaminan kinerja lingkungan',
+                                    'cadangan biaya penutupan', 'kewajiban rehabilitasi',
+                                    'biaya revegetasi', 'dana pemulihan lahan',
+                                    'post-mining obligation', 'environmental bond',
+                                    'rehabilitation fund', 'closure financial guarantee']
             },
             'priority_domains': ['esdm.go.id', 'minerba.esdm.go.id', 'modi.esdm.go.id',
                                'idx.co.id', 'ptba.co.id', 'antam.com']
@@ -220,7 +299,15 @@ class Config:
                 'restoration_costs': ['costos de cierre', 'costos de restauración', 'closure costs',
                                     'pasivos ambientales', 'provisión de cierre', 'garantías financieras',
                                     'plan de cierre de minas', 'obligaciones de cierre',
-                                    'fondos de garantía', 'environmental liability']
+                                    'fondos de garantía', 'environmental liability',
+                                    'costos de remediación', 'garantía ambiental',
+                                    'fianza de cierre', 'provisión para cierre de mina',
+                                    'costos post-cierre', 'obligaciones ambientales',
+                                    'carta fianza', 'seguro ambiental',
+                                    'costos de rehabilitación', 'pasivos de cierre',
+                                    'garantía de cumplimiento', 'fondo de cierre',
+                                    'costos de desmantelamiento', 'provisión ambiental',
+                                    'obligaciones de remediación', 'costos de abandono']
             },
             'priority_domains': ['ingemmet.gob.pe', 'minem.gob.pe', 'osinergmin.gob.pe',
                                'smv.gob.pe', 'bvl.com.pe']
@@ -238,7 +325,16 @@ class Config:
                 'restoration_costs': ['costos de cierre', 'costos de restauración', 'closure costs',
                                     'pasivos ambientales', 'provisión de cierre', 'garantías financieras',
                                     'plan de cierre de faena', 'obligaciones ambientales',
-                                    'fondos de garantía', 'environmental liability']
+                                    'fondos de garantía', 'environmental liability',
+                                    'costos de remediación', 'garantía ambiental',
+                                    'póliza de seguro', 'provisión para cierre de faena minera',
+                                    'costos post-cierre', 'obligaciones de cierre',
+                                    'boleta de garantía', 'seguro ambiental',
+                                    'costos de rehabilitación', 'pasivos de cierre',
+                                    'garantía de cumplimiento', 'fondo de cierre',
+                                    'costos de desmantelamiento', 'provisión ambiental',
+                                    'obligaciones de remediación', 'costos de abandono',
+                                    'garantía de seriedad', 'costos de monitoreo post-cierre']
             },
             'priority_domains': ['sernageomin.cl', 'cochilco.cl', 'sonami.cl',
                                'cmfchile.cl', 'bolsadesantiago.com']
@@ -288,9 +384,31 @@ class Config:
     def validate(cls):
         """Validiere kritische Konfiguration beim Start"""
         errors = []
+        warnings = []
         
-        if not cls.PERPLEXITY_API_KEY:
-            errors.append("PERPLEXITY_API_KEY nicht gesetzt")
+        # ÄNDERUNG 02.07.2025: Multi-Provider Validierung
+        providers_configured = False
+        
+        if cls.PROVIDERS.get('perplexity', {}).get('enabled'):
+            if not cls.PERPLEXITY_API_KEY:
+                warnings.append("PERPLEXITY_API_KEY nicht gesetzt - Perplexity Provider deaktiviert")
+                cls.PROVIDERS['perplexity']['enabled'] = False
+            else:
+                providers_configured = True
+        
+        if cls.PROVIDERS.get('openrouter', {}).get('enabled'):
+            if not cls.OPENROUTER_API_KEY:
+                warnings.append("OPENROUTER_API_KEY nicht gesetzt - OpenRouter Provider deaktiviert")
+                cls.PROVIDERS['openrouter']['enabled'] = False
+            else:
+                providers_configured = True
+        
+        if not providers_configured:
+            errors.append("Kein Provider konfiguriert - mindestens ein API-Key muss gesetzt sein")
+        
+        # Zeige Warnungen
+        for warning in warnings:
+            print(f"⚠️  WARNUNG: {warning}")
             
         if errors:
             raise ValueError(f"Konfigurationsfehler: {', '.join(errors)}")

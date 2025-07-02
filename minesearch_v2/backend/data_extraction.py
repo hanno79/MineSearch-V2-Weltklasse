@@ -157,7 +157,33 @@ class DataExtractor:
             # Zusätzliche flexible Patterns
             r'(?:Umwelt|Environmental).*?(?:Kosten|costs|liabilities).*?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?|million)?',
             r'\$\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?|million)?\s*(?:für|for)\s+(?:Restauration|Sanierung|restoration|closure)',
-            r'(?:Schätzung|estimate).*?(?:Restauration|Sanierung|closure).*?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?|million)?'
+            r'(?:Schätzung|estimate).*?(?:Restauration|Sanierung|closure).*?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?|million)?',
+            # ÄNDERUNG 02.07.2025: Neue erweiterte Patterns
+            # Spanische Patterns
+            r'costos?\s+de\s+cierre:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millones?)?\s*(?:USD|PEN|CLP)?',
+            r'pasivos?\s+ambientales?:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millones?)?\s*(?:USD|PEN|CLP)?',
+            r'provisión\s+(?:para\s+)?cierre:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millones?)?\s*(?:USD|PEN|CLP)?',
+            r'garantías?\s+(?:financieras?|ambientales?):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millones?)?\s*(?:USD|PEN|CLP)?',
+            # Indonesische Patterns
+            r'biaya\s+(?:reklamasi|rehabilitasi|penutupan):\s*(?:Rp|IDR|USD)?\s*([\d,]+(?:\.\d+)?)\s*(?:miliar|juta)?',
+            r'jaminan\s+(?:reklamasi|lingkungan):\s*(?:Rp|IDR|USD)?\s*([\d,]+(?:\.\d+)?)\s*(?:miliar|juta)?',
+            r'dana\s+(?:cadangan|jaminan)\s+reklamasi:\s*(?:Rp|IDR|USD)?\s*([\d,]+(?:\.\d+)?)\s*(?:miliar|juta)?',
+            # Tabellarische Darstellungen
+            r'(?:closure|restoration|ARO|rehabilitation)[\s\S]{0,50}?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million|M)?',
+            r'(?:environmental|closure)\s+(?:bond|security|guarantee)[\s\S]{0,30}?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million|M)?',
+            # Footnote/Note Patterns
+            r'Note\s+\d+[\s\S]{0,200}?(?:closure|restoration|ARO)[\s\S]{0,100}?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million)?',
+            # Multi-line Patterns für komplexe Darstellungen
+            r'(?:closure|restoration)\s+(?:costs?|provision|liability)[\s\n\r]{0,20}?\$?\s*([\d,]+(?:\.\d+)?)',
+            # Patterns mit Währungszeichen am Ende
+            r'([\d,]+(?:\.\d+)?)\s*(?:million|millones?|miliar)?\s*(?:USD|CAD|AUD|PEN|CLP|IDR)\s+(?:for\s+)?(?:closure|restoration|rehabilitation)',
+            # Decommissioning und andere Varianten
+            r'(?:decommissioning|abandonment|post-mining)\s+(?:costs?|obligations?):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million)?',
+            r'(?:mine\s+)?(?:closure|rehabilitation)\s+(?:provision|reserve|fund):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million)?',
+            # Progressive/Final rehabilitation
+            r'(?:progressive|final)\s+rehabilitation\s+(?:costs?|provision):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million)?',
+            # Care and maintenance
+            r'care\s+and\s+maintenance\s+(?:costs?|provision):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million)?'
         ]
     
     def extract_structured_data(self, content: str, mine_name: str, country: Optional[str] = None) -> Dict[str, str]:

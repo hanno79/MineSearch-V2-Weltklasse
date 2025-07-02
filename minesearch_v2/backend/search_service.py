@@ -15,6 +15,8 @@ from utils import normalize_accents, generate_name_variants, generate_multilingu
 from data_extraction import extract_structured_data_with_sources
 from source_discovery import extract_sources_from_content
 from enhanced_source_discovery import EnhancedSourceDiscovery
+from providers.registry import provider_registry
+from providers.base_provider import SearchResult
 
 # ÄNDERUNG 30.06.2025: Strukturiertes Logging implementiert (Regel 16)
 logger = logging.getLogger(__name__)
@@ -22,12 +24,17 @@ logger = logging.getLogger(__name__)
 # ÄNDERUNG 01.07.2025: CSV_COLUMNS aus config.py importiert
 
 class MineSearchService:
-    """Service-Klasse für Mining-Suchen über Perplexity API"""
+    """Service-Klasse für Mining-Suchen über verschiedene Provider"""
     
     def __init__(self):
+        # ÄNDERUNG 02.07.2025: Provider-basierte Architektur
+        provider_registry.initialize(config.PROVIDERS)
+        self.registry = provider_registry
+        self.enhanced_discovery = EnhancedSourceDiscovery()  # ÄNDERUNG 01.07.2025: Enhanced Source Discovery
+        
+        # Legacy Support für direkte Perplexity-Nutzung
         self.api_key = config.PERPLEXITY_API_KEY
         self.api_url = "https://api.perplexity.ai/chat/completions"
-        self.enhanced_discovery = EnhancedSourceDiscovery()  # ÄNDERUNG 01.07.2025: Enhanced Source Discovery
         
     async def search_mine(self, mine_name: str, country: Optional[str] = None, 
                          commodity: Optional[str] = None, model: str = "sonar-pro",
@@ -82,8 +89,9 @@ class MineSearchService:
             
             # ÄNDERUNG 01.07.2025: Verwende Enhanced Prompt mit discovered sources
             if discovered_sources:
+                # ÄNDERUNG 02.07.2025: Erhöhtes Limit für mehr Quellennutzung
                 search_query = self.enhanced_discovery.build_enhanced_prompt(
-                    mine_name, discovered_sources, max_sources=15
+                    mine_name, discovered_sources, max_sources=25
                 )
                 # Füge Standard-Suchbegriffe hinzu
                 standard_query = self._build_search_query(
@@ -180,10 +188,17 @@ class MineSearchService:
                 data_quality = processed_result['data'].get('data_quality', {})
                 sources = processed_result['data'].get('sources', [])
                 
+                # ÄNDERUNG 02.07.2025: Aggressivere Two-Phase Aktivierung
                 # Prüfe ob Two-Phase automatisch aktiviert werden sollte
+                restoration_missing = (
+                    'Restaurationskosten' in data_quality.get('missing_critical_fields', []) or
+                    not processed_result['data'].get('structured_data', {}).get('Restaurationskosten') or
+                    processed_result['data'].get('structured_data', {}).get('Restaurationskosten') == '-'
+                )
+                
                 should_activate_two_phase = (
-                    data_quality.get('completeness_percentage', 0) < 40 or  # Weniger als 40% Daten
-                    'Restaurationskosten' in data_quality.get('missing_critical_fields', []) or  # Keine Restaurationskosten
+                    restoration_missing or  # Fehlende Restaurationskosten = IMMER Two-Phase
+                    data_quality.get('completeness_percentage', 0) < 30 or  # Weniger als 30% Daten (gesenkt von 40%)
                     len(sources) < 3  # Weniger als 3 Quellen
                 )
                 
@@ -287,6 +302,10 @@ class MineSearchService:
         query += f"Außerdem: Betreiber, exakte Koordinaten, Rohstoffe, Produktionsdaten, Aktivitätsstatus, Fläche in km². "
         query += f"KRITISCH: Suche in verschiedenen Quellen: Regierungsdatenbanken, SEDAR, NI 43-101 Reports, Annual Reports mit ARO Sections, Closure Plans. "
         query += f"Suche auch in: {', '.join(Config.PRIORITY_MINING_DOMAINS['tier1'][:5])}. "
+        # ÄNDERUNG 02.07.2025: Explizite PDF und Deep-Link Anweisungen
+        query += f"WICHTIG: Wenn du PDF-Links findest, lade sie herunter und analysiere den Inhalt! "
+        query += f"Durchsuche auch Unterseiten wie /investor-relations/, /sustainability/, /environmental/, /reports/. "
+        query += f"Suche in Annual Reports speziell in: MD&A Section, Notes to Financial Statements, Environmental Liabilities. "
         query += f"Gib für JEDE Information die genaue Quelle mit URL an!"
         return query
     
@@ -298,6 +317,9 @@ class MineSearchService:
         query += f"6) Produktionsdaten. "
         query += f"ZUSÄTZLICH: Prüfe offizielle Mining-Datenbanken und Regierungsportale. "
         query += f"Suche nach NI 43-101 Reports und Annual Reports. "
+        # ÄNDERUNG 02.07.2025: Verbesserte Anweisungen für PDF-Analyse
+        query += f"WICHTIG: Analysiere gefundene PDFs und extrahiere Finanzdaten daraus. "
+        query += f"Prüfe auch Unterseiten der Hauptdomains für weitere Informationen. "
         query += f"Strukturiere die Antwort klar mit Überschriften und gib für jede Information die Quelle an."
         return query
     
@@ -370,6 +392,7 @@ class MineSearchService:
     
     def _get_system_prompt(self) -> str:
         """Gibt den System-Prompt für Perplexity zurück"""
+        # ÄNDERUNG 02.07.2025: Verbesserter System-Prompt mit mehrsprachigen Hinweisen
         currency = "USD"  # Default, wird überschrieben durch spezifische Anfrage
         
         return f"""Du bist ein Mining-Recherche-Experte. Antworte auf Deutsch mit STRUKTURIERTEN DATEN im folgenden Format:
@@ -389,6 +412,11 @@ class MineSearchService:
 - Fördermenge: [Menge/Jahr mit Einheit] [Quelle: URL/Dokument]
 - Fläche: [in km²] [Quelle: URL/Dokument]
 - Restaurationskosten: [Betrag in {currency}$ mit Jahr] [Quelle: URL/Dokument]
+
+**WICHTIG FÜR RESTAURATIONSKOSTEN:**
+Suche nach: ARO, closure costs, environmental liability, restoration provision, rehabilitation costs, 
+decommissioning costs, closure bond, financial assurance, pasivos ambientales, costos de cierre,
+biaya reklamasi, jaminan reklamasi. Gib ALLE gefundenen Beträge an, auch wenn in verschiedenen Währungen!
 
 **QUELLEN-SEKTION:**
 [Liste ALLE verwendeten Quellen nummeriert auf]
@@ -566,8 +594,8 @@ class MineSearchService:
             return phase1_result
         
         # ÄNDERUNG 01.07.2025: Phase 2 mit gezielten Perplexity-Suchen
-        # ÄNDERUNG 02.07.2025: Reduziere auf max 3 Quellen für Performance
-        max_phase2_sources = 3 if _from_auto else 5  # Weniger bei Auto-Two-Phase
+        # ÄNDERUNG 02.07.2025: Erhöhte Limits für bessere Abdeckung
+        max_phase2_sources = 5 if _from_auto else 10  # Erhöht von 3/5 auf 5/10
         logger.info(f"Phase 2 - Gezielte Suchen für Top {len(valid_sources[:max_phase2_sources])} Quellen")
         
         phase2_results = []
