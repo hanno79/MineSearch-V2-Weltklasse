@@ -166,45 +166,69 @@ class SearchSession:
 
 
 class SourceRegistry:
-    """In-Memory Source Registry (später durch Datenbank ersetzen)"""
+    """Source Registry mit Datenbank-Backend"""
     
     def __init__(self):
-        self.sources: Dict[str, SourceRecord] = {}
-        self.sessions: Dict[str, SearchSession] = {}
+        # Import hier um zirkuläre Imports zu vermeiden
+        from database import db_manager
+        self.db = db_manager
+        self.sessions: Dict[str, SearchSession] = {}  # Sessions bleiben in-memory
     
     def add_source(self, source: SourceRecord):
         """Füge Quelle zur Registry hinzu"""
-        self.sources[source.url] = source
+        # Konvertiere SourceRecord zu DB-Eintrag
+        self.db.add_or_update_source(
+            url=source.url,
+            domain=source.domain,
+            country=source.country,
+            region=source.region,
+            source_type=source.source_type,
+            metadata=source.metadata
+        )
     
     def get_source(self, url: str) -> Optional[SourceRecord]:
         """Hole Quelle aus Registry"""
-        return self.sources.get(url)
+        from database import Source
+        with self.db.get_session() as session:
+            db_source = session.query(Source).filter_by(url=url).first()
+            if db_source:
+                return SourceRecord(
+                    url=db_source.url,
+                    domain=db_source.domain,
+                    country=db_source.country,
+                    region=db_source.region,
+                    source_type=db_source.source_type,
+                    reliability_score=db_source.reliability_score,
+                    last_successful_access=db_source.last_successful_access,
+                    last_attempted_access=db_source.last_attempted_access,
+                    total_searches=db_source.total_searches,
+                    successful_searches=db_source.successful_searches,
+                    typical_content_types=db_source.typical_content_types or [],
+                    metadata=db_source.extra_metadata or {}
+                )
+        return None
     
     def get_sources_for_country(self, country: str, min_reliability: float = 50.0) -> List[SourceRecord]:
         """Hole alle Quellen für ein Land mit Mindest-Zuverlässigkeit"""
-        return [
-            source for source in self.sources.values()
-            if source.country == country and source.reliability_score >= min_reliability
-        ]
+        db_sources = self.db.get_sources_for_search(country=country, min_reliability=min_reliability)
+        return self._convert_db_sources(db_sources)
     
     def get_sources_for_region(self, country: str, region: str, min_reliability: float = 50.0) -> List[SourceRecord]:
         """Hole alle Quellen für eine Region"""
-        return [
-            source for source in self.sources.values()
-            if source.country == country and source.region == region and source.reliability_score >= min_reliability
-        ]
+        db_sources = self.db.get_sources_for_search(
+            country=country, region=region, min_reliability=min_reliability
+        )
+        return self._convert_db_sources(db_sources)
     
     def get_top_sources(self, limit: int = 10, source_type: Optional[str] = None) -> List[SourceRecord]:
         """Hole Top-Quellen sortiert nach Zuverlässigkeit"""
-        sources = list(self.sources.values())
-        
-        if source_type:
-            sources = [s for s in sources if s.source_type == source_type]
-        
-        # Sortiere nach Reliability Score
-        sources.sort(key=lambda s: s.reliability_score, reverse=True)
-        
-        return sources[:limit]
+        from database import Source
+        with self.db.get_session() as session:
+            query = session.query(Source)
+            if source_type:
+                query = query.filter_by(source_type=source_type)
+            db_sources = query.order_by(Source.reliability_score.desc()).limit(limit).all()
+            return self._convert_db_sources(db_sources)
     
     def create_session(self, mine_name: str, country: Optional[str] = None, region: Optional[str] = None) -> SearchSession:
         """Erstelle neue Such-Session"""
@@ -223,31 +247,35 @@ class SourceRegistry:
         """Hole Session"""
         return self.sessions.get(session_id)
     
+    def _convert_db_sources(self, db_sources) -> List[SourceRecord]:
+        """Konvertiere DB Sources zu SourceRecord Objekten"""
+        records = []
+        for db_source in db_sources:
+            records.append(SourceRecord(
+                url=db_source.url,
+                domain=db_source.domain,
+                country=db_source.country,
+                region=db_source.region,
+                source_type=db_source.source_type,
+                reliability_score=db_source.reliability_score,
+                last_successful_access=db_source.last_successful_access,
+                last_attempted_access=db_source.last_attempted_access,
+                total_searches=db_source.total_searches,
+                successful_searches=db_source.successful_searches,
+                typical_content_types=db_source.typical_content_types or [],
+                metadata=db_source.extra_metadata or {}
+            ))
+        return records
+    
     def save_to_file(self, filepath: str):
-        """Speichere Registry in Datei (temporär bis DB implementiert)"""
-        data = {
-            "sources": {url: source.to_dict() for url, source in self.sources.items()},
-            "sessions": {sid: session.get_summary() for sid, session in self.sessions.items()}
-        }
-        
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        """Legacy Methode - Daten sind jetzt in DB"""
+        # Nicht mehr benötigt, aber für Kompatibilität behalten
+        pass
     
     def load_from_file(self, filepath: str):
-        """Lade Registry aus Datei"""
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            # Lade Quellen
-            for url, source_data in data.get("sources", {}).items():
-                self.sources[url] = SourceRecord.from_dict(source_data)
-            
-            # Sessions werden nicht geladen (nur aktuelle Session relevant)
-            
-        except FileNotFoundError:
-            # Keine gespeicherte Registry - starte leer
-            pass
+        """Legacy Methode - Daten sind jetzt in DB"""
+        # Nicht mehr benötigt, aber für Kompatibilität behalten
+        pass
 
 
 # Globale Registry-Instanz

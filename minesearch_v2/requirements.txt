@@ -12,6 +12,10 @@ python-multipart==0.0.9
 sqlalchemy==2.0.29
 aiosqlite==0.20.0
 
+# Web Scraping (für Enhanced Source Discovery)
+beautifulsoup4==4.12.3
+lxml==5.2.2
+
 # Optional fuer Entwicklung
 pytest==8.1.1
 pytest-asyncio==0.23.5

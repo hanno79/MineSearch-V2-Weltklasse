@@ -73,6 +73,11 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         discovered_sources.extend(registry_sources)
         logger.info(f"[ACTIVE DISCOVERY] {len(registry_sources)} Quellen aus Registry")
         
+        # 6. ÄNDERUNG 02.07.2025: Zusätzliche Quellen aus Datenbank
+        db_sources = self._get_database_sources(mine_name, country, region)
+        discovered_sources.extend(db_sources)
+        logger.info(f"[ACTIVE DISCOVERY] {len(db_sources)} Quellen aus Datenbank")
+        
         # Deduplizierung
         unique_sources = self._deduplicate_sources(discovered_sources)
         
@@ -248,6 +253,39 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         
         return sources
     
+    def _get_database_sources(self, mine_name: str, country: Optional[str], 
+                             region: Optional[str]) -> List[Dict[str, Any]]:
+        """
+        Hole zusätzliche Quellen aus der Datenbank
+        
+        ÄNDERUNG 02.07.2025: Nutze DB für bewährte Quellen
+        """
+        sources = []
+        
+        # Import hier um zirkuläre Imports zu vermeiden
+        from database import db_manager
+        
+        # Hole relevante Quellen aus DB
+        db_sources = db_manager.get_sources_for_search(
+            country=country,
+            region=region,
+            min_reliability=40.0,  # Mindestens 40% Zuverlässigkeit
+            limit=30  # Max 30 zusätzliche Quellen
+        )
+        
+        for db_source in db_sources:
+            sources.append({
+                'url': db_source.url,
+                'domain': db_source.domain,
+                'type': db_source.source_type or 'unknown',
+                'priority': 1 if db_source.reliability_score > 70 else 2,
+                'description': f"DB-Quelle (Score: {db_source.reliability_score:.0f}%, Suchen: {db_source.total_searches})",
+                'reliability_score': db_source.reliability_score,
+                'from_database': True  # Markierung für Tracking
+            })
+        
+        return sources
+    
     def _classify_domain(self, domain: str) -> str:
         """Klassifiziere Domain-Typ"""
         if any(gov in domain for gov in ['.gov', '.gouv', '.gob', '.go.']):
@@ -299,7 +337,7 @@ class EnhancedSourceDiscovery(SourceDiscovery):
             source_registry.add_source(source)
         
         # Update Zugriffstatistiken
-        source.update_access(success, content_type)
+        source_registry.db.update_source_statistics(url, success, content_type)
         
         logger.info(f"[SOURCE TRACKING] {url}: {'Erfolg' if success else 'Fehlschlag'} (Score: {source.reliability_score:.0f}%)")
     

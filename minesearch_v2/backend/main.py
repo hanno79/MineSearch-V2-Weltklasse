@@ -5,7 +5,7 @@ Version: 2.0
 Beschreibung: MineSearch 2.0 - Radikal vereinfachtes Mining-Recherche-System
 """
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Response, Query
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Response, Query, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
@@ -125,6 +125,32 @@ async def search_mine(request: MineSearchRequest, model: str = "sonar-pro"):
             model=model,
             region=request.region
         )
+        
+        # ÄNDERUNG 02.07.2025: Speichere erfolgreiches Ergebnis in DB
+        if result.get('success') and result.get('data'):
+            try:
+                from database import db_manager
+                search_duration = result.get('data', {}).get('search_duration')
+                
+                db_manager.save_search_result({
+                    'mine_name': request.mine_name,
+                    'country': request.country,
+                    'region': request.region,
+                    'commodity': request.commodity,
+                    'model_used': model,
+                    'search_type': 'standard',
+                    'search_duration': search_duration,
+                    'structured_data': result['data'].get('structured_data'),
+                    'structured_data_with_sources': result['data'].get('structured_data_with_sources'),
+                    'sources': result['data'].get('sources'),
+                    'source_index': result['data'].get('source_index'),
+                    'data_quality': result['data'].get('data_quality'),
+                    'source_discovery_session': result['data'].get('source_discovery_session'),
+                    'success': True
+                })
+            except Exception as e:
+                logger.error(f"Fehler beim Speichern des Ergebnisses: {str(e)}")
+        
         return MineSearchResponse(**result)
     except ValueError as e:
         logger.error(f"Fehler bei der Suche: {str(e)}")
@@ -189,10 +215,36 @@ async def batch_search(
                     result = await search_mine(request, model=model)
                 
                 if result.success:
-                    results.append({
+                    result_data = {
                         'mine': mine,
                         'data': result.data
-                    })
+                    }
+                    results.append(result_data)
+                    
+                    # ÄNDERUNG 02.07.2025: Speichere Batch-Ergebnisse mit Session-ID
+                    try:
+                        from database import db_manager
+                        search_duration = result.data.get('search_duration')
+                        
+                        db_manager.save_search_result({
+                            'session_id': session_id,  # Für Gruppierung
+                            'mine_name': mine['mine_name'],
+                            'country': mine.get('country'),
+                            'region': mine.get('region'),
+                            'commodity': mine.get('commodity'),
+                            'model_used': model,
+                            'search_type': search_type,
+                            'search_duration': search_duration,
+                            'structured_data': result.data.get('structured_data'),
+                            'structured_data_with_sources': result.data.get('structured_data_with_sources'),
+                            'sources': result.data.get('sources'),
+                            'source_index': result.data.get('source_index'),
+                            'data_quality': result.data.get('data_quality'),
+                            'source_discovery_session': result.data.get('source_discovery_session'),
+                            'success': True
+                        })
+                    except Exception as e:
+                        logger.error(f"Fehler beim Speichern des Batch-Ergebnisses: {str(e)}")
                 else:
                     errors.append({
                         'mine': mine,
@@ -271,6 +323,32 @@ async def enhanced_search(request: MineSearchRequest, model: str = Query("sonar-
             model=model,
             region=request.region
         )
+        
+        # ÄNDERUNG 02.07.2025: Speichere auch Enhanced-Ergebnisse
+        if result.get('success') and result.get('data'):
+            try:
+                from database import db_manager
+                search_duration = result.get('data', {}).get('search_duration')
+                
+                db_manager.save_search_result({
+                    'mine_name': request.mine_name,
+                    'country': request.country,
+                    'region': request.region,
+                    'commodity': request.commodity,
+                    'model_used': model,
+                    'search_type': 'enhanced',
+                    'search_duration': search_duration,
+                    'structured_data': result['data'].get('structured_data'),
+                    'structured_data_with_sources': result['data'].get('structured_data_with_sources'),
+                    'sources': result['data'].get('sources'),
+                    'source_index': result['data'].get('source_index'),
+                    'data_quality': result['data'].get('data_quality'),
+                    'source_discovery_session': result['data'].get('source_discovery_session'),
+                    'success': True
+                })
+            except Exception as e:
+                logger.error(f"Fehler beim Speichern des Enhanced-Ergebnisses: {str(e)}")
+        
         return MineSearchResponse(**result)
     except Exception as e:
         logger.error(f"Fehler bei erweiterter Suche: {str(e)}")
@@ -332,6 +410,46 @@ async def lifespan(app: FastAPI):
     try:
         config.validate()
         logger.info("Konfiguration validiert - alle Systeme bereit")
+        
+        # ÄNDERUNG 02.07.2025: API-Key Validierung beim Start
+        if config.PERPLEXITY_API_KEY:
+            logger.info("🔑 Prüfe Perplexity API-Key...")
+            async with httpx.AsyncClient() as client:
+                try:
+                    response = await client.post(
+                        "https://api.perplexity.ai/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {config.PERPLEXITY_API_KEY}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": "llama-3.1-sonar-small-128k-online",
+                            "messages": [{"role": "user", "content": "test"}],
+                            "max_tokens": 1
+                        },
+                        timeout=5.0
+                    )
+                    
+                    if response.status_code == 200:
+                        logger.info("✅ Perplexity API-Key ist gültig und funktionsfähig")
+                    elif response.status_code == 401:
+                        response_text = response.text.lower()
+                        if "quota" in response_text or "budget" in response_text:
+                            logger.warning("⚠️ Perplexity API-Key ist gültig, aber das Budget ist aufgebraucht!")
+                            logger.warning("→ Bitte laden Sie Ihr Guthaben auf: https://www.perplexity.ai/settings/api")
+                        else:
+                            logger.error("❌ Perplexity API-Key ist ungültig oder abgelaufen!")
+                            logger.error("→ Bitte prüfen Sie Ihre .env Datei")
+                    else:
+                        logger.warning(f"⚠️ Unerwartete API-Antwort: {response.status_code}")
+                        
+                except httpx.TimeoutException:
+                    logger.warning("⚠️ API-Validierung Timeout - Perplexity API möglicherweise nicht erreichbar")
+                except Exception as e:
+                    logger.warning(f"⚠️ API-Validierung fehlgeschlagen: {str(e)}")
+        else:
+            logger.warning("⚠️ Kein Perplexity API-Key konfiguriert!")
+            
     except ValueError as e:
         logger.error(f"Konfigurationsfehler: {e}")
         logger.warning("System startet trotzdem - bitte Konfiguration prüfen!")
@@ -406,6 +524,189 @@ async def smart_search(request: MineSearchRequest, auto_upgrade: bool = True):
         phase1_result.data['recommendation'] = "Empfehlung: Verwenden Sie die erweiterte Suche oder Deep Research für bessere Ergebnisse"
     
     return phase1_result
+
+# ÄNDERUNG 02.07.2025: API-Endpoints für Quellen-Datenbank
+@app.get("/api/sources")
+async def get_sources(
+    country: Optional[str] = Query(None),
+    region: Optional[str] = Query(None),
+    source_type: Optional[str] = Query(None),
+    min_reliability: float = Query(30.0),
+    limit: int = Query(50),
+    offset: int = Query(0)
+):
+    """Hole Quellen aus der Datenbank mit Filteroptionen"""
+    from database import db_manager, Source
+    
+    with db_manager.get_session() as session:
+        query = session.query(Source).filter(Source.reliability_score >= min_reliability)
+        
+        if country:
+            query = query.filter((Source.country == country) | (Source.country.is_(None)))
+        if region and country:
+            query = query.filter((Source.region == region) | (Source.region.is_(None)))
+        if source_type:
+            query = query.filter_by(source_type=source_type)
+        
+        # Total count für Pagination
+        total = query.count()
+        
+        # Hole Quellen mit Pagination
+        sources = query.order_by(
+            Source.reliability_score.desc()
+        ).offset(offset).limit(limit).all()
+        
+        return {
+            "success": True,
+            "data": {
+                "sources": [source.to_dict() for source in sources],
+                "total": total,
+                "limit": limit,
+                "offset": offset
+            }
+        }
+
+@app.get("/api/sources/stats")
+async def get_source_statistics():
+    """Hole Statistiken über die Quellen-Datenbank"""
+    from database import db_manager
+    
+    stats = db_manager.get_statistics()
+    return {
+        "success": True,
+        "data": stats
+    }
+
+@app.get("/api/sources/{source_id}")
+async def get_source_by_id(source_id: int):
+    """Hole einzelne Quelle nach ID"""
+    from database import db_manager, Source
+    
+    with db_manager.get_session() as session:
+        source = session.query(Source).filter_by(id=source_id).first()
+        if not source:
+            raise HTTPException(status_code=404, detail="Quelle nicht gefunden")
+        
+        return {
+            "success": True,
+            "data": source.to_dict()
+        }
+
+@app.post("/api/sources/search")
+async def search_sources_for_mine(
+    mine_name: str = Body(...),
+    country: Optional[str] = Body(None),
+    region: Optional[str] = Body(None)
+):
+    """Suche relevante Quellen für eine spezifische Mine"""
+    from database import db_manager
+    
+    sources = db_manager.get_sources_for_search(
+        country=country,
+        region=region,
+        min_reliability=30.0,
+        limit=100
+    )
+    
+    return {
+        "success": True,
+        "data": {
+            "mine_name": mine_name,
+            "country": country,
+            "region": region,
+            "sources": [source.to_dict() for source in sources],
+            "total": len(sources)
+        }
+    }
+
+# ÄNDERUNG 02.07.2025: API-Endpoints für Ergebnis-Datenbank
+@app.get("/api/results")
+async def get_results(
+    mine_name: Optional[str] = Query(None),
+    country: Optional[str] = Query(None),
+    session_id: Optional[str] = Query(None),
+    days_back: int = Query(30),
+    limit: int = Query(50),
+    offset: int = Query(0)
+):
+    """Hole gespeicherte Suchergebnisse mit Filtern"""
+    from database import db_manager
+    
+    results = db_manager.get_search_results(
+        limit=limit,
+        offset=offset,
+        mine_name=mine_name,
+        country=country,
+        session_id=session_id,
+        days_back=days_back
+    )
+    
+    # Total count für Pagination
+    total = len(db_manager.get_search_results(limit=1000, days_back=days_back))
+    
+    return {
+        "success": True,
+        "data": {
+            "results": [r.to_dict() for r in results],
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }
+    }
+
+@app.get("/api/results/stats")
+async def get_result_statistics():
+    """Hole Statistiken über gespeicherte Ergebnisse"""
+    from database import db_manager
+    
+    stats = db_manager.get_result_statistics()
+    return {
+        "success": True,
+        "data": stats
+    }
+
+@app.get("/api/results/sessions")
+async def get_result_sessions(limit: int = Query(20)):
+    """Hole gruppierte Such-Sessions"""
+    from database import db_manager
+    
+    sessions = db_manager.get_sessions(limit=limit)
+    return {
+        "success": True,
+        "data": sessions
+    }
+
+@app.get("/api/results/{result_id}")
+async def get_result_by_id(result_id: int):
+    """Hole einzelnes Suchergebnis nach ID"""
+    from database import db_manager
+    
+    result = db_manager.get_search_result_by_id(result_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Ergebnis nicht gefunden")
+    
+    return {
+        "success": True,
+        "data": result.to_dict()
+    }
+
+@app.delete("/api/results/{result_id}")
+async def delete_result(result_id: int):
+    """Lösche einzelnes Suchergebnis"""
+    from database import db_manager
+    
+    with db_manager.get_session() as session:
+        result = session.query(db_manager.SearchResult).filter_by(id=result_id).first()
+        if not result:
+            raise HTTPException(status_code=404, detail="Ergebnis nicht gefunden")
+        
+        session.delete(result)
+        session.commit()
+    
+    return {
+        "success": True,
+        "message": f"Ergebnis {result_id} gelöscht"
+    }
 
 if __name__ == "__main__":
     import uvicorn

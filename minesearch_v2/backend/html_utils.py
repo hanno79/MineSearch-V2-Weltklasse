@@ -181,12 +181,76 @@ def create_error_card(error: Dict) -> str:
     """Erstelle HTML für einen Fehler"""
     mine = error['mine']
     err = error['error']
-    return f"""
+    
+    # ÄNDERUNG 02.07.2025: Verbesserte Fehlerdarstellung mit Lösungshinweisen
+    error_html = f"""
     <div class="result-card error">
         <h4>❌ {mine['mine_name']}</h4>
-        <p>Fehler: {err}</p>
-    </div>
     """
+    
+    # Spezielle Behandlung für API-Fehler
+    if "🔐" in err or "💳" in err or "🔑" in err:
+        # Formatiere mehrzeilige Fehlermeldungen besser
+        error_lines = err.split('\n')
+        error_html += "<div style='background: #fee; padding: 15px; border-radius: 5px; margin: 10px 0;'>"
+        
+        for line in error_lines:
+            if line.strip():
+                if "→" in line:
+                    # Lösungshinweise hervorheben
+                    error_html += f"<p style='margin: 5px 0; padding-left: 20px; color: #666;'>➜ {line.replace('→', '').strip()}</p>"
+                elif "http" in line:
+                    # Links klickbar machen
+                    url_match = line.split()[-1] if line.split() else ""
+                    if url_match.startswith('http'):
+                        error_html += f"<p style='margin: 10px 0;'><a href='{url_match}' target='_blank' style='color: #0066cc; text-decoration: underline;'>🔗 {url_match}</a></p>"
+                    else:
+                        error_html += f"<p style='margin: 5px 0;'>{line}</p>"
+                elif any(emoji in line for emoji in ['🔐', '💳', '🔑', '⏱️', '🔧', '❓']):
+                    # Zeilen mit Emojis hervorheben
+                    error_html += f"<p style='margin: 8px 0; font-weight: bold; color: #d32f2f;'>{line}</p>"
+                else:
+                    # Normale Zeilen
+                    error_html += f"<p style='margin: 5px 0;'>{line}</p>"
+        
+        error_html += "</div>"
+        
+        # Zusätzliche Hilfe-Box je nach Fehlertyp
+        if "Budget" in err or "aufgebraucht" in err or "💳" in err:
+            error_html += """
+            <div style='background: #fff3cd; padding: 12px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #ffc107;'>
+                <strong>💡 Schnelle Lösung:</strong>
+                <ol style='margin: 5px 0 0 20px;'>
+                    <li>Öffnen Sie <a href='https://www.perplexity.ai/settings/api' target='_blank'>Perplexity API Settings</a></li>
+                    <li>Laden Sie Ihr API-Guthaben auf</li>
+                    <li>Starten Sie die Suche erneut</li>
+                </ol>
+            </div>
+            """
+        elif "ungültig" in err or "abgelaufen" in err or "🔑" in err:
+            error_html += """
+            <div style='background: #fff3cd; padding: 12px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #ffc107;'>
+                <strong>💡 Schnelle Lösung:</strong>
+                <ol style='margin: 5px 0 0 20px;'>
+                    <li>Generieren Sie einen neuen API-Key: <a href='https://www.perplexity.ai/settings/api' target='_blank'>Perplexity API</a></li>
+                    <li>Ersetzen Sie den Key in der .env Datei</li>
+                    <li>Starten Sie den Server neu</li>
+                </ol>
+            </div>
+            """
+        elif "Rate Limit" in err or "⏱️" in err:
+            error_html += """
+            <div style='background: #e3f2fd; padding: 12px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #2196f3;'>
+                <strong>ℹ️ Info:</strong> Das API-Limit wurde temporär erreicht. 
+                Die Suche wird automatisch in wenigen Minuten wieder funktionieren.
+            </div>
+            """
+    else:
+        # Standard-Fehlerbehandlung
+        error_html += f"<p style='padding: 10px; background: #fee; border-radius: 5px;'>Fehler: {err}</p>"
+    
+    error_html += "</div>"
+    return error_html
 
 def create_batch_results_table(results: List[Dict]) -> str:
     """Erstelle HTML-Tabelle für Batch-Ergebnisse"""

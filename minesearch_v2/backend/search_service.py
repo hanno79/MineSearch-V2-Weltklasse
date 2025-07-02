@@ -31,7 +31,7 @@ class MineSearchService:
         
     async def search_mine(self, mine_name: str, country: Optional[str] = None, 
                          commodity: Optional[str] = None, model: str = "sonar-pro",
-                         region: Optional[str] = None) -> Dict[str, Any]:
+                         region: Optional[str] = None, _is_auto_enhanced: bool = False) -> Dict[str, Any]:
         """
         Hauptsuchfunktion für Mining-Informationen
         
@@ -40,6 +40,7 @@ class MineSearchService:
             country: Land (optional)
             commodity: Rohstoff (optional)
             model: Perplexity-Modell
+            _is_auto_enhanced: INTERN - Verhindert Rekursion bei Auto-Two-Phase
             
         Returns:
             Dict mit Suchergebnissen
@@ -49,11 +50,14 @@ class MineSearchService:
             raise ValueError("API Key nicht konfiguriert")
         
         # ÄNDERUNG 01.07.2025: Active Source Discovery Phase
+        start_time = datetime.now()
+        logger.info(f"[SEARCH START] Mine: {mine_name}, Model: {model}, Auto-Enhanced: {_is_auto_enhanced}")
+        
         session = self.enhanced_discovery.start_session(mine_name, country, region)
         discovered_sources = self.enhanced_discovery.discover_sources_for_mine(
             mine_name, country, region, commodity
         )
-        logger.info(f"[ENHANCED SEARCH] {len(discovered_sources)} Quellen für {mine_name} entdeckt")
+        logger.info(f"[SOURCE DISCOVERY] {len(discovered_sources)} Quellen für {mine_name} entdeckt")
         
         # ÄNDERUNG 01.07.2025: API-Suche für strukturierte Daten
         api_results = {}
@@ -168,7 +172,11 @@ class MineSearchService:
                 )
             
             # ÄNDERUNG 01.07.2025: Automatische Two-Phase bei schlechten Ergebnissen
-            if model != "sonar-deep-research" and processed_result.get('success'):
+            # ÄNDERUNG 02.07.2025: Rekursionsschutz hinzugefügt
+            if (model != "sonar-deep-research" and 
+                processed_result.get('success') and 
+                not _is_auto_enhanced):  # Verhindere Rekursion!
+                
                 data_quality = processed_result['data'].get('data_quality', {})
                 sources = processed_result['data'].get('sources', [])
                 
@@ -180,9 +188,15 @@ class MineSearchService:
                 )
                 
                 if should_activate_two_phase:
-                    logger.info(f"[AUTO TWO-PHASE] Aktiviere automatische Two-Phase für {mine_name} (Qualität: {data_quality.get('completeness_percentage', 0)}%)")
-                    # Führe Two-Phase-Suche durch
-                    enhanced_result = await self.enhanced_search(mine_name, country, commodity, model, region)
+                    logger.warning(f"[AUTO TWO-PHASE] Aktiviere automatische Two-Phase für {mine_name} (Qualität: {data_quality.get('completeness_percentage', 0)}%)")
+                    logger.warning("[AUTO TWO-PHASE] WARNUNG: Dies kann die Suchzeit erheblich verlängern!")
+                    
+                    # Führe Two-Phase-Suche durch - MIT Rekursionsschutz
+                    enhanced_result = await self.enhanced_search(
+                        mine_name, country, commodity, model, region, 
+                        _from_auto=True  # Markiere als automatisch
+                    )
+                    
                     # Markiere als automatische Two-Phase
                     if enhanced_result.get('data'):
                         enhanced_result['data']['auto_two_phase'] = True
@@ -192,6 +206,13 @@ class MineSearchService:
                             'few_sources': len(sources) < 3
                         }
                     return enhanced_result
+            
+            # Zeittracking
+            search_duration = (datetime.now() - start_time).total_seconds()
+            if processed_result.get('data'):
+                processed_result['data']['search_duration'] = search_duration
+            
+            logger.info(f"[SEARCH COMPLETE] Mine: {mine_name}, Duration: {search_duration:.1f}s, Success: {processed_result.get('success', False)}")
             
             return processed_result
             
@@ -313,8 +334,37 @@ class MineSearchService:
             )
             
             if response.status_code != 200:
-                logger.error(f"[API ERROR] Status: {response.status_code}")
-                raise ValueError(f"API Fehler: {response.status_code} - {response.text}")
+                logger.error(f"[API ERROR] Status: {response.status_code}, Response: {response.text[:200]}")
+                
+                # ÄNDERUNG 02.07.2025: Benutzerfreundliche Fehlermeldungen für API-Fehler
+                if response.status_code == 401:
+                    error_msg = "🔐 Perplexity API Authentifizierung fehlgeschlagen.\n\n"
+                    response_text = response.text.lower()
+                    
+                    if "quota" in response_text or "budget" in response_text or "limit" in response_text:
+                        error_msg += "💳 Ihr API-Budget ist aufgebraucht.\n"
+                        error_msg += "→ Bitte prüfen Sie Ihr Perplexity-Konto und laden Sie Ihr Guthaben auf.\n"
+                    elif "invalid" in response_text or "unauthorized" in response_text:
+                        error_msg += "🔑 Der API-Key ist ungültig oder abgelaufen.\n"
+                        error_msg += "→ Bitte prüfen Sie Ihre .env Datei und generieren Sie ggf. einen neuen Key.\n"
+                    else:
+                        error_msg += "❓ Authentifizierungsproblem mit dem API-Key.\n"
+                    
+                    error_msg += "\n📍 API-Verwaltung: https://www.perplexity.ai/settings/api"
+                    raise ValueError(error_msg)
+                
+                elif response.status_code == 429:
+                    error_msg = "⏱️ Rate Limit erreicht.\n"
+                    error_msg += "→ Zu viele Anfragen. Bitte warten Sie einen Moment und versuchen Sie es erneut."
+                    raise ValueError(error_msg)
+                
+                elif response.status_code == 503:
+                    error_msg = "🔧 Perplexity API ist momentan nicht verfügbar.\n"
+                    error_msg += "→ Bitte versuchen Sie es in einigen Minuten erneut."
+                    raise ValueError(error_msg)
+                
+                else:
+                    raise ValueError(f"API Fehler: {response.status_code} - {response.text[:200]}")
             
             return response.json()
     
@@ -478,7 +528,7 @@ class MineSearchService:
     
     async def enhanced_search(self, mine_name: str, country: Optional[str] = None,
                             commodity: Optional[str] = None, model: str = "sonar-pro",
-                            region: Optional[str] = None) -> Dict[str, Any]:
+                            region: Optional[str] = None, _from_auto: bool = False) -> Dict[str, Any]:
         """
         Erweiterte Zwei-Phasen-Suche für umfangreichere Ergebnisse
         
@@ -486,11 +536,18 @@ class MineSearchService:
         Phase 2: Vertiefung basierend auf gefundenen Quellen
         
         ÄNDERUNG 01.07.2025: Aus main.py hierher verschoben
-        """
-        logger.info(f"Starte erweiterte Zwei-Phasen-Suche für: {mine_name} mit Modell: {model}")
+        ÄNDERUNG 02.07.2025: Rekursionsschutz hinzugefügt
         
-        # Phase 1: Initiale Suche
-        phase1_result = await self.search_mine(mine_name, country, commodity, model, region)
+        Args:
+            _from_auto: INTERN - True wenn von Auto-Two-Phase aufgerufen
+        """
+        logger.info(f"Starte erweiterte Zwei-Phasen-Suche für: {mine_name} mit Modell: {model} (from_auto={_from_auto})")
+        
+        # Phase 1: Initiale Suche - MIT Rekursionsschutz
+        phase1_result = await self.search_mine(
+            mine_name, country, commodity, model, region, 
+            _is_auto_enhanced=_from_auto  # Verhindere weitere Auto-Aktivierung!
+        )
         
         if not phase1_result.get('success') or not phase1_result.get('data'):
             return phase1_result
@@ -509,11 +566,13 @@ class MineSearchService:
             return phase1_result
         
         # ÄNDERUNG 01.07.2025: Phase 2 mit gezielten Perplexity-Suchen
-        logger.info(f"Phase 2 - Gezielte Suchen für Top {len(valid_sources[:5])} Quellen")
+        # ÄNDERUNG 02.07.2025: Reduziere auf max 3 Quellen für Performance
+        max_phase2_sources = 3 if _from_auto else 5  # Weniger bei Auto-Two-Phase
+        logger.info(f"Phase 2 - Gezielte Suchen für Top {len(valid_sources[:max_phase2_sources])} Quellen")
         
         phase2_results = []
-        for i, source in enumerate(valid_sources[:5]):  # Max 5 Quellen für Phase 2
-            logger.info(f"Phase 2 - Suche {i+1}/5: {source['type']} - {source['value'][:50]}...")
+        for i, source in enumerate(valid_sources[:max_phase2_sources]):
+            logger.info(f"Phase 2 - Suche {i+1}/{max_phase2_sources}: {source['type']} - {source['value'][:50]}...")
             
             # Erstelle spezifischen Prompt für diese Quelle
             source_prompt = f"""

@@ -133,6 +133,14 @@
                     <input type="radio" name="search_method" id="method_single" value="single">
                     <label for="method_single">🔎 Einzelne Mine suchen</label>
                 </div>
+                <div>
+                    <input type="radio" name="search_method" id="method_sources" value="sources">
+                    <label for="method_sources">📚 Quellen-Datenbank</label>
+                </div>
+                <div>
+                    <input type="radio" name="search_method" id="method_results" value="results">
+                    <label for="method_results">📊 Ergebnis-Datenbank</label>
+                </div>
             </section>
 
             <!-- CSV Upload Form -->
@@ -200,10 +208,129 @@
                 </form>
             </div>
 
+            <!-- Quellen-Datenbank -->
+            <div id="sources_form" class="search-form">
+                <h2>📚 Quellen-Datenbank</h2>
+                
+                <div class="sources-stats" id="sources-stats">
+                    <!-- Statistiken werden hier eingefügt -->
+                </div>
+                
+                <div class="sources-filters">
+                    <h3>Filter</h3>
+                    <form id="sources-filter-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="filter_country">Land</label>
+                                <select id="filter_country" name="country">
+                                    <option value="">Alle Länder</option>
+                                    <option value="Canada">Kanada</option>
+                                    <option value="Australia">Australien</option>
+                                    <option value="USA">USA</option>
+                                    <option value="Chile">Chile</option>
+                                    <option value="Peru">Peru</option>
+                                    <option value="Indonesia">Indonesien</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="filter_type">Quellentyp</label>
+                                <select id="filter_type" name="source_type">
+                                    <option value="">Alle Typen</option>
+                                    <option value="government">Regierung</option>
+                                    <option value="exchange">Börse</option>
+                                    <option value="industry">Industrie</option>
+                                    <option value="database">Datenbank</option>
+                                    <option value="document">Dokument</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="filter_reliability">Min. Zuverlässigkeit</label>
+                                <input type="number" id="filter_reliability" name="min_reliability" 
+                                       value="30" min="0" max="100" step="10">
+                            </div>
+                        </div>
+                        <button type="button" onclick="loadSources()" class="unified-search-button">
+                            Filter anwenden
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="sources-table-container" id="sources-table-container">
+                    <!-- Tabelle wird hier eingefügt -->
+                </div>
+            </div>
+            
+            <!-- ÄNDERUNG 02.07.2025: Ergebnis-Datenbank Form -->
+            <div id="results_form" class="search-form">
+                <h2>📊 Gespeicherte Suchergebnisse</h2>
+                
+                <!-- Statistiken -->
+                <div id="results-stats" class="sources-stats">
+                    <!-- Wird per JavaScript gefüllt -->
+                </div>
+                
+                <!-- Filter -->
+                <div class="sources-filters">
+                    <h3>Filter</h3>
+                    <form id="results-filter-form">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div class="form-group">
+                                <label for="filter_mine">Mine (Textsuche)</label>
+                                <input type="text" id="filter_mine" name="mine_name" 
+                                       placeholder="z.B. Grasberg">
+                            </div>
+                            <div class="form-group">
+                                <label for="filter_result_country">Land</label>
+                                <select id="filter_result_country" name="country">
+                                    <option value="">Alle Länder</option>
+                                    <option value="Canada">Kanada</option>
+                                    <option value="Australia">Australien</option>
+                                    <option value="USA">USA</option>
+                                    <option value="Indonesia">Indonesien</option>
+                                    <option value="Chile">Chile</option>
+                                    <option value="Peru">Peru</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="filter_days">Zeitraum</label>
+                                <select id="filter_days" name="days_back">
+                                    <option value="7">Letzte 7 Tage</option>
+                                    <option value="30" selected>Letzte 30 Tage</option>
+                                    <option value="90">Letzte 90 Tage</option>
+                                    <option value="365">Letztes Jahr</option>
+                                    <option value="9999">Alle</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="filter_session">Session</label>
+                                <select id="filter_session" name="session_id">
+                                    <option value="">Alle Sessions</option>
+                                    <!-- Wird dynamisch gefüllt -->
+                                </select>
+                            </div>
+                        </div>
+                        <button type="button" onclick="loadResults()" class="unified-search-button">
+                            Filter anwenden
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Ergebnistabelle -->
+                <div class="results-table-container" id="results-table-container">
+                    <!-- Tabelle wird hier eingefügt -->
+                </div>
+                
+                <!-- Detail-Ansicht (Modal-ähnlich) -->
+                <div id="result-detail-modal" style="display: none;">
+                    <!-- Details werden hier eingefügt -->
+                </div>
+            </div>
+
             <!-- Einheitlicher Ladeindikator -->
             <div id="loading" class="htmx-indicator">
                 <div class="spinner"></div>
-                <p id="loading-text">Suche läuft...</p>
+                <p id="loading-text" style="margin: 10px 0 5px 0; font-size: 16px;">Suche läuft...</p>
+                <p id="loading-timer" style="font-weight: bold; color: #2563eb; font-size: 20px; margin: 5px 0; display: block;">00:00</p>
             </div>
 
             <!-- Ergebnisbereich -->
@@ -218,15 +345,63 @@
     </div>
 
     <script>
-        // Modell-Warnung Handler
-        document.getElementById('search_model').addEventListener('change', function() {
-            const warning = document.getElementById('global-model-warning');
-            if (this.value === 'sonar-deep-research') {
-                warning.style.display = 'block';
-            } else {
-                warning.style.display = 'none';
+        // Warte bis DOM geladen ist
+        document.addEventListener('DOMContentLoaded', function() {
+            // Timer-Variablen
+            let searchTimerInterval = null;
+            let searchStartTime = null;
+            
+            // Timer-Funktionen
+            window.startSearchTimer = function() {
+                console.log('startSearchTimer aufgerufen');
+                // Timer zurücksetzen
+                stopSearchTimer();
+                searchStartTime = Date.now();
+                const timerElement = document.getElementById('loading-timer');
+                if (timerElement) {
+                    console.log('Timer-Element gefunden:', timerElement);
+                    timerElement.textContent = '00:00';
+                    timerElement.style.display = 'block';
+                    timerElement.style.visibility = 'visible';
+                } else {
+                    console.error('Timer-Element nicht gefunden!');
+                }
+                
+                // Timer starten
+                searchTimerInterval = setInterval(() => {
+                    const elapsed = Date.now() - searchStartTime;
+                    const minutes = Math.floor(elapsed / 60000);
+                    const seconds = Math.floor((elapsed % 60000) / 1000);
+                    const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    const timerElement = document.getElementById('loading-timer');
+                    if (timerElement) {
+                        timerElement.textContent = timeString;
+                        console.log('Timer aktualisiert:', timeString);
+                    }
+                }, 1000);
             }
-        });
+            
+            window.stopSearchTimer = function() {
+                if (searchTimerInterval) {
+                    clearInterval(searchTimerInterval);
+                    searchTimerInterval = null;
+                }
+            }
+            
+            // Modell-Warnung Handler
+            const searchModelElement = document.getElementById('search_model');
+            if (searchModelElement) {
+                searchModelElement.addEventListener('change', function() {
+                    const warning = document.getElementById('global-model-warning');
+                    if (warning) {
+                        if (this.value === 'sonar-deep-research') {
+                            warning.style.display = 'block';
+                        } else {
+                            warning.style.display = 'none';
+                        }
+                    }
+                });
+            }
 
         // Tab-Wechsel Handler
         document.querySelectorAll('input[name="search_method"]').forEach(radio => {
@@ -239,12 +414,24 @@
                 // Gewählte Form anzeigen
                 if (this.value === 'csv') {
                     document.getElementById('csv_form').classList.add('active');
-                } else {
+                } else if (this.value === 'single') {
                     document.getElementById('single_form').classList.add('active');
+                } else if (this.value === 'sources') {
+                    document.getElementById('sources_form').classList.add('active');
+                    // Lade Quellen wenn Tab gewählt wird
+                    loadSourcesStats();
+                    loadSources();
+                } else if (this.value === 'results') {
+                    document.getElementById('results_form').classList.add('active');
+                    // Lade Ergebnisse wenn Tab gewählt wird
+                    loadResultsStats();
+                    loadResults();
                 }
                 
-                // Ergebnisse löschen beim Wechsel
-                document.getElementById('results').innerHTML = '';
+                // ÄNDERUNG 02.07.2025: Ergebnisse nur bei Such-Tabs löschen, nicht bei Datenbank-Tabs
+                if (this.value === 'csv' || this.value === 'single') {
+                    document.getElementById('results').innerHTML = '';
+                }
             });
         });
 
@@ -302,7 +489,12 @@
             
             // Loading Text aktualisieren
             document.getElementById('loading-text').textContent = config.loadingText;
-            document.getElementById('loading').style.display = 'block';
+            const loadingDiv = document.getElementById('loading');
+            loadingDiv.style.display = 'block';
+            loadingDiv.classList.add('htmx-request'); // Füge HTMX-Klasse hinzu für CSS
+            
+            // Timer starten
+            startSearchTimer();
             
             // URL-Parameter erstellen
             const params = new URLSearchParams();
@@ -325,7 +517,10 @@
                 displayResults(data);
             })
             .catch(error => {
-                document.getElementById('loading').style.display = 'none';
+                const loadingDiv = document.getElementById('loading');
+                loadingDiv.style.display = 'none';
+                loadingDiv.classList.remove('htmx-request');
+                stopSearchTimer(); // Timer auch bei Fehler stoppen
                 document.getElementById('results').innerHTML = `
                     <div class="result-card error">
                         <h3>❌ Fehler bei der Suche</h3>
@@ -341,7 +536,12 @@
             const resultsDiv = document.getElementById('results');
             
             // Stelle sicher, dass Ladeindikator ausgeblendet wird
-            document.getElementById('loading').style.display = 'none';
+            const loadingDiv = document.getElementById('loading');
+            loadingDiv.style.display = 'none';
+            loadingDiv.classList.remove('htmx-request');
+            
+            // Timer stoppen
+            stopSearchTimer();
             
             if (response.success && response.data) {
                 console.log('Erfolgreiche Response, structured_data vorhanden:', 'structured_data' in response.data);
@@ -661,15 +861,42 @@
             }
         });
         
+        // HTMX Event-Handler für Timer bei Batch-Suchen
+        document.body.addEventListener('htmx:beforeRequest', function(evt) {
+            // Hole den Request-Pfad
+            const path = evt.detail.pathInfo?.requestPath || evt.detail.xhr?.responseURL || '';
+            console.log('HTMX beforeRequest für:', path, 'Element:', evt.detail.elt);
+            
+            // Timer starten für Such-Requests
+            if (path.includes('/api/batch-search') || path.includes('/api/upload-csv') || 
+                (evt.detail.elt && (evt.detail.elt.id === 'batch-form' || evt.detail.elt.name === 'csv_file'))) {
+                console.log('Starte Timer für Batch-Suche');
+                startSearchTimer();
+                
+                // Stelle sicher, dass Ladeindikator sichtbar ist
+                const loadingDiv = document.getElementById('loading');
+                if (loadingDiv) {
+                    loadingDiv.style.display = 'block';
+                    loadingDiv.classList.add('htmx-request');
+                }
+            }
+        });
+        
         // ÄNDERUNG 29.06.2025: HTMX Event-Handler für Ladeindikator
         document.body.addEventListener('htmx:afterRequest', function(evt) {
+            const path = evt.detail.pathInfo?.requestPath || evt.detail.xhr?.responseURL || '';
+            console.log('HTMX afterRequest für:', path);
+            
             // Verstecke Ladeindikator nach jeder HTMX-Anfrage
             document.getElementById('loading').style.display = 'none';
+            stopSearchTimer(); // Timer stoppen
+            console.log('Timer gestoppt');
         });
 
         document.body.addEventListener('htmx:afterSwap', function(evt) {
             // Zusätzliche Sicherheit: Verstecke auch nach Swap
             document.getElementById('loading').style.display = 'none';
+            stopSearchTimer(); // Timer stoppen
         });
 
         // Fix für Batch-Suche: Überwache das results div
@@ -680,6 +907,7 @@
                     const batchResults = document.querySelector('.batch-results');
                     if (batchResults) {
                         document.getElementById('loading').style.display = 'none';
+                        stopSearchTimer(); // Timer stoppen
                     }
                 }
             });
@@ -690,6 +918,306 @@
         if (resultsDiv) {
             resultsObserver.observe(resultsDiv, { childList: true, subtree: true });
         }
+
+        // ÄNDERUNG 02.07.2025: Funktionen für Quellen-Datenbank
+        async function loadSourcesStats() {
+            try {
+                const response = await fetch('/api/sources/stats');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.data;
+                    const statsHtml = `
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <h4>Gesamt-Quellen</h4>
+                                <p class="stat-number">${stats.total_sources}</p>
+                            </div>
+                            <div class="stat-card">
+                                <h4>Durchschnittliche Erfolgsquote</h4>
+                                <p class="stat-number">${stats.average_success_rate.toFixed(1)}%</p>
+                            </div>
+                            <div class="stat-card">
+                                <h4>Quellen nach Land</h4>
+                                <div class="stat-list">
+                                    ${Object.entries(stats.sources_by_country)
+                                        .sort((a, b) => b[1] - a[1])
+                                        .slice(0, 5)
+                                        .map(([country, count]) => 
+                                            `<div>${country}: ${count}</div>`
+                                        ).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('sources-stats').innerHTML = statsHtml;
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden der Statistiken:', error);
+            }
+        }
+
+        async function loadSources() {
+            const formData = new FormData(document.getElementById('sources-filter-form'));
+            const params = new URLSearchParams();
+            
+            // Filter-Parameter
+            if (formData.get('country')) params.append('country', formData.get('country'));
+            if (formData.get('source_type')) params.append('source_type', formData.get('source_type'));
+            params.append('min_reliability', formData.get('min_reliability') || '30');
+            params.append('limit', '100');
+            
+            try {
+                const response = await fetch(`/api/sources?${params.toString()}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displaySourcesTable(data.data.sources);
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden der Quellen:', error);
+                document.getElementById('sources-table-container').innerHTML = 
+                    '<div class="error">Fehler beim Laden der Quellen</div>';
+            }
+        }
+
+        function displaySourcesTable(sources) {
+            if (!sources || sources.length === 0) {
+                document.getElementById('sources-table-container').innerHTML = 
+                    '<p>Keine Quellen gefunden mit den gewählten Filtern.</p>';
+                return;
+            }
+            
+            const tableHtml = `
+                <table class="sources-table">
+                    <thead>
+                        <tr>
+                            <th>URL/Domain</th>
+                            <th>Land</th>
+                            <th>Region</th>
+                            <th>Typ</th>
+                            <th>Zuverlässigkeit</th>
+                            <th>Suchen</th>
+                            <th>Erfolgsquote</th>
+                            <th>Letzter Zugriff</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sources.map(source => `
+                            <tr>
+                                <td>
+                                    <a href="${source.url}" target="_blank" 
+                                       title="${source.url}"
+                                       style="display: block; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                                        ${source.domain}
+                                    </a>
+                                </td>
+                                <td>${source.country || 'Global'}</td>
+                                <td>${source.region || '-'}</td>
+                                <td><span class="badge badge-${source.source_type}">${source.source_type}</span></td>
+                                <td>
+                                    <div class="reliability-bar">
+                                        <div class="reliability-fill" style="width: ${source.reliability_score}%"></div>
+                                        <span>${source.reliability_score.toFixed(0)}%</span>
+                                    </div>
+                                </td>
+                                <td>${source.total_searches}</td>
+                                <td>${source.success_rate.toFixed(0)}%</td>
+                                <td>${source.last_successful_access ? 
+                                    new Date(source.last_successful_access).toLocaleDateString('de-DE') : 
+                                    'Nie'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            document.getElementById('sources-table-container').innerHTML = tableHtml;
+        }
+        
+        // ÄNDERUNG 02.07.2025: Funktionen für Ergebnis-Datenbank
+        async function loadResultsStats() {
+            try {
+                const response = await fetch('/api/results/stats');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.data;
+                    const statsHtml = `
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <h4>Gesamt-Ergebnisse</h4>
+                                <p class="stat-number">${stats.total_results}</p>
+                            </div>
+                            <div class="stat-card">
+                                <h4>Erfolgreiche Suchen</h4>
+                                <p class="stat-number">${stats.successful_results}</p>
+                            </div>
+                            <div class="stat-card">
+                                <h4>Durchschn. Datenqualität</h4>
+                                <p class="stat-number">${stats.average_data_quality.toFixed(0)}%</p>
+                            </div>
+                            <div class="stat-card">
+                                <h4>Suchen nach Modell</h4>
+                                <div class="stat-list">
+                                    ${Object.entries(stats.results_by_model)
+                                        .map(([model, count]) => 
+                                            `<div>${model}: ${count}</div>`
+                                        ).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('results-stats').innerHTML = statsHtml;
+                    
+                    // Lade Sessions für Filter
+                    loadSessions();
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden der Ergebnis-Statistiken:', error);
+            }
+        }
+        
+        async function loadSessions() {
+            try {
+                const response = await fetch('/api/results/sessions');
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    const select = document.getElementById('filter_session');
+                    select.innerHTML = '<option value="">Alle Sessions</option>';
+                    
+                    data.data.forEach(session => {
+                        const option = document.createElement('option');
+                        option.value = session.session_id;
+                        const date = new Date(session.start_time).toLocaleDateString('de-DE');
+                        option.textContent = `${date} - ${session.mine_count} Minen (${session.example_mine || 'Batch'})`;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden der Sessions:', error);
+            }
+        }
+        
+        async function loadResults() {
+            const formData = new FormData(document.getElementById('results-filter-form'));
+            const params = new URLSearchParams();
+            
+            // Filter-Parameter
+            if (formData.get('mine_name')) params.append('mine_name', formData.get('mine_name'));
+            if (formData.get('country')) params.append('country', formData.get('country'));
+            if (formData.get('session_id')) params.append('session_id', formData.get('session_id'));
+            params.append('days_back', formData.get('days_back') || '30');
+            params.append('limit', '50');
+            
+            try {
+                const response = await fetch(`/api/results?${params}`);
+                const data = await response.json();
+                
+                if (data.success && data.data.results) {
+                    displayResultsTable(data.data.results);
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden der Ergebnisse:', error);
+                document.getElementById('results-table-container').innerHTML = 
+                    '<p style="color: red;">Fehler beim Laden der Ergebnisse</p>';
+            }
+        }
+        
+        function displayResultsTable(results) {
+            if (!results || results.length === 0) {
+                document.getElementById('results-table-container').innerHTML = 
+                    '<p style="text-align: center; color: #666;">Keine Ergebnisse gefunden</p>';
+                return;
+            }
+            
+            const tableHtml = `
+                <table class="sources-table">
+                    <thead>
+                        <tr>
+                            <th>Zeitstempel</th>
+                            <th>Mine</th>
+                            <th>Land</th>
+                            <th>Modell</th>
+                            <th>Datenqualität</th>
+                            <th>Restaurationskosten</th>
+                            <th>Quellen</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${results.map(result => {
+                            const quality = result.data_quality || {};
+                            const qualityPercent = quality.completeness_percentage || 0;
+                            const qualityColor = qualityPercent > 70 ? '#10b981' : 
+                                               qualityPercent > 40 ? '#f59e0b' : '#ef4444';
+                            const restorationCost = result.structured_data?.['Restaurationskosten'] || 'k.A.';
+                            const sourceCount = result.sources?.length || 0;
+                            
+                            return `
+                            <tr>
+                                <td>${new Date(result.search_timestamp).toLocaleString('de-DE')}</td>
+                                <td><strong>${result.mine_name}</strong></td>
+                                <td>${result.country || '-'}</td>
+                                <td><span class="badge">${result.model_used}</span></td>
+                                <td>
+                                    <div class="reliability-bar">
+                                        <div class="reliability-fill" style="width: ${qualityPercent}%; background: ${qualityColor}"></div>
+                                        <span>${qualityPercent}%</span>
+                                    </div>
+                                </td>
+                                <td style="color: ${restorationCost !== 'k.A.' ? '#dc2626' : '#999'};">
+                                    <strong>${restorationCost}</strong>
+                                </td>
+                                <td>${sourceCount}</td>
+                                <td>
+                                    <button onclick="viewResultDetail(${result.id})" 
+                                            style="background: #3b82f6; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">
+                                        Details
+                                    </button>
+                                </td>
+                            </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            document.getElementById('results-table-container').innerHTML = tableHtml;
+        }
+        
+        async function viewResultDetail(resultId) {
+            try {
+                const response = await fetch(`/api/results/${resultId}`);
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    // Verwende die existierende createStructuredResultCard Funktion
+                    const detailHtml = createStructuredResultCard(data.data);
+                    
+                    // Zeige in Modal oder ersetze Tabelle temporär
+                    const container = document.getElementById('results-table-container');
+                    container.innerHTML = `
+                        <div style="margin-bottom: 20px;">
+                            <button onclick="loadResults()" 
+                                    style="background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                                ← Zurück zur Übersicht
+                            </button>
+                        </div>
+                        ${detailHtml}
+                    `;
+                    
+                    // Scrolle nach oben
+                    container.scrollIntoView({ behavior: 'smooth' });
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden der Details:', error);
+                alert('Fehler beim Laden der Details');
+            }
+        }
+        
+        }); // Ende DOMContentLoaded
     </script>
 </body>
 </html>
