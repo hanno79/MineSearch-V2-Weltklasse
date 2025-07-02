@@ -93,18 +93,19 @@
                 
                 <div style="background: #f0f8ff; padding: 12px; border-radius: 5px; margin-top: 10px;">
                     <label style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
-                        <input type="checkbox" id="two_phase_enabled" style="width: 18px; height: 18px;">
+                        <input type="checkbox" id="two_phase_enabled" style="width: 18px; height: 18px;" checked>
                         <span><strong>🔍 2-Phasen-Suche aktivieren</strong></span>
                     </label>
                     <small style="display: block; margin-top: 8px; margin-left: 28px; color: #555;">
                         Führt zusätzliche gezielte Suchen zu den besten gefundenen Quellen durch.<br>
+                        <strong>Wird automatisch aktiviert</strong> bei wenigen Daten, fehlenden Restaurationskosten oder wenigen Quellen.<br>
                         Verlängert die Suche um 1-2 Minuten, liefert aber deutlich mehr Quellen und Details.
                     </small>
                 </div>
                 
                 <div style="background: #f0fdf4; padding: 12px; border-radius: 5px; margin-top: 10px;">
                     <label style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
-                        <input type="checkbox" id="smart_search_enabled" style="width: 18px; height: 18px;">
+                        <input type="checkbox" id="smart_search_enabled" style="width: 18px; height: 18px;" checked>
                         <span><strong>🤖 Smart-Search aktivieren</strong></span>
                     </label>
                     <small style="display: block; margin-top: 8px; margin-left: 28px; color: #555;">
@@ -276,6 +277,7 @@
                 config.endpoint = '/api/smart-search';
                 config.loadingText = `Smart-Search läuft (startet mit Schnell, erweitert bei Bedarf automatisch)...`;
                 config.smartSearch = true;
+                config.twoPhase = false; // Explizit false setzen
             }
             // 2-Phasen-Suche nur wenn Smart-Search deaktiviert UND nicht Deep Research
             else if (twoPhase && model !== 'sonar-deep-research') {
@@ -286,6 +288,9 @@
                 config.loadingText = `${config.description} läuft (${config.baseTime})...`;
                 config.twoPhase = false;
             }
+            
+            // Füge searchType hinzu
+            config.searchType = model === 'sonar-deep-research' ? 'deep-research' : 'standard';
             
             return config;
         }
@@ -335,17 +340,37 @@
             console.log('DisplayResults aufgerufen mit:', response);
             const resultsDiv = document.getElementById('results');
             
+            // Stelle sicher, dass Ladeindikator ausgeblendet wird
+            document.getElementById('loading').style.display = 'none';
+            
             if (response.success && response.data) {
                 console.log('Erfolgreiche Response, structured_data vorhanden:', 'structured_data' in response.data);
                 console.log('Anzahl Felder in structured_data:', Object.keys(response.data.structured_data || {}).length);
                 
+                // Zeige Auto-Two-Phase Hinweis wenn aktiviert
+                let autoTwoPhaseHtml = '';
+                if (response.data.auto_two_phase) {
+                    const reasons = response.data.two_phase_reason || {};
+                    const reasonTexts = [];
+                    if (reasons.low_quality) reasonTexts.push('wenige Daten gefunden');
+                    if (reasons.missing_restoration) reasonTexts.push('keine Restaurationskosten');
+                    if (reasons.few_sources) reasonTexts.push('wenige Quellen');
+                    
+                    autoTwoPhaseHtml = `
+                        <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 10px; margin-bottom: 15px; border-radius: 5px;">
+                            <strong>🔄 Automatische 2-Phasen-Suche aktiviert</strong><br>
+                            <small>Grund: ${reasonTexts.join(', ')}</small>
+                        </div>
+                    `;
+                }
+                
                 // Strukturierte Daten vorhanden?
                 if (response.data.structured_data) {
-                    resultsDiv.innerHTML = createStructuredResultCard(response.data);
+                    resultsDiv.innerHTML = autoTwoPhaseHtml + createStructuredResultCard(response.data);
                 } else {
                     // Fallback für einfache Antworten
                     console.log('Fallback: Keine strukturierten Daten');
-                    resultsDiv.innerHTML = `
+                    resultsDiv.innerHTML = autoTwoPhaseHtml + `
                         <div class="result-card success">
                             <h3>✓ Suchergebnis für: ${response.data.mine_name}</h3>
                             <div class="result-content">
@@ -425,7 +450,7 @@
             
             // Definiere die Reihenfolge der CSV-Spalten (muss mit Backend übereinstimmen)
             const csvColumns = [
-                'ID', 'Name', 'Country', 'Region', 'Betreiber', 'x-Koordinate', 
+                'ID', 'Name', 'Country', 'Region', 'Eigentümer', 'Betreiber', 'x-Koordinate', 
                 'y-Koordinate', 'Aktivitätsstatus',
                 'Restaurationskosten', 'Jahr der Aufnahme der Kosten',
                 'Jahr der Erstellung des Dokumentes', 
@@ -514,7 +539,7 @@
                     }
                     
                     // ÄNDERUNG 28.06.2025: Quellenreferenzen nur bei echten Infos und erlaubten Feldern
-                    const fieldsWithoutSources = ['ID', 'Name', 'Country', 'Region', 'Quellenangaben'];
+                    const fieldsWithoutSources = ['ID', 'Name', 'Country', 'Region', 'Eigentümer', 'Quellenangaben'];
                     const isEmptyValue = !value || value === '-' || 
                                        ['k.a', 'k.a.', 'keine daten', 'nicht gefunden'].includes(value.toLowerCase());
                     
@@ -635,6 +660,36 @@
                 }, 100);
             }
         });
+        
+        // ÄNDERUNG 29.06.2025: HTMX Event-Handler für Ladeindikator
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            // Verstecke Ladeindikator nach jeder HTMX-Anfrage
+            document.getElementById('loading').style.display = 'none';
+        });
+
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            // Zusätzliche Sicherheit: Verstecke auch nach Swap
+            document.getElementById('loading').style.display = 'none';
+        });
+
+        // Fix für Batch-Suche: Überwache das results div
+        const resultsObserver = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                    // Wenn Batch-Ergebnisse eingefügt wurden
+                    const batchResults = document.querySelector('.batch-results');
+                    if (batchResults) {
+                        document.getElementById('loading').style.display = 'none';
+                    }
+                }
+            });
+        });
+
+        // Starte Überwachung
+        const resultsDiv = document.getElementById('results');
+        if (resultsDiv) {
+            resultsObserver.observe(resultsDiv, { childList: true, subtree: true });
+        }
     </script>
 </body>
 </html>

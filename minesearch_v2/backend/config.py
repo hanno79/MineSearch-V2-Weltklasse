@@ -9,6 +9,23 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+# ÄNDERUNG 01.07.2025: CSV_COLUMNS zentral definiert zur Vermeidung von Duplikaten
+CSV_COLUMNS = [
+    'ID', 'Name', 'Country', 'Region', 'Eigentümer', 'Betreiber', 'x-Koordinate', 
+    'y-Koordinate', 'Aktivitätsstatus',
+    'Restaurationskosten', 'Jahr der Aufnahme der Kosten',
+    'Jahr der Erstellung des Dokumentes', 
+    'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)',
+    'Minentyp (Untertage/ Open-Pit/ usw.)', 'Produktionsstart',
+    'Produktionsende', 'Fördermenge/Jahr', 'Fläche der Mine in qkm',
+    'Quellenangaben'
+]
+
+# Felder die KEINE Quellennummern brauchen
+FIELDS_WITHOUT_SOURCES = [
+    'ID', 'Name', 'Country', 'Region', 'Eigentümer', 'Quellenangaben'
+]
+
 # Lade Umgebungsvariablen
 env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(env_path)
@@ -80,10 +97,19 @@ class Config:
                        'Newfoundland and Labrador', 'Prince Edward Island',
                        'Northwest Territories', 'Yukon', 'Nunavut'],
             'mining_terms': {
-                'mine': ['mine', 'site minier'],
-                'operator': ['operator', 'opérateur', 'exploitant'],
-                'commodity': ['commodity', 'produit', 'minerai']
-            }
+                'mine': ['mine', 'site minier', 'project', 'projet', 'property', 'propriété'],
+                'operator': ['operator', 'opérateur', 'exploitant', 'betreiber', 'operador'],
+                'owner': ['owner', 'propriétaire', 'eigentümer', 'propietario', 'belongs to', 'gehört', 'property of'],
+                'commodity': ['commodity', 'produit', 'minerai', 'mineral', 'minéral'],
+                'restoration_costs': ['restoration costs', 'closure costs', 'reclamation costs', 
+                                    'coûts de restauration', 'coûts de fermeture', 'coûts de réhabilitation',
+                                    'asset retirement obligation', 'ARO', 'obligation de mise hors service',
+                                    'environmental liability', 'passif environnemental', 
+                                    'closure bond', 'garantie financière', 'financial assurance',
+                                    'provision for closure', 'provision pour fermeture']
+            },
+            'priority_domains': ['mern.gouv.qc.ca', 'nrcan.gc.ca', 'gestim.quebec',
+                               'mining.ca', 'sedar.com', 'tse.ca', 'gov.bc.ca']
         },
         'canada': {  # Englische Variante
             'languages': ['en', 'fr'],
@@ -91,7 +117,21 @@ class Config:
             'regions': ['Quebec', 'Ontario', 'British Columbia', 'Alberta', 
                        'Manitoba', 'Saskatchewan', 'Nova Scotia', 'New Brunswick', 
                        'Newfoundland and Labrador', 'Prince Edward Island',
-                       'Northwest Territories', 'Yukon', 'Nunavut']
+                       'Northwest Territories', 'Yukon', 'Nunavut'],
+            'mining_terms': {
+                'mine': ['mine', 'site minier', 'project', 'projet', 'property', 'propriété'],
+                'operator': ['operator', 'opérateur', 'exploitant', 'betreiber', 'operador'],
+                'owner': ['owner', 'propriétaire', 'eigentümer', 'propietario', 'belongs to', 'gehört', 'property of'],
+                'commodity': ['commodity', 'produit', 'minerai', 'mineral', 'minéral'],
+                'restoration_costs': ['restoration costs', 'closure costs', 'reclamation costs', 
+                                    'coûts de restauration', 'coûts de fermeture', 'coûts de réhabilitation',
+                                    'asset retirement obligation', 'ARO', 'obligation de mise hors service',
+                                    'environmental liability', 'passif environnemental', 
+                                    'closure bond', 'garantie financière', 'financial assurance',
+                                    'provision for closure', 'provision pour fermeture']
+            },
+            'priority_domains': ['mern.gouv.qc.ca', 'nrcan.gc.ca', 'gestim.quebec',
+                               'mining.ca', 'sedar.com', 'tse.ca', 'gov.bc.ca']
         },
         'australien': {
             'languages': ['en'],
@@ -100,17 +140,36 @@ class Config:
                        'Victoria', 'South Australia', 'Tasmania', 
                        'Northern Territory'],
             'mining_terms': {
-                'mine': ['mine', 'mining operation'],
-                'operator': ['operator', 'owner'],
-                'commodity': ['commodity', 'mineral']
-            }
+                'mine': ['mine', 'mining operation', 'project', 'property', 'deposit'],
+                'operator': ['operator', 'company', 'joint venture', 'JV', 'operates', 'operating company'],
+                'owner': ['owner', 'owns', 'ownership', 'property of', 'belongs to', 'held by'],
+                'commodity': ['commodity', 'mineral', 'ore', 'resource'],
+                'restoration_costs': ['restoration costs', 'closure costs', 'reclamation costs',
+                                    'rehabilitation costs', 'asset retirement obligation', 'ARO',
+                                    'environmental liability', 'closure bond', 'financial assurance',
+                                    'provision for closure', 'mine closure provision']
+            },
+            'priority_domains': ['ga.gov.au', 'dmp.wa.gov.au', 'sarig.sa.gov.au', 
+                               'minedex.dmirs.wa.gov.au', 'asx.com.au']
         },
         'australia': {  # Englische Variante
             'languages': ['en'],
             'currency': 'AUD',
             'regions': ['Western Australia', 'Queensland', 'New South Wales', 
                        'Victoria', 'South Australia', 'Tasmania', 
-                       'Northern Territory']
+                       'Northern Territory'],
+            'mining_terms': {
+                'mine': ['mine', 'mining operation', 'project', 'property', 'deposit'],
+                'operator': ['operator', 'company', 'joint venture', 'JV', 'operates', 'operating company'],
+                'owner': ['owner', 'owns', 'ownership', 'property of', 'belongs to', 'held by'],
+                'commodity': ['commodity', 'mineral', 'ore', 'resource'],
+                'restoration_costs': ['restoration costs', 'closure costs', 'reclamation costs',
+                                    'rehabilitation costs', 'asset retirement obligation', 'ARO',
+                                    'environmental liability', 'closure bond', 'financial assurance',
+                                    'provision for closure', 'mine closure provision']
+            },
+            'priority_domains': ['ga.gov.au', 'dmp.wa.gov.au', 'sarig.sa.gov.au', 
+                               'minedex.dmirs.wa.gov.au', 'asx.com.au']
         },
         'indonesien': {
             'languages': ['id', 'en'],
@@ -118,16 +177,35 @@ class Config:
             'regions': ['Kalimantan', 'Sulawesi', 'Papua', 'Sumatra', 
                        'Java', 'Nusa Tenggara', 'Maluku'],
             'mining_terms': {
-                'mine': ['tambang', 'mine'],
-                'operator': ['PT', 'operator', 'perusahaan'],
-                'commodity': ['komoditas', 'mineral', 'bahan galian']
-            }
+                'mine': ['tambang', 'mine', 'proyek', 'project', 'lokasi penambangan'],
+                'operator': ['PT', 'operator', 'perusahaan', 'kontraktor', 'pemegang IUP', 'dioperasikan oleh'],
+                'owner': ['pemilik', 'owner', 'dimiliki oleh', 'milik', 'kepemilikan'],
+                'commodity': ['komoditas', 'mineral', 'bahan galian', 'sumber daya'],
+                'restoration_costs': ['biaya reklamasi', 'biaya penutupan tambang', 'restoration costs',
+                                    'jaminan reklamasi', 'dana jaminan', 'closure costs',
+                                    'kewajiban lingkungan', 'environmental liability',
+                                    'provisi penutupan tambang', 'closure provision']
+            },
+            'priority_domains': ['esdm.go.id', 'minerba.esdm.go.id', 'modi.esdm.go.id',
+                               'idx.co.id', 'ptba.co.id', 'antam.com']
         },
         'indonesia': {  # Englische Variante
             'languages': ['id', 'en'],
             'currency': 'IDR',
             'regions': ['Kalimantan', 'Sulawesi', 'Papua', 'Sumatra', 
-                       'Java', 'Nusa Tenggara', 'Maluku']
+                       'Java', 'Nusa Tenggara', 'Maluku'],
+            'mining_terms': {
+                'mine': ['tambang', 'mine', 'proyek', 'project', 'lokasi penambangan'],
+                'operator': ['PT', 'operator', 'perusahaan', 'kontraktor', 'pemegang IUP', 'dioperasikan oleh'],
+                'owner': ['pemilik', 'owner', 'dimiliki oleh', 'milik', 'kepemilikan'],
+                'commodity': ['komoditas', 'mineral', 'bahan galian', 'sumber daya'],
+                'restoration_costs': ['biaya reklamasi', 'biaya penutupan tambang', 'restoration costs',
+                                    'jaminan reklamasi', 'dana jaminan', 'closure costs',
+                                    'kewajiban lingkungan', 'environmental liability',
+                                    'provisi penutupan tambang', 'closure provision']
+            },
+            'priority_domains': ['esdm.go.id', 'minerba.esdm.go.id', 'modi.esdm.go.id',
+                               'idx.co.id', 'ptba.co.id', 'antam.com']
         },
         'peru': {
             'languages': ['es', 'en'],
@@ -135,10 +213,17 @@ class Config:
             'regions': ['Arequipa', 'Cajamarca', 'Cusco', 'Junín', 
                        'La Libertad', 'Pasco', 'Áncash', 'Apurímac'],
             'mining_terms': {
-                'mine': ['mina', 'mine'],
-                'operator': ['operador', 'empresa minera'],
-                'commodity': ['mineral', 'commodity']
-            }
+                'mine': ['mina', 'mine', 'proyecto', 'project', 'yacimiento', 'operación minera'],
+                'operator': ['operador', 'empresa minera', 'titular', 'compañía', 'concesionario', 'opera'],
+                'owner': ['propietario', 'dueño', 'owner', 'propiedad de', 'pertenece a'],
+                'commodity': ['mineral', 'commodity', 'recurso', 'metal', 'concentrado'],
+                'restoration_costs': ['costos de cierre', 'costos de restauración', 'closure costs',
+                                    'pasivos ambientales', 'provisión de cierre', 'garantías financieras',
+                                    'plan de cierre de minas', 'obligaciones de cierre',
+                                    'fondos de garantía', 'environmental liability']
+            },
+            'priority_domains': ['ingemmet.gob.pe', 'minem.gob.pe', 'osinergmin.gob.pe',
+                               'smv.gob.pe', 'bvl.com.pe']
         },
         'chile': {
             'languages': ['es', 'en'],
@@ -146,12 +231,58 @@ class Config:
             'regions': ['Antofagasta', 'Atacama', 'Coquimbo', 'Valparaíso',
                        'O\'Higgins', 'Maule', 'Tarapacá'],
             'mining_terms': {
-                'mine': ['mina', 'faena minera'],
-                'operator': ['operador', 'compañía minera'],
-                'commodity': ['mineral', 'commodity']
-            }
+                'mine': ['mina', 'faena minera', 'proyecto', 'yacimiento', 'operación'],
+                'operator': ['operador', 'compañía minera', 'titular', 'empresa', 'sociedad minera', 'operada por'],
+                'owner': ['propietario', 'dueño', 'owner', 'propiedad de', 'pertenece a', 'de propiedad de'],
+                'commodity': ['mineral', 'commodity', 'recurso', 'metal', 'concentrado'],
+                'restoration_costs': ['costos de cierre', 'costos de restauración', 'closure costs',
+                                    'pasivos ambientales', 'provisión de cierre', 'garantías financieras',
+                                    'plan de cierre de faena', 'obligaciones ambientales',
+                                    'fondos de garantía', 'environmental liability']
+            },
+            'priority_domains': ['sernageomin.cl', 'cochilco.cl', 'sonami.cl',
+                               'cmfchile.cl', 'bolsadesantiago.com']
         }
     }
+    
+    # ÄNDERUNG 29.06.2025: Globale Mining-Begriffe und Abkürzungen
+    MINING_ABBREVIATIONS = {
+        'technical_reports': ['NI 43-101', 'JORC', 'SAMREC', 'PERC', 'SME', 'CRIRSCO'],
+        'study_types': ['PEA', 'PFS', 'DFS', 'FS', 'Feasibility Study', 'Pre-Feasibility',
+                       'Preliminary Economic Assessment', 'Scoping Study'],
+        'resource_categories': ['Measured', 'Indicated', 'Inferred', 'Reserve', 'Resource',
+                              'Proven', 'Probable', 'M&I', 'P&P'],
+        'commodity_symbols': {
+            'Au': 'Gold', 'Ag': 'Silver', 'Cu': 'Copper', 'Pb': 'Lead', 'Zn': 'Zinc',
+            'Ni': 'Nickel', 'Co': 'Cobalt', 'Li': 'Lithium', 'Fe': 'Iron', 'U': 'Uranium',
+            'Mo': 'Molybdenum', 'Pt': 'Platinum', 'Pd': 'Palladium', 'REE': 'Rare Earth'
+        }
+    }
+    
+    # ÄNDERUNG 29.06.2025: Priorisierte Domains für Mining-Daten
+    PRIORITY_MINING_DOMAINS = {
+        'tier1': [  # Regierungsseiten und offizielle Datenbanken - keine Bevorzugung
+            'mern.gouv.qc.ca', 'nrcan.gc.ca', 'blm.gov', 'usgs.gov',
+            'ga.gov.au', 'sarig.sa.gov.au', 'sernageomin.cl', 'gestim.quebec',
+            'ingemmet.gob.pe', 'esdm.go.id', 'dmr.gov.za'
+        ],
+        'tier2': [  # Börsen und Finanzdokumente
+            'sedar.com', 'sec.gov', 'asx.com.au', 'tsx.com', 'jse.co.za',
+            'bolsadesantiago.com', 'bvl.com.pe', 'idx.co.id'
+        ],
+        'tier3': [  # Mining-Portale und Industrie-Seiten
+            'mining.com', 'mining-technology.com', 'infomine.com',
+            'northernminer.com', 'miningweekly.com', 'minexploration.com'
+        ]
+    }
+    
+    # ÄNDERUNG 29.06.2025: PDF-Suchmuster für technische Dokumente
+    PDF_SEARCH_PATTERNS = [
+        '*technical-report*.pdf', '*NI-43-101*.pdf', '*feasibility*.pdf',
+        '*closure-plan*.pdf', '*environmental-assessment*.pdf', '*restoration*.pdf',
+        '*reclamation*.pdf', '*rehabilitation*.pdf', '*annual-report*.pdf',
+        '*sustainability-report*.pdf', '*resource-estimate*.pdf'
+    ]
     
     @classmethod
     def validate(cls):
