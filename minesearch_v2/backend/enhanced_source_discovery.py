@@ -15,8 +15,9 @@ import urllib.parse
 import asyncio
 
 from config import config, Config
-from models import SourceRecord, SearchSession, source_registry
 from source_discovery import SourceDiscovery
+import uuid
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +29,10 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         super().__init__()
         self.session: Optional[SearchSession] = None
     
-    def start_session(self, mine_name: str, country: Optional[str] = None, region: Optional[str] = None) -> SearchSession:
+    def start_session(self, mine_name: str, country: Optional[str] = None, region: Optional[str] = None) -> 'SearchSession':
         """Starte neue Such-Session"""
-        self.session = source_registry.create_session(mine_name, country, region)
+        # ÄNDERUNG 02.07.2025: Einfache Session-Implementierung ohne Registry
+        self.session = SearchSession(mine_name, country, region)
         logger.info(f"[SOURCE DISCOVERY] Session {self.session.session_id} gestartet für {mine_name}")
         return self.session
     
@@ -68,12 +70,7 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         discovered_sources.extend(pdf_sources)
         logger.info(f"[ACTIVE DISCOVERY] {len(pdf_sources)} technische Dokumente gefunden")
         
-        # 5. Bekannte erfolgreiche Quellen aus Registry
-        registry_sources = self._get_registry_recommendations(country, region, commodity)
-        discovered_sources.extend(registry_sources)
-        logger.info(f"[ACTIVE DISCOVERY] {len(registry_sources)} Quellen aus Registry")
-        
-        # 6. ÄNDERUNG 02.07.2025: Zusätzliche Quellen aus Datenbank
+        # 5. ÄNDERUNG 02.07.2025: Bekannte erfolgreiche Quellen aus Datenbank
         db_sources = self._get_database_sources(mine_name, country, region)
         discovered_sources.extend(db_sources)
         logger.info(f"[ACTIVE DISCOVERY] {len(db_sources)} Quellen aus Datenbank")
@@ -228,30 +225,7 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         
         return sources
     
-    def _get_registry_recommendations(self, country: Optional[str], region: Optional[str], 
-                                    commodity: Optional[str]) -> List[Dict[str, Any]]:
-        """Hole Empfehlungen aus der Source Registry"""
-        sources = []
-        
-        # Hole erfolgreiche Quellen aus Registry
-        if country and region:
-            registry_sources = source_registry.get_sources_for_region(country, region, min_reliability=70.0)
-        elif country:
-            registry_sources = source_registry.get_sources_for_country(country, min_reliability=70.0)
-        else:
-            registry_sources = source_registry.get_top_sources(limit=5)
-        
-        for source in registry_sources:
-            sources.append({
-                'url': source.url,
-                'domain': source.domain,
-                'type': source.source_type,
-                'priority': 1 if source.reliability_score > 80 else 2,
-                'description': f"Bewährte Quelle (Score: {source.reliability_score:.0f}%)",
-                'reliability_score': source.reliability_score
-            })
-        
-        return sources
+    # ÄNDERUNG 02.07.2025: _get_registry_recommendations entfernt - verwende _get_database_sources
     
     def _get_database_sources(self, mine_name: str, country: Optional[str], 
                              region: Optional[str]) -> List[Dict[str, Any]]:
@@ -322,24 +296,33 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         # Update Session
         self.session.add_searched_source(url, success, found_data)
         
-        # Update Registry
-        source = source_registry.get_source(url)
-        if not source:
-            # Neue Quelle erstellen
-            domain = urllib.parse.urlparse(url).netloc
-            source = SourceRecord(
-                url=url,
-                domain=domain,
-                country=self.session.country,
-                region=self.session.region,
-                source_type=self._classify_domain(domain)
-            )
-            source_registry.add_source(source)
+        # ÄNDERUNG 02.07.2025: Verwende direkt die Datenbank
+        from database import db_manager
+        
+        # Parse Domain
+        domain = urllib.parse.urlparse(url).netloc
+        
+        # Erstelle oder aktualisiere Quelle in DB
+        source = db_manager.add_or_update_source(
+            url=url,
+            domain=domain,
+            country=self.session.country,
+            region=self.session.region,
+            source_type='unknown',  # Wird automatisch klassifiziert in add_or_update_source
+            metadata={
+                'discovered_for': self.session.mine_name,
+                'found_fields': found_data.get('fields', []) if found_data else []
+            }
+        )
         
         # Update Zugriffstatistiken
-        source_registry.db.update_source_statistics(url, success, content_type)
+        db_manager.update_source_statistics(url, success, content_type)
         
-        logger.info(f"[SOURCE TRACKING] {url}: {'Erfolg' if success else 'Fehlschlag'} (Score: {source.reliability_score:.0f}%)")
+        # Hole aktualisierte Quelle für Score-Anzeige
+        with db_manager.get_session() as session:
+            updated_source = session.query(db_manager.Source).filter_by(url=url).first()
+            if updated_source:
+                logger.info(f"[SOURCE TRACKING] {url}: {'Erfolg' if success else 'Fehlschlag'} (Score: {updated_source.reliability_score:.0f}%, Typ: {updated_source.source_type})")
     
     def finalize_session(self) -> Optional[Dict[str, Any]]:
         """Beende Session und erstelle Zusammenfassung"""
@@ -349,12 +332,7 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         self.session.finalize()
         summary = self.session.get_summary()
         
-        # Speichere Registry
-        import os
-        registry_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'source_registry.json')
-        os.makedirs(os.path.dirname(registry_file), exist_ok=True)
-        source_registry.save_to_file(registry_file)
-        
+        # ÄNDERUNG 02.07.2025: Registry-Speicherung entfernt - alles in DB
         logger.info(f"[SOURCE DISCOVERY] Session {self.session.session_id} beendet: "
                    f"{summary['statistics']['searched']} Quellen durchsucht, "
                    f"{summary['statistics']['successful']} erfolgreich")
@@ -512,3 +490,71 @@ class EnhancedSourceDiscovery(SourceDiscovery):
                 
                 # Später wird track_source_result aufgerufen wenn Perplexity
                 # die Quelle in seiner Antwort erwähnt
+
+
+# ÄNDERUNG 02.07.2025: Einfache SearchSession-Klasse ohne Registry
+class SearchSession:
+    """Einfache Session-Klasse für Source Discovery"""
+    
+    def __init__(self, mine_name: str, country: Optional[str] = None, region: Optional[str] = None):
+        self.session_id = str(uuid.uuid4())
+        self.mine_name = mine_name
+        self.country = country
+        self.region = region
+        self.start_time = datetime.now()
+        self.end_time = None
+        self.discovered_sources = []
+        self.searched_sources = []
+        self.successful_sources = []
+        self.failed_sources = []
+    
+    def add_discovered_source(self, url: str):
+        """Füge entdeckte Quelle hinzu"""
+        if url not in self.discovered_sources:
+            self.discovered_sources.append(url)
+    
+    def add_searched_source(self, url: str, success: bool, data: Optional[Dict[str, Any]] = None):
+        """Füge durchsuchte Quelle hinzu"""
+        source_info = {
+            'url': url,
+            'success': success,
+            'timestamp': datetime.now().isoformat(),
+            'details': data
+        }
+        
+        self.searched_sources.append(source_info)
+        
+        if success:
+            self.successful_sources.append(source_info)
+        else:
+            self.failed_sources.append(source_info)
+    
+    def finalize(self):
+        """Beende Session"""
+        self.end_time = datetime.now()
+    
+    def get_summary(self) -> Dict[str, Any]:
+        """Erstelle Session-Zusammenfassung"""
+        duration = (self.end_time or datetime.now()) - self.start_time
+        
+        return {
+            'session_id': self.session_id,
+            'mine_name': self.mine_name,
+            'country': self.country,
+            'region': self.region,
+            'start_time': self.start_time.isoformat(),
+            'end_time': self.end_time.isoformat() if self.end_time else None,
+            'duration_seconds': duration.total_seconds(),
+            'statistics': {
+                'discovered': len(self.discovered_sources),
+                'searched': len(self.searched_sources),
+                'successful': len(self.successful_sources),
+                'failed': len(self.failed_sources),
+                'success_rate': (len(self.successful_sources) / len(self.searched_sources) * 100) if self.searched_sources else 0
+            },
+            'sources': {
+                'discovered': self.discovered_sources[:10],  # Top 10
+                'successful': self.successful_sources[:10],  # Top 10
+                'failed': self.failed_sources[:10]  # Top 10
+            }
+        }

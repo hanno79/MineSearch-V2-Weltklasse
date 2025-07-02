@@ -78,6 +78,11 @@
         <header>
             <h1>🔍 MineSearch 2.0</h1>
             <p class="subtitle">Einfaches Mining-Recherche-System</p>
+            <div style="margin-top: 15px;">
+                <a href="/sources" style="background: #2563eb; color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none; display: inline-block;">
+                    📊 Quellen-Datenbank
+                </a>
+            </div>
         </header>
 
         <main>
@@ -350,6 +355,7 @@
             // Timer-Variablen
             let searchTimerInterval = null;
             let searchStartTime = null;
+            let lastSearchDuration = null;
             
             // Timer-Funktionen
             window.startSearchTimer = function() {
@@ -376,7 +382,7 @@
                     const timerElement = document.getElementById('loading-timer');
                     if (timerElement) {
                         timerElement.textContent = timeString;
-                        console.log('Timer aktualisiert:', timeString);
+                        // Timer-Log entfernt für saubere Konsole
                     }
                 }, 1000);
             }
@@ -385,6 +391,15 @@
                 if (searchTimerInterval) {
                     clearInterval(searchTimerInterval);
                     searchTimerInterval = null;
+                }
+                
+                // Berechne finale Suchdauer
+                if (searchStartTime) {
+                    const elapsed = Date.now() - searchStartTime;
+                    const minutes = Math.floor(elapsed / 60000);
+                    const seconds = Math.floor((elapsed % 60000) / 1000);
+                    lastSearchDuration = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    window.lastSearchDuration = lastSearchDuration; // Global verfügbar machen
                 }
             }
             

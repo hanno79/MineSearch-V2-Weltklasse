@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MineSearch 2.1 - Quellen-Datenbank</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        /* Zusätzliche Styles für Tooltips */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+        }
+        
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 300px;
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -150px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 0.9;
+        }
+        
+        /* Farbcodierung für Zuverlässigkeits-Scores */
+        .score-excellent { background-color: #10b981; }
+        .score-good { background-color: #3b82f6; }
+        .score-moderate { background-color: #f59e0b; }
+        .score-poor { background-color: #ef4444; }
+        
+        .filter-section {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .filter-section select, .filter-section input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MineSearch 2.1</h1>
+            <p class="subtitle">Quellen-Datenbank</p>
+            <div style="margin-top: 10px;">
+                <a href="/" style="color: #2563eb;">← Zurück zur Suche</a>
+            </div>
+        </header>
+
+        <main>
+            <!-- Statistiken -->
+            <div class="sources-stats" id="stats-container">
+                <h2>Lade Statistiken...</h2>
+            </div>
+
+            <!-- Filter -->
+            <div class="sources-filters">
+                <h3>Filter</h3>
+                <div class="filter-section">
+                    <select id="filter-country" onchange="loadSources()">
+                        <option value="">Alle Länder</option>
+                        <option value="Canada">Kanada</option>
+                        <option value="USA">USA</option>
+                        <option value="Australia">Australien</option>
+                        <option value="Chile">Chile</option>
+                        <option value="Peru">Peru</option>
+                    </select>
+                    
+                    <select id="filter-type" onchange="loadSources()">
+                        <option value="">Alle Typen</option>
+                        <option value="government">Regierung</option>
+                        <option value="exchange">Börse</option>
+                        <option value="database">Datenbank</option>
+                        <option value="industry">Industrie</option>
+                        <option value="document">Dokument</option>
+                        <option value="unknown">Unbekannt</option>
+                    </select>
+                    
+                    <select id="filter-reliability" onchange="loadSources()">
+                        <option value="0">Alle Zuverlässigkeiten</option>
+                        <option value="70">≥ 70% (Exzellent)</option>
+                        <option value="50">≥ 50% (Gut)</option>
+                        <option value="30">≥ 30% (Moderat)</option>
+                    </select>
+                    
+                    <input type="text" id="filter-search" placeholder="Domain suchen..." onkeyup="filterTable()">
+                </div>
+            </div>
+
+            <!-- Quellen-Tabelle -->
+            <div class="sources-table-container">
+                <table class="sources-table" id="sources-table">
+                    <thead>
+                        <tr>
+                            <th>Domain</th>
+                            <th>Typ</th>
+                            <th>Land</th>
+                            <th>
+                                <div class="tooltip">
+                                    Zuverlässigkeit
+                                    <span class="tooltiptext">
+                                        Multi-Faktor-Bewertung:<br>
+                                        • Erfolgsquote (40%)<br>
+                                        • Quellentyp (20%)<br>
+                                        • Aktualität (20%)<br>
+                                        • Datenmenge (20%)
+                                    </span>
+                                </div>
+                            </th>
+                            <th>Erfolgsquote</th>
+                            <th>Letzter Zugriff</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sources-tbody">
+                        <tr>
+                            <td colspan="7" style="text-align: center;">Lade Quellen...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+
+        <footer>
+            <p>MineSearch 2.1 - Mining Research System</p>
+            <p><a href="https://github.com/yourusername/minesearch">GitHub</a> | 
+               <a href="/api/docs">API Dokumentation</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // Lade Statistiken
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/sources/stats');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.data;
+                    document.getElementById('stats-container').innerHTML = `
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <h4>Gesamtquellen</h4>
+                                <p class="stat-number">${stats.total_sources}</p>
+                            </div>
+                            <div class="stat-card">
+                                <h4>Ø Erfolgsquote</h4>
+                                <p class="stat-number">${stats.average_success_rate}%</p>
+                            </div>
+                            <div class="stat-card">
+                                <h4>Quellen nach Land</h4>
+                                <div class="stat-list">
+                                    ${Object.entries(stats.sources_by_country)
+                                        .sort(([,a], [,b]) => b - a)
+                                        .slice(0, 5)
+                                        .map(([country, count]) => 
+                                            `<div>${country}: ${count}</div>`
+                                        ).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden der Statistiken:', error);
+            }
+        }
+
+        // Lade Quellen
+        async function loadSources() {
+            const country = document.getElementById('filter-country').value;
+            const type = document.getElementById('filter-type').value;
+            const minReliability = document.getElementById('filter-reliability').value;
+            
+            const params = new URLSearchParams();
+            if (country) params.append('country', country);
+            if (type) params.append('source_type', type);
+            params.append('min_reliability', minReliability);
+            params.append('limit', '100');
+            
+            try {
+                const response = await fetch(`/api/sources?${params}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displaySources(data.data.sources);
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden der Quellen:', error);
+            }
+        }
+
+        // Zeige Quellen in Tabelle
+        function displaySources(sources) {
+            const tbody = document.getElementById('sources-tbody');
+            
+            if (sources.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Keine Quellen gefunden</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = sources.map(source => {
+                const scoreClass = getScoreClass(source.reliability_score);
+                const typeClass = `badge-${source.source_type}`;
+                const successRate = source.total_searches > 0 
+                    ? (source.successful_searches / source.total_searches * 100).toFixed(0) 
+                    : 0;
+                const lastAccess = source.last_successful_access 
+                    ? new Date(source.last_successful_access).toLocaleDateString('de-DE')
+                    : 'Nie';
+                
+                return `
+                    <tr>
+                        <td>
+                            <a href="${source.url}" target="_blank" style="color: #2563eb;">
+                                ${source.domain}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="badge ${typeClass}">${translateType(source.source_type)}</span>
+                        </td>
+                        <td>${source.country || 'Global'}</td>
+                        <td>
+                            <div class="reliability-bar tooltip">
+                                <div class="reliability-fill ${scoreClass}" style="width: ${source.reliability_score}%"></div>
+                                <span>${source.reliability_score.toFixed(0)}%</span>
+                                <span class="tooltiptext">
+                                    Berechnung:<br>
+                                    • Erfolgsquote: ${successRate}%<br>
+                                    • Typ-Bonus: ${getTypeBonus(source.source_type)} Punkte<br>
+                                    • Zugriffe: ${source.total_searches}<br>
+                                    • Letzter Erfolg: ${lastAccess}
+                                </span>
+                            </div>
+                        </td>
+                        <td>${successRate}% (${source.successful_searches}/${source.total_searches})</td>
+                        <td>${lastAccess}</td>
+                        <td>
+                            <button onclick="viewSource(${source.id})" style="font-size: 12px; padding: 4px 8px;">
+                                Details
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Hilfsfunktionen
+        function getScoreClass(score) {
+            if (score >= 70) return 'score-excellent';
+            if (score >= 50) return 'score-good';
+            if (score >= 30) return 'score-moderate';
+            return 'score-poor';
+        }
+
+        function translateType(type) {
+            const translations = {
+                'government': 'Regierung',
+                'exchange': 'Börse',
+                'database': 'Datenbank',
+                'industry': 'Industrie',
+                'document': 'Dokument',
+                'unknown': 'Unbekannt'
+            };
+            return translations[type] || type;
+        }
+
+        function getTypeBonus(type) {
+            const bonuses = {
+                'government': 20,
+                'database': 18,
+                'exchange': 15,
+                'industry': 12,
+                'document': 10,
+                'unknown': 5
+            };
+            return bonuses[type] || 5;
+        }
+
+        function filterTable() {
+            const searchText = document.getElementById('filter-search').value.toLowerCase();
+            const rows = document.querySelectorAll('#sources-tbody tr');
+            
+            rows.forEach(row => {
+                const domain = row.cells[0]?.textContent.toLowerCase() || '';
+                row.style.display = domain.includes(searchText) ? '' : 'none';
+            });
+        }
+
+        function viewSource(sourceId) {
+            alert(`Details für Quelle ${sourceId} - Funktion noch nicht implementiert`);
+        }
+
+        // Initial laden
+        loadStats();
+        loadSources();
+    </script>
+</body>
+</html>

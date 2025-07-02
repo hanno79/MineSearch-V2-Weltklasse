@@ -72,6 +72,125 @@ class Source(Base):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+    
+    def update_access(self, success: bool, content_type: Optional[str] = None):
+        """Aktualisiere Zugriffs-Statistiken"""
+        self.last_attempted_access = datetime.now()
+        self.total_searches += 1
+        
+        if success:
+            self.last_successful_access = datetime.now()
+            self.successful_searches += 1
+            
+            # Aktualisiere Content-Types
+            if content_type and self.typical_content_types is not None:
+                if content_type not in self.typical_content_types:
+                    self.typical_content_types.append(content_type)
+        
+        # Berechne neue Zuverlässigkeit mit Multi-Faktor-Bewertung
+        self.reliability_score = self.calculate_reliability_score()
+    
+    def calculate_reliability_score(self) -> float:
+        """
+        Berechne Multi-Faktor-Zuverlässigkeitsbewertung
+        
+        Faktoren:
+        1. Erfolgsquote (40% Gewichtung)
+        2. Quellentyp (20% Gewichtung)
+        3. Aktualität (20% Gewichtung)
+        4. Datenmenge (20% Gewichtung)
+        """
+        score = 0.0
+        
+        # 1. Erfolgsquote (40 Punkte maximal)
+        if self.total_searches > 0:
+            success_rate = self.successful_searches / self.total_searches
+            if self.total_searches >= 10:
+                # Volle Gewichtung bei vielen Versuchen
+                score += success_rate * 40
+            elif self.total_searches >= 5:
+                # Reduzierte Gewichtung bei wenigen Versuchen
+                score += success_rate * 30
+            else:
+                # Minimale Gewichtung bei sehr wenigen Versuchen
+                score += success_rate * 20
+        
+        # 2. Quellentyp-Bonus (20 Punkte maximal)
+        type_scores = {
+            'government': 20,     # Regierungsquellen am zuverlässigsten
+            'database': 18,       # Offizielle Datenbanken
+            'exchange': 15,       # Börsendokumente
+            'industry': 12,       # Industrie-Portale
+            'document': 10,       # PDF-Dokumente
+            'unknown': 5          # Unbekannte Quellen
+        }
+        score += type_scores.get(self.source_type, 5)
+        
+        # 3. Aktualität (20 Punkte maximal)
+        if self.last_successful_access:
+            days_since_success = (datetime.now() - self.last_successful_access).days
+            if days_since_success < 7:
+                score += 20  # Sehr aktuell
+            elif days_since_success < 30:
+                score += 15  # Aktuell
+            elif days_since_success < 90:
+                score += 10  # Mäßig aktuell
+            elif days_since_success < 180:
+                score += 5   # Veraltet
+            # Älter als 180 Tage: 0 Punkte
+        
+        # 4. Datenmenge/Konsistenz (20 Punkte maximal)
+        if self.total_searches >= 20 and self.successful_searches >= 15:
+            score += 20  # Viele erfolgreiche Zugriffe
+        elif self.total_searches >= 10 and self.successful_searches >= 7:
+            score += 15  # Gute Historie
+        elif self.total_searches >= 5 and self.successful_searches >= 3:
+            score += 10  # Moderate Historie
+        elif self.successful_searches > 0:
+            score += 5   # Wenige aber erfolgreiche Zugriffe
+        
+        # Bonus für Content-Type-Vielfalt
+        if self.typical_content_types and len(self.typical_content_types) > 2:
+            score += 5  # Bonus für vielfältige Inhaltstypen
+        
+        # Stelle sicher, dass Score zwischen 0 und 100 liegt
+        return min(100.0, max(0.0, score))
+    
+    @classmethod
+    def classify_source_type(cls, url: str, domain: str) -> str:
+        """
+        Automatische Klassifizierung des Quellentyps basierend auf URL/Domain
+        
+        ÄNDERUNG 02.07.2025: Verbesserte Typerkennung
+        """
+        # Government domains
+        gov_patterns = ['.gov', '.gouv', '.gob', '.go.', 'government', 'regierung']
+        if any(pattern in domain.lower() for pattern in gov_patterns):
+            return 'government'
+        
+        # Exchange/Financial domains  
+        exchange_patterns = ['sedar', 'sec.gov', 'asx.com', 'tsx.com', 'jse.co', 
+                           'bolsa', 'bvl.com', 'idx.co', 'exchange', 'börse']
+        if any(pattern in domain.lower() for pattern in exchange_patterns):
+            return 'exchange'
+        
+        # Database domains
+        db_patterns = ['gestim', 'infomine', 'mindat', 'mrdata', 'usgs', 'nrcan',
+                      'database', 'registry', 'cadastre', 'kataster']
+        if any(pattern in domain.lower() for pattern in db_patterns):
+            return 'database'
+        
+        # Industry/Mining portals
+        industry_patterns = ['mining', 'miningweekly', 'mineria', 'bergbau', 
+                           'mineral', 'metals', 'resource']
+        if any(pattern in domain.lower() for pattern in industry_patterns):
+            return 'industry'
+        
+        # Document repositories
+        if 'pdf' in url.lower() or 'document' in url.lower() or 'report' in url.lower():
+            return 'document'
+        
+        return 'unknown'
 
 
 class SearchResult(Base):
@@ -140,24 +259,6 @@ class SearchResult(Base):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
-    
-    def update_access(self, success: bool, content_type: Optional[str] = None):
-        """Aktualisiere Zugriffs-Statistiken"""
-        self.last_attempted_access = datetime.now()
-        self.total_searches += 1
-        
-        if success:
-            self.last_successful_access = datetime.now()
-            self.successful_searches += 1
-            
-            # Aktualisiere Content-Types
-            if content_type and self.typical_content_types is not None:
-                if content_type not in self.typical_content_types:
-                    self.typical_content_types.append(content_type)
-        
-        # Berechne neue Zuverlässigkeit (einfache Formel)
-        if self.total_searches >= 5:  # Mindestens 5 Versuche für aussagekräftige Statistik
-            self.reliability_score = min(100.0, (self.successful_searches / self.total_searches) * 100)
 
 
 class DatabaseManager:
@@ -184,9 +285,32 @@ class DatabaseManager:
                             region: Optional[str] = None, source_type: str = 'unknown',
                             metadata: Optional[Dict[str, Any]] = None) -> Source:
         """Füge neue Quelle hinzu oder aktualisiere bestehende"""
+        # ÄNDERUNG 02.07.2025: URL-Normalisierung zur Vermeidung von Duplikaten
+        from urllib.parse import urlparse
+        
+        # Normalisiere URL - entferne Query-Parameter für Vergleiche
+        if not url.startswith('search:'):
+            try:
+                parsed = urlparse(url)
+                # Basis-URL ohne Query für Datenbanksuche
+                base_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip('/')
+                # Verwende Domain aus URL falls nicht gegeben
+                if not domain:
+                    domain = parsed.netloc
+            except:
+                base_url = url
+        else:
+            # Spezialbehandlung für Document-Search
+            base_url = url
+            domain = 'document_search'
+        
+        # Automatische Quellentyp-Klassifizierung
+        if source_type == 'unknown':
+            source_type = Source.classify_source_type(url, domain)
+            
         with self.get_session() as session:
-            # Prüfe ob Quelle bereits existiert
-            source = session.query(Source).filter_by(url=url).first()
+            # Prüfe ob Quelle bereits existiert - suche nach Domain statt URL
+            source = session.query(Source).filter_by(domain=domain).first()
             
             if source:
                 # Aktualisiere bestehende Quelle
@@ -194,14 +318,18 @@ class DatabaseManager:
                     source.country = country
                 if region and not source.region:
                     source.region = region
-                if source_type != 'unknown' and source.source_type == 'unknown':
+                # Aktualisiere Typ nur wenn neuer Typ spezifischer ist
+                if source_type != 'unknown' and (source.source_type == 'unknown' or source_type != source.source_type):
+                    logger.info(f"[DB] Aktualisiere Quellentyp für {domain}: {source.source_type} → {source_type}")
                     source.source_type = source_type
                 if metadata:
                     source.extra_metadata = {**(source.extra_metadata or {}), **metadata}
+                # Neuberechnung des Scores bei Aktualisierung
+                source.reliability_score = source.calculate_reliability_score()
             else:
-                # Erstelle neue Quelle
+                # Erstelle neue Quelle mit normalisierter URL
                 source = Source(
-                    url=url,
+                    url=base_url,  # Verwende normalisierte URL
                     domain=domain,
                     country=country,
                     region=region,
@@ -209,6 +337,7 @@ class DatabaseManager:
                     extra_metadata=metadata
                 )
                 session.add(source)
+                logger.info(f"[DB] Neue Quelle hinzugefügt: {domain} (Typ: {source_type})")
             
             session.commit()
             session.refresh(source)

@@ -101,6 +101,17 @@ async def read_root():
         logger.error(f"Fehler beim Laden der HTML-Datei: {e}")
         return "<h1>Fehler beim Laden der Seite</h1>"
 
+# ÄNDERUNG 02.07.2025: Quellen-Datenbank Seite
+@app.get("/sources", response_class=HTMLResponse)
+async def sources_page():
+    """Quellen-Datenbank Seite"""
+    try:
+        with open("../frontend/sources.html", "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        logger.error(f"Fehler beim Laden der Quellen-Seite: {e}")
+        return "<h1>Fehler beim Laden der Seite</h1>"
+
 # ÄNDERUNG 01.07.2025: Hilfsfunktionen aus utils.py verwenden statt Duplikate
 
 # ÄNDERUNG 01.07.2025: get_country_config und generate_multilingual_search_terms aus utils.py verwenden
@@ -269,8 +280,15 @@ async def batch_search(
         # Erstelle HTML Response
         html_response = f"""
         <div class="batch-results">
-            <h3>Batch-Suche abgeschlossen</h3>
+            <h3>Batch-Suche abgeschlossen <span id="search-duration-display" style="font-size: 0.9em; color: #666;"></span></h3>
             <p>✓ {len(results)} erfolgreich | ❌ {len(errors)} Fehler</p>
+            
+            <script>
+                // Zeige Suchdauer wenn verfügbar
+                if (window.lastSearchDuration) {{
+                    document.getElementById('search-duration-display').textContent = '(' + window.lastSearchDuration + ')';
+                }}
+            </script>
             
             <!-- ÄNDERUNG 28.06.2025: Download-Button hinzufügen -->
             <div style="margin: 20px 0;">

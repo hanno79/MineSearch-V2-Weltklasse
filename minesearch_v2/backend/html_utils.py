@@ -7,6 +7,7 @@ Beschreibung: HTML-Utility-Funktionen für MineSearch Frontend-Generierung
 
 from typing import Dict, List, Any, Optional
 from config import CSV_COLUMNS, FIELDS_WITHOUT_SOURCES
+import re
 
 def create_result_card(result: Dict) -> str:
     """Erstelle HTML für ein Suchergebnis"""
@@ -257,29 +258,60 @@ def create_batch_results_table(results: List[Dict]) -> str:
     if not results:
         return ""
     
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"create_batch_results_table: Verarbeite {len(results)} Ergebnisse")
+    
     # CSV-Daten für Export vorbereiten
     csv_lines_with_sources = [";".join(CSV_COLUMNS)]  # Header
     
     # HTML-Tabelle vorbereiten
     csv_table_html = f"""
-    <div style="margin: 20px 0; padding: 15px; background: #f0fff4; border-radius: 5px;">
-        <h4>📊 Ergebnistabelle mit Quellenreferenzen</h4>
-        <p style="margin-bottom: 10px;">Die Tabelle zeigt alle gefundenen Daten. Zahlen in eckigen Klammern [1,2,3] verweisen auf die Quellen unten.</p>
+    <div style="margin: 0; padding: 10px 0; background: #f0fff4; width: 100%;">
+        <div style="max-width: 1400px; margin: 0 auto; padding: 0 15px;">
+            <h4>📊 Ergebnistabelle mit Quellenreferenzen</h4>
+            <p style="margin-bottom: 10px;">Die Tabelle zeigt alle gefundenen Daten. Zahlen in eckigen Klammern [1,2,3] verweisen auf die Quellen unten.</p>
+        </div>
         
-        <div style="overflow-x: auto;">
-            <table id="results-table" style="width: 100%; border-collapse: collapse; font-size: 14px; background: white;">
+        <div style="overflow-x: auto; padding: 0 10px;">
+            <table id="results-table" style="width: 100%; border-collapse: collapse; font-size: 13px; background: white; table-layout: fixed;">
                 <thead>
                     <tr style="background: #4CAF50; color: white;">
     """
     
-    # Tabellen-Header
+    # Tabellen-Header mit optimierten Breiten
+    column_widths = {
+        'ID': '40px',
+        'Name': '150px',
+        'Country': '80px',
+        'Region': '100px',
+        'Eigentümer': '120px',
+        'Betreiber': '120px',
+        'x-Koordinate': '90px',
+        'y-Koordinate': '90px',
+        'Aktivitätsstatus': '100px',
+        'Restaurationskosten': '130px',
+        'Jahr der Aufnahme der Kosten': '80px',
+        'Jahr der Erstellung des Dokumentes': '80px',
+        'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': '100px',
+        'Minentyp (Untertage/ Open-Pit/ usw.)': '100px',
+        'Produktionsstart': '80px',
+        'Produktionsende': '80px',
+        'Fördermenge/Jahr': '100px',
+        'Fläche der Mine in qkm': '80px',
+        'Quellenangaben': '120px'
+    }
+    
     for col in CSV_COLUMNS:
-        csv_table_html += f'<th style="padding: 10px; border: 1px solid #ddd; text-align: left; position: sticky; top: 0; background: #4CAF50;">{col}</th>'
+        width = column_widths.get(col, 'auto')
+        csv_table_html += f'<th style="padding: 8px 6px; border: 1px solid #ddd; text-align: left; position: sticky; top: 0; background: #4CAF50; width: {width}; min-width: {width}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{col}</th>'
     csv_table_html += '</tr></thead><tbody>'
     
     # Tabellen-Zeilen
+    rows_added = 0
     for idx, r in enumerate(results):
         if 'structured_data' in r['data']:
+            rows_added += 1
             row_style = 'style="background: #f9f9f9;"' if idx % 2 == 0 else ''
             csv_table_html += f'<tr {row_style}>'
             
@@ -290,8 +322,19 @@ def create_batch_results_table(results: List[Dict]) -> str:
                 value = r['data']['structured_data'].get(col, '')
                 display_value = value if value else '-'
                 
-                # Quellenreferenzen hinzufügen
-                if (col not in FIELDS_WITHOUT_SOURCES and 
+                # ÄNDERUNG 02.07.2025: Spezialbehandlung für Quellenangaben im CSV
+                if col == 'Quellenangaben' and value and value != '-' and value != 'Keine spezifischen Quellen dokumentiert':
+                    # Für CSV: Entferne Nummerierung aus Quellen
+                    clean_sources = []
+                    if '+++' in value:
+                        for source in value.split('+++'):
+                            # Entferne [X] Präfix mit regex
+                            clean_source = re.sub(r'^\[\d+\]\s*', '', source.strip())
+                            if clean_source:
+                                clean_sources.append(clean_source)
+                    csv_values.append('; '.join(clean_sources) if clean_sources else value)
+                # Normale Felder mit Quellenreferenzen
+                elif (col not in FIELDS_WITHOUT_SOURCES and 
                     'structured_data_with_sources' in r['data'] and
                     value and value != '-'):
                     source_data = r['data']['structured_data_with_sources'].get(col, {})
@@ -305,7 +348,7 @@ def create_batch_results_table(results: List[Dict]) -> str:
                     csv_values.append(value)
                 
                 # Spezielle Formatierung
-                cell_style = 'padding: 8px; border: 1px solid #ddd;'
+                cell_style = 'padding: 6px; border: 1px solid #ddd;'
                 
                 # Finanzspalten hervorheben
                 if col in ['Restaurationskosten', 'Jahr der Aufnahme der Kosten', 'Jahr der Erstellung des Dokumentes']:
@@ -322,6 +365,45 @@ def create_batch_results_table(results: List[Dict]) -> str:
                     elif 'geschlossen' in value.lower():
                         display_value = f'<span style="color: #ef4444; font-weight: 600;">{display_value}</span>'
                 
+                # ÄNDERUNG 02.07.2025: Kompakte Quellendarstellung
+                elif col == 'Quellenangaben' and value and value != '-' and value != 'Keine spezifischen Quellen dokumentiert':
+                    # Zähle Quellen (getrennt durch +++)
+                    sources_list = value.split('+++')
+                    num_sources = len(sources_list)
+                    
+                    # Erstelle kompakte Darstellung mit Toggle
+                    row_id = f"row_{idx}_{col.replace(' ', '_')}"
+                    display_value = f"""
+                    <div class="sources-compact" onclick="toggleSources('{row_id}')" style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                        <span>📚</span>
+                        <span>{num_sources} Quellen</span>
+                        <span id="toggle_{row_id}" style="font-size: 0.8em;">▶</span>
+                    </div>
+                    <div id="sources_{row_id}" class="sources-expanded" style="display: none; margin-top: 5px; font-size: 0.85em; max-height: 150px; overflow-y: auto; background: #f9f9f9; padding: 5px; border-radius: 3px;">
+                    """
+                    
+                    # Zeige erste 3 Quellen
+                    for i, source in enumerate(sources_list[:3]):
+                        display_value += f"{source.strip()}<br>"
+                    
+                    if num_sources > 3:
+                        display_value += f"<span style='color: #666; font-style: italic;'>... und {num_sources - 3} weitere</span><br>"
+                        # Versteckte weitere Quellen
+                        display_value += f"<div id='more_{row_id}' style='display: none; margin-top: 5px;'>"
+                        for source in sources_list[3:]:
+                            display_value += f"{source.strip()}<br>"
+                        display_value += "</div>"
+                        display_value += f"<a href='#' onclick='toggleMore(\"{row_id}\"); return false;' style='color: #2563eb; font-size: 0.9em;'>Alle anzeigen</a>"
+                    
+                    display_value += "</div>"
+                
+                # Standard-Zellinhalt mit Overflow-Handling (außer bei Quellenangaben)
+                if col != 'Quellenangaben':
+                    cell_style += ' overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'
+                    if col in ['Name', 'Eigentümer', 'Betreiber'] and len(str(display_value)) > 30:
+                        # Tooltip für lange Texte
+                        cell_style += f' title="{value}"'
+                
                 csv_table_html += f'<td style="{cell_style}">{display_value}</td>'
             
             csv_table_html += '</tr>'
@@ -332,18 +414,21 @@ def create_batch_results_table(results: List[Dict]) -> str:
             </table>
         </div>
         
-        <div style="margin-top: 15px; display: flex; gap: 10px;">
+        <div style="max-width: 1400px; margin: 15px auto 0; padding: 0 15px; display: flex; gap: 10px;">
             <button onclick="copyTableAsCSV()" style="padding: 8px 15px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
                 📋 Als CSV kopieren
             </button>
             <button onclick="copyTableAsHTML()" style="padding: 8px 15px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">
                 📋 Als Tabelle kopieren
             </button>
+            <button onclick="toggleAllSources()" style="padding: 8px 15px; background: #9333ea; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                📚 Alle Quellen ein-/ausklappen
+            </button>
         </div>
         
         <script>
             function copyTableAsCSV() {
-                const csvData = `""" + '\\n'.join(csv_lines_with_sources).replace('`', '\\`') + """`;
+                const csvData = `""" + '\\n'.join(csv_lines_with_sources).replace('`', '\\`').replace("'", "\\'") + """`;
                 navigator.clipboard.writeText(csvData).then(() => {
                     alert('CSV-Daten wurden in die Zwischenablage kopiert!');
                 });
@@ -359,6 +444,49 @@ def create_batch_results_table(results: List[Dict]) -> str:
                 window.getSelection().removeAllRanges();
                 alert('Tabelle wurde in die Zwischenablage kopiert!');
             }
+            
+            // Toggle-Funktionen für kompakte Quellen
+            function toggleSources(rowId) {
+                const sourcesDiv = document.getElementById('sources_' + rowId);
+                const toggleIcon = document.getElementById('toggle_' + rowId);
+                
+                if (sourcesDiv.style.display === 'none') {
+                    sourcesDiv.style.display = 'block';
+                    toggleIcon.textContent = '▼';
+                } else {
+                    sourcesDiv.style.display = 'none';
+                    toggleIcon.textContent = '▶';
+                }
+            }
+            
+            function toggleMore(rowId) {
+                const moreDiv = document.getElementById('more_' + rowId);
+                const link = event.target;
+                
+                if (moreDiv.style.display === 'none') {
+                    moreDiv.style.display = 'block';
+                    link.textContent = 'Weniger anzeigen';
+                } else {
+                    moreDiv.style.display = 'none';
+                    link.textContent = 'Alle anzeigen';
+                }
+            }
+            
+            // Alle Quellen ein-/ausklappen
+            let allSourcesExpanded = false;
+            function toggleAllSources() {
+                allSourcesExpanded = !allSourcesExpanded;
+                const allSourceDivs = document.querySelectorAll('[id^="sources_row_"]');
+                const allToggleIcons = document.querySelectorAll('[id^="toggle_row_"]');
+                
+                allSourceDivs.forEach(div => {
+                    div.style.display = allSourcesExpanded ? 'block' : 'none';
+                });
+                
+                allToggleIcons.forEach(icon => {
+                    icon.textContent = allSourcesExpanded ? '▼' : '▶';
+                });
+            }
         </script>
     </div>
     """
@@ -368,6 +496,7 @@ def create_batch_results_table(results: List[Dict]) -> str:
     if source_discovery_summary:
         csv_table_html += source_discovery_summary
     
+    logger.info(f"create_batch_results_table: {rows_added} Zeilen zur Tabelle hinzugefügt")
     return csv_table_html
 
 def _create_batch_source_summary(results: List[Dict]) -> str:
