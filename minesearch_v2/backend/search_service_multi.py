@@ -10,11 +10,17 @@ import asyncio
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
-from config import config, Config
+from config import config, Config, SOURCE_SHARING_CONFIG
 from providers.registry import provider_registry
 from providers.base_provider import SearchResult
-from source_discovery import EnhancedSourceDiscovery
+from enhanced_source_discovery import EnhancedSourceDiscovery
 from utils import generate_name_variants, generate_multilingual_search_terms, get_country_config
+from source_aggregator import SourceAggregator
+from search_phases import SearchPhaseManager
+from search_utils import SearchQueryBuilder, DataQualityCalculator, SourceCacheManager, ResultCombiner
+from search_result_combiner import SearchResultCombiner
+from search_async_utils import AsyncSearchUtils
+from shared_sources_analyzer import SharedSourcesAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +33,16 @@ class MultiProviderSearchService:
         provider_registry.initialize(config.PROVIDERS)
         self.registry = provider_registry
         self.enhanced_discovery = EnhancedSourceDiscovery()
+        
+        # Helper-Klassen initialisieren
+        self.phase_manager = SearchPhaseManager()
+        self.query_builder = SearchQueryBuilder()
+        self.quality_calculator = DataQualityCalculator()
+        self.cache_manager = SourceCacheManager()
+        self.result_combiner = ResultCombiner()
+        self.search_result_combiner = SearchResultCombiner()
+        self.async_utils = AsyncSearchUtils()
+        self.sources_analyzer = SharedSourcesAnalyzer(self.registry)
     
     async def search_with_model(self, model_id: str, mine_name: str, 
                                country: Optional[str] = None,
@@ -67,22 +83,31 @@ class MultiProviderSearchService:
         # Starte Source Discovery Session
         session = self.enhanced_discovery.start_session(mine_name, country, region)
         
-        # Source Discovery nur für Web-Search-fähige Modelle
+        # ÄNDERUNG 04.07.2025: Source Discovery für ALLE Modelle durchführen
+        # Auch OpenRouter-Modelle können von den Quellen-URLs profitieren
         discovered_sources = []
-        if model_config.supports_web_search:
+        try:
+            # Verwende die korrekte synchrone Methode (Session bereits gestartet)
             discovered_sources = self.enhanced_discovery.discover_sources_for_mine(
-                mine_name, country, region, commodity
+                mine_name=mine_name, 
+                country=country, 
+                region=region,
+                commodity=commodity
             )
             logger.info(f"[MULTI-SEARCH] {len(discovered_sources)} Quellen für {mine_name} entdeckt")
+        except Exception as e:
+            logger.warning(f"[MULTI-SEARCH] Fehler bei Source Discovery: {str(e)}")
         
         # Erstelle Suchanfrage
         name_variants = generate_name_variants(mine_name)
-        multilingual_terms = generate_multilingual_search_terms(mine_name, country)
+        country_config = get_country_config(country) if country else {}
+        multilingual_terms = generate_multilingual_search_terms(country_config)
         
         # Basis-Query
-        query = self._build_search_query(
+        query = self.query_builder.build_search_query(
             mine_name, name_variants, multilingual_terms, 
-            country, commodity, model_id, discovered_sources
+            country, commodity, model_id, discovered_sources,
+            model_config
         )
         
         # Provider-spezifische Optionen
@@ -91,8 +116,9 @@ class MultiProviderSearchService:
             'country': country,
             'commodity': commodity,
             'region': region,
-            'currency': get_country_config(country).get('currency', 'USD') if country else 'USD',
+            'currency': country_config.get('currency', 'USD'),
             'name_variants': name_variants,
+            'multilingual_terms': multilingual_terms,  # ÄNDERUNG 04.07.2025: Füge multilingual terms hinzu
             'discovered_sources': discovered_sources
         }
         
@@ -133,25 +159,30 @@ class MultiProviderSearchService:
         Returns:
             Dict mit Ergebnissen pro Modell
         """
+        # ÄNDERUNG 04.07.2025: Echte parallele Ausführung mit asyncio.gather
         # Erstelle Tasks für alle Modelle
         tasks = []
+        model_ids_list = []
         for model_id in model_ids:
             task = self.search_with_model(model_id, mine_name, country, commodity, region)
-            tasks.append((model_id, task))
+            tasks.append(task)
+            model_ids_list.append(model_id)
         
-        # Führe alle Suchen parallel aus
+        # Führe alle Suchen WIRKLICH parallel aus
+        task_results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Verarbeite Ergebnisse
         results = {}
-        for model_id, task in tasks:
-            try:
-                result = await task
-                results[model_id] = result
-            except Exception as e:
-                logger.error(f"[MULTI-SEARCH] Fehler bei {model_id}: {str(e)}")
+        for model_id, result in zip(model_ids_list, task_results):
+            if isinstance(result, Exception):
+                logger.error(f"[MULTI-SEARCH] Fehler bei {model_id}: {str(result)}")
                 results[model_id] = {
                     "success": False,
-                    "error": str(e),
+                    "error": str(result),
                     "data": {}
                 }
+            else:
+                results[model_id] = result
         
         return {
             "success": True,
@@ -162,40 +193,122 @@ class MultiProviderSearchService:
             "timestamp": datetime.now().isoformat()
         }
     
-    def _build_search_query(self, mine_name: str, name_variants: List[str],
-                           multilingual_terms: List[str], country: Optional[str],
-                           commodity: Optional[str], model_id: str,
-                           discovered_sources: List[Dict[str, Any]]) -> str:
-        """Erstelle Suchanfrage basierend auf Modell-Fähigkeiten"""
+    async def search_two_phase(self, mine_name: str, country: Optional[str] = None,
+                              commodity: Optional[str] = None, region: Optional[str] = None) -> Dict[str, Any]:
+        """
+        ÄNDERUNG 04.07.2025: Optimierte Zwei-Phasen-Suche
         
-        model_config = self.registry.get_model_config(model_id)
+        Phase 1: Schnelle Quellensuche mit günstigem Modell
+        Phase 2: Detaillierte Datenextraktion mit Premium-Modellen
         
-        # Basis-Query
-        query = f"Finde Informationen über die Mine: {mine_name}"
+        Args:
+            mine_name: Name der Mine
+            country: Land (optional)
+            commodity: Rohstoff (optional)
+            region: Region (optional)
+            
+        Returns:
+            Kombiniertes Ergebnis mit besten Daten
+        """
+        logger.info(f"[TWO-PHASE] Starte Zwei-Phasen-Suche für {mine_name}")
         
-        if name_variants and len(name_variants) > 1:
-            query += f" (auch bekannt als: {', '.join(name_variants[:2])})"
+        # Phase 1: Schnelle Quellensuche
+        logger.info("[TWO-PHASE] Phase 1: Quellensuche...")
+        phase1_result = await self.search_with_model(
+            self.phase_manager.phase1_models[0], 
+            mine_name, 
+            country, 
+            commodity, 
+            region
+        )
         
-        if country:
-            query += f" in {country}"
+        # Extrahiere gefundene Quellen aus Phase 1
+        discovered_sources = []
+        if phase1_result.get('success') and phase1_result.get('sources'):
+            discovered_sources = phase1_result['sources']
+            logger.info(f"[TWO-PHASE] Phase 1 abgeschlossen: {len(discovered_sources)} Quellen gefunden")
+        else:
+            logger.warning("[TWO-PHASE] Phase 1: Keine Quellen gefunden")
         
-        if commodity:
-            query += f", die {commodity} abbaut"
+        # Phase 2: Detaillierte Suche mit Premium-Modellen
+        logger.info("[TWO-PHASE] Phase 2: Detailsuche mit Premium-Modellen...")
         
-        # Füge discovered sources hinzu für Web-Search-fähige Modelle
-        if model_config.supports_web_search and discovered_sources:
-            query += "\n\nPrüfe speziell diese Quellen:\n"
-            for source in discovered_sources[:10]:
-                query += f"- {source['url']} ({source.get('description', '')})\n"
+        # Erstelle spezialisierte Query für Phase 2
+        specialized_query = self.phase_manager.build_phase2_query(mine_name, country, region, commodity, discovered_sources)
         
-        # Spezielle Anweisungen
-        query += "\n\nFokussiere besonders auf:"
-        query += "\n- Restaurationskosten / Closure Costs / Environmental Liabilities"
-        query += "\n- Betreiber und Eigentümer"
-        query += "\n- Produktionsdaten und Status"
-        query += "\n- Genaue Koordinaten"
+        # Führe Phase 2 Suchen parallel aus
+        phase2_tasks = []
+        for model_id in self.phase_manager.phase2_models:
+            if self.registry.is_model_available(model_id):
+                task = self.async_utils.search_with_enhanced_query(
+                    self.registry,
+                    self._convert_to_standard_format,
+                    model_id, 
+                    mine_name, 
+                    country, 
+                    commodity, 
+                    region,
+                    specialized_query,
+                    discovered_sources
+                )
+                phase2_tasks.append(task)
         
-        return query
+        phase2_results = await asyncio.gather(*phase2_tasks, return_exceptions=True)
+        
+        # Kombiniere Ergebnisse
+        combined_data = self.result_combiner.combine_phase_results(phase1_result, phase2_results)
+        
+        # ÄNDERUNG 04.07.2025: Optionale Phase 3 mit Abacus AI für kritische Felder
+        phase3_triggered = False
+        if self.phase_manager.should_trigger_phase3(combined_data):
+            logger.info("[TWO-PHASE] Phase 3: Ultra-Deep Research mit Abacus AI...")
+            phase3_triggered = True
+            
+            # Erstelle spezielle Query für fehlende kritische Felder
+            missing_fields_query = self.phase_manager.build_phase3_query(
+                mine_name, country, region, commodity, 
+                combined_data['best_data'], combined_data['all_sources']
+            )
+            
+            # Phase 3 mit Abacus Deep Agent
+            for model_id in self.phase_manager.phase3_models:
+                if self.registry.is_model_available(model_id):
+                    try:
+                        phase3_result = await self.async_utils.search_with_enhanced_query(
+                            self.registry,
+                            self._convert_to_standard_format,
+                            model_id, mine_name, country, commodity, region,
+                            missing_fields_query, combined_data['all_sources']
+                        )
+                        
+                        # Integriere Phase 3 Ergebnisse
+                        if phase3_result.get('success'):
+                            combined_data = self.result_combiner.integrate_phase3_results(
+                                combined_data, phase3_result
+                            )
+                    except Exception as e:
+                        logger.error(f"[TWO-PHASE] Phase 3 Fehler: {str(e)}")
+        
+        return {
+            "success": True,
+            "mine_name": mine_name,
+            "country": country,
+            "search_type": "two_phase" if not phase3_triggered else "three_phase",
+            "phase1_sources": len(discovered_sources),
+            "phase2_models": len(self.phase2_models),
+            "phase3_triggered": phase3_triggered,
+            "data": combined_data['best_data'],
+            "confidence_scores": combined_data['confidence'],
+            "sources": combined_data['all_sources'],
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    
+    
+    
+    
+    
+    
     
     def _convert_to_standard_format(self, provider_result: SearchResult, 
                                    model_id: str, mine_name: str,
@@ -210,17 +323,18 @@ class MultiProviderSearchService:
             }
         
         # Berechne Datenqualität
-        data_quality = self._calculate_data_quality(provider_result.structured_data)
+        data_quality = self.quality_calculator.calculate_data_quality(provider_result.structured_data)
         
+        # ÄNDERUNG 05.07.2025: Korrigierte Datenstruktur für Frontend-Kompatibilität
         return {
             "success": True,
-            "data": {
+            "data": provider_result.structured_data,  # Direkt die strukturierten Daten
+            "sources": provider_result.sources,  # Quellen auf oberster Ebene
+            "metadata": {
                 "content": provider_result.content,
                 "mine_name": mine_name,
-                "structured_data": provider_result.structured_data,
                 "structured_data_with_sources": provider_result.metadata.get('structured_data_with_sources', {}),
                 "source_index": provider_result.metadata.get('source_index', {}),
-                "sources": provider_result.sources,
                 "source_summary": {
                     "urls": len([s for s in provider_result.sources if s.get('type') == 'url']),
                     "documents": len([s for s in provider_result.sources if s.get('type') == 'document']),
@@ -237,32 +351,147 @@ class MultiProviderSearchService:
             }
         }
     
-    def _calculate_data_quality(self, structured_data: Dict[str, str]) -> Dict[str, Any]:
-        """Berechne Datenqualitäts-Metriken"""
-        from config import CSV_COLUMNS
+    
+    async def search_with_source_sharing(self, model_ids: List[str], mine_name: str,
+                                       country: Optional[str] = None,
+                                       commodity: Optional[str] = None,
+                                       region: Optional[str] = None) -> Dict[str, Any]:
+        """
+        ÄNDERUNG 05.07.2025: Cross-Provider Source Sharing Implementation
         
-        filled_fields = sum(1 for col in CSV_COLUMNS if structured_data.get(col) and col != 'Name')
-        total_fields = len(CSV_COLUMNS) - 1  # Minus Name-Feld
-        data_completeness = filled_fields / total_fields if total_fields > 0 else 0
+        Führt eine zweistufige Suche durch:
+        1. Alle Provider sammeln Quellen
+        2. Alle Provider analysieren ALLE gesammelten Quellen
         
-        # Bestimme Qualitätsstufe
-        if data_completeness >= 0.7:
-            quality_level = "Hoch"
-        elif data_completeness >= 0.4:
-            quality_level = "Mittel"
-        else:
-            quality_level = "Niedrig"
+        Args:
+            model_ids: Liste von Modell-IDs
+            mine_name: Name der Mine
+            country: Land (optional)
+            commodity: Rohstoff (optional)
+            region: Region (optional)
+            
+        Returns:
+            Dict mit kombinierten Ergebnissen und maximaler Abdeckung
+        """
+        logger.info(f"[SOURCE-SHARING] Starte Cross-Provider Suche für {mine_name} mit {len(model_ids)} Modellen")
+        start_time = datetime.now()
         
-        return {
-            "filled_fields": filled_fields,
-            "total_fields": total_fields,
-            "completeness_percentage": round(data_completeness * 100),
-            "quality_level": quality_level,
-            "missing_critical_fields": [
-                col for col in ['Betreiber', 'Restaurationskosten', 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)'] 
-                if not structured_data.get(col)
-            ]
-        }
+        # ÄNDERUNG 05.07.2025: Performance-Optimierungen
+        config = SOURCE_SHARING_CONFIG
+        
+        # Prüfe Cache für Quellen
+        cache_key = self.cache_manager.generate_cache_key(mine_name, country, commodity, region)
+        if config['cache_sources']:
+            cached_sources = self.cache_manager.get_cached_sources(cache_key)
+            if cached_sources:
+                logger.info(f"[SOURCE-SHARING] Verwende {len(cached_sources)} gecachte Quellen")
+                # Springe direkt zu Phase 2 mit gecachten Quellen
+                return await self.async_utils.execute_phase2_with_sources(
+                    cached_sources, model_ids, mine_name, country, commodity, region, start_time,
+                    self, self.phase_manager, config
+                )
+        
+        # Phase 1: Quellen-Sammlung
+        logger.info("[SOURCE-SHARING] Phase 1: Sammle Quellen von allen Providern...")
+        
+        # ÄNDERUNG 05.07.2025: Batch-Processing für bessere Performance
+        batch_size = config.get('batch_size', 5)
+        phase1_results = []
+        
+        for i in range(0, len(model_ids), batch_size):
+            batch = model_ids[i:i + batch_size]
+            source_tasks = []
+            
+            for model_id in batch:
+                # Verwende Timeout für Phase 1
+                task = asyncio.create_task(
+                    self.async_utils.search_with_timeout(
+                        self.search_with_model,
+                        model_id, mine_name, country, commodity, region,
+                        timeout=config.get('phase1_timeout', 30)
+                    )
+                )
+                source_tasks.append(task)
+            
+            # Führe Batch parallel aus
+            batch_results = await asyncio.gather(*source_tasks, return_exceptions=True)
+            phase1_results.extend(batch_results)
+        
+        # Aggregiere alle Quellen
+        aggregator = SourceAggregator()
+        all_sources = []
+        successful_providers = []
+        
+        for model_id, result in zip(model_ids, phase1_results):
+            if isinstance(result, Exception):
+                logger.error(f"[SOURCE-SHARING] Fehler bei {model_id} in Phase 1: {str(result)}")
+                continue
+                
+            if result.get('success') and result.get('sources'):
+                sources = result['sources']
+                logger.info(f"[SOURCE-SHARING] {model_id} lieferte {len(sources)} Quellen")
+                all_sources.extend(sources)
+                successful_providers.append(model_id)
+                
+                # Sammle auch bereits gefundene Daten
+                aggregator.add_provider_result(model_id, result)
+        
+        # Dedupliziere und ranke Quellen
+        unique_sources = aggregator.deduplicate_sources(all_sources)
+        
+        # ÄNDERUNG 05.07.2025: Limitiere Gesamtanzahl Quellen
+        max_sources = config.get('max_total_sources', 30)
+        if len(unique_sources) > max_sources:
+            unique_sources = unique_sources[:max_sources]
+            logger.info(f"[SOURCE-SHARING] Limitiere auf Top {max_sources} Quellen")
+        
+        logger.info(f"[SOURCE-SHARING] {len(all_sources)} Gesamt-Quellen -> {len(unique_sources)} unique Quellen")
+        
+        # Cache die Quellen für zukünftige Anfragen
+        if config['cache_sources']:
+            self.cache_manager.cache_sources(cache_key, unique_sources, config.get('source_cache_ttl', 21600))
+        
+        # Wenn keine Quellen gefunden, gib Phase 1 Ergebnisse zurück
+        if not unique_sources:
+            logger.warning("[SOURCE-SHARING] Keine Quellen gefunden, überspringe Phase 2")
+            return self.search_result_combiner.combine_source_sharing_results(phase1_results, model_ids, [], start_time)
+        
+        # Phase 2: Cross-Provider-Analyse
+        logger.info("[SOURCE-SHARING] Phase 2: Alle Provider analysieren alle Quellen...")
+        
+        # Erstelle erweiterte Query mit allen Quellen
+        enhanced_query = self.phase_manager.build_source_sharing_query(mine_name, country, region, commodity, unique_sources)
+        
+        # Erstelle Tasks für Phase 2
+        phase2_tasks = []
+        for model_id in successful_providers:
+            task = self.sources_analyzer.analyze_with_shared_sources(
+                model_id, mine_name, country, commodity, region, 
+                enhanced_query, unique_sources,
+                self._convert_to_standard_format
+            )
+            phase2_tasks.append(task)
+        
+        # Führe Phase 2 parallel aus
+        phase2_results = await asyncio.gather(*phase2_tasks, return_exceptions=True)
+        
+        # Kombiniere alle Ergebnisse
+        combined_result = self.search_result_combiner.combine_source_sharing_results(
+            phase1_results, model_ids, phase2_results, start_time, unique_sources
+        )
+        
+        logger.info(f"[SOURCE-SHARING] Abgeschlossen. Gesamtdauer: {(datetime.now() - start_time).total_seconds():.1f}s")
+        
+        return combined_result
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
 
 # Globale Service-Instanz

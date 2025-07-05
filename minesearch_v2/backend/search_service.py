@@ -12,11 +12,12 @@ from typing import Dict, Any, List, Optional
 
 from config import config, Config, CSV_COLUMNS, FIELDS_WITHOUT_SOURCES
 from utils import normalize_accents, generate_name_variants, generate_multilingual_search_terms, get_country_config
-from data_extraction import extract_structured_data_with_sources
+from data_extraction import DataExtractor
 from source_discovery import extract_sources_from_content
 from enhanced_source_discovery import EnhancedSourceDiscovery
 from providers.registry import provider_registry
 from providers.base_provider import SearchResult
+from cache_service import get_cache_service, cached_search
 
 # ÄNDERUNG 30.06.2025: Strukturiertes Logging implementiert (Regel 16)
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class MineSearchService:
         provider_registry.initialize(config.PROVIDERS)
         self.registry = provider_registry
         self.enhanced_discovery = EnhancedSourceDiscovery()  # ÄNDERUNG 01.07.2025: Enhanced Source Discovery
+        self.data_extractor = DataExtractor()  # ÄNDERUNG 05.07.2025: Refactorierte Datenextraktion
         
         # Legacy Support für direkte Perplexity-Nutzung
         self.api_key = config.PERPLEXITY_API_KEY
@@ -55,6 +57,16 @@ class MineSearchService:
         if not self.api_key:
             logger.error("Perplexity API Key nicht konfiguriert")
             raise ValueError("API Key nicht konfiguriert")
+        
+        # ÄNDERUNG 05.07.2025: Cache-Integration
+        cache = get_cache_service()
+        cached_result = cache.get(mine_name, country or "", model, 
+                                 commodity=commodity, region=region)
+        if cached_result:
+            logger.info(f"[CACHE HIT] Verwende gecachtes Ergebnis für {mine_name}")
+            cached_result['from_cache'] = True
+            cached_result['cache_timestamp'] = datetime.now().isoformat()
+            return cached_result
         
         # ÄNDERUNG 01.07.2025: Active Source Discovery Phase
         start_time = datetime.now()
@@ -83,7 +95,8 @@ class MineSearchService:
         try:
             # Generiere Suchvarianten
             name_variants = generate_name_variants(mine_name)
-            multilingual_terms = generate_multilingual_search_terms(mine_name, country)
+            country_config = get_country_config(country)
+            multilingual_terms = generate_multilingual_search_terms(country_config)
             
             logger.info(f"[SEARCH] Mine: {mine_name}, Modell: {model}, Varianten: {len(name_variants)}")
             
@@ -166,8 +179,8 @@ class MineSearchService:
                 if additional_content and processed_result.get('success'):
                     processed_result['data']['content'] += additional_content
                     # Neu-Extraktion der strukturierten Daten mit allen Inhalten
-                    from data_extraction import extract_structured_data_with_sources
-                    combined_data = extract_structured_data_with_sources(
+                    from data_extraction import DataExtractor
+                    combined_data = self.data_extractor.extract_structured_data_with_sources(
                         processed_result['data']['content'], mine_name, country
                     )
                     processed_result['data']['structured_data'] = combined_data['data']
@@ -228,6 +241,14 @@ class MineSearchService:
                 processed_result['data']['search_duration'] = search_duration
             
             logger.info(f"[SEARCH COMPLETE] Mine: {mine_name}, Duration: {search_duration:.1f}s, Success: {processed_result.get('success', False)}")
+            
+            # ÄNDERUNG 05.07.2025: Cache erfolgreiche Ergebnisse
+            if processed_result.get('success') and processed_result.get('data'):
+                # Cache mit längerem TTL für Deep Research
+                ttl = 7200 if model == "sonar-deep-research" else 3600
+                cache.set(mine_name, country or "", model, processed_result, ttl=ttl,
+                         commodity=commodity, region=region)
+                logger.info(f"[CACHE SET] Ergebnis für {mine_name} gecacht (TTL: {ttl}s)")
             
             return processed_result
             
@@ -449,7 +470,7 @@ biaya reklamasi, jaminan reklamasi. Gib ALLE gefundenen Beträge an, auch wenn i
             content = f"Keine spezifischen Informationen über die Mine '{mine_name}' gefunden."
         
         # Extrahiere strukturierte Daten mit Quellen
-        extended_data = extract_structured_data_with_sources(content, mine_name, country)
+        extended_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
         structured_data = extended_data['data']
         data_with_sources = extended_data['data_with_sources']
         source_index = extended_data['source_index']
@@ -650,7 +671,7 @@ biaya reklamasi, jaminan reklamasi. Gib ALLE gefundenen Beträge an, auch wenn i
                 combined_content += result['content'] + "\n"
         
         # Aktualisiere strukturierte Daten
-        enhanced_data = extract_structured_data_with_sources(combined_content, mine_name, country)
+        enhanced_data = self.data_extractor.extract_structured_data_with_sources(combined_content, mine_name, country)
         all_sources = extract_sources_from_content(combined_content)
         
         return {
