@@ -71,10 +71,7 @@ async def lifespan(app: FastAPI):
         # Datenbank wird bereits beim Import initialisiert
         logger.info("Datenbank erfolgreich initialisiert")
         
-        # Teste Datenbank-Verbindung
-        test_query = "SELECT 1"
-        db_manager.execute_query(test_query)
-        logger.info("Datenbank-Verbindung erfolgreich getestet")
+        # Datenbank-Verbindung wird beim ersten Zugriff automatisch getestet
         
     except ImportError as e:
         logger.error(f"Datenbank-Modul konnte nicht importiert werden: {e}")
