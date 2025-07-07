@@ -295,6 +295,140 @@ class SearchResult(Base):
         }
 
 
+class ModelStatistics(Base):
+    """Datenbank-Tabelle für Modell-Statistiken"""
+    __tablename__ = 'model_statistics'
+    
+    id = Column(Integer, primary_key=True)
+    model_id = Column(String(100), nullable=False, index=True)
+    mine_name = Column(String(255), nullable=False, index=True)
+    country = Column(String(100), nullable=True)
+    region = Column(String(100), nullable=True)
+    commodity = Column(String(100), nullable=True)
+    run_number = Column(Integer, nullable=False)  # 1-5 für jeden Durchlauf
+    timestamp = Column(DateTime, nullable=False, server_default=func.now())
+    
+    # Ergebnis-Metriken
+    success = Column(Boolean, nullable=False, default=False)
+    response_time_ms = Column(Float, nullable=True)
+    fields_found = Column(Integer, nullable=False, default=0)
+    sources_count = Column(Integer, nullable=False, default=0)
+    
+    # Daten
+    raw_result = Column(JSON, nullable=True)  # Komplette API-Antwort
+    structured_data = Column(JSON, nullable=True)  # Extrahierte Felder
+    error_message = Column(Text, nullable=True)
+    
+    # Indizes
+    __table_args__ = (
+        Index('idx_model_mine', 'model_id', 'mine_name'),
+        Index('idx_model_timestamp', 'model_id', 'timestamp'),
+    )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Konvertiere zu Dictionary für API-Responses"""
+        return {
+            'id': self.id,
+            'model_id': self.model_id,
+            'mine_name': self.mine_name,
+            'country': self.country,
+            'region': self.region,
+            'commodity': self.commodity,
+            'run_number': self.run_number,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'success': self.success,
+            'response_time_ms': self.response_time_ms,
+            'fields_found': self.fields_found,
+            'sources_count': self.sources_count,
+            'structured_data': self.structured_data,
+            'error_message': self.error_message
+        }
+
+
+class FieldConsistency(Base):
+    """Datenbank-Tabelle für Feld-Konsistenz-Analyse"""
+    __tablename__ = 'field_consistency'
+    
+    id = Column(Integer, primary_key=True)
+    model_id = Column(String(100), nullable=False, index=True)
+    mine_name = Column(String(255), nullable=False, index=True)
+    field_name = Column(String(100), nullable=False)
+    consistency_score = Column(Float, nullable=False, default=0.0)  # 0.0 bis 1.0
+    values_found = Column(JSON, nullable=False)  # Array aller gefundenen Werte
+    most_common_value = Column(Text, nullable=True)
+    occurrence_count = Column(Integer, nullable=False, default=0)
+    total_runs = Column(Integer, nullable=False, default=5)
+    is_consistent = Column(Boolean, nullable=False, default=False)  # True wenn >80% gleich
+    last_updated = Column(DateTime, nullable=False, server_default=func.now())
+    
+    # Indizes
+    __table_args__ = (
+        Index('idx_model_mine_field', 'model_id', 'mine_name', 'field_name'),
+        Index('idx_consistency', 'consistency_score'),
+    )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Konvertiere zu Dictionary für API-Responses"""
+        return {
+            'id': self.id,
+            'model_id': self.model_id,
+            'mine_name': self.mine_name,
+            'field_name': self.field_name,
+            'consistency_score': self.consistency_score,
+            'values_found': self.values_found,
+            'most_common_value': self.most_common_value,
+            'occurrence_count': self.occurrence_count,
+            'total_runs': self.total_runs,
+            'is_consistent': self.is_consistent,
+            'last_updated': self.last_updated.isoformat() if self.last_updated else None
+        }
+
+
+class ModelSummary(Base):
+    """Datenbank-Tabelle für Modell-Zusammenfassung"""
+    __tablename__ = 'model_summary'
+    
+    model_id = Column(String(100), primary_key=True)
+    total_tests = Column(Integer, nullable=False, default=0)
+    total_mines_tested = Column(Integer, nullable=False, default=0)
+    avg_response_time_ms = Column(Float, nullable=False, default=0.0)
+    avg_fields_found = Column(Float, nullable=False, default=0.0)
+    avg_sources_count = Column(Float, nullable=False, default=0.0)
+    success_rate = Column(Float, nullable=False, default=0.0)  # 0.0 bis 1.0
+    overall_consistency = Column(Float, nullable=False, default=0.0)  # 0.0 bis 1.0
+    
+    # Feld-spezifische Konsistenz
+    critical_fields_consistency = Column(JSON, nullable=True)  # {"Eigentümer": 0.8, "Betreiber": 0.6, ...}
+    
+    # Kosten-Schätzung
+    estimated_cost_per_request = Column(Float, nullable=True)
+    total_estimated_cost = Column(Float, nullable=False, default=0.0)
+    
+    # Timestamps
+    first_test_at = Column(DateTime, nullable=True)
+    last_test_at = Column(DateTime, nullable=True)
+    last_updated = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Konvertiere zu Dictionary für API-Responses"""
+        return {
+            'model_id': self.model_id,
+            'total_tests': self.total_tests,
+            'total_mines_tested': self.total_mines_tested,
+            'avg_response_time_ms': self.avg_response_time_ms,
+            'avg_fields_found': self.avg_fields_found,
+            'avg_sources_count': self.avg_sources_count,
+            'success_rate': self.success_rate,
+            'overall_consistency': self.overall_consistency,
+            'critical_fields_consistency': self.critical_fields_consistency,
+            'estimated_cost_per_request': self.estimated_cost_per_request,
+            'total_estimated_cost': self.total_estimated_cost,
+            'first_test_at': self.first_test_at.isoformat() if self.first_test_at else None,
+            'last_test_at': self.last_test_at.isoformat() if self.last_test_at else None,
+            'last_updated': self.last_updated.isoformat() if self.last_updated else None
+        }
+
+
 class DatabaseManager:
     """Verwaltung der Datenbankverbindung und -operationen"""
     

@@ -146,12 +146,85 @@ class MultiProviderSearchService:
             if not standard_result.get('success'):
                 logger.warning(f"[MULTI-SEARCH] {model_id} gab keinen Erfolg zurück: {standard_result.get('error', 'Unbekannter Fehler')}")
             else:
-                logger.info(f"[MULTI-SEARCH] {model_id} erfolgreich: {len(standard_result.get('data', {}))} Felder extrahiert")
+                # ÄNDERUNG 07.07.2025: Detailliertes Logging für erfolgreiche Suchen
+                data = standard_result.get('data', {})
+                structured_data = data.get('structured_data', {}) if isinstance(data, dict) else {}
+                filled_fields = len([v for v in structured_data.values() if v and str(v).strip()])
+                logger.info(f"[MULTI-SEARCH] {model_id} erfolgreich: {filled_fields} Felder extrahiert")
+                
+                # Debug: Zeige welche Felder gefüllt sind
+                if filled_fields > 0:
+                    filled_field_names = [k for k, v in structured_data.items() if v and str(v).strip()]
+                    logger.debug(f"[MULTI-SEARCH] {model_id} gefüllte Felder: {filled_field_names[:10]}")
+                
+                # ÄNDERUNG 07.07.2025: Erfasse Statistiken für normale Suchen
+                # Fire-and-forget Statistik-Erfassung
+                try:
+                    import aiohttp
+                    async def capture_stats():
+                        try:
+                            stats_data = {
+                                'model_id': model_id,
+                                'mine_name': mine_name,
+                                'country': country,
+                                'success': True,
+                                'response_time_ms': (provider_result.search_duration or 0) * 1000,
+                                'fields_found': filled_fields,
+                                'sources_count': len(sources),
+                                'structured_data': structured_data
+                            }
+                            
+                            async with aiohttp.ClientSession() as session:
+                                async with session.post(
+                                    'http://localhost:8000/api/benchmark/capture',
+                                    json=stats_data,
+                                    timeout=aiohttp.ClientTimeout(total=5)
+                                ) as response:
+                                    if response.status == 200:
+                                        logger.debug(f"[MULTI-SEARCH] Statistiken erfasst für {model_id}")
+                                    else:
+                                        logger.debug(f"[MULTI-SEARCH] Statistik-Erfassung Status: {response.status}")
+                        except Exception as e:
+                            # Ignoriere Fehler - fire-and-forget
+                            logger.debug(f"[MULTI-SEARCH] Statistik-Erfassung Fehler: {str(e)}")
+                    
+                    # Starte Task ohne zu warten
+                    asyncio.create_task(capture_stats())
+                    
+                except Exception as e:
+                    # Ignoriere Fehler bei der Task-Erstellung
+                    logger.debug(f"[MULTI-SEARCH] Konnte Statistik-Task nicht erstellen: {str(e)}")
             
             return standard_result
             
         except ValueError as e:
             logger.error(f"[MULTI-SEARCH] Model-ID Format-Fehler bei {model_id}: {str(e)}")
+            
+            # ÄNDERUNG 07.07.2025: Erfasse auch fehlgeschlagene Suchen
+            try:
+                import aiohttp
+                async def capture_error_stats():
+                    try:
+                        stats_data = {
+                            'model_id': model_id,
+                            'mine_name': mine_name,
+                            'country': country,
+                            'success': False,
+                            'error_message': str(e)
+                        }
+                        async with aiohttp.ClientSession() as session:
+                            await session.post(
+                                'http://localhost:8000/api/benchmark/capture',
+                                json=stats_data,
+                                timeout=aiohttp.ClientTimeout(total=5)
+                            )
+                    except:
+                        pass
+                
+                asyncio.create_task(capture_error_stats())
+            except:
+                pass
+            
             return {
                 "success": False,
                 "error": f"Ungültiges Model-ID Format: {model_id}",
@@ -160,6 +233,32 @@ class MultiProviderSearchService:
             }
         except AttributeError as e:
             logger.error(f"[MULTI-SEARCH] Provider-Methode fehlt bei {model_id}: {str(e)}")
+            
+            # ÄNDERUNG 07.07.2025: Erfasse auch fehlgeschlagene Suchen
+            try:
+                import aiohttp
+                async def capture_error_stats():
+                    try:
+                        stats_data = {
+                            'model_id': model_id,
+                            'mine_name': mine_name,
+                            'country': country,
+                            'success': False,
+                            'error_message': str(e)
+                        }
+                        async with aiohttp.ClientSession() as session:
+                            await session.post(
+                                'http://localhost:8000/api/benchmark/capture',
+                                json=stats_data,
+                                timeout=aiohttp.ClientTimeout(total=5)
+                            )
+                    except:
+                        pass
+                
+                asyncio.create_task(capture_error_stats())
+            except:
+                pass
+            
             return {
                 "success": False,
                 "error": f"Provider-Implementierungsfehler: {str(e)}",
@@ -168,6 +267,32 @@ class MultiProviderSearchService:
             }
         except Exception as e:
             logger.error(f"[MULTI-SEARCH] Unerwarteter Fehler bei {model_id}: {type(e).__name__}: {str(e)}", exc_info=True)
+            
+            # ÄNDERUNG 07.07.2025: Erfasse auch fehlgeschlagene Suchen
+            try:
+                import aiohttp
+                async def capture_error_stats():
+                    try:
+                        stats_data = {
+                            'model_id': model_id,
+                            'mine_name': mine_name,
+                            'country': country,
+                            'success': False,
+                            'error_message': f"{type(e).__name__}: {str(e)}"
+                        }
+                        async with aiohttp.ClientSession() as session:
+                            await session.post(
+                                'http://localhost:8000/api/benchmark/capture',
+                                json=stats_data,
+                                timeout=aiohttp.ClientTimeout(total=5)
+                            )
+                    except:
+                        pass
+                
+                asyncio.create_task(capture_error_stats())
+            except:
+                pass
+            
             return {
                 "success": False,
                 "error": f"{type(e).__name__}: {str(e)}",
@@ -357,6 +482,32 @@ class MultiProviderSearchService:
         
         # ÄNDERUNG 06.07.2025: Robustere Fehlerbehandlung
         if not provider_result.success:
+            # ÄNDERUNG 07.07.2025: Erfasse auch Provider-Fehler
+            try:
+                import aiohttp
+                async def capture_provider_error():
+                    try:
+                        stats_data = {
+                            'model_id': model_id,
+                            'mine_name': mine_name,
+                            'country': country,
+                            'success': False,
+                            'error_message': provider_result.error or "Provider gab keinen Erfolg zurück",
+                            'response_time_ms': (provider_result.search_duration or 0) * 1000
+                        }
+                        async with aiohttp.ClientSession() as session:
+                            await session.post(
+                                'http://localhost:8000/api/benchmark/capture',
+                                json=stats_data,
+                                timeout=aiohttp.ClientTimeout(total=5)
+                            )
+                    except:
+                        pass
+                
+                asyncio.create_task(capture_provider_error())
+            except:
+                pass
+            
             return {
                 "success": False,
                 "status": "error",
@@ -381,27 +532,30 @@ class MultiProviderSearchService:
                 "total_fields": len(structured_data)
             }
         
-        # ÄNDERUNG 06.07.2025: Einheitliche Struktur für alle Antworten
+        # ÄNDERUNG 07.07.2025: Konsistente Struktur mit structured_data im data-Objekt
         return {
             "success": True,
             "status": "success",
-            "data": structured_data,  # Direkt die strukturierten Daten
-            "sources": sources,  # Quellen auf oberster Ebene
-            "model_id": model_id,
-            "mine_name": mine_name,
-            "country": country,
-            "filled_fields": len([v for v in structured_data.values() if v and str(v).strip()]),
-            "metadata": {
-                "content": provider_result.content[:1000] if provider_result.content else "",  # Begrenze Content-Größe
-                "mine_name": mine_name,
+            "data": {
+                "structured_data": structured_data,  # Strukturierte Daten in data.structured_data
                 "structured_data_with_sources": provider_result.metadata.get('structured_data_with_sources', {}) if provider_result.metadata else {},
+                "sources": sources,
                 "source_index": provider_result.metadata.get('source_index', {}) if provider_result.metadata else {},
                 "source_summary": {
                     "urls": len([s for s in sources if s.get('type') == 'url']),
                     "documents": len([s for s in sources if s.get('type') == 'document']),
                     "organizations": len([s for s in sources if s.get('type') == 'organization']),
                     "total": len(sources)
-                },
+                }
+            },
+            "sources": sources,  # Auch auf oberster Ebene für Kompatibilität
+            "model_id": model_id,
+            "mine_name": mine_name,
+            "country": country,
+            "filled_fields": len([v for v in structured_data.values() if v and str(v).strip()]),
+            "metadata": {
+                "content": provider_result.content[:1000] if provider_result.content else "",
+                "mine_name": mine_name,
                 "data_quality": data_quality,
                 "search_metadata": {
                     "model_used": model_id,
@@ -694,7 +848,29 @@ Gib konkrete Zahlen mit Währung und Jahr an."""
             result = await provider.search(enhanced_query, model_key, options)
             
             # Konvertiere und annotiere mit Source-Sharing Info
-            standard_result = self._convert_to_standard_format(result, model_id, mine_name, country)
+            # ÄNDERUNG 07.07.2025: Nutze die MultiProviderSearchService Konvertierungsmethode
+            if hasattr(result, 'structured_data'):
+                # SearchResult Objekt
+                standard_result = {
+                    "success": result.success,
+                    "status": "completed" if result.success else "error",
+                    "data": {
+                        "structured_data": result.structured_data or {},
+                        "structured_data_with_sources": result.metadata.get('structured_data_with_sources', {}) if result.metadata else {},
+                        "sources": result.sources or [],
+                        "source_index": result.metadata.get('source_index', {}) if result.metadata else {}
+                    },
+                    "sources": result.sources or [],
+                    "model_id": model_id,
+                    "mine_name": mine_name,
+                    "country": country,
+                    "filled_fields": len([v for v in (result.structured_data or {}).values() if v and str(v).strip()]),
+                    "metadata": result.metadata or {}
+                }
+            else:
+                # Dict Result
+                standard_result = result
+            
             standard_result['source_sharing_used'] = True
             standard_result['shared_sources_count'] = len(sources)
             

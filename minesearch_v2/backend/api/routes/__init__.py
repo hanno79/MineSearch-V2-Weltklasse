@@ -13,6 +13,7 @@ from .results import router as results_router
 from .models_info import router as models_router
 from .static import router as static_router
 from .cache import router as cache_router
+from .benchmark import router as benchmark_router
 
 # Haupt-Router erstellen
 router = APIRouter()
@@ -25,3 +26,4 @@ router.include_router(sources_router, prefix="/api", tags=["sources"])
 router.include_router(results_router, prefix="/api", tags=["results"])
 router.include_router(models_router, prefix="/api", tags=["models"])
 router.include_router(cache_router, prefix="/api", tags=["cache"])
+router.include_router(benchmark_router)
