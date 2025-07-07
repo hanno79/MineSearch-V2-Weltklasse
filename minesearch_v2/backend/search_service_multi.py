@@ -43,6 +43,11 @@ class MultiProviderSearchService:
         self.search_result_combiner = SearchResultCombiner()
         self.async_utils = AsyncSearchUtils()
         self.sources_analyzer = SharedSourcesAnalyzer(self.registry)
+        
+        # ÄNDERUNG 05.07.2025: Phase-Modelle für Two-Phase Search
+        self.phase1_models = self.phase_manager.phase1_models
+        self.phase2_models = self.phase_manager.phase2_models
+        self.phase3_models = self.phase_manager.phase3_models
     
     async def search_with_model(self, model_id: str, mine_name: str, 
                                country: Optional[str] = None,
@@ -81,22 +86,29 @@ class MultiProviderSearchService:
             }
         
         # Starte Source Discovery Session
-        session = self.enhanced_discovery.start_session(mine_name, country, region)
+        session = None
+        try:
+            session = self.enhanced_discovery.start_session(mine_name, country, region)
+            if not session:
+                logger.warning("[MULTI-SEARCH] Konnte keine Source Discovery Session starten")
+        except Exception as e:
+            logger.error(f"[MULTI-SEARCH] Fehler beim Start der Source Discovery Session: {e}")
         
         # ÄNDERUNG 04.07.2025: Source Discovery für ALLE Modelle durchführen
         # Auch OpenRouter-Modelle können von den Quellen-URLs profitieren
         discovered_sources = []
-        try:
-            # Verwende die korrekte synchrone Methode (Session bereits gestartet)
-            discovered_sources = self.enhanced_discovery.discover_sources_for_mine(
-                mine_name=mine_name, 
-                country=country, 
-                region=region,
-                commodity=commodity
-            )
-            logger.info(f"[MULTI-SEARCH] {len(discovered_sources)} Quellen für {mine_name} entdeckt")
-        except Exception as e:
-            logger.warning(f"[MULTI-SEARCH] Fehler bei Source Discovery: {str(e)}")
+        if session:
+            try:
+                # Verwende die korrekte synchrone Methode (Session bereits gestartet)
+                discovered_sources = self.enhanced_discovery.discover_sources_for_mine(
+                    mine_name=mine_name, 
+                    country=country, 
+                    region=region,
+                    commodity=commodity
+                )
+                logger.info(f"[MULTI-SEARCH] {len(discovered_sources)} Quellen für {mine_name} entdeckt")
+            except Exception as e:
+                logger.warning(f"[MULTI-SEARCH] Fehler bei Source Discovery: {str(e)}")
         
         # Erstelle Suchanfrage
         name_variants = generate_name_variants(mine_name)
@@ -128,19 +140,47 @@ class MultiProviderSearchService:
             result = await provider.search(query, model_key, options)
             
             # Konvertiere Provider-Result in Standard-Format
-            return self._convert_to_standard_format(result, model_id, mine_name, country)
+            standard_result = self._convert_to_standard_format(result, model_id, mine_name, country)
             
-        except Exception as e:
-            logger.error(f"[MULTI-SEARCH] Fehler bei {model_id}: {str(e)}")
+            # ÄNDERUNG 06.07.2025: Stelle sicher, dass das Ergebnis korrekt ist
+            if not standard_result.get('success'):
+                logger.warning(f"[MULTI-SEARCH] {model_id} gab keinen Erfolg zurück: {standard_result.get('error', 'Unbekannter Fehler')}")
+            else:
+                logger.info(f"[MULTI-SEARCH] {model_id} erfolgreich: {len(standard_result.get('data', {}))} Felder extrahiert")
+            
+            return standard_result
+            
+        except ValueError as e:
+            logger.error(f"[MULTI-SEARCH] Model-ID Format-Fehler bei {model_id}: {str(e)}")
             return {
                 "success": False,
-                "error": str(e),
-                "data": {}
+                "error": f"Ungültiges Model-ID Format: {model_id}",
+                "data": {},
+                "status": "error"
+            }
+        except AttributeError as e:
+            logger.error(f"[MULTI-SEARCH] Provider-Methode fehlt bei {model_id}: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Provider-Implementierungsfehler: {str(e)}",
+                "data": {},
+                "status": "error"
+            }
+        except Exception as e:
+            logger.error(f"[MULTI-SEARCH] Unerwarteter Fehler bei {model_id}: {type(e).__name__}: {str(e)}", exc_info=True)
+            return {
+                "success": False,
+                "error": f"{type(e).__name__}: {str(e)}",
+                "data": {},
+                "status": "error"
             }
         finally:
             # Finalisiere Session
             if session:
-                self.enhanced_discovery.finalize_session()
+                try:
+                    self.enhanced_discovery.finalize_session()
+                except Exception as e:
+                    logger.error(f"[MULTI-SEARCH] Fehler beim Finalisieren der Session: {e}")
     
     async def search_with_multiple_models(self, model_ids: List[str], mine_name: str,
                                         country: Optional[str] = None,
@@ -315,38 +355,59 @@ class MultiProviderSearchService:
                                    country: Optional[str]) -> Dict[str, Any]:
         """Konvertiere Provider-Result in Standard MineSearch Format"""
         
+        # ÄNDERUNG 06.07.2025: Robustere Fehlerbehandlung
         if not provider_result.success:
             return {
                 "success": False,
-                "error": provider_result.error,
-                "data": {}
+                "status": "error",
+                "error": provider_result.error or "Provider gab keinen Erfolg zurück",
+                "data": {},
+                "sources": [],
+                "model_id": model_id
             }
         
-        # Berechne Datenqualität
-        data_quality = self.quality_calculator.calculate_data_quality(provider_result.structured_data)
+        # Stelle sicher, dass structured_data existiert
+        structured_data = provider_result.structured_data or {}
+        sources = provider_result.sources or []
         
-        # ÄNDERUNG 05.07.2025: Korrigierte Datenstruktur für Frontend-Kompatibilität
+        # Berechne Datenqualität
+        try:
+            data_quality = self.quality_calculator.calculate_data_quality(structured_data)
+        except Exception as e:
+            logger.warning(f"[CONVERT] Fehler bei Datenqualitäts-Berechnung: {e}")
+            data_quality = {
+                "score": 0,
+                "filled_fields": len([v for v in structured_data.values() if v]),
+                "total_fields": len(structured_data)
+            }
+        
+        # ÄNDERUNG 06.07.2025: Einheitliche Struktur für alle Antworten
         return {
             "success": True,
-            "data": provider_result.structured_data,  # Direkt die strukturierten Daten
-            "sources": provider_result.sources,  # Quellen auf oberster Ebene
+            "status": "success",
+            "data": structured_data,  # Direkt die strukturierten Daten
+            "sources": sources,  # Quellen auf oberster Ebene
+            "model_id": model_id,
+            "mine_name": mine_name,
+            "country": country,
+            "filled_fields": len([v for v in structured_data.values() if v and str(v).strip()]),
             "metadata": {
-                "content": provider_result.content,
+                "content": provider_result.content[:1000] if provider_result.content else "",  # Begrenze Content-Größe
                 "mine_name": mine_name,
-                "structured_data_with_sources": provider_result.metadata.get('structured_data_with_sources', {}),
-                "source_index": provider_result.metadata.get('source_index', {}),
+                "structured_data_with_sources": provider_result.metadata.get('structured_data_with_sources', {}) if provider_result.metadata else {},
+                "source_index": provider_result.metadata.get('source_index', {}) if provider_result.metadata else {},
                 "source_summary": {
-                    "urls": len([s for s in provider_result.sources if s.get('type') == 'url']),
-                    "documents": len([s for s in provider_result.sources if s.get('type') == 'document']),
-                    "organizations": len([s for s in provider_result.sources if s.get('type') == 'organization']),
-                    "total": len(provider_result.sources)
+                    "urls": len([s for s in sources if s.get('type') == 'url']),
+                    "documents": len([s for s in sources if s.get('type') == 'document']),
+                    "organizations": len([s for s in sources if s.get('type') == 'organization']),
+                    "total": len(sources)
                 },
                 "data_quality": data_quality,
                 "search_metadata": {
                     "model_used": model_id,
-                    "provider": provider_result.metadata.get('provider', 'unknown'),
+                    "provider": provider_result.metadata.get('provider', model_id.split(':')[0]) if provider_result.metadata else model_id.split(':')[0],
                     "search_timestamp": datetime.now().isoformat(),
-                    "search_duration": provider_result.search_duration
+                    "search_duration": provider_result.search_duration or 0
                 }
             }
         }
@@ -484,14 +545,169 @@ class MultiProviderSearchService:
         
         return combined_result
     
+    async def search_direct(self, model_id: str, mine_name: str,
+                          country: Optional[str] = None,
+                          commodity: Optional[str] = None,
+                          region: Optional[str] = None,
+                          focus: str = "financial") -> Dict[str, Any]:
+        """
+        ÄNDERUNG 06.07.2025: Vereinfachte direkte Suche mit Fokus auf Finanzdaten
+        
+        Args:
+            model_id: Modell-ID im Format "provider:model"
+            mine_name: Name der Mine
+            country: Land (optional)
+            commodity: Rohstoff (optional)
+            region: Region (optional)
+            focus: Suchfokus ("financial", "technical", "general")
+            
+        Returns:
+            Suchergebnis mit extrahierten Daten
+        """
+        provider = self.registry.get_provider_for_model(model_id)
+        if not provider:
+            return {
+                "success": False,
+                "error": f"Provider für {model_id} nicht gefunden",
+                "data": {}
+            }
+        
+        # Fokussierte Query basierend auf Suchtyp
+        if focus == "financial":
+            query = f"""Finde detaillierte FINANZDATEN für {mine_name} Mine in {country or 'unbekannt'}:
+            
+PRIORITÄT 1 - Restaurationskosten:
+- Closure costs / Reclamation costs / ARO (Asset Retirement Obligation)
+- Rehabilitation costs / Restoration provisions
+- Suche nach Beträgen in CAD, USD mit Jahr
+
+PRIORITÄT 2 - Finanzielle Kennzahlen:
+- Marktkapitalisierung / Market cap
+- Jahresumsatz / Annual revenue
+- Investitionssumme / Capital expenditure
+- EBITDA / Cashflow
+
+PRIORITÄT 3 - Reserven:
+- Gold/Mineral reserves (in Unzen/Tonnen)
+- Ressourcen / Resources
+- Mine life / Lebensdauer
+
+Gib konkrete Zahlen mit Währung und Jahr an."""
+        else:
+            # Standard-Query
+            query = f"Finde detaillierte Informationen über {mine_name} Mine"
+            if country:
+                query += f" in {country}"
+            if commodity:
+                query += f", die {commodity} abbaut"
+        
+        try:
+            # Direkte Suche ohne komplexe Transformationen
+            provider_name, model_key = model_id.split(':')
+            
+            # Minimale Optionen
+            options = {
+                'mine_name': mine_name,
+                'country': country,
+                'commodity': commodity,
+                'region': region,
+                'temperature': 0.1,  # Niedrig für präzise Daten
+                'focus': focus
+            }
+            
+            # Führe Suche aus
+            start_time = datetime.now()
+            result = await provider.search(query, model_key, options)
+            duration = (datetime.now() - start_time).total_seconds()
+            
+            # Direkte Rückgabe mit minimaler Transformation
+            if result.success:
+                return {
+                    "success": True,
+                    "status": "success",
+                    "data": result.structured_data,
+                    "sources": result.sources,
+                    "model_id": model_id,
+                    "duration": duration,
+                    "filled_fields": len([v for v in result.structured_data.values() if v and str(v).strip()]),
+                    "focus": focus
+                }
+            else:
+                return {
+                    "success": False,
+                    "status": "error",
+                    "error": result.error or "Suche fehlgeschlagen",
+                    "data": {},
+                    "model_id": model_id,
+                    "duration": duration
+                }
+                
+        except Exception as e:
+            logger.error(f"[SEARCH-DIRECT] Fehler bei {model_id}: {type(e).__name__}: {str(e)}")
+            return {
+                "success": False,
+                "status": "error",
+                "error": f"{type(e).__name__}: {str(e)}",
+                "data": {},
+                "model_id": model_id
+            }
     
-    
-    
-    
-    
-    
-    
-    
+    async def _analyze_with_shared_sources(self, model_id: str, mine_name: str,
+                                          country: str, commodity: str, region: str,
+                                          enhanced_query: str, sources: List[Dict]) -> Dict[str, Any]:
+        """
+        Analysiere mit geteilten Quellen aus anderen Providern
+        
+        Args:
+            model_id: Modell-ID
+            mine_name: Name der Mine
+            country: Land
+            commodity: Rohstoff
+            region: Region
+            enhanced_query: Erweiterte Query mit Quellen-Informationen
+            sources: Liste von Quellen aus Phase 1
+            
+        Returns:
+            Suchergebnis
+        """
+        provider = self.registry.get_provider_for_model(model_id)
+        if not provider:
+            return {
+                "success": False,
+                "error": f"Provider für {model_id} nicht gefunden",
+                "data": {}
+            }
+        
+        # Erweiterte Optionen mit geteilten Quellen
+        options = {
+            'mine_name': mine_name,
+            'country': country,
+            'commodity': commodity,
+            'region': region,
+            'shared_sources': sources,
+            'focus': 'restoration_costs',  # Fokus auf Restaurationskosten
+            'temperature': 0.1  # Niedrige Temperature für präzise Extraktion
+        }
+        
+        try:
+            provider_name, model_key = model_id.split(':')
+            result = await provider.search(enhanced_query, model_key, options)
+            
+            # Konvertiere und annotiere mit Source-Sharing Info
+            standard_result = self._convert_to_standard_format(result, model_id, mine_name, country)
+            standard_result['source_sharing_used'] = True
+            standard_result['shared_sources_count'] = len(sources)
+            
+            return standard_result
+            
+        except Exception as e:
+            logger.error(f"[SOURCE-SHARING] Fehler bei {model_id}: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "data": {},
+                "source_sharing_used": True
+            }
 
 
 # Globale Service-Instanz

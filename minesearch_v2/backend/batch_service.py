@@ -154,6 +154,14 @@ class BatchService:
                   hx-indicator="#batch-loading">
                 
                 <input type="hidden" name="session_id" value="{session_id}">
+                <input type="hidden" name="selected_models" id="batch_selected_models" value="">
+                
+                <div class="model-info" style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-radius: 5px;">
+                    <p style="margin: 0;"><strong>Hinweis:</strong> Die Batch-Suche verwendet die oben ausgewählten Modelle.</p>
+                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #666;">
+                        ⚠️ Bei Abacus AI: Rechne mit bis zu 5 Minuten pro Mine!
+                    </p>
+                </div>
                 
                 <div class="form-group">
                     <label>Anzahl zu suchender Minen:</label>

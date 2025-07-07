@@ -20,6 +20,40 @@ logger = logging.getLogger(__name__)
 # Datenbank-Basis
 Base = declarative_base()
 
+# Globale Engine und Session Factory
+engine = None
+SessionLocal = None
+
+def init_db():
+    """Initialisiere Datenbank-Verbindung"""
+    global engine, SessionLocal
+    
+    config = Config()
+    database_url = config.get('DATABASE_URL', 'sqlite:///./mines.db')
+    
+    engine = create_engine(
+        database_url,
+        connect_args={"check_same_thread": False} if database_url.startswith('sqlite') else {}
+    )
+    
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    
+    # Erstelle Tabellen
+    Base.metadata.create_all(bind=engine)
+    
+    logger.info(f"Datenbank initialisiert: {database_url}")
+
+def get_db():
+    """Dependency für FastAPI/andere Frameworks"""
+    if SessionLocal is None:
+        init_db()
+    
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 class Source(Base):
     """Datenbank-Tabelle für Mining-Quellen"""
     __tablename__ = 'sources'

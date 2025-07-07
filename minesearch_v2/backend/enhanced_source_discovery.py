@@ -14,8 +14,9 @@ from datetime import datetime
 import urllib.parse
 import asyncio
 
-from config import config, Config
+from config import config, Config, COUNTRY_CONFIG
 from source_discovery import SourceDiscovery
+from models import SearchSession
 import uuid
 from datetime import datetime, timedelta
 
@@ -31,8 +32,14 @@ class EnhancedSourceDiscovery(SourceDiscovery):
     
     def start_session(self, mine_name: str, country: Optional[str] = None, region: Optional[str] = None) -> 'SearchSession':
         """Starte neue Such-Session"""
-        # ÄNDERUNG 02.07.2025: Einfache Session-Implementierung ohne Registry
-        self.session = SearchSession(mine_name, country, region)
+        # ÄNDERUNG 04.07.2025: Verwende SearchSession aus models.py mit korrekter Initialisierung
+        import uuid
+        self.session = SearchSession(
+            session_id=str(uuid.uuid4()),
+            mine_name=mine_name,
+            country=country,
+            region=region
+        )
         logger.info(f"[SOURCE DISCOVERY] Session {self.session.session_id} gestartet für {mine_name}")
         return self.session
     
@@ -92,9 +99,10 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         sources = []
         
         # Hole Länderkonfiguration
-        country_config = Config.COUNTRY_CONFIGS.get(country.lower(), {})
+        country_config = COUNTRY_CONFIG.get(country.lower(), {})
         priority_domains = country_config.get('priority_domains', [])
         
+        # ÄNDERUNG 06.07.2025: Erweiterte GESTIM-Integration für Restaurationskosten
         # Spezialbehandlung für Quebec/GESTIM
         if country.lower() in ['kanada', 'canada'] and region and 'quebec' in region.lower():
             sources.append({
@@ -102,9 +110,20 @@ class EnhancedSourceDiscovery(SourceDiscovery):
                 'domain': 'gestim.mines.gouv.qc.ca',
                 'type': 'database',
                 'priority': 1,
-                'description': 'GESTIM - Quebec Mining Registry',
-                'search_hint': f"Suche nach: {mine_name}",
-                'api_available': True  # Markiere dass API verfügbar ist
+                'description': 'GESTIM - Quebec Mining Registry (Konzessionen & Umweltauflagen)',
+                'search_hint': f"Suche nach: {mine_name} - Fokus auf Umweltgarantien",
+                'api_available': True,  # Markiere dass API verfügbar ist
+                'restoration_focus': True  # Markierung für Restaurationskosten-Fokus
+            })
+            
+            # Zusätzliche GESTIM-spezifische Suche für Restaurationskosten
+            sources.append({
+                'url': f"search:'{mine_name}' GESTIM environmental guarantee filetype:pdf",
+                'domain': 'gestim.mines.gouv.qc.ca',
+                'type': 'document',
+                'priority': 1,
+                'description': 'GESTIM Umweltgarantien und Sicherheitsleistungen',
+                'search_pattern': f"'{mine_name}' GESTIM environmental guarantee filetype:pdf"
             })
         
         # Andere Priority Domains
@@ -203,7 +222,7 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         """Suche nach technischen Dokumenten"""
         sources = []
         
-        # ÄNDERUNG 02.07.2025: Erweiterte PDF-Suchpatterns
+        # ÄNDERUNG 06.07.2025: Erweiterte PDF-Suchpatterns für Konzessionsdokumente und kleine Minen
         # Basis-Suchbegriffe für technische Dokumente
         doc_patterns = [
             f'"{mine_name}" NI 43-101 technical report filetype:pdf',
@@ -220,7 +239,19 @@ class EnhancedSourceDiscovery(SourceDiscovery):
             f'"{mine_name}" asset retirement obligation filetype:pdf',
             f'"{mine_name}" reclamation plan filetype:pdf',
             f'"{mine_name}" rehabilitation plan filetype:pdf',
-            f'"{mine_name}" decommissioning plan filetype:pdf'
+            f'"{mine_name}" decommissioning plan filetype:pdf',
+            # NEUE Patterns für Konzessionsdokumente und Managementpläne
+            f'"{mine_name}" concession document filetype:pdf',
+            f'"{mine_name}" mining permit filetype:pdf',
+            f'"{mine_name}" environmental permit filetype:pdf',
+            f'"{mine_name}" management plan filetype:pdf',
+            f'"{mine_name}" mine management plan filetype:pdf',
+            f'"{mine_name}" exploration closure plan filetype:pdf',
+            f'"{mine_name}" GESTIM filetype:pdf',
+            f'"{mine_name}" mining title filetype:pdf',
+            f'"{mine_name}" licence application filetype:pdf',
+            f'"{mine_name}" financial guarantee filetype:pdf',
+            f'"{mine_name}" environmental bond filetype:pdf'
         ]
         
         # Erstelle Google-ähnliche Suchanfragen
@@ -499,15 +530,24 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         - Financial Assurance / Closure Bond / Environmental Bond
         - Post-closure monitoring costs
         - Progressive rehabilitation costs
+        - Exploration closure costs (für kleine Minen)
+        - Initial restoration costs
         
         Prüfe speziell diese Dokumenttypen:
         - Annual Reports: Notes to Financial Statements (Note über ARO/Environmental Liabilities)
         - Sustainability Reports: Environmental Provisions Section
         - Technical Reports: Section über Closure Costs
         - MD&A: Diskussion über zukünftige Verpflichtungen
+        - KONZESSIONSDOKUMENTE: Umweltauflagen und Sicherheitsleistungen
+        - MANAGEMENTPLÄNE: Restaurationsverpflichtungen
+        - GESTIM DATENBANK (für Quebec): Mining titles und Umweltgarantien
+        - UMWELTGENEHMIGUNGEN: Finanzielle Sicherheiten
         
-        WICHTIG: Gib ALLE gefundenen Beträge mit Währung und Jahr an!
-        Beispiel: "$45.3 million CAD (2023)" oder "USD 123 million as of December 2022"
+        WICHTIG: 
+        - Gib ALLE gefundenen Beträge an, auch kleine Beträge ab $1,000!
+        - Explorationsminen können Kosten von nur $5,000 - $50,000 haben
+        - Format: "$5,000 CAD (2023)" oder "$25k USD exploration closure"
+        - Achte auf Bezeichnungen wie "thousand", "k", "tausend"
         
         Wenn verschiedene Währungen gefunden werden, gib alle an und rechne ggf. um.
         """
@@ -532,69 +572,4 @@ class EnhancedSourceDiscovery(SourceDiscovery):
                 # die Quelle in seiner Antwort erwähnt
 
 
-# ÄNDERUNG 02.07.2025: Einfache SearchSession-Klasse ohne Registry
-class SearchSession:
-    """Einfache Session-Klasse für Source Discovery"""
-    
-    def __init__(self, mine_name: str, country: Optional[str] = None, region: Optional[str] = None):
-        self.session_id = str(uuid.uuid4())
-        self.mine_name = mine_name
-        self.country = country
-        self.region = region
-        self.start_time = datetime.now()
-        self.end_time = None
-        self.discovered_sources = []
-        self.searched_sources = []
-        self.successful_sources = []
-        self.failed_sources = []
-    
-    def add_discovered_source(self, url: str):
-        """Füge entdeckte Quelle hinzu"""
-        if url not in self.discovered_sources:
-            self.discovered_sources.append(url)
-    
-    def add_searched_source(self, url: str, success: bool, data: Optional[Dict[str, Any]] = None):
-        """Füge durchsuchte Quelle hinzu"""
-        source_info = {
-            'url': url,
-            'success': success,
-            'timestamp': datetime.now().isoformat(),
-            'details': data
-        }
-        
-        self.searched_sources.append(source_info)
-        
-        if success:
-            self.successful_sources.append(source_info)
-        else:
-            self.failed_sources.append(source_info)
-    
-    def finalize(self):
-        """Beende Session"""
-        self.end_time = datetime.now()
-    
-    def get_summary(self) -> Dict[str, Any]:
-        """Erstelle Session-Zusammenfassung"""
-        duration = (self.end_time or datetime.now()) - self.start_time
-        
-        return {
-            'session_id': self.session_id,
-            'mine_name': self.mine_name,
-            'country': self.country,
-            'region': self.region,
-            'start_time': self.start_time.isoformat(),
-            'end_time': self.end_time.isoformat() if self.end_time else None,
-            'duration_seconds': duration.total_seconds(),
-            'statistics': {
-                'discovered': len(self.discovered_sources),
-                'searched': len(self.searched_sources),
-                'successful': len(self.successful_sources),
-                'failed': len(self.failed_sources),
-                'success_rate': (len(self.successful_sources) / len(self.searched_sources) * 100) if self.searched_sources else 0
-            },
-            'sources': {
-                'discovered': self.discovered_sources[:10],  # Top 10
-                'successful': self.successful_sources[:10],  # Top 10
-                'failed': self.failed_sources[:10]  # Top 10
-            }
-        }
+# ÄNDERUNG 04.07.2025: SearchSession aus models.py verwenden statt lokale Definition

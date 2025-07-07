@@ -8,7 +8,7 @@ Beschreibung: Hilfsfunktionen für MineSearch
 import re
 import logging
 from typing import List, Dict, Any, Optional
-from config import config
+from config import config, COUNTRY_CONFIG
 
 # ÄNDERUNG 30.06.2025: Strukturiertes Logging (Regel 16)
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ def get_country_config(country: str) -> Dict:
     country_lower = country.lower()
     
     # Suche passende Konfiguration
-    for country_key, config_data in config.COUNTRY_CONFIGS.items():
+    for country_key, config_data in COUNTRY_CONFIG.items():
         if country_key.lower() in country_lower or country_lower in country_key.lower():
             logger.debug(f"[COUNTRY CONFIG] Gefunden für '{country}': {country_key}")
             return config_data
@@ -67,34 +67,23 @@ def get_country_config(country: str) -> Dict:
     return {'languages': ['en'], 'currency': 'USD'}
 
 
-def generate_multilingual_search_terms(mine_name: str, country: Optional[str] = None) -> List[str]:
+def generate_multilingual_search_terms(country_config: Dict[str, Any]) -> Dict[str, List[str]]:
     """
-    Generiere mehrsprachige Suchbegriffe basierend auf Land
+    ÄNDERUNG 04.07.2025: Generiere mehrsprachige Suchbegriffe aus country_config
     
     Args:
-        mine_name: Name der Mine
-        country: Land (optional)
+        country_config: Länderspezifische Konfiguration
         
     Returns:
-        Liste mehrsprachiger Suchbegriffe
+        Dict mit Kategorien und mehrsprachigen Begriffen
     """
-    terms = []
-    country_config = get_country_config(country) if country else {}
+    if not country_config or not isinstance(country_config, dict):
+        return {}
     
     # Hole Mining-Begriffe für das Land
     mining_terms = country_config.get('mining_terms', {})
-    mine_words = mining_terms.get('mine', ['mine'])
     
-    # Füge verschiedene Sprachvarianten hinzu
-    for mine_word in mine_words:
-        terms.append(f"{mine_word} {mine_name}")
-        
-        # Mit Akzenten und ohne
-        normalized = normalize_accents(mine_name)
-        if normalized != mine_name:
-            terms.append(f"{mine_word} {normalized}")
-    
-    return terms
+    return mining_terms
 
 
 def generate_name_variants(mine_name: str) -> List[str]:

@@ -6,11 +6,17 @@ Beschreibung: Provider-Registry für dynamische Verwaltung aller Search-Provider
 """
 
 import logging
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Optional, Type, Any
 from importlib import import_module
 
 from .base_provider import AbstractProvider, ModelConfig
-from ..config import Config
+try:
+    from config import Config
+except ImportError:
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +29,17 @@ class ProviderRegistry:
         self._available_models: Dict[str, ModelConfig] = {}
         self._provider_classes: Dict[str, Type[AbstractProvider]] = {
             'perplexity': 'PerplexityProvider',
-            'openrouter': 'OpenRouterProvider'
+            'openrouter': 'OpenRouterProvider',
+            'abacus': 'AbacusProvider',
+            'tavily': 'TavilyProvider',
+            'exa': 'ExaProvider',
+            'scrapingbee': 'ScrapingBeeProvider',
+            'firecrawl': 'FirecrawlProvider',
+            'brightdata': 'BrightdataProvider',
+            'openai': 'OpenAIProvider',
+            'anthropic': 'AnthropicProvider',
+            'gemini': 'GeminiProvider',
+            'grok': 'GrokProvider'
         }
         
     def initialize(self, config: Dict[str, Any]):
@@ -83,7 +99,8 @@ class ProviderRegistry:
             return None
         
         try:
-            module = import_module(f'.{provider_name}_provider', package='minesearch_v2.backend.providers')
+            # Dynamischer Import mit absoluten Pfad
+            module = import_module(f'providers.{provider_name}_provider')
             provider_class = getattr(module, class_name)
             return provider_class
         except Exception as e:

@@ -23,3 +23,9 @@ class APIKeysConfig:
     SCRAPINGBEE_API_KEY = os.getenv('SCRAPINGBEE_API_KEY', '')
     FIRECRAWL_API_KEY = os.getenv('FIRECRAWL_API_KEY', '')
     BRIGHTDATA_API_KEY = os.getenv('BRIGHTDATA_API_KEY', '')
+    
+    # ÄNDERUNG 06.07.2025: Premium LLM Provider API Keys
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+    ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+    GROK_API_KEY = os.getenv('GROK_API_KEY', '')

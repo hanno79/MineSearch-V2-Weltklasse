@@ -1,0 +1,390 @@
+"""
+Author: rahn
+Datum: 04.07.2025
+Version: 1.0
+Beschreibung: Exa AI Provider für neuronale und semantische Suche
+"""
+
+import httpx
+import logging
+import json
+from typing import Dict, List, Any, Optional
+from datetime import datetime
+
+from .base_provider import AbstractProvider, ModelConfig, SearchResult
+
+# ÄNDERUNG 06.07.2025: Absolute Imports für Provider-Kompatibilität
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from data_extraction import DataExtractor
+from source_discovery import extract_sources_from_content
+from utils import generate_name_variants, get_country_config, generate_multilingual_search_terms
+from specialized_prompts import SpecializedPrompts
+
+logger = logging.getLogger(__name__)
+
+
+class ExaProvider(AbstractProvider):
+    """Provider für Exa AI - Neuronale/Semantische Suche"""
+    
+    def __init__(self, api_key: str, config: Dict[str, Any]):
+        super().__init__(api_key, config)
+        self.api_url = config.get('base_url', 'https://api.exa.ai')
+        self.models = self._init_models()
+        self.data_extractor = DataExtractor()
+    
+    def _init_models(self) -> Dict[str, ModelConfig]:
+        """Initialisiere verfügbare Modelle"""
+        models = {}
+        
+        for model_key, model_config in self.config.get('models', {}).items():
+            models[model_key] = ModelConfig(
+                id=model_config['id'],
+                name=model_config['name'],
+                timeout=model_config['timeout'],
+                max_tokens=model_config['max_tokens'],
+                description=model_config['description'],
+                provider='exa',
+                supports_web_search=model_config.get('supports_web_search', True),
+                supports_deep_research=model_config.get('supports_deep_research', False),
+                is_free=model_config.get('is_free', False)
+            )
+        
+        return models
+    
+    async def search(self, query: str, model_id: str, options: Dict[str, Any]) -> SearchResult:
+        """Führe Suche mit Exa durch"""
+        start_time = datetime.now()
+        
+        # Hole Model-Config
+        model_config = self.models.get(model_id)
+        if not model_config:
+            return SearchResult(
+                success=False,
+                content="",
+                structured_data={},
+                sources=[],
+                metadata={},
+                error=f"Unbekanntes Modell: {model_id}"
+            )
+        
+        # Mining-spezifische Parameter
+        mine_name = options.get('mine_name', '')
+        country = options.get('country')
+        commodity = options.get('commodity')
+        region = options.get('region')
+        
+        # ÄNDERUNG 05.07.2025: Nutze Specialized Prompts für bessere Ergebnisse
+        # Erstelle semantische Query für Mining-Recherche
+        enhanced_query = self._build_semantic_query(query, mine_name, country, commodity, region, model_id)
+        
+        # Füge spezialisierte Restaurationskosten-Begriffe hinzu
+        restoration_prompt = SpecializedPrompts.get_restoration_costs_prompt(mine_name, country, commodity)
+        enhanced_query = f"{enhanced_query}\n\n{restoration_prompt}"
+        
+        try:
+            async with httpx.AsyncClient(timeout=model_config.timeout) as client:
+                # Exa API Request
+                endpoint = f"{self.api_url}/search"
+                
+                # ÄNDERUNG 05.07.2025: Unterstützung für Research-Modelle
+                if 'research' in model_id:
+                    # Exa Research API nutzt anderen Endpoint
+                    endpoint = f"{self.api_url}/research"
+                    request_data = {
+                        "query": enhanced_query,
+                        "model": model_config.id,  # exa-research oder exa-research-pro
+                        "include_domains": self._get_mining_domains(country),
+                        "search_options": {
+                            "max_searches": 50 if model_id == 'research-pro' else 30,
+                            "deep_search": True,
+                            "include_pdfs": True,
+                            "extract_structured_data": True
+                        }
+                    }
+                else:
+                    # Standard Neural/Keyword Search
+                    request_data = {
+                        "query": enhanced_query,
+                        "num_results": 30,  # Mehr Ergebnisse für bessere Abdeckung
+                        "type": "neural" if model_id == 'neural-search' else "keyword",
+                        "useAutoprompt": True,  # Exa optimiert die Query automatisch
+                        "includeDomains": self._get_mining_domains(country),
+                        "startCrawlDate": "2020-01-01",  # Nur aktuelle Informationen
+                        "endCrawlDate": datetime.now().strftime("%Y-%m-%d"),
+                        "category": "company",  # Fokus auf Unternehmensseiten
+                        "contents": {
+                            "text": True,
+                            "highlights": True  # Wichtige Passagen hervorheben
+                        }
+                    }
+                
+                # Similarity Search wenn gewählt
+                if model_id == 'similarity-search' and options.get('reference_url'):
+                    endpoint = f"{self.api_url}/find-similar"
+                    request_data = {
+                        "url": options['reference_url'],
+                        "num_results": 20,  # ÄNDERUNG 05.07.2025: Korrigiert zu snake_case (Exa API Standard)
+                        "includeDomains": self._get_mining_domains(country),
+                        "excludeSourceDomain": True
+                    }
+                
+                response = await client.post(
+                    endpoint,
+                    headers={
+                        "x-api-key": self.api_key,
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+                    json=request_data
+                )
+                
+                if response.status_code != 200:
+                    error_msg = self._handle_api_error(response)
+                    return SearchResult(
+                        success=False,
+                        content="",
+                        structured_data={},
+                        sources=[],
+                        metadata={'status_code': response.status_code},
+                        error=error_msg
+                    )
+                
+                # Parse Response
+                result = response.json()
+                
+                # Extrahiere Content und Quellen
+                content = self._build_content_from_results(result, mine_name)
+                sources = self._extract_exa_sources(result)
+                
+                # Extrahiere strukturierte Daten
+                extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
+                
+                duration = (datetime.now() - start_time).total_seconds()
+                
+                return SearchResult(
+                    success=True,
+                    content=content,
+                    structured_data=extracted_data['data'],
+                    sources=sources,
+                    metadata={
+                        'model': model_id,
+                        'provider': 'exa',
+                        'structured_data_with_sources': extracted_data['data_with_sources'],
+                        'source_index': extracted_data['source_index'],
+                        'results_count': len(result.get('results', [])),
+                        'search_type': 'neural' if model_id == 'neural-search' else 'similarity'
+                    },
+                    search_duration=duration
+                )
+                
+        except httpx.TimeoutException:
+            return SearchResult(
+                success=False,
+                content="",
+                structured_data={},
+                sources=[],
+                metadata={},
+                error=f"Zeitüberschreitung nach {model_config.timeout}s"
+            )
+        except Exception as e:
+            logger.error(f"[EXA] Fehler bei Suche: {str(e)}")
+            return SearchResult(
+                success=False,
+                content="",
+                structured_data={},
+                sources=[],
+                metadata={},
+                error=str(e)
+            )
+    
+    def _build_semantic_query(self, base_query: str, mine_name: str, 
+                             country: str, commodity: str, region: str, model_id: str) -> str:
+        """Erstelle semantisch optimierte Query für Mining-Recherche"""
+        
+        # ÄNDERUNG 05.07.2025: Erweiterte Queries für Deep Search
+        if model_id in ['neural-search', 'research', 'research-pro']:
+            # Natürlichsprachliche Query für neuronale/research Suche
+            query_parts = [
+                f"Find comprehensive and detailed information about {mine_name} mine",
+                f"including specific restoration costs, closure costs, environmental liabilities with exact dollar amounts",
+                f"precise GPS coordinates, location data, latitude and longitude in decimal degrees",
+                f"current operator, owner, parent company, mining company ownership structure",
+                f"production data, annual output in tonnes, historical production figures",
+                f"mine area in square kilometers, mine type (open-pit, underground)",
+                f"operational status, start and end dates of production"
+            ]
+            
+            if country:
+                query_parts.append(f"located in {country}")
+            
+            if commodity:
+                query_parts.append(f"producing {commodity}")
+            
+            if region:
+                query_parts.append(f"in the {region} region")
+            
+            # Spezielle Anweisungen für Research-Modelle
+            if 'research' in model_id:
+                query_parts.extend([
+                    "Search technical reports, NI 43-101 documents, annual reports",
+                    "Extract data from PDFs, government databases, company filings",
+                    "Cross-reference multiple sources for accuracy",
+                    "Include data from subpages and embedded documents"
+                ])
+            
+            return ' '.join(query_parts)
+        
+        else:
+            # Keyword-basierte Query für similarity search
+            keywords = [
+                f'"{mine_name}"',
+                'mine OR mining',
+                'restoration costs OR closure costs OR "asset retirement obligation" OR ARO',
+                'coordinates OR latitude OR longitude OR GPS',
+                'operator OR owner OR company',
+                'production OR output OR tonnage',
+                'technical report OR feasibility study',
+                'PDF OR document'
+            ]
+            
+            if country:
+                keywords.append(country)
+            
+            if commodity:
+                keywords.append(commodity)
+            
+            return ' '.join(keywords)
+    
+    def _build_content_from_results(self, exa_response: Dict, mine_name: str) -> str:
+        """Erstelle strukturierten Content aus Exa-Ergebnissen"""
+        content_parts = []
+        
+        content_parts.append(f"**Exa Neural Search Ergebnisse für {mine_name}:**\n")
+        
+        for idx, result in enumerate(exa_response.get('results', []), 1):
+            content_parts.append(f"\n[Quelle {idx}] {result.get('title', 'Unbekannt')}")
+            content_parts.append(f"URL: {result.get('url', '')}")
+            content_parts.append(f"Score: {result.get('score', 0):.3f}")
+            
+            # Text-Content
+            if result.get('text'):
+                content_parts.append(f"\nInhalt:\n{result['text'][:2000]}...")
+            
+            # Highlights wenn vorhanden
+            if result.get('highlights'):
+                content_parts.append("\nWichtige Passagen:")
+                for highlight in result['highlights'][:3]:
+                    content_parts.append(f"• {highlight}")
+            
+            content_parts.append("")
+        
+        return '\n'.join(content_parts)
+    
+    def _extract_exa_sources(self, response: Dict) -> List[Dict[str, Any]]:
+        """Extrahiere Quellen aus Exa Response"""
+        sources = []
+        
+        for idx, result in enumerate(response.get('results', []), 1):
+            source = {
+                'type': 'url',
+                'value': result.get('url', ''),
+                'title': result.get('title', ''),
+                'description': result.get('snippet', '')[:200] if result.get('snippet') else '',
+                'score': result.get('score', 0),
+                'published_date': result.get('published_date', ''),
+                'author': result.get('author', ''),
+                'provider': 'exa'
+            }
+            
+            # Füge Highlights als zusätzliche Info hinzu
+            if result.get('highlights'):
+                source['highlights'] = result['highlights'][:3]
+            
+            sources.append(source)
+        
+        return sources
+    
+    def _get_mining_domains(self, country: str) -> List[str]:
+        """Hole Mining-spezifische Domains"""
+        domains = [
+            "mining.com",
+            "minexplore.com", 
+            "northernminer.com",
+            "miningweekly.com",
+            "mining-technology.com",
+            "resourceworld.com",
+            "infomine.com",
+            "kitco.com"
+        ]
+        
+        # Länderspezifische Domains hinzufügen
+        if country:
+            country_config = get_country_config(country)
+            priority_domains = country_config.get('priority_domains', [])
+            domains.extend(priority_domains)
+        
+        return domains
+    
+    def _handle_api_error(self, response: httpx.Response) -> str:
+        """Behandle API-Fehler mit benutzerfreundlichen Nachrichten"""
+        if response.status_code == 401:
+            return "🔑 Exa API-Key ungültig.\n→ Bitte prüfen Sie Ihre .env Datei."
+        
+        elif response.status_code == 429:
+            return "⏱️ Rate Limit erreicht.\n→ Zu viele Anfragen. Bitte warten Sie einen Moment."
+        
+        elif response.status_code == 402:
+            return "💳 Exa API-Guthaben aufgebraucht.\n→ Bitte laden Sie Ihr Konto auf."
+        
+        else:
+            try:
+                error_data = response.json()
+                return f"Exa API Fehler: {error_data.get('detail', error_data.get('error', 'Unbekannter Fehler'))}"
+            except:
+                return f"API Fehler: {response.status_code} - {response.text[:200]}"
+    
+    def get_models(self) -> Dict[str, ModelConfig]:
+        """Gibt verfügbare Modelle zurück"""
+        return self.models
+    
+    def validate_config(self) -> bool:
+        """Validiert Provider-Konfiguration"""
+        if not self.api_key:
+            logger.error("[EXA] Kein API-Key konfiguriert")
+            return False
+        
+        if not self.models:
+            logger.error("[EXA] Keine Modelle konfiguriert")
+            return False
+        
+        return True
+    
+    async def health_check(self) -> bool:
+        """Prüfe ob Exa API erreichbar ist"""
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    f"{self.api_url}/health",
+                    headers={
+                        "x-api-key": self.api_key
+                    }
+                )
+                return response.status_code in [200, 401]  # 401 = Key ungültig, aber API erreichbar
+        except:
+            return False
+    
+    def get_system_prompt(self, options: Dict[str, Any]) -> str:
+        """Gibt den System-Prompt für Exa zurück"""
+        return """Du bist ein Mining-Recherche-Spezialist der Exa's neuronale Suche nutzt.
+        
+Fokussiere dich auf:
+- Semantische Verbindungen zwischen Mining-Informationen
+- Technische Dokumente und Berichte
+- Mining-spezifische Domains und Quellen
+- Ähnliche Minen und Projekte
+- Detaillierte Betreiber- und Kostendaten
+
+Nutze Exa's neuronale Suchfähigkeiten für tiefgehende semantische Analysen."""

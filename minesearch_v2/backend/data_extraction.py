@@ -1,8 +1,8 @@
 """
 Author: rahn
-Datum: 30.06.2025
-Version: 1.0
-Beschreibung: Datenextraktion aus Perplexity-Antworten für MineSearch
+Datum: 05.07.2025
+Version: 2.0
+Beschreibung: Refactorierte Datenextraktion für MineSearch - Hauptmodul
 """
 
 import re
@@ -12,179 +12,27 @@ from config import config, CSV_COLUMNS, FIELDS_WITHOUT_SOURCES
 from utils import clean_extracted_value, get_country_config
 from source_discovery import extract_sources_from_content
 
-# ÄNDERUNG 30.06.2025: Strukturiertes Logging (Regel 16)
+# Importiere neue Module
+from extraction_patterns import get_extraction_patterns, get_enhanced_coordinate_patterns
+from extraction_validators import (
+    is_placeholder_value, validate_coordinate, 
+    validate_restoration_cost, validate_year, validate_area
+)
+from extraction_processors import (
+    process_restoration_costs, process_activity_status,
+    split_country_region, find_region_from_content,
+    process_sources, post_process_data, clean_field_value
+)
+
 logger = logging.getLogger(__name__)
 
-# ÄNDERUNG 01.07.2025: CSV_COLUMNS und FIELDS_WITHOUT_SOURCES aus config.py importiert
 
 class DataExtractor:
     """Klasse für strukturierte Datenextraktion aus Mining-Suchergebnissen"""
     
     def __init__(self):
-        self.patterns = self._initialize_patterns()
-    
-    def _initialize_patterns(self) -> Dict[str, List[str]]:
-        """Initialisiere Regex-Patterns für alle Felder"""
-        return {
-            'ID': [
-                r'ID:\s*([^\n]+)',
-                r'Kennziffer:\s*([^\n]+)',
-                r'Nummer:\s*([^\n]+)',
-                r'Reference:\s*([^\n]+)'
-            ],
-            'Country': [
-                r'Land:\s*([^\n]+)', 
-                r'Country:\s*([^\n]+)', 
-                r'in\s+(\w+(?:\s+\w+)?)\s*(?:gelegen|liegt)'
-            ],
-            'Region': [
-                r'Region:\s*([^\n]+)', 
-                r'Provinz:\s*([^\n]+)', 
-                r'Province:\s*([^\n]+)', 
-                r'in\s+(?:der\s+)?(?:Region|Provinz)\s+([^\n,]+)',
-                r'in\s+(Quebec|Québec|Ontario|British Columbia|Alberta|Manitoba|Saskatchewan)[\s,]',
-                r'(?:located\s+in|liegt\s+in)\s+(Quebec|Québec|Ontario|British Columbia|Alberta)[\s,]'
-            ],
-            'Eigentümer': [
-                r'Eigentümer:\s*([^\n]+)',
-                r'Owner:\s*([^\n]+)',
-                r'Propriétaire:\s*([^\n]+)',
-                r'Propietario:\s*([^\n]+)',
-                r'Pemilik:\s*([^\n]+)',
-                r'gehört\s+(?:zu|der|dem)\s+([^\n]+)',
-                r'owned\s+by\s+([^\n]+)',
-                r'property\s+of\s+([^\n]+)',
-                r'belongs\s+to\s+([^\n]+)',
-                r'possession\s+of\s+([^\n]+)',
-                r'Eigentum\s+(?:von|der)\s+([^\n]+)'
-            ],
-            'Betreiber': [
-                r'Betreiber:\s*([^\n]+)', 
-                r'Operator:\s*([^\n]+)', 
-                r'betrieben\s+von\s+([^\n,]+)', 
-                r'operated\s+by\s+([^\n,]+)',
-                r'opérateur:\s*([^\n]+)',
-                r'operador:\s*([^\n]+)',
-                r'dioperasikan\s+oleh\s+([^\n]+)'
-            ],
-            'x-Koordinate': [
-                r'Latitude:\s*([-\d.]+)', 
-                r'Lat:\s*([-\d.]+)', 
-                r'Breitengrad:\s*([-\d.]+)'
-            ],
-            'y-Koordinate': [
-                r'Longitude:\s*([-\d.]+)', 
-                r'Long?:\s*([-\d.]+)', 
-                r'Längengrad:\s*([-\d.]+)'
-            ],
-            'Aktivitätsstatus': [
-                r'Status:\s*([^\n]+)', 
-                r'Aktivitätsstatus:\s*([^\n]+)', 
-                r'(?:ist\s+)?(?:derzeit\s+)?(aktiv|geschlossen|stillgelegt|in Betrieb|geplant)',
-                r'(Geplant[^,\n]*)',
-                r'(Akquisition\s+abgeschlossen[^,\n]*)',
-                r'(In\s+Entwicklung[^,\n]*)',
-                r'(Explorationsphase[^,\n]*)',
-                r'(Produktion\s+eingestellt[^,\n]*)',
-                r'(Temporär\s+stillgelegt[^,\n]*)'
-            ],
-            'Restaurationskosten': self._get_restoration_cost_patterns(),
-            'Jahr der Aufnahme der Kosten': [
-                r'(?:Kosten|costs?)\s+(?:von|from|Stand)\s+(\d{4})', 
-                r'(?:per|as\s+of)\s+(\d{4})',
-                r'(?:Stand|status|as\s+of):\s*(?:\w+\s+)?(\d{4})',
-                r'(\d{4})\s+(?:Kosten|costs|liabilities)'
-            ],
-            'Jahr der Erstellung des Dokumentes': [
-                r'(?:Dokument|Report|Bericht)\s+(?:vom|von|dated|from)\s+(\b(?:19|20)\d{2}\b)',
-                r'(?:Stand|Date|Datum):\s*(?:\w+\s+)?(\b(?:19|20)\d{2}\b)',
-                r'(?:erstellt|created|prepared|published)\s+(?:im|in)?\s*(\b(?:19|20)\d{2}\b)',
-                r'(\b(?:19|20)\d{2}\b)\s+(?:Report|Bericht|Document|Study)',
-                r'(?:Veröffentlicht|Published|Released):\s*(?:\w+\s+)?(\b(?:19|20)\d{2}\b)',
-                r'(?:Technical\s+Report|NI\s*43-101).*?(\b(?:19|20)\d{2}\b)',
-                r'(?:Report|Document|Bericht).*?\((\b(?:19|20)\d{2}\b)\)'
-            ],
-            'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [
-                r'Rohstoffe?:\s*([^\n]+)', 
-                r'(?:produziert|fördert|abbaut)\s+([^\n]+(?:Gold|Kupfer|Silber|Zink|Blei|Nickel|Kohle|Eisenerz)[^\n]*)',
-                r'Commodity:\s*([^\n]+)',
-                r'Commodities:\s*([^\n]+)',
-                r'Mineral(?:s|ien)?:\s*([^\n]+)',
-                r'(?:haupt|main)\s*(?:rohstoff|commodity):\s*([^\n]+)'
-            ],
-            'Minentyp (Untertage/ Open-Pit/ usw.)': [
-                r'Minentyp:\s*([^\n]+)', 
-                r'Type:\s*([^\n]+)',
-                r'((?:Open[- ]?Pit|Untertage|Underground|Tagebau)[^\n,]*)'
-            ],
-            'Produktionsstart': [
-                r'Produktionsstart:\s*(\d{4})', 
-                r'Start:\s*(\d{4})', 
-                r'(?:in\s+Betrieb\s+seit|eröffnet)\s+(\d{4})'
-            ],
-            'Produktionsende': [
-                r'Produktionsende:\s*(\d{4})', 
-                r'Ende:\s*(\d{4})', 
-                r'geschlossen\s+(?:seit\s+)?(\d{4})'
-            ],
-            'Fördermenge/Jahr': [
-                r'Fördermenge:\s*([\d,]+(?:\.\d+)?)\s*([^\n]+)',
-                r'Produktion:\s*([\d,]+(?:\.\d+)?)\s*([^\n]+)',
-                r'produziert\s+(?:jährlich\s+)?([\d,]+(?:\.\d+)?)\s*([^\n]+)'
-            ],
-            'Fläche der Mine in qkm': [
-                r'Fläche:\s*([\d,]+(?:\.\d+)?)\s*(?:km²|qkm|km2)', 
-                r'Area:\s*([\d,]+(?:\.\d+)?)\s*(?:km²|qkm|km2)'
-            ]
-        }
-    
-    def _get_restoration_cost_patterns(self) -> List[str]:
-        """Spezielle Patterns für Restaurationskosten"""
-        return [
-            # Existierende Patterns für bereits bezahlte Kosten
-            r'Restaurationskosten:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?)?\s*(?:CAD|CDN|\$)?',
-            r'Sanierungskosten:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?)?\s*(?:CAD|CDN|\$)?',
-            r'(?:Environmental\s+)?liabilities?:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million|Mio\.?)?\s*(?:CAD|CDN)?',
-            r'Closure\s+costs?:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million|Mio\.?)?\s*(?:CAD|CDN)?',
-            # Neue Patterns für geplante/zukünftige Kosten
-            r'(?:geplante|geschätzte|estimated|planned|future)\s+(?:Restaurations|Sanierungs|restoration|remediation|closure)kosten:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?|million)?\s*(?:CAD|CDN|\$)?',
-            r'(?:Restaurations|Sanierungs)kosten\s+(?:werden|sind)\s+(?:auf|geschätzt)\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?)?\s*(?:CAD|CDN|\$)?',
-            r'Rückstellungen?\s+(?:für\s+)?(?:Rekultivierung|Sanierung|Stilllegung):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?)?\s*(?:CAD|CDN|\$)?',
-            r'(?:Asset\s+)?(?:Retirement|Decommissioning)\s+Obligations?:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million|Mio\.?)?\s*(?:CAD|CDN)?',
-            r'(?:provision|reserve)\s+for\s+(?:site\s+)?(?:restoration|remediation|closure):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million)?\s*(?:CAD|CDN)?',
-            # Patterns für "budgetiert" oder "veranschlagt"
-            r'(?:budgetiert|veranschlagt|budgeted|allocated)\s+für\s+(?:Restauration|Sanierung|restoration):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?|million)?\s*(?:CAD|CDN|\$)?',
-            # Zusätzliche flexible Patterns
-            r'(?:Umwelt|Environmental).*?(?:Kosten|costs|liabilities).*?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?|million)?',
-            r'\$\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?|million)?\s*(?:für|for)\s+(?:Restauration|Sanierung|restoration|closure)',
-            r'(?:Schätzung|estimate).*?(?:Restauration|Sanierung|closure).*?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?|million)?',
-            # ÄNDERUNG 02.07.2025: Neue erweiterte Patterns
-            # Spanische Patterns
-            r'costos?\s+de\s+cierre:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millones?)?\s*(?:USD|PEN|CLP)?',
-            r'pasivos?\s+ambientales?:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millones?)?\s*(?:USD|PEN|CLP)?',
-            r'provisión\s+(?:para\s+)?cierre:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millones?)?\s*(?:USD|PEN|CLP)?',
-            r'garantías?\s+(?:financieras?|ambientales?):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millones?)?\s*(?:USD|PEN|CLP)?',
-            # Indonesische Patterns
-            r'biaya\s+(?:reklamasi|rehabilitasi|penutupan):\s*(?:Rp|IDR|USD)?\s*([\d,]+(?:\.\d+)?)\s*(?:miliar|juta)?',
-            r'jaminan\s+(?:reklamasi|lingkungan):\s*(?:Rp|IDR|USD)?\s*([\d,]+(?:\.\d+)?)\s*(?:miliar|juta)?',
-            r'dana\s+(?:cadangan|jaminan)\s+reklamasi:\s*(?:Rp|IDR|USD)?\s*([\d,]+(?:\.\d+)?)\s*(?:miliar|juta)?',
-            # Tabellarische Darstellungen
-            r'(?:closure|restoration|ARO|rehabilitation)[\s\S]{0,50}?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million|M)?',
-            r'(?:environmental|closure)\s+(?:bond|security|guarantee)[\s\S]{0,30}?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million|M)?',
-            # Footnote/Note Patterns
-            r'Note\s+\d+[\s\S]{0,200}?(?:closure|restoration|ARO)[\s\S]{0,100}?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million)?',
-            # Multi-line Patterns für komplexe Darstellungen
-            r'(?:closure|restoration)\s+(?:costs?|provision|liability)[\s\n\r]{0,20}?\$?\s*([\d,]+(?:\.\d+)?)',
-            # Patterns mit Währungszeichen am Ende
-            r'([\d,]+(?:\.\d+)?)\s*(?:million|millones?|miliar)?\s*(?:USD|CAD|AUD|PEN|CLP|IDR)\s+(?:for\s+)?(?:closure|restoration|rehabilitation)',
-            # Decommissioning und andere Varianten
-            r'(?:decommissioning|abandonment|post-mining)\s+(?:costs?|obligations?):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million)?',
-            r'(?:mine\s+)?(?:closure|rehabilitation)\s+(?:provision|reserve|fund):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million)?',
-            # Progressive/Final rehabilitation
-            r'(?:progressive|final)\s+rehabilitation\s+(?:costs?|provision):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million)?',
-            # Care and maintenance
-            r'care\s+and\s+maintenance\s+(?:costs?|provision):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million)?'
-        ]
+        self.patterns = get_extraction_patterns()
+        self.coordinate_patterns = get_enhanced_coordinate_patterns()
     
     def extract_structured_data(self, content: str, mine_name: str, country: Optional[str] = None) -> Dict[str, str]:
         """
@@ -198,7 +46,6 @@ class DataExtractor:
         Returns:
             Dict mit extrahierten Daten
         """
-        # ÄNDERUNG 30.06.2025: Try-catch für Datenextraktion (Regel 13)
         try:
             data = {col: '' for col in CSV_COLUMNS}
             data['Name'] = mine_name
@@ -211,285 +58,242 @@ class DataExtractor:
             for field, field_patterns in self.patterns.items():
                 value = self._extract_field(field, field_patterns, content, currency)
                 if value:
-                    data[field] = value
+                    # Platzhalter-Validierung
+                    if is_placeholder_value(value, field):
+                        logger.info(f"[PLACEHOLDER REMOVED] Platzhalter '{value}' für Feld '{field}' entfernt")
+                        data[field] = ""
+                    else:
+                        data[field] = value
             
-            # Spezielle Nachbearbeitung
-            data = self._post_process_data(data, content, country_config)
+            # Spezielle Behandlung für Koordinaten mit erweiterten Patterns
+            data = self._extract_coordinates(content, data)
             
-            # Quellenverarbeitung
-            data = self._process_sources(data, content)
+            # Post-Processing
+            data = post_process_data(data, content, country_config)
             
-            logger.info(f"[EXTRACTION] {mine_name}: {sum(1 for v in data.values() if v)} Felder extrahiert")
+            # Validierung spezifischer Felder
+            data = self._validate_fields(data, currency)
+            
+            # Bereinige alle Feldwerte
+            for field in data:
+                if data[field] and field not in FIELDS_WITHOUT_SOURCES:
+                    data[field] = clean_field_value(data[field], field)
+            
+            # Quellen verarbeiten
+            all_sources = extract_sources_from_content(content)
+            data = process_sources(data, all_sources)
+            
+            logger.info(f"[DATA EXTRACTION] Erfolgreich {len([v for v in data.values() if v])} Felder extrahiert")
             
             return data
             
         except Exception as e:
-            logger.error(f"[EXTRACTION ERROR] Fehler bei Datenextraktion für {mine_name}: {str(e)}")
-            # Gib minimale Daten zurück
-            return {col: '' for col in CSV_COLUMNS} | {'Name': mine_name}
+            logger.error(f"[DATA EXTRACTION ERROR] Fehler bei Datenextraktion: {str(e)}")
+            return {col: '' for col in CSV_COLUMNS}
     
     def _extract_field(self, field: str, patterns: List[str], content: str, currency: str) -> Optional[str]:
-        """Extrahiere ein einzelnes Feld mit den gegebenen Patterns"""
+        """Extrahiere ein spezifisches Feld mit den gegebenen Patterns"""
+        # ÄNDERUNG 06.07.2025: Spezialbehandlung für Restaurationskosten
+        if field == 'Restaurationskosten':
+            from extraction_restoration_costs import RestorationCostExtractor
+            extractor = RestorationCostExtractor()
+            result = extractor.extract_restoration_costs(content)
+            if result and 'restoration_costs' in result:
+                return result['restoration_costs']
         
         for pattern in patterns:
-            match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
-            if match:
-                value = match.group(1)
-                
-                # Debug-Logging für wichtige Felder
-                if field in ['Restaurationskosten', 'Jahr der Aufnahme der Kosten', 'Jahr der Erstellung des Dokumentes']:
-                    logger.debug(f"[PATTERN] {field}: '{value}' (Pattern: {pattern[:50]}...)")
-                
-                # Spezielle Verarbeitung für Restaurationskosten
-                if field == 'Restaurationskosten':
-                    return self._process_restoration_costs(value, match.group(0), currency)
-                else:
-                    return clean_extracted_value(value)
+            try:
+                match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
+                if match:
+                    value = match.group(1).strip()
+                    
+                    # Spezialbehandlung für Restaurationskosten
+                    if field == 'Restaurationskosten':
+                        value = process_restoration_costs(value, match.group(0), currency)
+                    
+                    # Bereinigung
+                    value = clean_extracted_value(value)
+                    
+                    if value:
+                        logger.debug(f"[EXTRACTION] {field}: '{value}' (Pattern: {pattern[:50]}...)")
+                        return value
+                        
+            except re.error as e:
+                logger.error(f"[REGEX ERROR] Fehler bei Pattern für {field}: {e}")
+                continue
         
         return None
     
-    def _process_restoration_costs(self, value: str, full_match: str, currency: str) -> str:
-        """Verarbeite Restaurationskosten mit Währungskonvertierung"""
+    def _extract_coordinates(self, content: str, data: Dict[str, str]) -> Dict[str, str]:
+        """Extrahiere Koordinaten mit erweiterten Patterns"""
+        # Versuche zuerst mit Standard-Patterns
+        if not data.get('x-Koordinate'):
+            for pattern in self.coordinate_patterns['latitude']:
+                match = re.search(pattern, content, re.IGNORECASE)
+                if match:
+                    if 'DMS' in pattern or '°' in pattern:
+                        # Handle DMS format
+                        coord = validate_coordinate(match.group(0), 'x')
+                    else:
+                        coord = validate_coordinate(match.group(1), 'x')
+                    
+                    if coord:
+                        data['x-Koordinate'] = coord
+                        logger.info(f"[COORDINATES] Latitude gefunden: {coord}")
+                        break
         
-        value = value.replace(',', '')
-        try:
-            amount = float(value)
-            
-            # Wenn "Million" erwähnt wurde, multipliziere
-            if 'million' in full_match.lower() or 'mio' in full_match.lower():
-                amount *= 1_000_000
-            
-            # Prüfe ob es geplante/zukünftige Kosten sind
-            full_match_lower = full_match.lower()
-            if any(word in full_match_lower for word in [
-                'geplant', 'geschätzt', 'estimated', 'planned', 
-                'future', 'budgetiert', 'veranschlagt', 
-                'rückstellung', 'provision', 'reserve'
-            ]):
-                return f"${amount:,.0f} {currency} (geplant)"
+        if not data.get('y-Koordinate'):
+            for pattern in self.coordinate_patterns['longitude']:
+                match = re.search(pattern, content, re.IGNORECASE)
+                if match:
+                    if 'DMS' in pattern or '°' in pattern:
+                        # Handle DMS format
+                        coord = validate_coordinate(match.group(0), 'y')
+                    else:
+                        coord = validate_coordinate(match.group(1), 'y')
+                    
+                    if coord:
+                        data['y-Koordinate'] = coord
+                        logger.info(f"[COORDINATES] Longitude gefunden: {coord}")
+                        break
+        
+        return data
+    
+    def _validate_fields(self, data: Dict[str, str], currency: str) -> Dict[str, str]:
+        """Validiere spezifische Felder"""
+        # Restaurationskosten
+        if data.get('Restaurationskosten'):
+            validated = validate_restoration_cost(data['Restaurationskosten'], currency)
+            if validated:
+                data['Restaurationskosten'] = validated
             else:
-                return f"${amount:,.0f} {currency}"
-        except:
-            return clean_extracted_value(value)
-    
-    def _post_process_data(self, data: Dict[str, str], content: str, country_config: Dict) -> Dict[str, str]:
-        """Nachbearbeitung der extrahierten Daten"""
+                data['Restaurationskosten'] = ""
         
-        # Intelligentes Status-Mapping
-        if data['Aktivitätsstatus']:
-            data['Aktivitätsstatus'] = self._process_activity_status(data['Aktivitätsstatus'])
+        # Jahre
+        if data.get('Jahr der Aufnahme der Kosten'):
+            validated = validate_year(data['Jahr der Aufnahme der Kosten'], 'costs')
+            data['Jahr der Aufnahme der Kosten'] = validated or ""
         
-        # Intelligente Land/Region Trennung
-        if data['Country'] and '(' in data['Country']:
-            data = self._split_country_region(data)
+        if data.get('Jahr der Erstellung des Dokumentes'):
+            validated = validate_year(data['Jahr der Erstellung des Dokumentes'], 'document')
+            data['Jahr der Erstellung des Dokumentes'] = validated or ""
         
-        # Regionen basierend auf Länderkonfiguration zuordnen
-        if data['Country'] and not data['Region']:
-            data['Region'] = self._find_region_from_content(data['Country'], content, country_config)
+        if data.get('Produktionsstart'):
+            validated = validate_year(data['Produktionsstart'], 'production')
+            data['Produktionsstart'] = validated or ""
         
-        return data
-    
-    def _process_activity_status(self, status_text: str) -> str:
-        """Verarbeite Aktivitätsstatus mit Kategorisierung"""
+        if data.get('Produktionsende'):
+            validated = validate_year(data['Produktionsende'], 'production')
+            data['Produktionsende'] = validated or ""
         
-        status_lower = status_text.lower()
+        # ÄNDERUNG 05.07.2025: Strikte Koordinaten-Validierung
+        # Validiere x-Koordinate (Latitude)
+        if data.get('x-Koordinate'):
+            validated = validate_coordinate(data['x-Koordinate'], 'x')
+            if validated:
+                data['x-Koordinate'] = validated
+            else:
+                logger.warning(f"Ungültige x-Koordinate entfernt: {data['x-Koordinate']}")
+                data['x-Koordinate'] = ""
         
-        # Bestimme die Kategorie
-        if any(word in status_lower for word in ['aktiv', 'in betrieb', 'produziert', 'operating', 'active']):
-            category = 'aktiv'
-        elif any(word in status_lower for word in ['geplant', 'akquisition', 'entwicklung', 'exploration', 'planned', 'proposed']):
-            category = 'geplant'
-        elif any(word in status_lower for word in ['geschlossen', 'stillgelegt', 'eingestellt', 'closed', 'ceased']):
-            category = 'geschlossen'
-        elif any(word in status_lower for word in ['temporär', 'suspended', 'care and maintenance']):
-            category = 'sonstiges'
-        else:
-            category = 'sonstiges'
+        # Validiere y-Koordinate (Longitude)
+        if data.get('y-Koordinate'):
+            validated = validate_coordinate(data['y-Koordinate'], 'y')
+            if validated:
+                data['y-Koordinate'] = validated
+            else:
+                logger.warning(f"Ungültige y-Koordinate entfernt: {data['y-Koordinate']}")
+                data['y-Koordinate'] = ""
         
-        # Behalte detaillierte Beschreibung bei längeren Texten
-        if len(status_text) > 20 and category != status_text.lower():
-            return f"{status_text} ({category})"
-        else:
-            return category
-    
-    def _split_country_region(self, data: Dict[str, str]) -> Dict[str, str]:
-        """Trenne Land und Region aus kombiniertem Feld"""
-        
-        match = re.match(r'^([^(]+)\s*\(([^)]+)\)', data['Country'])
-        if match:
-            country = match.group(1).strip()
-            region = match.group(2).strip()
-            data['Country'] = country
-            if not data['Region']:
-                data['Region'] = region
+        # Fläche
+        if data.get('Fläche der Mine in qkm'):
+            validated = validate_area(data['Fläche der Mine in qkm'])
+            data['Fläche der Mine in qkm'] = validated or ""
         
         return data
     
-    def _find_region_from_content(self, country: str, content: str, country_config: Dict) -> str:
-        """Finde Region basierend auf Länderkonfiguration"""
+    def extract_structured_data_with_sources(self, content: str, mine_name: str, 
+                                           country: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Extrahiere strukturierte Daten mit Quellenzuordnung
         
-        country_lower = country.lower()
-        content_lower = content.lower()
+        Args:
+            content: Perplexity API Antwort
+            mine_name: Name der Mine
+            country: Land (optional)
+            
+        Returns:
+            Dict mit extrahierten Daten und Quellenreferenzen
+        """
+        # Basis-Extraktion
+        data = self.extract_structured_data(content, mine_name, country)
         
-        # Suche passende Länderkonfiguration
-        if not country_config:
-            for country_key in config.COUNTRY_CONFIGS:
-                if country_key.lower() in country_lower or country_lower in country_key.lower():
-                    country_config = config.COUNTRY_CONFIGS[country_key]
-                    break
-        
-        # Wenn Länderkonfiguration gefunden, suche nach Regionen
-        if country_config and 'regions' in country_config:
-            for region in country_config['regions']:
-                if region.lower() in content_lower:
-                    return region
-        
-        return ''
-    
-    def _process_sources(self, data: Dict[str, str], content: str) -> Dict[str, str]:
-        """Verarbeite und formatiere Quellen"""
-        
-        # Extrahiere alle Quellen
-        sources = extract_sources_from_content(content)
-        
-        # Sammle alle Quellen-Werte
-        all_source_values = []
-        
-        # URLs zuerst
-        source_urls = [s['value'] for s in sources if s['type'] == 'url']
-        all_source_values.extend(source_urls)
-        
-        # Dann Dokumente
-        source_docs = [s['value'] for s in sources if s['type'] == 'document']
-        all_source_values.extend(source_docs)
-        
-        # Dann Organisationen
-        source_orgs = [s['value'] for s in sources if s['type'] == 'organization']
-        all_source_values.extend(source_orgs)
-        
-        # Filtere ungültige Quellen
-        valid_source_values = []
-        for source_value in all_source_values:
-            if (source_value and 
-                not any(skip in source_value.lower() for skip in [
-                    'k.a.', 'k.a', 'keine', 'nicht gefunden', 'nicht verfügbar', 
-                    'perplexity search', '[quelle:', 'no specific'
-                ])):
-                valid_source_values.append(source_value)
-        
-        if valid_source_values:
-            # Erstelle nummerierte Liste
-            numbered_sources = []
-            for i, source_value in enumerate(valid_source_values, 1):
-                numbered_sources.append(f"[{i}] {source_value}")
-            data['Quellenangaben'] = '+++'.join(numbered_sources)
-        else:
-            data['Quellenangaben'] = 'Keine spezifischen Quellen dokumentiert'
-        
-        return data
-
-
-def extract_structured_data(content: str, mine_name: str, country: Optional[str] = None) -> Dict[str, str]:
-    """Wrapper-Funktion für Kompatibilität"""
-    extractor = DataExtractor()
-    return extractor.extract_structured_data(content, mine_name, country)
-
-
-def extract_structured_data_with_sources(content: str, mine_name: str, country: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Extrahiere strukturierte Daten mit Quellenverfolgung
-    
-    Returns:
-        Dict mit:
-        - 'data': {field: value} - Bereinigte Werte
-        - 'data_with_sources': {field: {'value': value, 'sources': [1,2,3]}}
-        - 'source_index': {1: 'URL oder Dokumentname', 2: '...'}
-    """
-    # ÄNDERUNG 30.06.2025: Try-catch für Quellenextraktion (Regel 13)
-    try:
-        # Hole normale strukturierte Daten
-        data = extract_structured_data(content, mine_name, country)
-        
-        # Erstelle Quellen-Index
+        # Quellen extrahieren
         all_sources = extract_sources_from_content(content)
-        source_index = {}
         
-        # Sortiere Quellen nach Typ
-        source_urls = [s for s in all_sources if s['type'] == 'url']
-        source_docs = [s for s in all_sources if s['type'] == 'document']
-        source_orgs = [s for s in all_sources if s['type'] == 'organization']
-        
-        # Erstelle Index
-        idx = 1
-        for source in source_urls + source_docs + source_orgs:
-            source_index[idx] = source['value']
-            idx += 1
-        
-        # Initialisiere data_with_sources
-        data_with_sources = {}
-        
-        # Für jedes Feld: Finde zugehörige Quellennummern
-        for field, value in data.items():
-            needs_sources = (
-                value and 
-                value != '-' and
-                field not in FIELDS_WITHOUT_SOURCES and
-                value.lower() not in ['k.a', 'k.a.', 'keine daten', 'nicht gefunden']
-            )
-            
-            source_numbers = []
-            if needs_sources:
-                source_numbers = _find_source_numbers_for_value(
-                    field, value, content, all_sources
-                )
-            
-            data_with_sources[field] = {
-                'value': value,
-                'sources': source_numbers
-            }
+        # Quellen zu Daten zuordnen
+        data_with_sources = assign_sources_to_data(data, content, all_sources)
         
         return {
             'data': data,
             'data_with_sources': data_with_sources,
-            'source_index': source_index
-        }
-        
-    except Exception as e:
-        logger.error(f"[SOURCE EXTRACTION ERROR] {str(e)}")
-        # Fallback
-        return {
-            'data': extract_structured_data(content, mine_name, country),
-            'data_with_sources': {},
-            'source_index': {}
+            'source_index': all_sources
         }
 
 
-def _find_source_numbers_for_value(field: str, value: str, content: str, 
-                                   all_sources: List[Dict]) -> List[int]:
-    """Finde Quellennummern für einen bestimmten Wert"""
+# Hilfsfunktionen für Quellenzuordnung
+def assign_sources_to_data(data: Dict[str, str], content: str, 
+                          all_sources: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Ordne Quellen zu extrahierten Datenwerten zu
     
+    Args:
+        data: Extrahierte Daten
+        content: Original-Content mit Quellenreferenzen
+        all_sources: Liste aller extrahierten Quellen
+        
+    Returns:
+        Dict mit Daten und zugeordneten Quellenreferenzen
+    """
+    data_with_sources = {}
+    
+    for field, value in data.items():
+        if not value or field in FIELDS_WITHOUT_SOURCES:
+            data_with_sources[field] = {'value': value, 'sources': []}
+            continue
+        
+        # Finde Quellenreferenzen für diesen Wert
+        source_numbers = _find_source_references(value, content, all_sources)
+        
+        data_with_sources[field] = {
+            'value': value,
+            'sources': source_numbers
+        }
+    
+    return data_with_sources
+
+
+def _find_source_references(value: str, content: str, 
+                           all_sources: List[Dict[str, Any]]) -> List[int]:
+    """Finde Quellenreferenzen für einen bestimmten Wert"""
     source_numbers = []
     
-    # Prüfe ob Content nummerierte Quellen hat
-    has_numbered_sources = bool(re.search(r'\[\d+\]', content))
+    # Suche nach direkten Quellenreferenzen [1], [2,3] etc.
+    patterns = _get_source_patterns_for_value(value)
     
-    if has_numbered_sources:
-        # Suche explizite Quellennummern
-        patterns = _get_source_patterns_for_value(value)
-        
-        for pattern in patterns:
-            try:
-                matches = re.findall(pattern, content, re.IGNORECASE)
-                for match in matches:
-                    for num in match.split(','):
-                        try:
-                            source_num = int(num.strip())
-                            if source_num not in source_numbers and source_num <= len(all_sources):
-                                source_numbers.append(source_num)
-                        except ValueError:
-                            continue
-            except re.error:
-                continue
+    for pattern in patterns:
+        try:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            for match in matches:
+                for num in match.split(','):
+                    try:
+                        source_num = int(num.strip())
+                        if source_num not in source_numbers and source_num <= len(all_sources):
+                            source_numbers.append(source_num)
+                    except ValueError:
+                        continue
+        except re.error:
+            continue
     
     # Kontext-basierte Zuordnung wenn keine expliziten Quellen
     if not source_numbers:
@@ -509,7 +313,6 @@ def _find_source_numbers_for_value(field: str, value: str, content: str,
 
 def _get_source_patterns_for_value(value: str) -> List[str]:
     """Erstelle Regex-Patterns für Quellensuche"""
-    
     patterns = []
     escaped_value = re.escape(value)
     
@@ -541,7 +344,6 @@ def _get_source_patterns_for_value(value: str) -> List[str]:
 
 def _find_value_in_context(value: str, content: str, context_size: int = 200) -> List[Dict[str, Any]]:
     """Finde alle Vorkommen eines Wertes im Content mit Kontext"""
-    
     contexts = []
     value_lower = value.lower()
     content_lower = content.lower()
@@ -570,7 +372,6 @@ def _find_value_in_context(value: str, content: str, context_size: int = 200) ->
 
 def _find_sources_in_context(context: str, all_sources: List[Dict[str, Any]]) -> List[int]:
     """Finde Quellen-Referenzen in einem Kontext-String"""
-    
     found_sources = []
     context_lower = context.lower()
     

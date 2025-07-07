@@ -14,7 +14,11 @@ from .models import (
     EXA_MODELS,
     SCRAPINGBEE_MODELS,
     FIRECRAWL_MODELS,
-    BRIGHTDATA_MODELS
+    BRIGHTDATA_MODELS,
+    OPENAI_MODELS,
+    ANTHROPIC_MODELS,
+    GEMINI_MODELS,
+    GROK_MODELS
 )
 
 # Provider Konfiguration
@@ -37,13 +41,13 @@ PROVIDERS_CONFIG = {
         'models': ABACUS_MODELS
     },
     'tavily': {
-        'enabled': False,  # Temporär deaktiviert für neue Provider-Tests
+        'enabled': True,  # Aktiviert für umfassende Tests
         'api_key': APIKeysConfig.TAVILY_API_KEY,
         'base_url': 'https://api.tavily.com',
         'models': TAVILY_MODELS
     },
     'exa': {
-        'enabled': False,  # Temporär deaktiviert für neue Provider-Tests
+        'enabled': True,  # Aktiviert für umfassende Tests
         'api_key': APIKeysConfig.EXA_API_KEY,
         'base_url': 'https://api.exa.ai',
         'models': EXA_MODELS
@@ -65,5 +69,29 @@ PROVIDERS_CONFIG = {
         'api_key': APIKeysConfig.BRIGHTDATA_API_KEY,
         'base_url': 'https://api.brightdata.com',
         'models': BRIGHTDATA_MODELS
+    },
+    'openai': {
+        'enabled': True,
+        'api_key': APIKeysConfig.OPENAI_API_KEY,
+        'base_url': 'https://api.openai.com/v1',
+        'models': OPENAI_MODELS
+    },
+    'anthropic': {
+        'enabled': True,
+        'api_key': APIKeysConfig.ANTHROPIC_API_KEY,
+        'base_url': 'https://api.anthropic.com/v1',
+        'models': ANTHROPIC_MODELS
+    },
+    'gemini': {
+        'enabled': True,
+        'api_key': APIKeysConfig.GEMINI_API_KEY,
+        'base_url': 'https://generativelanguage.googleapis.com/v1',
+        'models': GEMINI_MODELS
+    },
+    'grok': {
+        'enabled': True,
+        'api_key': APIKeysConfig.GROK_API_KEY,
+        'base_url': 'https://api.x.ai/v1',
+        'models': GROK_MODELS
     }
 }

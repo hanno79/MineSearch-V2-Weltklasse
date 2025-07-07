@@ -24,7 +24,14 @@ class BrightdataScraper:
                                       url: str, headers: Dict[str, str] = None) -> Optional[str]:
         """Scraped URL mit Web Unlocker Proxy"""
         
-        proxy_url = f"http://brd-customer-{self.customer_id}-zone-web_unlocker:{self.password}@brd.superproxy.io:22225"
+        # ÄNDERUNG 05.07.2025: Korrigiertes Proxy-URL Format
+        # Wenn customer_id bereits das volle Format hat (mit Hash), verwende es direkt
+        if len(self.customer_id) > 20 and '-' in self.customer_id:
+            # Vollständige customer_id mit Hash
+            proxy_url = f"http://{self.customer_id}-zone-web_unlocker:@brd.superproxy.io:22225"
+        else:
+            # Kurze customer_id - füge Präfix hinzu
+            proxy_url = f"http://brd-customer-{self.customer_id}-zone-web_unlocker:{self.password}@brd.superproxy.io:22225"
         
         default_headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'

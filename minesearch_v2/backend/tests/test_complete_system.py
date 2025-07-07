@@ -12,8 +12,8 @@ import json
 import sys
 from typing import Dict, List, Any
 
-from search_service_multi import MultiProviderSearchService
-from config import config
+from minesearch_v2.backend.search_service_multi import MultiProviderSearchService
+from minesearch_v2.backend.config import config
 
 # Logging konfigurieren
 logging.basicConfig(

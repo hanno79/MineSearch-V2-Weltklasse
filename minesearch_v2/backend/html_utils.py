@@ -473,18 +473,21 @@ def create_batch_results_table(results: List[Dict]) -> str:
             }
             
             // Alle Quellen ein-/ausklappen
-            let allSourcesExpanded = false;
+            if (typeof window.allSourcesExpanded === 'undefined') {
+                window.allSourcesExpanded = false;
+            }
+            
             function toggleAllSources() {
-                allSourcesExpanded = !allSourcesExpanded;
+                window.allSourcesExpanded = !window.allSourcesExpanded;
                 const allSourceDivs = document.querySelectorAll('[id^="sources_row_"]');
                 const allToggleIcons = document.querySelectorAll('[id^="toggle_row_"]');
                 
                 allSourceDivs.forEach(div => {
-                    div.style.display = allSourcesExpanded ? 'block' : 'none';
+                    div.style.display = window.allSourcesExpanded ? 'block' : 'none';
                 });
                 
                 allToggleIcons.forEach(icon => {
-                    icon.textContent = allSourcesExpanded ? '▼' : '▶';
+                    icon.textContent = window.allSourcesExpanded ? '▼' : '▶';
                 });
             }
         </script>

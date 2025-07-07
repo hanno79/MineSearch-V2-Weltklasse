@@ -41,7 +41,7 @@ class SearchQueryBuilder:
             query += f", die {commodity} abbaut"
         
         # Füge discovered sources hinzu für Web-Search-fähige Modelle
-        if model_config.get('supports_web_search') and discovered_sources:
+        if hasattr(model_config, 'supports_web_search') and model_config.supports_web_search and discovered_sources:
             query += "\n\nPrüfe speziell diese Quellen:\n"
             for source in discovered_sources[:10]:
                 query += f"- {source['url']} ({source.get('description', '')})\n"

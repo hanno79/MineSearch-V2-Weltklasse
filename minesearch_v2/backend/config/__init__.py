@@ -5,6 +5,10 @@ Version: 1.0
 Beschreibung: Config Package für MineSearch
 """
 
+# ÄNDERUNG 06.07.2025: Load .env file before importing configs
+from dotenv import load_dotenv
+load_dotenv()
+
 from .base import Config, CSV_COLUMNS, FIELDS_WITHOUT_SOURCES
 from .api_keys import APIKeysConfig
 from .providers import PROVIDERS_CONFIG

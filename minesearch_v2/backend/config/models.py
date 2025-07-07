@@ -37,7 +37,7 @@ PERPLEXITY_MODELS = {
     }
 }
 
-# OpenRouter Modelle
+# OpenRouter Modelle (DeepSeek wird jetzt separat geführt)
 OPENROUTER_MODELS = {
     'deepseek-free': {
         'id': 'deepseek/deepseek-chat',
@@ -47,6 +47,25 @@ OPENROUTER_MODELS = {
         'description': 'Kostenloses Chat-Modell mit gutem Reasoning',
         'supports_web_search': False,
         'is_free': True
+    },
+    'deepseek-chat': {
+        'id': 'deepseek/deepseek-chat',
+        'name': 'DeepSeek Chat',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'Fortgeschrittenes Chat-Modell',
+        'supports_web_search': False,
+        'is_free': False
+    },
+    'deepseek-reasoner': {
+        'id': 'deepseek/deepseek-reasoner',
+        'name': 'DeepSeek Reasoner',
+        'timeout': 180,
+        'max_tokens': 12000,
+        'description': 'Spezialisiert auf komplexes Reasoning',
+        'supports_web_search': False,
+        'supports_deep_research': True,
+        'is_free': False
     }
 }
 
@@ -65,13 +84,14 @@ ABACUS_MODELS = {
 }
 
 # Tavily Modelle
+# WICHTIG: Tavily hat ein Query-Limit von 400 Zeichen
 TAVILY_MODELS = {
     'search': {
         'id': 'tavily-search',
         'name': 'Tavily Search',
         'timeout': 60,
         'max_tokens': 5000,
-        'description': 'Moderne KI-gestützte Websuche für aktuelle Informationen',
+        'description': 'Moderne KI-gestützte Websuche für aktuelle Informationen (400 Zeichen Query-Limit)',
         'supports_web_search': True,
         'is_free': False
     },
@@ -80,7 +100,7 @@ TAVILY_MODELS = {
         'name': 'Tavily Research',
         'timeout': 120,
         'max_tokens': 8000,
-        'description': 'Tiefgehende Recherche mit mehreren Quellen',
+        'description': 'Tiefgehende Recherche mit mehreren Quellen (400 Zeichen Query-Limit)',
         'supports_web_search': True,
         'supports_deep_research': True,
         'is_free': False
@@ -220,6 +240,173 @@ BRIGHTDATA_MODELS = {
     }
 }
 
+# ÄNDERUNG 06.07.2025: Premium LLM Modelle für verbesserte Restaurationskosten-Extraktion
+
+# OpenAI Modelle
+OPENAI_MODELS = {
+    'o3-deep-research': {
+        'id': 'o3-deep-research',
+        'name': 'O3 Deep Research',
+        'timeout': 300,
+        'max_tokens': 16000,
+        'description': 'Maximale Intelligenz für komplexe Research-Aufgaben',
+        'supports_web_search': False,
+        'supports_deep_research': True,
+        'is_free': False
+    },
+    'gpt-4.1': {
+        'id': 'gpt-4.1-2025-04-14',
+        'name': 'GPT-4.1 (April 2025)',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'Beste Performance für komplexe Finanzanalysen',
+        'supports_web_search': False,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'o3': {
+        'id': 'o3-2025-04-16',
+        'name': 'O3 Standard',
+        'timeout': 180,
+        'max_tokens': 12000,
+        'description': 'Fortgeschrittenes Reasoning für Mining-Analysen',
+        'supports_web_search': False,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'o4-mini': {
+        'id': 'o4-mini-2025-04-16',
+        'name': 'O4 Mini',
+        'timeout': 60,
+        'max_tokens': 4000,
+        'description': 'Kosteneffizient für schnelle Analysen',
+        'supports_web_search': False,
+        'is_free': False
+    }
+}
+
+# Anthropic Modelle
+ANTHROPIC_MODELS = {
+    'claude-sonnet-4': {
+        'id': 'claude-sonnet-4-20250514',
+        'name': 'Claude Sonnet 4',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'Neueste Claude Generation für technische Analysen',
+        'supports_web_search': False,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'claude-3.7-sonnet': {
+        'id': 'claude-3-7-sonnet-latest',
+        'name': 'Claude 3.7 Sonnet Latest',
+        'timeout': 90,
+        'max_tokens': 4000,
+        'description': 'Schnellere Alternative mit gutem Preis-Leistungs-Verhältnis',
+        'supports_web_search': False,
+        'is_free': False
+    },
+    'claude-opus-4': {
+        'id': 'claude-opus-4-20250514',
+        'name': 'Claude Opus 4',
+        'timeout': 180,
+        'max_tokens': 12000,
+        'description': 'Maximum Intelligence für komplexe Mining-Dokumente',
+        'supports_web_search': False,
+        'supports_deep_research': True,
+        'is_free': False
+    }
+}
+
+# Google Gemini Modelle
+GEMINI_MODELS = {
+    'gemini-2.5-pro': {
+        'id': 'gemini-2.5-pro',
+        'name': 'Gemini 2.5 Pro',
+        'timeout': 180,
+        'max_tokens': 30000,
+        'description': '2M Token Kontext für große Dokumente, Multimodal',
+        'supports_web_search': False,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'gemini-2.5-flash': {
+        'id': 'gemini-2.5-flash',
+        'name': 'Gemini 2.5 Flash',
+        'timeout': 60,
+        'max_tokens': 10000,
+        'description': 'Schnell und kosteneffizient',
+        'supports_web_search': False,
+        'is_free': False
+    },
+    'gemini-2.5-flash-lite': {
+        'id': 'gemini-2.5-flash-lite-preview-06-17',
+        'name': 'Gemini 2.5 Flash Lite Preview',
+        'timeout': 30,
+        'max_tokens': 5000,
+        'description': 'Ultra-schnell für einfache Analysen',
+        'supports_web_search': False,
+        'is_free': False
+    }
+}
+
+# xAI Grok Modelle
+GROK_MODELS = {
+    'grok-3': {
+        'id': 'grok-3',
+        'name': 'Grok 3',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'Real-time Informationen mit X/Twitter Integration',
+        'supports_web_search': True,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'grok-3-mini': {
+        'id': 'grok-3-mini',
+        'name': 'Grok 3 Mini',
+        'timeout': 60,
+        'max_tokens': 4000,
+        'description': 'Kosteneffiziente Version',
+        'supports_web_search': True,
+        'is_free': False
+    },
+    'grok-3-fast': {
+        'id': 'grok-3-fast',
+        'name': 'Grok 3 Fast',
+        'timeout': 30,
+        'max_tokens': 2000,
+        'description': 'Ultra-schnelle Suche mit Web-Zugriff',
+        'supports_web_search': True,
+        'is_free': False
+    }
+}
+
+# ÄNDERUNG 06.07.2025: DeepSeek Modelle hinzugefügt
+# DeepSeek Modelle (via OpenRouter)
+DEEPSEEK_MODELS = {
+    'deepseek-chat': {
+        'id': 'deepseek/deepseek-chat',
+        'name': 'DeepSeek Chat',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'Fortgeschrittenes Chat-Modell mit gutem Reasoning',
+        'supports_web_search': False,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'deepseek-reasoner': {
+        'id': 'deepseek/deepseek-reasoner',
+        'name': 'DeepSeek Reasoner',
+        'timeout': 180,
+        'max_tokens': 12000,
+        'description': 'Spezialisiert auf komplexes logisches Denken',
+        'supports_web_search': False,
+        'supports_deep_research': True,
+        'is_free': False
+    }
+}
+
 # Zusammenführung aller Modelle für einfachen Zugriff
 MODELS_CONFIG = {
     'perplexity': PERPLEXITY_MODELS,
@@ -229,5 +416,10 @@ MODELS_CONFIG = {
     'exa': EXA_MODELS,
     'scrapingbee': SCRAPINGBEE_MODELS,
     'firecrawl': FIRECRAWL_MODELS,
-    'brightdata': BRIGHTDATA_MODELS
+    'brightdata': BRIGHTDATA_MODELS,
+    'openai': OPENAI_MODELS,
+    'anthropic': ANTHROPIC_MODELS,
+    'gemini': GEMINI_MODELS,
+    'grok': GROK_MODELS,
+    'deepseek': DEEPSEEK_MODELS
 }

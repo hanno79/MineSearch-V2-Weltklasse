@@ -155,7 +155,7 @@
             <div id="csv_form" class="search-form active">
                 <h2>CSV-Datei mit Minen hochladen</h2>
                 <form id="csv-upload-form" 
-                      hx-post="/api/upload-csv" 
+                      hx-post="http://localhost:8000/api/upload-csv" 
                       hx-encoding="multipart/form-data"
                       hx-target="#csv-info"
                       hx-indicator="#loading">
@@ -411,7 +411,7 @@
             // Funktion zum Laden verfügbarer Modelle
             async function loadAvailableModels() {
                 try {
-                    const response = await fetch('/api/models');
+                    const response = await fetch('http://localhost:8000/api/models');
                     const data = await response.json();
                     
                     if (data.success && data.models) {
@@ -436,16 +436,19 @@
                             
                             models.forEach(model => {
                                 const isDefault = model.id === 'perplexity:sonar-pro' || model.id === 'openrouter:deepseek-free';
-                                const icon = model.is_free ? '🆓' : model.supports_web_search ? '🌐' : '🤖';
+                                // ÄNDERUNG 04.07.2025: Spezial-Icon für Abacus AI
+                                const isAbacus = model.id.includes('abacus:');
+                                const icon = isAbacus ? '🔬' : (model.is_free ? '🆓' : model.supports_web_search ? '🌐' : '🤖');
                                 const timeInfo = model.timeout > 120 ? ` (${Math.round(model.timeout/60)}+ Min)` : '';
+                                const specialTag = isAbacus ? ' <span style="background: #2196f3; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">ULTRA-DEEP</span>' : '';
                                 
                                 html += `
                                     <label style="display: block; margin: 5px 0; cursor: pointer;">
                                         <input type="checkbox" name="model" value="${model.id}" 
                                                ${isDefault ? 'checked' : ''}
                                                style="margin-right: 8px;"
-                                               onchange="updateModelWarning()">
-                                        <span>${icon} ${model.name}${timeInfo} - ${model.description}</span>
+                                               onchange="updateModelWarning(); updateBatchModels();">
+                                        <span>${icon} ${model.name}${timeInfo}${specialTag} - ${model.description}</span>
                                     </label>
                                 `;
                             });
@@ -469,16 +472,27 @@
                 
                 if (warning) {
                     let hasLongRunning = false;
+                    let hasAbacus = false;
                     checkedModels.forEach(checkbox => {
                         if (checkbox.value.includes('deep-research') || 
                             checkbox.value.includes('sonar-reasoning')) {
                             hasLongRunning = true;
                         }
+                        // ÄNDERUNG 04.07.2025: Spezielle Warnung für Abacus AI
+                        if (checkbox.value.includes('abacus:deep-agent')) {
+                            hasAbacus = true;
+                        }
                     });
                     
-                    warning.style.display = hasLongRunning ? 'block' : 'none';
-                    if (hasLongRunning) {
+                    warning.style.display = (hasLongRunning || hasAbacus) ? 'block' : 'none';
+                    if (hasAbacus) {
+                        warning.innerHTML = '🔬 <strong>Ultra-Deep Research aktiviert:</strong> Abacus AI Deep Agent kann 5+ Minuten pro Mine dauern, liefert aber die umfassendsten Ergebnisse!';
+                        warning.style.background = '#e3f2fd';
+                        warning.style.borderColor = '#2196f3';
+                    } else if (hasLongRunning) {
                         warning.innerHTML = '⚠️ <strong>Achtung:</strong> Einige gewählte Modelle können 30+ Minuten pro Mine dauern!';
+                        warning.style.background = '#fff3cd';
+                        warning.style.borderColor = '#ffc107';
                     }
                 }
             }
@@ -529,7 +543,7 @@
             // Bei mehreren Modellen verwende Multi-Model-Endpunkt
             if (selectedModels.length > 1) {
                 return {
-                    endpoint: '/api/multi-search',
+                    endpoint: '/api/search/multi',  // ÄNDERUNG 03.07.2025: Korrekter API-Endpunkt
                     models: selectedModels,
                     loadingText: `Multi-Modell-Suche läuft mit ${selectedModels.length} Modellen...`,
                     isMultiModel: true,
@@ -542,12 +556,26 @@
             const model = selectedModels[0];
             const isPerplexity = model.startsWith('perplexity:');
             const modelKey = model.split(':')[1];
+            const provider = model.split(':')[0];
             
-            // Basis-Konfiguration
+            // ÄNDERUNG 04.07.2025: Non-Perplexity Provider über Multi-Route
+            // Tavily, Exa und andere müssen über Multi-Provider-Route laufen
+            if (!isPerplexity) {
+                return {
+                    endpoint: '/api/search/multi',
+                    models: [model],
+                    loadingText: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Suche läuft...`,
+                    isMultiModel: true,  // Technisch Multi-Route, auch bei einem Modell
+                    twoPhase: false,
+                    smartSearch: false
+                };
+            }
+            
+            // Basis-Konfiguration für Perplexity
             let config = {
                 endpoint: '/api/search',
                 model: modelKey,
-                provider: model.split(':')[0],
+                provider: provider,
                 baseTime: '60 Sekunden',
                 description: 'Standard-Suche',
                 isMultiModel: false
@@ -611,7 +639,7 @@
             
             // Multi-Model oder Single-Model Request
             if (config.isMultiModel) {
-                requestBody.models = config.models;
+                requestBody.model_ids = config.models;  // ÄNDERUNG 03.07.2025: Korrekter Parameter-Name
             } else {
                 requestBody.model = config.model;
                 requestBody.provider = config.provider;
@@ -1101,7 +1129,7 @@
         // ÄNDERUNG 02.07.2025: Funktionen für Quellen-Datenbank
         async function loadSourcesStats() {
             try {
-                const response = await fetch('/api/sources/stats');
+                const response = await fetch('http://localhost:8000/api/sources/stats');
                 const data = await response.json();
                 
                 if (data.success) {
@@ -1217,7 +1245,7 @@
         // ÄNDERUNG 02.07.2025: Funktionen für Ergebnis-Datenbank
         async function loadResultsStats() {
             try {
-                const response = await fetch('/api/results/stats');
+                const response = await fetch('http://localhost:8000/api/results/stats');
                 const data = await response.json();
                 
                 if (data.success) {
@@ -1259,7 +1287,7 @@
         
         async function loadSessions() {
             try {
-                const response = await fetch('/api/results/sessions');
+                const response = await fetch('http://localhost:8000/api/results/sessions');
                 const data = await response.json();
                 
                 if (data.success && data.data) {
@@ -1393,6 +1421,30 @@
             } catch (error) {
                 console.error('Fehler beim Laden der Details:', error);
                 alert('Fehler beim Laden der Details');
+            }
+        }
+        
+        // ÄNDERUNG 04.07.2025: Synchronisiere ausgewählte Modelle mit Batch-Form
+        document.body.addEventListener('htmx:afterOnLoad', function(evt) {
+            // Wenn CSV erfolgreich hochgeladen wurde und das hidden field existiert
+            const batchModelsField = document.getElementById('batch_selected_models');
+            if (batchModelsField) {
+                // Hole aktuell ausgewählte Modelle
+                const selectedModels = Array.from(document.querySelectorAll('input[name="model"]:checked'))
+                    .map(cb => cb.value);
+                
+                // Setze die Modelle im hidden field
+                batchModelsField.value = selectedModels.join(',');
+            }
+        });
+        
+        // Aktualisiere hidden field wenn Modell-Auswahl sich ändert
+        window.updateBatchModels = function() {
+            const batchModelsField = document.getElementById('batch_selected_models');
+            if (batchModelsField) {
+                const selectedModels = Array.from(document.querySelectorAll('input[name="model"]:checked'))
+                    .map(cb => cb.value);
+                batchModelsField.value = selectedModels.join(',');
             }
         }
         

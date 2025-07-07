@@ -12,8 +12,17 @@ from datetime import datetime
 import json
 
 from .base_provider import AbstractProvider, ModelConfig, SearchResult
-from ..data_extraction import extract_structured_data_with_sources
-from ..source_discovery import extract_sources_from_content
+
+# ÄNDERUNG 06.07.2025: Absolute Imports für Provider-Kompatibilität
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from data_extraction import DataExtractor
+from source_discovery import extract_sources_from_content
+from enhanced_source_discovery import EnhancedSourceDiscovery
+from utils import generate_name_variants, get_country_config, generate_multilingual_search_terms
+from specialized_prompts import SpecializedPrompts
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +34,7 @@ class OpenRouterProvider(AbstractProvider):
         super().__init__(api_key, config)
         self.api_url = config.get('base_url', 'https://openrouter.ai/api/v1') + '/chat/completions'
         self.models = self._init_models()
+        self.data_extractor = DataExtractor()
     
     def _init_models(self) -> Dict[str, ModelConfig]:
         """Initialisiere verfügbare Modelle"""
@@ -63,8 +73,42 @@ class OpenRouterProvider(AbstractProvider):
             )
         
         try:
-            # Angepasster Query für OpenRouter (ohne Web-Suche)
-            enhanced_query = self._enhance_query_for_no_web(query, options)
+            # ÄNDERUNG 04.07.2025: Enhanced Source Discovery nutzen
+            mine_name = options.get('mine_name', '')
+            country = options.get('country')
+            region = options.get('region')
+            
+            # ÄNDERUNG 06.07.2025: Nutze übergebene Quellen wenn vorhanden
+            discovered_sources = options.get('discovered_sources', [])
+            skip_discovery = options.get('skip_source_discovery', False)
+            
+            # Initialisiere source_discovery immer
+            source_discovery = EnhancedSourceDiscovery()
+            
+            if not discovered_sources and not skip_discovery and mine_name:
+                # Nur wenn keine Quellen übergeben wurden, führe eigene Discovery durch
+                logger.info(f"[OPENROUTER] Starte eigene Source Discovery für {mine_name}")
+                discovered_sources = source_discovery.discover_sources_for_mine(
+                    mine_name=mine_name,
+                    country=country,
+                    region=region
+                )
+                logger.info(f"[OPENROUTER] {len(discovered_sources)} Quellen selbst entdeckt")
+            else:
+                logger.info(f"[OPENROUTER] Nutze {len(discovered_sources)} übergebene Quellen")
+            
+            # Generiere Sprachvarianten
+            name_variants = generate_name_variants(mine_name) if mine_name else []
+            country_config = get_country_config(country) if country else {}
+            multilingual_terms = generate_multilingual_search_terms(country_config)
+            
+            # Angepasster Query für OpenRouter mit Quellen
+            enhanced_query = self._enhance_query_for_no_web(
+                query, options, 
+                discovered_sources=discovered_sources,
+                name_variants=name_variants,
+                multilingual_terms=multilingual_terms
+            )
             
             # API-Call
             async with httpx.AsyncClient(timeout=model_config.timeout) as client:
@@ -115,11 +159,21 @@ class OpenRouterProvider(AbstractProvider):
                     content = result.get('message', 'Keine Antwort erhalten')
                 
                 # Extrahiere strukturierte Daten
-                mine_name = options.get('mine_name', '')
-                country = options.get('country')
-                
-                extracted_data = extract_structured_data_with_sources(content, mine_name, country)
+                extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
                 sources = extract_sources_from_content(content)
+                
+                # ÄNDERUNG 04.07.2025: Tracke Source Discovery Ergebnisse
+                for source in sources:
+                    if source.get('url'):
+                        source_discovery.track_source_result(
+                            url=source['url'],
+                            success=True,
+                            content_type=source.get('type', 'general'),
+                            found_data={'mine': mine_name, 'fields': list(extracted_data['data'].keys())}
+                        )
+                
+                # Finalisiere Session
+                session_summary = source_discovery.finalize_session()
                 
                 duration = (datetime.now() - start_time).total_seconds()
                 
@@ -133,7 +187,9 @@ class OpenRouterProvider(AbstractProvider):
                         'provider': 'openrouter',
                         'structured_data_with_sources': extracted_data['data_with_sources'],
                         'source_index': extracted_data['source_index'],
-                        'usage': result.get('usage', {})
+                        'usage': result.get('usage', {}),
+                        'source_discovery_session': session_summary,
+                        'discovered_sources_count': len(discovered_sources)
                     },
                     search_duration=duration
                 )
@@ -158,33 +214,71 @@ class OpenRouterProvider(AbstractProvider):
                 error=str(e)
             )
     
-    def _enhance_query_for_no_web(self, query: str, options: Dict[str, Any]) -> str:
+    def _enhance_query_for_no_web(self, query: str, options: Dict[str, Any], 
+                                  discovered_sources: List[Dict] = None,
+                                  name_variants: List[str] = None,
+                                  multilingual_terms: Dict[str, List[str]] = None) -> str:
         """
         Erweitere Query für Modelle ohne Web-Suche
-        Füge Kontext und Hinweise hinzu
+        Füge Kontext, Quellen und Sprachvarianten hinzu
         """
         mine_name = options.get('mine_name', '')
         country = options.get('country', '')
         commodity = options.get('commodity', '')
+        region = options.get('region', '')
+        
+        # ÄNDERUNG 04.07.2025: Nutze spezialisierte Prompts
+        # ÄNDERUNG 05.07.2025: Verstärkter Fokus auf Restaurationskosten
+        specialized_prompt = SpecializedPrompts.get_enhanced_query(
+            mine_name=mine_name,
+            country=country,
+            region=region,
+            commodity=commodity,
+            focus_fields=['restoration_costs', 'coordinates', 'ownership', 'production']
+        )
+        
+        # Füge zusätzlichen spezifischen Restaurationskosten-Prompt hinzu
+        restoration_prompt = SpecializedPrompts.get_restoration_costs_prompt(mine_name, country, commodity)
+        
+        # ÄNDERUNG 04.07.2025: Füge Quellen-URLs hinzu
+        sources_text = ""
+        if discovered_sources:
+            sources_text = "\n\nRELEVANTE QUELLEN (bitte nutze dein Wissen über diese Quellen):\n"
+            for i, source in enumerate(discovered_sources[:20], 1):  # Top 20 Quellen
+                sources_text += f"[{i}] {source['url']} ({source.get('description', source.get('type', 'Quelle'))})\n"
+        
+        # Füge Namensvarianten hinzu
+        variants_text = ""
+        if name_variants:
+            variants_text = f"\n\nMÖGLICHE SCHREIBWEISEN: {', '.join(name_variants[:5])}"
+        
+        # Füge mehrsprachige Begriffe hinzu
+        multilingual_text = ""
+        if multilingual_terms:
+            key_terms = []
+            for term_type, terms in multilingual_terms.items():
+                if term_type == 'restoration_costs' and terms:
+                    key_terms.extend(terms[:5])  # Top 5 Begriffe
+            if key_terms:
+                multilingual_text = f"\n\nSUCHBEGRIFFE für Restaurationskosten: {', '.join(key_terms)}"
         
         enhanced = f"""Basierend auf deinem Wissen über Bergbau und Mining, beantworte folgende Anfrage:
 
 {query}
 
-WICHTIGE HINWEISE:
-- Wenn die Mine "{mine_name}" existiert, gib bekannte Informationen
-- Wenn du keine spezifischen Daten hast, gib plausible Schätzungen basierend auf:
-  * Typische Werte für {country if country else 'das Land'}
-  * Übliche Kosten für {commodity if commodity else 'den Rohstoff'}
-  * Branchenstandards für Restaurationskosten
-- Markiere unsichere Daten als "geschätzt" oder "typischer Wert"
-- Nutze dein Wissen über Mining-Industrie und Umweltvorschriften
+MINE: {mine_name}
+LAND: {country if country else 'Unbekannt'}
+REGION: {region if region else 'Unbekannt'}
+ROHSTOFF: {commodity if commodity else 'Unbekannt'}
+{variants_text}
+{multilingual_text}
+{sources_text}
 
-FOKUS auf Restaurationskosten:
-- Typische Restaurationskosten liegen zwischen 10-500 Millionen USD
-- Große Tagebau-Minen: oft 100-500 Millionen USD
-- Untertage-Minen: oft 20-200 Millionen USD
-- Berücksichtige Umweltauflagen des Landes"""
+{specialized_prompt}
+
+{restoration_prompt}
+
+ANTWORTE IM STRUKTURIERTEN FORMAT wie im System-Prompt beschrieben."""
         
         return enhanced
     
@@ -228,31 +322,36 @@ FOKUS auf Restaurationskosten:
         currency = options.get('currency', 'USD')
         
         return f"""Du bist ein Mining-Recherche-Experte mit umfassendem Wissen über die globale Bergbauindustrie. 
-Antworte auf Deutsch mit STRUKTURIERTEN DATEN. Wenn du keine spezifischen Daten hast, gib plausible Schätzungen basierend auf deinem Fachwissen.
+Antworte auf Deutsch mit STRUKTURIERTEN DATEN.
 
 **GEFUNDENE DATEN FÜR [MINENNAME]:**
 - Name: [exakter Name] [Quelle: Fachwissen/Schätzung]
 - Land: [Land] [Quelle: Fachwissen/Schätzung]
 - Region: [Region/Provinz] [Quelle: Fachwissen/Schätzung]
-- Eigentümer: [Eigentümer oder "Unbekannt"] [Quelle: Fachwissen/Schätzung]
-- Betreiber: [Betreiber oder "Unbekannt"] [Quelle: Fachwissen/Schätzung]
-- Koordinaten: [Latitude, Longitude oder "k.A."] [Quelle: Fachwissen/Schätzung]
+- Eigentümer: [Eigentümer oder LEER lassen] [Quelle: Fachwissen/Schätzung]
+- Betreiber: [Betreiber oder LEER lassen] [Quelle: Fachwissen/Schätzung]
+- Koordinaten: [Latitude, Longitude oder LEER lassen] [Quelle: Fachwissen/Schätzung]
 - Status: [aktiv/geschlossen/geplant] [Quelle: Fachwissen/Schätzung]
 - Rohstoffe: [Liste der Rohstoffe] [Quelle: Fachwissen/Schätzung]
 - Minentyp: [Untertage/Open-Pit/etc] [Quelle: Fachwissen/Schätzung]
-- Produktionsstart: [Jahr oder "k.A."] [Quelle: Fachwissen/Schätzung]
+- Produktionsstart: [Jahr oder LEER lassen] [Quelle: Fachwissen/Schätzung]
 - Produktionsende: [Jahr oder 'aktiv'] [Quelle: Fachwissen/Schätzung]
-- Fördermenge: [Menge/Jahr oder "k.A."] [Quelle: Fachwissen/Schätzung]
-- Fläche: [in km² oder "k.A."] [Quelle: Fachwissen/Schätzung]
-- Restaurationskosten: [Betrag in {currency}$ oder Schätzung] [Quelle: Fachwissen/Schätzung]
+- Fördermenge: [Menge/Jahr oder LEER lassen] [Quelle: Fachwissen/Schätzung]
+- Fläche: [in km² oder LEER lassen] [Quelle: Fachwissen/Schätzung]
+- Restaurationskosten: [NUR realistische Beträge in {currency}$ oder LEER] [Quelle: Fachwissen/Schätzung]
 
-**WICHTIG FÜR RESTAURATIONSKOSTEN:**
-Wenn keine spezifischen Daten verfügbar sind, schätze basierend auf:
-- Minentyp (Open-Pit: 50-500 Mio USD, Untertage: 20-200 Mio USD)
-- Größe der Mine
-- Umweltvorschriften des Landes
-- Art des Rohstoffs
-Gib IMMER eine Schätzung mit Begründung!
+**KRITISCHE REGELN FÜR RESTAURATIONSKOSTEN:**
+- NIEMALS "$1 CAD", "$2 CAD", "$3 CAD" oder ähnliche Platzhalter verwenden!
+- Nur realistische Schätzungen basierend auf:
+  * Minentyp (Open-Pit: 50-500 Mio USD, Untertage: 20-200 Mio USD)
+  * Größe der Mine und Umweltvorschriften
+- Mindestbetrag: $10,000 - darunter ist unrealistisch
+- Wenn unsicher: Feld LEER lassen, KEINE Minimalwerte!
+
+**VERBOTENE PLATZHALTER:**
+- KEINE "k.A.", "n/a", "-", "unbekannt", "nicht gefunden"
+- KEINE Minimalwerte wie $1, $2, $3
+- Wenn keine Daten: Feld einfach LEER lassen
 
 **QUELLEN-SEKTION:**
 [Da du keine Web-Suche durchführst, gib an:]
