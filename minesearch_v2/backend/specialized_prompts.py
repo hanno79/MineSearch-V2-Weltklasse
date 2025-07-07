@@ -273,3 +273,135 @@ VERBOTEN:
                 'empty_if_invalid': True
             }
         }
+    
+    @staticmethod
+    def get_source_discovery_prompt(mine_name: str, country: str = None, 
+                                   region: str = None, commodity: str = None) -> str:
+        """NEUER PROMPT: Spezialisiert auf Quellensuche"""
+        
+        location = country if country else "weltweit"
+        if region:
+            location = f"{region}, {country}" if country else region
+        
+        return f"""QUELLENSUCHE für {mine_name} Mine {f'in {location}' if location else ''}
+
+AUFGABE: Finde ALLE verfügbaren Quellen, Dokumente und Referenzen zu dieser Mine.
+
+PRIORITÄT 1 - Offizielle Quellen:
+- Unternehmenswebseiten (Investor Relations, Projekte)
+- Behördendokumente (SEDAR, SEC, ASX, TSX)
+- Regierungsportale (Bergbauministerien, Umweltbehörden)
+- GESTIM Datenbank (für Quebec)
+
+PRIORITÄT 2 - Technische Dokumente:
+- NI 43-101 Technical Reports
+- JORC Reports
+- Feasibility Studies
+- Environmental Impact Assessments
+- Mine Closure Plans
+- Exploration Reports
+
+PRIORITÄT 3 - Finanzdokumente:
+- Annual Reports / Jahresberichte
+- Quarterly Reports
+- Financial Statements
+- MD&A (Management Discussion & Analysis)
+- Investor Presentations
+
+PRIORITÄT 4 - Medien und Analysen:
+- Mining.com, Northern Miner, Mining Journal
+- Reuters, Bloomberg, Financial Post
+- Analyst Reports
+- Branchennachrichten
+
+PRIORITÄT 5 - Spezialdatenbanken:
+- Mining Data Online
+- S&P Global Market Intelligence
+- Wood Mackenzie
+- InfoMine
+- USGS, Natural Resources Canada
+
+AUSGABEFORMAT:
+[1] URL - Beschreibung (Dokumenttyp, Jahr)
+[2] URL - Beschreibung (Dokumenttyp, Jahr)
+...
+
+WICHTIG: 
+- Gib ALLE gefundenen URLs an
+- Kennzeichne Dokumenttyp (PDF, Webseite, Datenbank)
+- Notiere das Jahr/Datum wenn verfügbar
+- Priorisiere aktuelle Quellen (< 3 Jahre)"""
+    
+    @staticmethod
+    def get_comprehensive_extraction_prompt(mine_name: str, sources: List[str]) -> str:
+        """NEUER PROMPT: Umfassende Datenextraktion aus Quellen"""
+        
+        sources_text = "\n".join([f"[{i+1}] {source}" for i, source in enumerate(sources[:30])])
+        
+        return f"""UMFASSENDE DATENEXTRAKTION für {mine_name}
+
+AUFGABE: Analysiere ALLE folgenden Quellen und extrahiere JEDE verfügbare Information.
+
+QUELLEN:
+{sources_text}
+
+EXTRAKTIONSANWEISUNGEN:
+
+1. LIES JEDE QUELLE SORGFÄLTIG
+2. SUCHE in Tabellen, Fußnoten, Anhängen, Grafiken
+3. BEACHTE verschiedene Schreibweisen und Sprachen
+4. KOMBINIERE Informationen aus mehreren Quellen
+5. PRIORISIERE neuere Daten bei Konflikten
+
+DATENFELDER (mit Quellenangabe):
+
+BASISDATEN:
+- Name: [exakt] [Quelle: Nr]
+- Land: [Land] [Quelle: Nr]
+- Region: [Provinz/Staat] [Quelle: Nr]
+- Status: [aktiv/geschlossen/geplant] [Quelle: Nr]
+
+EIGENTUM & BETRIEB:
+- Eigentümer: [mit %] [Quelle: Nr]
+- Betreiber: [Operator] [Quelle: Nr]
+- Joint Venture Partner: [falls vorhanden] [Quelle: Nr]
+
+KOORDINATEN (alle Formate):
+- Latitude: [Dezimalgrad] [Quelle: Nr]
+- Longitude: [Dezimalgrad] [Quelle: Nr]
+- UTM: [falls verfügbar] [Quelle: Nr]
+
+FINANZDATEN:
+- Restaurationskosten: [Betrag, Währung, Jahr] [Quelle: Nr]
+- ARO: [Asset Retirement Obligation] [Quelle: Nr]
+- Marktkapitalisierung: [Betrag] [Quelle: Nr]
+- Jahresumsatz: [Betrag, Jahr] [Quelle: Nr]
+- EBITDA: [Betrag, Jahr] [Quelle: Nr]
+- Investitionssumme: [CAPEX] [Quelle: Nr]
+
+PRODUKTION:
+- Rohstoffe: [Liste] [Quelle: Nr]
+- Jahresproduktion: [Menge, Einheit, Jahr] [Quelle: Nr]
+- Produktionsstart: [Jahr] [Quelle: Nr]
+- Produktionsende: [Jahr/aktiv] [Quelle: Nr]
+- Lebensdauer: [Jahre] [Quelle: Nr]
+
+TECHNISCHE DATEN:
+- Minentyp: [Open-Pit/Underground/etc] [Quelle: Nr]
+- Fläche: [km²] [Quelle: Nr]
+- Tiefe: [m] [Quelle: Nr]
+- Reserven: [Menge, Einheit] [Quelle: Nr]
+- Ressourcen: [Menge, Einheit] [Quelle: Nr]
+- Erzgehalt: [%, g/t] [Quelle: Nr]
+
+WEITERE DATEN:
+- Mitarbeiterzahl: [Anzahl] [Quelle: Nr]
+- Verarbeitungskapazität: [t/Tag] [Quelle: Nr]
+- Infrastruktur: [Beschreibung] [Quelle: Nr]
+- Umweltgenehmigungen: [Status] [Quelle: Nr]
+
+WICHTIG:
+- Gib ALLE gefundenen Daten an
+- Verwende [Quelle: X] für jedes Datenfeld
+- Bei mehreren Werten: Alle angeben mit Quelle
+- KEINE Platzhalter oder Schätzungen"""

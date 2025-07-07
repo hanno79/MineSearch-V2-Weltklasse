@@ -101,14 +101,21 @@ def generate_name_variants(mine_name: str) -> List[str]:
     # Original Name
     variants.add(mine_name)
     
-    # Normalisierte Version (ohne Akzente)
+    # ÄNDERUNG 07.07.2025: Erweiterte Akzent-Behandlung
+    # Generiere BEIDE Versionen: mit und ohne Akzente
     normalized = normalize_accents(mine_name)
     if normalized != mine_name:
         variants.add(normalized)
+        
+        # Füge auch Versionen mit alternativen Akzenten hinzu
+        # z.B. Quebec → Québec, Montreal → Montréal
+        accent_alternatives = generate_accent_alternatives(mine_name)
+        variants.update(accent_alternatives)
     
     # Erweiterte Präfix/Suffix-Varianten
     mine_prefixes = ['Mine', 'mine', 'Project', 'project', 'Property', 'property', 
-                     'Deposit', 'deposit', 'Operation', 'operation']
+                     'Deposit', 'deposit', 'Operation', 'operation', 'Site', 'site',
+                     'Mina', 'mina', 'Proyecto', 'proyecto']  # Spanisch hinzugefügt
     
     # Prüfe ob Name bereits ein Präfix hat
     has_prefix = False
@@ -121,11 +128,14 @@ def generate_name_variants(mine_name: str) -> List[str]:
             variants.add(without_prefix.capitalize())
             variants.add(without_prefix.upper())
             variants.add(without_prefix.lower())
+            
+            # Füge auch Akzent-Varianten des Namens ohne Präfix hinzu
+            variants.update(generate_accent_alternatives(without_prefix))
             break
     
     # Füge verschiedene Präfixe hinzu wenn noch keines vorhanden
     if not has_prefix:
-        for prefix in ['Mine', 'Project', 'Property']:
+        for prefix in ['Mine', 'Project', 'Property', 'Mina', 'Proyecto']:
             variants.add(f"{prefix} {mine_name}")
             variants.add(f"{prefix.lower()} {mine_name.lower()}")
     
@@ -162,6 +172,7 @@ def generate_name_variants(mine_name: str) -> List[str]:
         without_brackets = re.sub(r'\s*\([^)]*\)', '', mine_name).strip()
         variants.add(without_brackets)
         variants.add(normalize_accents(without_brackets))
+        variants.update(generate_accent_alternatives(without_brackets))
         
         # Füge auch Varianten mit dem Inhalt der Klammern hinzu
         bracket_content = re.search(r'\(([^)]+)\)', mine_name)
@@ -182,6 +193,73 @@ def generate_name_variants(mine_name: str) -> List[str]:
     logger.debug(f"[NAME VARIANTS] {mine_name} → {len(variants)} Varianten generiert")
     
     return list(variants)
+
+
+def generate_accent_alternatives(text: str) -> List[str]:
+    """
+    NEUE FUNKTION: Generiere alternative Schreibweisen mit Akzenten
+    
+    Args:
+        text: Text für den Akzent-Alternativen generiert werden sollen
+        
+    Returns:
+        Liste von Textvarianten mit alternativen Akzenten
+    """
+    alternatives = set()
+    
+    # Häufige Akzent-Alternativen (ohne Akzent → mit Akzent)
+    accent_additions = {
+        'Quebec': 'Québec',
+        'Montreal': 'Montréal',
+        'Jerome': 'Jérôme',
+        'Cote': 'Côte',
+        'Leon': 'Léon',
+        'Jose': 'José',
+        'Maria': 'María',
+        'Sao': 'São',
+        'Joao': 'João',
+        'Francois': 'François',
+        'Andre': 'André',
+        'Rene': 'René',
+        'Noel': 'Noël',
+        'Stephane': 'Stéphane',
+        'Therese': 'Thérèse'
+    }
+    
+    # Prüfe ob eines der Wörter im Text vorkommt
+    for word_without, word_with in accent_additions.items():
+        # Prüfe ob das Wort ohne Akzent im Text vorkommt
+        if word_without.lower() in text.lower():
+            # Ersetze case-insensitive
+            pattern = re.compile(re.escape(word_without), re.IGNORECASE)
+            alternative = pattern.sub(word_with, text)
+            if alternative != text:
+                alternatives.add(alternative)
+            # Füge auch die exakte Akzent-Version hinzu
+            alternatives.add(word_with)
+        
+        # Prüfe auch umgekehrt (mit Akzent → ohne)
+        if word_with.lower() in text.lower():
+            pattern = re.compile(re.escape(word_with), re.IGNORECASE)
+            alternative = pattern.sub(word_without, text)
+            if alternative != text:
+                alternatives.add(alternative)
+    
+    # Generische Akzent-Muster
+    # e → é am Wortende (französisch)
+    if text.endswith('e'):
+        alternatives.add(text[:-1] + 'é')
+    
+    # a → á (spanisch/portugiesisch)
+    if 'a' in text.lower():
+        for match in re.finditer(r'a', text, re.IGNORECASE):
+            alt = text[:match.start()] + 'á' + text[match.end():]
+            alternatives.add(alt)
+            # Nur erste paar Varianten, sonst zu viele
+            if len(alternatives) > 5:
+                break
+    
+    return list(alternatives)
 
 
 def clean_extracted_value(value: str) -> str:
