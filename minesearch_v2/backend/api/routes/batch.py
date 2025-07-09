@@ -387,6 +387,11 @@ async def batch_search(
                         logger.info(f"[BATCH-DEBUG] {field}: '{str(value)[:100]}...'")
                     
                     # Ergebnis zur Liste hinzufügen
+                    # ÄNDERUNG 09.07.2025: Berechne data_quality für result_data
+                    filled_fields = len([v for v in best_data.values() if v and str(v).strip() and not is_placeholder_value(v, '')])
+                    total_fields = len(CSV_COLUMNS)
+                    completeness_percentage = (filled_fields / total_fields * 100) if total_fields > 0 else 0
+                    
                     result_data = {
                         "mine_name": mine_name,
                         "country": country,
@@ -397,7 +402,13 @@ async def batch_search(
                             "structured_data": best_data,
                             "structured_data_with_sources": best_data_with_sources,
                             "sources": all_sources[:20],  # Top 20 Quellen
-                            "source_index": source_index
+                            "source_index": source_index,
+                            "data_quality": {
+                                "filled_fields": filled_fields,
+                                "total_fields": total_fields,
+                                "completeness_percentage": completeness_percentage,
+                                "score": completeness_percentage / 100  # Normalisiert auf 0-1
+                            }
                         }
                     }
                     results.append(result_data)

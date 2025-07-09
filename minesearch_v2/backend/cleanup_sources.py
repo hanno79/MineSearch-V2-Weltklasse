@@ -219,25 +219,11 @@ def cleanup_sources():
         # 5. Entferne echte Duplikate (exakt gleiche URL)
         logger.info("\n=== Entferne echte Duplikate ===")
         
-        # Finde Duplikate
-        duplicates = session.query(
-            Source.url,
-            func.count(Source.id).label('count')
-        ).group_by(Source.url).having(func.count(Source.id) > 1).all()
+        # ÄNDERUNG 09.07.2025: Nutze die neue cleanup_duplicate_sources Methode
+        session.commit()  # Commit bisherige Änderungen
         
-        logger.info(f"URLs mit Duplikaten: {len(duplicates)}")
-        
-        removed_count = 0
-        for url, count in duplicates:
-            # Behalte nur den ältesten Eintrag
-            sources = session.query(Source).filter(Source.url == url).order_by(Source.created_at).all()
-            
-            # Behalte den ersten, lösche den Rest
-            for source in sources[1:]:
-                session.delete(source)
-                removed_count += 1
-        
-        session.commit()
+        # Nutze die verbesserte Methode aus db_manager
+        removed_count = db_manager.cleanup_duplicate_sources()
         logger.info(f"Duplikate entfernt: {removed_count}")
         
         # 6. Finale Statistiken

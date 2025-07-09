@@ -626,14 +626,27 @@ class DatabaseManager:
                 country = detected_country
             
         with self.get_session() as session:
-            # ÄNDERUNG 08.07.2025: Suche nach URL statt Domain für genaueres Tracking
+            # ÄNDERUNG 09.07.2025: Verbesserte Duplikat-Prüfung - berücksichtige URL und Region
             # Prüfe ob Quelle bereits existiert - suche nach exakter URL
             source = session.query(Source).filter_by(url=base_url).first()
+            
+            # Wenn Quelle existiert und Region unterschiedlich ist, erstelle neue Quelle nur wenn Region relevant
+            if source and region and source.region != region:
+                # Prüfe ob Region-spezifische Quelle bereits existiert
+                source_with_region = session.query(Source).filter_by(url=base_url, region=region).first()
+                if source_with_region:
+                    source = source_with_region
+                else:
+                    # Nur neue Quelle erstellen wenn Region für diese Domain relevant ist
+                    # (z.B. für gov-Seiten mit regionalen Inhalten)
+                    if source.source_type in ['government', 'database']:
+                        source = None  # Erstelle neue Quelle mit Region
             
             if source:
                 # Aktualisiere bestehende Quelle
                 if country and not source.country:
                     source.country = country
+                # Aktualisiere Region nur wenn noch nicht gesetzt
                 if region and not source.region:
                     source.region = region
                 # Aktualisiere Typ nur wenn neuer Typ spezifischer ist
@@ -660,6 +673,54 @@ class DatabaseManager:
             session.commit()
             session.refresh(source)
             return source
+    
+    def cleanup_duplicate_sources(self) -> int:
+        """Bereinige doppelte Quellen in der Datenbank"""
+        with self.get_session() as session:
+            # Finde alle URLs mit mehreren Einträgen
+            duplicates = session.query(
+                Source.url,
+                func.count(Source.id).label('count')
+            ).group_by(Source.url).having(func.count(Source.id) > 1).all()
+            
+            removed_count = 0
+            
+            for url, count in duplicates:
+                # Hole alle Quellen mit dieser URL
+                sources = session.query(Source).filter_by(url=url).order_by(
+                    Source.total_searches.desc(),  # Behalte die meistgenutzte
+                    Source.reliability_score.desc(),  # Mit höchster Zuverlässigkeit
+                    Source.created_at.asc()  # Älteste zuerst
+                ).all()
+                
+                if len(sources) > 1:
+                    # Behalte die erste (beste) Quelle
+                    keeper = sources[0]
+                    
+                    # Übertrage wichtige Daten von den Duplikaten
+                    for source in sources[1:]:
+                        # Aggregiere Statistiken
+                        keeper.total_searches += source.total_searches
+                        keeper.successful_searches += source.successful_searches
+                        
+                        # Übernehme bessere Metadaten
+                        if source.country and not keeper.country:
+                            keeper.country = source.country
+                        if source.region and not keeper.region:
+                            keeper.region = source.region
+                        if source.source_type != 'unknown' and keeper.source_type == 'unknown':
+                            keeper.source_type = source.source_type
+                        
+                        # Lösche Duplikat
+                        session.delete(source)
+                        removed_count += 1
+                    
+                    # Aktualisiere Reliability Score
+                    keeper.reliability_score = keeper.calculate_reliability_score()
+            
+            session.commit()
+            logger.info(f"[DB] {removed_count} doppelte Quellen entfernt")
+            return removed_count
     
     def get_sources_for_search(self, country: Optional[str] = None, region: Optional[str] = None,
                               source_type: Optional[str] = None, min_reliability: float = 30.0, 

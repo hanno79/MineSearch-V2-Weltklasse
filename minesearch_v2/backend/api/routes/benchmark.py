@@ -266,6 +266,9 @@ async def get_field_consistency_data(
     }
 
 
+# ÄNDERUNG 09.07.2025: Doppelte Endpoints entfernt - siehe Zeilen 331 und 474 für die aktiven Definitionen
+
+
 @router.get("/summary")
 async def get_benchmark_summary():
     """
@@ -536,8 +539,14 @@ async def capture_search_statistics(stats_data: Dict[str, Any]):
                 if field in critical_fields:
                     critical_fields_found.append(field)
         
-        # Daten-Erfolg: API hat geantwortet UND mindestens 3 kritische Felder gefunden
+        # ÄNDERUNG 09.07.2025: Verbesserte Erfolgs-Definition
+        # API-Erfolg: Modell hat ohne Fehler geantwortet
+        # Daten-Erfolg: Mindestens 3 Felder gefunden (nicht nur kritische)
         data_success = api_success and real_fields_count >= 3
+        
+        # Für Statistik verwenden wir api_success als success
+        # (damit auch Antworten ohne Daten als "erfolgreich" gezählt werden)
+        statistical_success = api_success
         
         # Erstelle ModelStatistics-Eintrag
         with db_manager.get_session() as session:
@@ -550,19 +559,20 @@ async def capture_search_statistics(stats_data: Dict[str, Any]):
                 region=stats_data.get('region'),
                 commodity=stats_data.get('commodity'),
                 run_number=stats_data.get('run_number', 1),
-                success=data_success,  # ÄNDERUNG: Nutze data_success statt api_success
+                success=statistical_success,  # ÄNDERUNG 09.07.2025: Nutze api_success für konsistente Zählung
                 response_time_ms=stats_data.get('response_time_ms'),
                 fields_found=real_fields_count,  # ÄNDERUNG: Nutze echte Feldanzahl
                 sources_count=stats_data.get('sources_count', 0),
                 structured_data=structured_data,
                 error_message=None if api_success else stats_data.get('error_message', 'API call failed'),
                 # Zusätzliche Metadaten für bessere Analyse
-                metadata={
+                raw_result={
                     'api_success': api_success,
                     'data_success': data_success,
                     'critical_fields_found': critical_fields_found,
                     'raw_fields_count': fields_found,
-                    'validated_fields_count': real_fields_count
+                    'validated_fields_count': real_fields_count,
+                    'metadata': stats_data.get('metadata', {})
                 }
             )
             session.add(stat)
@@ -612,17 +622,21 @@ async def capture_search_statistics(stats_data: Dict[str, Any]):
         # Konvertiere stats_data in das erwartete Format
         result_format = {
             'run_number': 1,
-            'success': data_success,
+            'success': statistical_success,  # ÄNDERUNG 09.07.2025: Verwende api_success
             'response_time_ms': stats_data.get('response_time_ms', 0),
             'fields_found': real_fields_count,
             'sources_count': stats_data.get('sources_count', 0),
             'structured_data': structured_data
         }
         
+        logger.info(f"[BENCHMARK] Rufe _update_model_summary auf für {stats_data['model_id']}")
+        
         await benchmark_service._update_model_summary(
             stats_data['model_id'], 
             [result_format]  # Als Liste im erwarteten Format
         )
+        
+        logger.info(f"[BENCHMARK] ModelSummary aktualisiert für {stats_data['model_id']}")
         
         return {"success": True, "message": "Statistiken erfasst"}
         

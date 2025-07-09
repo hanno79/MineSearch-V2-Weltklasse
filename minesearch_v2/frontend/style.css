@@ -28,7 +28,7 @@ body {
 }
 
 .container {
-    max-width: 800px;
+    max-width: 94%;  /* ÄNDERUNG 09.07.2025: Von 800px auf 94% für bessere Platznutzung */
     margin: 0 auto;
     padding: 20px;
     min-height: 100vh;
@@ -590,4 +590,19 @@ details ul {
 
 .sources-table-container {
     overflow-x: auto;
+    width: 100%;  /* ÄNDERUNG 09.07.2025: Volle Breite nutzen */
+}
+
+/* ÄNDERUNG 09.07.2025: Responsive Anpassungen für bessere Platznutzung */
+@media (min-width: 1800px) {
+    .container {
+        max-width: 1700px;  /* Begrenze maximale Breite auf sehr großen Bildschirmen */
+    }
+}
+
+@media (max-width: 1200px) {
+    .container {
+        max-width: 98%;  /* Noch weniger Rand auf kleineren Bildschirmen */
+        padding: 10px;
+    }
 }

@@ -72,6 +72,164 @@
         .unified-search-button:hover {
             background: #45a049;
         }
+        
+        /* ÄNDERUNG 09.07.2025: Bessere Darstellung für Quellen-Tabelle */
+        .sources-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .sources-table td {
+            padding: 8px;
+            vertical-align: top;
+        }
+        
+        .sources-table a {
+            text-decoration: none;
+            color: #333;
+        }
+        
+        .sources-table a:hover {
+            color: #4CAF50;
+        }
+        
+        /* ÄNDERUNG 09.07.2025: Accordion-Stil für gruppierte Quellen */
+        .sources-accordion {
+            width: 100%;
+            margin-top: 20px;
+        }
+        
+        .domain-group {
+            border: 1px solid #ddd;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .domain-header {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            background: #f5f5f5;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .domain-header:hover {
+            background: #e8e8e8;
+        }
+        
+        .domain-header.expanded {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .domain-toggle {
+            margin-right: 10px;
+            font-size: 12px;
+            transition: transform 0.3s;
+        }
+        
+        .domain-header.expanded .domain-toggle {
+            transform: rotate(90deg);
+        }
+        
+        .domain-info {
+            display: flex;
+            flex: 1;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .domain-name {
+            font-weight: bold;
+            flex: 0 0 30%;
+        }
+        
+        .domain-stats {
+            display: flex;
+            gap: 15px;
+            font-size: 14px;
+        }
+        
+        .domain-stat {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .stat-label {
+            color: #666;
+        }
+        
+        .domain-header.expanded .stat-label {
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .document-count {
+            background: #4CAF50;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+        
+        .domain-header.expanded .document-count {
+            background: white;
+            color: #4CAF50;
+        }
+        
+        .domain-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background: #fafafa;
+        }
+        
+        .domain-content.expanded {
+            max-height: 1000px;
+            transition: max-height 0.5s ease-in;
+        }
+        
+        .source-list {
+            padding: 15px;
+        }
+        
+        .source-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 10px;
+            background: white;
+            margin-bottom: 5px;
+            border-radius: 3px;
+            border: 1px solid #eee;
+        }
+        
+        .source-item:hover {
+            background: #f9f9f9;
+            border-color: #4CAF50;
+        }
+        
+        .source-url {
+            flex: 1;
+            color: #333;
+            text-decoration: none;
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .source-url:hover {
+            color: #4CAF50;
+        }
+        
+        .source-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 13px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -703,37 +861,7 @@
                 }
             }
 
-        // Tab-Wechsel Handler
-        document.querySelectorAll('input[name="search_method"]').forEach(radio => {
-            radio.addEventListener('change', function() {
-                // Alle Forms verstecken
-                document.querySelectorAll('.search-form').forEach(form => {
-                    form.classList.remove('active');
-                });
-                
-                // Gewählte Form anzeigen
-                if (this.value === 'csv') {
-                    document.getElementById('csv_form').classList.add('active');
-                } else if (this.value === 'single') {
-                    document.getElementById('single_form').classList.add('active');
-                } else if (this.value === 'sources') {
-                    document.getElementById('sources_form').classList.add('active');
-                    // Lade Quellen wenn Tab gewählt wird
-                    loadSourcesStats();
-                    loadSources();
-                } else if (this.value === 'results') {
-                    document.getElementById('results_form').classList.add('active');
-                    // Lade Ergebnisse wenn Tab gewählt wird
-                    loadResultsStats();
-                    loadResults();
-                }
-                
-                // ÄNDERUNG 02.07.2025: Ergebnisse nur bei Such-Tabs löschen, nicht bei Datenbank-Tabs
-                if (this.value === 'csv' || this.value === 'single') {
-                    document.getElementById('results').innerHTML = '';
-                }
-            });
-        });
+        // ÄNDERUNG 09.07.2025: Entfernt - Tab-Handler wurde zu handleTabChange konsolidiert
 
         // Such-Konfiguration basierend auf gewählten Modellen und Optionen
         function getSearchConfig() {
@@ -882,6 +1010,12 @@
         function displayResults(response) {
             console.log('DisplayResults aufgerufen mit:', response);
             const resultsDiv = document.getElementById('results');
+            
+            // ÄNDERUNG 09.07.2025: Speichere Suchergebnisse in SessionStorage
+            if (response && (response.success || response.results)) {
+                sessionStorage.setItem('lastSearchResults', JSON.stringify(response));
+                sessionStorage.setItem('lastSearchTimestamp', new Date().toISOString());
+            }
             
             // Stelle sicher, dass Ladeindikator ausgeblendet wird
             const loadingDiv = document.getElementById('loading');
@@ -1395,6 +1529,20 @@
                 
                 if (data.success) {
                     const stats = data.data;
+                    
+                    // ÄNDERUNG 09.07.2025: Berechne Domain-Statistiken
+                    const sourcesResponse = await fetch('http://localhost:8000/api/sources?limit=300');
+                    const sourcesData = await sourcesResponse.json();
+                    const domainCounts = {};
+                    if (sourcesData.success) {
+                        sourcesData.data.sources.forEach(source => {
+                            domainCounts[source.domain] = (domainCounts[source.domain] || 0) + 1;
+                        });
+                    }
+                    const topDomains = Object.entries(domainCounts)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 5);
+                    
                     const statsHtml = `
                         <div class="stats-grid">
                             <div class="stat-card">
@@ -1416,6 +1564,15 @@
                                         ).join('')}
                                 </div>
                             </div>
+                            <div class="stat-card">
+                                <h4>Top Domains</h4>
+                                <div class="stat-list">
+                                    ${topDomains
+                                        .map(([domain, count]) => 
+                                            `<div title="${domain}">${domain.length > 25 ? domain.substring(0, 22) + '...' : domain}: ${count}</div>`
+                                        ).join('')}
+                                </div>
+                            </div>
                         </div>
                     `;
                     document.getElementById('sources-stats').innerHTML = statsHtml;
@@ -1425,7 +1582,25 @@
             }
         }
 
+        // ÄNDERUNG 09.07.2025: Flag für laufende Requests
+        let loadSourcesInProgress = false;
+        let loadSourcesAbortController = null;
+        
         async function loadSources() {
+            // Verhindere mehrfache parallele Aufrufe
+            if (loadSourcesInProgress) {
+                console.log('LoadSources bereits aktiv, breche ab');
+                return;
+            }
+            
+            // Breche vorherigen Request ab falls vorhanden
+            if (loadSourcesAbortController) {
+                loadSourcesAbortController.abort();
+            }
+            
+            loadSourcesInProgress = true;
+            loadSourcesAbortController = new AbortController();
+            
             const formData = new FormData(document.getElementById('sources-filter-form'));
             const params = new URLSearchParams();
             
@@ -1433,22 +1608,144 @@
             if (formData.get('country')) params.append('country', formData.get('country'));
             if (formData.get('source_type')) params.append('source_type', formData.get('source_type'));
             params.append('min_reliability', formData.get('min_reliability') || '30');
-            params.append('limit', '100');
+            params.append('sort_by', 'count');  // Sortiere nach Anzahl
             
             try {
-                const response = await fetch(`/api/sources?${params.toString()}`);
+                // ÄNDERUNG 09.07.2025: Nutze gruppierten Endpoint
+                const response = await fetch(`/api/sources/grouped?${params.toString()}`, {
+                    signal: loadSourcesAbortController.signal
+                });
                 const data = await response.json();
                 
                 if (data.success) {
-                    displaySourcesTable(data.data.sources);
+                    displayGroupedSources(data.data);
                 }
             } catch (error) {
-                console.error('Fehler beim Laden der Quellen:', error);
-                document.getElementById('sources-table-container').innerHTML = 
-                    '<div class="error">Fehler beim Laden der Quellen</div>';
+                if (error.name !== 'AbortError') {
+                    console.error('Fehler beim Laden der Quellen:', error);
+                    document.getElementById('sources-table-container').innerHTML = 
+                        '<div class="error">Fehler beim Laden der Quellen</div>';
+                }
+            } finally {
+                loadSourcesInProgress = false;
+                loadSourcesAbortController = null;
             }
         }
 
+        // ÄNDERUNG 09.07.2025: Neue Funktion für gruppierte Anzeige
+        function displayGroupedSources(data) {
+            const { grouped_sources, total_domains, total_sources } = data;
+            
+            if (!grouped_sources || grouped_sources.length === 0) {
+                document.getElementById('sources-table-container').innerHTML = 
+                    '<p>Keine Quellen gefunden mit den gewählten Filtern.</p>';
+                return;
+            }
+            
+            // Erstelle Accordion-HTML
+            let accordionHtml = `
+                <div class="sources-summary" style="margin-bottom: 20px; padding: 15px; background: #f0f0f0; border-radius: 5px;">
+                    <strong>${total_domains} Domains</strong> mit insgesamt <strong>${total_sources} Quellen</strong>
+                    <button onclick="toggleAllDomains()" style="float: right; padding: 5px 15px; border: none; background: #4CAF50; color: white; border-radius: 3px; cursor: pointer;">
+                        Alle auf-/zuklappen
+                    </button>
+                </div>
+                <div class="sources-accordion">
+            `;
+            
+            grouped_sources.forEach((group, index) => {
+                const domainId = `domain_${index}`;
+                const primaryCountry = group.countries.length > 0 ? group.countries[0] : 'Global';
+                const primaryType = group.source_types.length > 0 ? group.source_types[0] : 'unknown';
+                
+                accordionHtml += `
+                    <div class="domain-group" data-domain="${group.domain}">
+                        <div class="domain-header" onclick="toggleDomain('${domainId}')" id="header_${domainId}">
+                            <span class="domain-toggle">▶</span>
+                            <div class="domain-info">
+                                <div class="domain-name">${group.domain}</div>
+                                <div class="domain-stats">
+                                    <div class="domain-stat">
+                                        <span class="stat-label">Land:</span>
+                                        <strong>${primaryCountry}</strong>
+                                    </div>
+                                    <div class="domain-stat">
+                                        <span class="stat-label">Typ:</span>
+                                        <span class="badge badge-${primaryType}">${primaryType}</span>
+                                    </div>
+                                    <div class="domain-stat">
+                                        <span class="stat-label">Ø Score:</span>
+                                        <strong>${group.avg_reliability_score}%</strong>
+                                    </div>
+                                    <div class="domain-stat">
+                                        <span class="stat-label">Erfolgsrate:</span>
+                                        <strong>${group.avg_success_rate}%</strong>
+                                    </div>
+                                    <div class="domain-stat">
+                                        <span class="document-count">${group.count} ${group.count === 1 ? 'Dokument' : 'Dokumente'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="domain-content" id="content_${domainId}">
+                            <div class="source-list">
+                                ${group.sources.map(source => {
+                                    const urlPath = source.url.split(group.domain)[1] || '';
+                                    const displayPath = urlPath.length > 80 ? '...' + urlPath.slice(-77) : urlPath;
+                                    const lastAccess = source.last_successful_access ? 
+                                        new Date(source.last_successful_access).toLocaleDateString('de-DE') : 
+                                        'Nie';
+                                    
+                                    return `
+                                        <div class="source-item">
+                                            <a href="${source.url}" target="_blank" class="source-url" title="${source.url}">
+                                                ${displayPath || '/'}
+                                            </a>
+                                            <div class="source-meta">
+                                                <span>Score: ${source.reliability_score.toFixed(0)}%</span>
+                                                <span>Suchen: ${source.total_searches}</span>
+                                                <span>Letzter Zugriff: ${lastAccess}</span>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            accordionHtml += '</div>';
+            document.getElementById('sources-table-container').innerHTML = accordionHtml;
+        }
+        
+        // Hilfsfunktionen für Accordion
+        window.toggleDomain = function(domainId) {
+            const header = document.getElementById(`header_${domainId}`);
+            const content = document.getElementById(`content_${domainId}`);
+            
+            header.classList.toggle('expanded');
+            content.classList.toggle('expanded');
+        };
+        
+        window.toggleAllDomains = function() {
+            const allHeaders = document.querySelectorAll('.domain-header');
+            const allContents = document.querySelectorAll('.domain-content');
+            
+            // Prüfe ob mindestens eine Domain eingeklappt ist
+            const hasCollapsed = Array.from(allHeaders).some(h => !h.classList.contains('expanded'));
+            
+            if (hasCollapsed) {
+                // Öffne alle
+                allHeaders.forEach(h => h.classList.add('expanded'));
+                allContents.forEach(c => c.classList.add('expanded'));
+            } else {
+                // Schließe alle
+                allHeaders.forEach(h => h.classList.remove('expanded'));
+                allContents.forEach(c => c.classList.remove('expanded'));
+            }
+        };
+        
         function displaySourcesTable(sources) {
             if (!sources || sources.length === 0) {
                 document.getElementById('sources-table-container').innerHTML = 
@@ -1476,8 +1773,23 @@
                                 <td>
                                     <a href="${source.url}" target="_blank" 
                                        title="${source.url}"
-                                       style="display: block; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                                       style="display: block; max-width: 400px; overflow: hidden; text-overflow: ellipsis;">
                                         ${source.domain}
+                                        ${(() => {
+                                            // ÄNDERUNG 09.07.2025: Zeige mehr URL-Details für bessere Unterscheidung
+                                            const urlPath = source.url.split(source.domain)[1] || '';
+                                            if (urlPath.length > 2) {
+                                                // Kürze lange Pfade intelligent
+                                                const parts = urlPath.split('/');
+                                                if (parts.length > 3) {
+                                                    // Zeige ersten und letzten Teil
+                                                    return `<br><small style="color: #666;">...${parts.slice(-2).join('/')}</small>`;
+                                                } else {
+                                                    return `<br><small style="color: #666;">${urlPath}</small>`;
+                                                }
+                                            }
+                                            return '';
+                                        })()}
                                     </a>
                                 </td>
                                 <td>${source.country || 'Global'}</td>
@@ -1655,7 +1967,8 @@
             document.getElementById('results-table-container').innerHTML = tableHtml;
         }
         
-        async function viewResultDetail(resultId) {
+        // Mache viewResultDetail global verfügbar
+        window.viewResultDetail = async function(resultId) {
             try {
                 const response = await fetch(`/api/results/${resultId}`);
                 const data = await response.json();
@@ -1716,31 +2029,7 @@
         let benchmarkSessionId = null;
         let benchmarkCheckInterval = null;
         
-        // Tab-Umschaltung erweitern
-        const originalTabHandler = document.querySelector('input[name="search_method"]:checked');
-        document.querySelectorAll('input[name="search_method"]').forEach(radio => {
-            radio.addEventListener('change', function() {
-                // Alle Formulare ausblenden
-                document.querySelectorAll('.search-form').forEach(form => {
-                    form.classList.remove('active');
-                });
-                // Gewähltes Formular anzeigen
-                const selectedForm = document.getElementById(this.value + '_form');
-                if (selectedForm) {
-                    selectedForm.classList.add('active');
-                    
-                    // Lade Daten für spezielle Tabs
-                    if (this.value === 'sources') {
-                        loadSources();
-                    } else if (this.value === 'results') {
-                        loadResults();
-                        loadSessions();
-                    } else if (this.value === 'statistics') {
-                        loadStatistics();
-                    }
-                }
-            });
-        });
+        // ÄNDERUNG 09.07.2025: Entfernt - Tab-Handler wurde zu handleTabChange konsolidiert
         
         // Lade Statistiken
         window.loadStatistics = async function() {
@@ -1833,7 +2122,8 @@
         // Zeige Statistik-Tabelle
         function displayStatisticsTable(data) {
             const sortBy = document.getElementById('stat_sort').value;
-            let models = data.all_models || [];
+            // ÄNDERUNG 09.07.2025: Stelle sicher, dass models immer ein Array ist
+            let models = Array.isArray(data.all_models) ? data.all_models : [];
             
             // Sortiere nach ausgewähltem Kriterium
             models.sort((a, b) => {
@@ -1951,9 +2241,13 @@
                 const data = await response.json();
                 console.log('Response von /api/models:', data);
                 
-                // ÄNDERUNG 09.07.2025: Korrigiere Zugriff auf Modelle - nutze available_models statt models
-                const models = data.available_models || data.models || [];
-                console.log('Verfügbare Modelle:', models);
+                // ÄNDERUNG 09.07.2025: Korrigiere Zugriff auf Modelle - konvertiere Objekt zu Array
+                const modelsObj = data.available_models || data.models || {};
+                const models = Object.entries(modelsObj).map(([id, details]) => ({
+                    id: id,
+                    ...details
+                }));
+                console.log('Verfügbare Modelle als Array:', models);
                 
                 if (models.length === 0) {
                     modelsContainer.innerHTML = '<p style="color: #ef4444;">Keine Modelle verfügbar. Bitte prüfen Sie die Backend-Konfiguration.</p>';
@@ -1985,6 +2279,151 @@
         window.closeBenchmarkModal = function() {
             document.getElementById('benchmark-modal').style.display = 'none';
             document.getElementById('benchmark-status').style.display = 'none';
+        }
+        
+        // ÄNDERUNG 09.07.2025: Implementiere fehlende Feld-Statistik Funktionen
+        window.loadFieldStatistics = async function() {
+            try {
+                const response = await fetch('/api/benchmark/field-statistics');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                if (data.success) {
+                    displayFieldStatistics(data.data);
+                } else {
+                    alert('Fehler beim Laden der Feld-Statistiken: ' + (data.error || 'Unbekannter Fehler'));
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden der Feld-Statistiken:', error);
+                alert('Fehler beim Laden der Feld-Statistiken: ' + error.message);
+            }
+        }
+        
+        window.loadFieldComparison = async function() {
+            try {
+                const response = await fetch('/api/benchmark/field-comparison');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                if (data.success) {
+                    displayFieldComparison(data.data);
+                } else {
+                    alert('Fehler beim Laden des Feld-Vergleichs: ' + (data.error || 'Unbekannter Fehler'));
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden des Feld-Vergleichs:', error);
+                alert('Fehler beim Laden des Feld-Vergleichs: ' + error.message);
+            }
+        }
+        
+        // Hilfsfunktionen für die Anzeige
+        function displayFieldStatistics(data) {
+            // Erstelle Modal oder dedizierte Anzeige
+            let html = `
+                <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                           background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                           max-width: 800px; max-height: 80vh; overflow-y: auto; z-index: 1000;">
+                    <h3 style="margin-bottom: 20px;">Feld-Statistiken</h3>
+                    <button onclick="this.parentElement.remove()" style="position: absolute; top: 10px; right: 10px; 
+                                                                       background: #ef4444; color: white; border: none; 
+                                                                       padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕</button>
+            `;
+            
+            if (data.field_stats && data.field_stats.length > 0) {
+                html += `
+                    <table class="sources-table" style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Feld</th>
+                                <th>Modell</th>
+                                <th>Erfolgsrate</th>
+                                <th>Durchschn. Konfidenz</th>
+                                <th>Anzahl Tests</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                data.field_stats.forEach(stat => {
+                    const successColor = stat.success_rate > 0.8 ? '#10b981' : 
+                                       stat.success_rate > 0.5 ? '#f59e0b' : '#ef4444';
+                    html += `
+                        <tr>
+                            <td><strong>${stat.field_name}</strong></td>
+                            <td>${stat.model_id}</td>
+                            <td style="color: ${successColor};">${(stat.success_rate * 100).toFixed(1)}%</td>
+                            <td>${stat.avg_confidence ? stat.avg_confidence.toFixed(2) : 'N/A'}</td>
+                            <td>${stat.total_searches}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += '</tbody></table>';
+            } else {
+                html += '<p>Keine Feld-Statistiken verfügbar. Führen Sie zuerst einige Benchmarks durch.</p>';
+            }
+            
+            html += '</div>';
+            
+            // Füge zum Body hinzu
+            const div = document.createElement('div');
+            div.innerHTML = html;
+            document.body.appendChild(div.firstElementChild);
+        }
+        
+        function displayFieldComparison(data) {
+            // Erstelle Modal für Feld-Vergleich
+            let html = `
+                <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                           background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                           max-width: 900px; max-height: 80vh; overflow-y: auto; z-index: 1000;">
+                    <h3 style="margin-bottom: 20px;">Feld-Vergleich zwischen Modellen</h3>
+                    <button onclick="this.parentElement.remove()" style="position: absolute; top: 10px; right: 10px; 
+                                                                       background: #ef4444; color: white; border: none; 
+                                                                       padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕</button>
+            `;
+            
+            if (data.field_comparison && Object.keys(data.field_comparison).length > 0) {
+                html += '<div style="overflow-x: auto;"><table class="sources-table" style="width: 100%;"><thead><tr><th>Feld</th>';
+                
+                // Header mit Modell-Namen
+                const models = data.models || [];
+                models.forEach(model => {
+                    html += `<th>${model}</th>`;
+                });
+                html += '</tr></thead><tbody>';
+                
+                // Zeilen mit Feld-Daten
+                Object.entries(data.field_comparison).forEach(([field, modelData]) => {
+                    html += `<tr><td><strong>${field}</strong></td>`;
+                    models.forEach(model => {
+                        const value = modelData[model];
+                        if (value) {
+                            const color = value.success_rate > 0.8 ? '#10b981' : 
+                                        value.success_rate > 0.5 ? '#f59e0b' : '#ef4444';
+                            html += `<td style="color: ${color};">${(value.success_rate * 100).toFixed(0)}%</td>`;
+                        } else {
+                            html += '<td>-</td>';
+                        }
+                    });
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table></div>';
+            } else {
+                html += '<p>Keine Vergleichsdaten verfügbar. Führen Sie zuerst Benchmarks mit mehreren Modellen durch.</p>';
+            }
+            
+            html += '</div>';
+            
+            // Füge zum Body hinzu
+            const div = document.createElement('div');
+            div.innerHTML = html;
+            document.body.appendChild(div.firstElementChild);
         }
         
         // Benchmark-Formular Submit
@@ -2053,12 +2492,15 @@
                     document.getElementById('benchmark-status').innerHTML = `
                         <div style="text-align: center; color: #10b981;">
                             ✅ Benchmark abgeschlossen!
-                            <button onclick="closeBenchmarkModal(); loadStatistics();" 
+                            <button onclick="closeBenchmarkModal();" 
                                     style="display: block; margin: 10px auto; background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
-                                Ergebnisse anzeigen
+                                Schließen
                             </button>
                         </div>
                     `;
+                    // ÄNDERUNG 09.07.2025: Automatisch Statistiken neu laden nach Benchmark
+                    console.log('[BENCHMARK] Lade Statistiken neu nach Benchmark-Abschluss');
+                    loadStatistics();
                 } else if (status.status === 'failed') {
                     clearInterval(benchmarkCheckInterval);
                     document.getElementById('benchmark-status').innerHTML = `
@@ -2622,6 +3064,100 @@
                 // Lade nur die Charts neu, nicht die ganze Statistik
                 await loadStatisticsCharts();
             }, { once: false });
+        }
+        
+        // ÄNDERUNG 09.07.2025: Konsolidierter Tab-Wechsel Handler
+        function handleTabChange() {
+            const selectedTab = document.querySelector('input[name="search_method"]:checked').value;
+            
+            // Speichere aktuellen Tab
+            sessionStorage.setItem('currentTab', selectedTab);
+            
+            // Alle Forms verstecken
+            document.querySelectorAll('.search-form').forEach(form => {
+                form.classList.remove('active');
+            });
+            
+            // Gewählte Form anzeigen
+            const selectedForm = document.getElementById(selectedTab + '_form');
+            if (selectedForm) {
+                selectedForm.classList.add('active');
+            }
+            
+            // Tab-spezifische Aktionen
+            switch(selectedTab) {
+                case 'csv':
+                    // Ergebnisse löschen
+                    document.getElementById('results').innerHTML = '';
+                    
+                    // Wiederherstellung von gespeicherten Ergebnissen
+                    const savedResults = sessionStorage.getItem('lastSearchResults');
+                    const savedTimestamp = sessionStorage.getItem('lastSearchTimestamp');
+                    
+                    if (savedResults) {
+                        try {
+                            const results = JSON.parse(savedResults);
+                            const timestamp = new Date(savedTimestamp);
+                            const minutesAgo = Math.floor((new Date() - timestamp) / 1000 / 60);
+                            
+                            // Zeige gespeicherte Ergebnisse wenn weniger als 30 Minuten alt
+                            if (minutesAgo < 30) {
+                                displayResults(results);
+                                
+                                // Zeige Hinweis über wiederhergestellte Ergebnisse
+                                const resultsDiv = document.getElementById('results');
+                                const restoreNotice = document.createElement('div');
+                                restoreNotice.style.cssText = 'background: #e0f2fe; padding: 10px; margin-bottom: 10px; border-radius: 5px;';
+                                restoreNotice.innerHTML = `
+                                    <small>ℹ️ Wiederhergestellte Ergebnisse von vor ${minutesAgo} Minuten. 
+                                    <a href="#" onclick="sessionStorage.removeItem('lastSearchResults'); sessionStorage.removeItem('lastSearchTimestamp'); document.getElementById('results').innerHTML = ''; return false;">Löschen</a></small>
+                                `;
+                                resultsDiv.insertBefore(restoreNotice, resultsDiv.firstChild);
+                            }
+                        } catch (e) {
+                            console.error('Fehler beim Wiederherstellen der Ergebnisse:', e);
+                        }
+                    }
+                    break;
+                    
+                case 'single':
+                    // Ergebnisse löschen
+                    document.getElementById('results').innerHTML = '';
+                    break;
+                    
+                case 'sources':
+                    // Lade Quellen-Statistiken und Tabelle
+                    loadSourcesStats();
+                    loadSources();
+                    break;
+                    
+                case 'results':
+                    // Lade Ergebnisse und Sessions
+                    loadResultsStats();
+                    loadResults();
+                    loadSessions();
+                    break;
+                    
+                case 'statistics':
+                    // Lade Statistiken
+                    loadStatistics();
+                    break;
+            }
+        }
+        
+        // Tab-Wechsel Event Listener
+        document.querySelectorAll('input[name="search_method"]').forEach(radio => {
+            radio.addEventListener('change', handleTabChange);
+        });
+        
+        // Stelle Tab-Zustand beim Laden wieder her
+        const savedTab = sessionStorage.getItem('currentTab');
+        if (savedTab) {
+            const tabRadio = document.getElementById(`method_${savedTab}`);
+            if (tabRadio) {
+                tabRadio.checked = true;
+                handleTabChange();
+            }
         }
         
         }); // Ende DOMContentLoaded

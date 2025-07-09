@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from database import (
     DatabaseManager, ModelStatistics, FieldConsistency, 
-    ModelSummary, get_db
+    ModelSummary, FieldStatistics, get_db
 )
 from search_service_multi import MultiProviderSearchService
 from config import CSV_COLUMNS, Config
@@ -279,6 +279,7 @@ class ModelBenchmarkService:
             }
             
             # Speichere in Datenbank
+            logger.debug(f"[BENCHMARK] Speichere Feld-Konsistenz für {field_name}: {consistency_score:.2f}")
             await self._save_field_consistency(
                 model_id=model_id,
                 mine_name=mine_name,
@@ -296,8 +297,10 @@ class ModelBenchmarkService:
             overall_consistency = statistics.mean([
                 fc['consistency_score'] for fc in field_consistency.values()
             ])
+            logger.info(f"[BENCHMARK] Gesamt-Konsistenz für {model_id}: {overall_consistency:.2f}")
         else:
             overall_consistency = 0.0
+            logger.warning(f"[BENCHMARK] Keine Feld-Konsistenz-Daten für {model_id}")
         
         # Prüfe kritische Felder
         critical_fields_found = sum(1 for field in self.CRITICAL_FIELDS if field in field_consistency)
@@ -399,26 +402,29 @@ class ModelBenchmarkService:
                         s.response_time_ms for s in all_stats if s.response_time_ms
                     ])
                     
-                    # ÄNDERUNG 07.07.2025: Unterscheide zwischen API-Erfolg und Daten-Erfolg
-                    # API-Erfolg: Modell hat geantwortet (unabhängig von Datenqualität)
-                    api_successful_stats = []
+                    # ÄNDERUNG 09.07.2025: Korrigierte Erfolgsraten-Berechnung
+                    # Sammle erfolgreiche und daten-erfolgreiche Stats
+                    successful_stats = []
                     data_successful_stats = []
                     
                     for stat in all_stats:
-                        # Prüfe Metadaten für API-Erfolg
-                        metadata = stat.metadata or {}
-                        api_success = metadata.get('api_success', stat.success)
-                        
-                        if api_success:
-                            api_successful_stats.append(stat)
-                        
-                        # Daten-Erfolg: Mindestens 3 kritische Felder gefunden
-                        if stat.success and stat.fields_found >= 3:
-                            data_successful_stats.append(stat)
+                        # API-Erfolg: stat.success ist True
+                        if stat.success:
+                            successful_stats.append(stat)
+                            
+                            # Daten-Erfolg: Mindestens 3 Felder gefunden
+                            if stat.fields_found >= 3:
+                                data_successful_stats.append(stat)
                     
-                    # Berechne beide Erfolgsraten
-                    summary.success_rate = len(api_successful_stats) / len(all_stats) if all_stats else 0
+                    # Berechne Erfolgsraten
+                    summary.success_rate = len(successful_stats) / len(all_stats) if all_stats else 0
                     summary.data_success_rate = len(data_successful_stats) / len(all_stats) if all_stats else 0
+                    
+                    # Debug-Logging
+                    logger.info(f"[BENCHMARK] ModelSummary Update für {model_id}: "
+                              f"Total Tests: {summary.total_tests}, "
+                              f"Erfolgsrate: {summary.success_rate:.2%}, "
+                              f"Daten-Erfolgsrate: {summary.data_success_rate:.2%}")
                     
                     if data_successful_stats:
                         summary.avg_fields_found = statistics.mean([
@@ -427,13 +433,13 @@ class ModelBenchmarkService:
                         summary.avg_sources_count = statistics.mean([
                             s.sources_count for s in data_successful_stats
                         ])
-                    elif api_successful_stats:
-                        # Fallback auf API-erfolgreiche Stats wenn keine Daten-erfolgreichen
+                    elif successful_stats:
+                        # Fallback auf erfolgreiche Stats wenn keine Daten-erfolgreichen
                         summary.avg_fields_found = statistics.mean([
-                            s.fields_found for s in api_successful_stats
+                            s.fields_found for s in successful_stats
                         ])
                         summary.avg_sources_count = statistics.mean([
-                            s.sources_count for s in api_successful_stats
+                            s.sources_count for s in successful_stats
                         ])
                 
                 # Berechne Gesamt-Konsistenz
@@ -445,6 +451,7 @@ class ModelBenchmarkService:
                     summary.overall_consistency = statistics.mean([
                         c.consistency_score for c in all_consistencies
                     ])
+                    logger.info(f"[BENCHMARK] Gesamt-Konsistenz für {model_id}: {summary.overall_consistency:.2f}")
                     
                     # Kritische Felder Konsistenz
                     critical_consistencies = {}
@@ -468,6 +475,9 @@ class ModelBenchmarkService:
                 summary.last_test_at = datetime.now()
             
             session.commit()
+            logger.info(f"[BENCHMARK] ModelSummary gespeichert für {model_id}: "
+                      f"Tests: {summary.total_tests}, Erfolgsrate: {summary.success_rate:.2%}, "
+                      f"Konsistenz: {summary.overall_consistency:.2f}")
     
     async def get_benchmark_summary(self, model_id: str) -> Optional[Dict[str, Any]]:
         """Hole Benchmark-Zusammenfassung für ein Modell"""
@@ -541,3 +551,43 @@ class ModelBenchmarkService:
             'results': results,
             'timestamp': datetime.now().isoformat()
         }
+    
+    async def get_field_statistics(self) -> List[Dict[str, Any]]:
+        """
+        ÄNDERUNG 09.07.2025: Hole Feld-Statistiken aus der Datenbank
+        """
+        with self.db_manager.get_session() as session:
+            field_stats = session.query(FieldStatistics).all()
+            return [stat.to_dict() for stat in field_stats]
+    
+    async def get_field_comparison(self) -> Dict[str, Any]:
+        """
+        ÄNDERUNG 09.07.2025: Erstelle Feld-Vergleich zwischen Modellen
+        """
+        with self.db_manager.get_session() as session:
+            # Hole alle Feld-Statistiken
+            field_stats = session.query(FieldStatistics).all()
+            
+            # Gruppiere nach Feld
+            field_comparison = {}
+            models = set()
+            
+            for stat in field_stats:
+                field_name = stat.field_name
+                model_id = stat.model_id
+                
+                if field_name not in field_comparison:
+                    field_comparison[field_name] = {}
+                
+                field_comparison[field_name][model_id] = {
+                    'success_rate': stat.success_rate,
+                    'avg_confidence': stat.avg_confidence,
+                    'total_searches': stat.total_searches
+                }
+                
+                models.add(model_id)
+            
+            return {
+                'field_comparison': field_comparison,
+                'models': sorted(list(models))
+            }

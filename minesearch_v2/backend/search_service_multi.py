@@ -583,7 +583,7 @@ class MultiProviderSearchService:
                 "total_fields": len(structured_data)
             }
         
-        # ÄNDERUNG 07.07.2025: Konsistente Struktur mit structured_data im data-Objekt
+        # ÄNDERUNG 09.07.2025: Füge data_quality direkt in data-Objekt ein
         return {
             "success": True,
             "status": "success",
@@ -592,6 +592,7 @@ class MultiProviderSearchService:
                 "structured_data_with_sources": provider_result.metadata.get('structured_data_with_sources', {}) if provider_result.metadata else {},
                 "sources": sources,
                 "source_index": provider_result.metadata.get('source_index', {}) if provider_result.metadata else {},
+                "data_quality": data_quality,  # Direkt in data für Frontend-Zugriff
                 "source_summary": {
                     "urls": len([s for s in sources if s.get('type') == 'url']),
                     "documents": len([s for s in sources if s.get('type') == 'document']),
