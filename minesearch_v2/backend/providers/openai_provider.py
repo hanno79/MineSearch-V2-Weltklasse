@@ -222,17 +222,20 @@ Analysiere die folgenden Aspekte mit HÖCHSTER PRIORITÄT:
                 focus='financial_data'
             )
             
-            # Verwende v1/responses Endpunkt für o3-deep-research
+            # Verwende Standard Chat Completions Endpunkt für o3-deep-research
             async with httpx.AsyncClient(timeout=model_config.timeout) as client:
                 response = await client.post(
-                    "https://api.openai.com/v1/responses",  # Anderer Endpunkt
+                    "https://api.openai.com/v1/chat/completions",  # Standard Endpunkt
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
                         "Content-Type": "application/json"
                     },
                     json={
                         "model": model_config.id,
-                        "prompt": enhanced_query,
+                        "messages": [
+                            {"role": "system", "content": "Du bist ein Experte für Mining-Projekte und Finanzdaten."},
+                            {"role": "user", "content": enhanced_query}
+                        ],
                         "temperature": 0.1,
                         "max_tokens": model_config.max_tokens
                     }
@@ -255,9 +258,9 @@ Analysiere die folgenden Aspekte mit HÖCHSTER PRIORITÄT:
                             error=self._handle_api_error(response)
                         )
                 
-                # Parse Response
+                # Parse Response (Standard Chat Completions Format)
                 result = response.json()
-                content = result.get("text", result.get("choices", [{}])[0].get("text", ""))
+                content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
                 
                 # Extrahiere strukturierte Daten
                 extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)

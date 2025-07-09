@@ -18,7 +18,8 @@ from .models import (
     OPENAI_MODELS,
     ANTHROPIC_MODELS,
     GEMINI_MODELS,
-    GROK_MODELS
+    GROK_MODELS,
+    DEEPSEEK_MODELS
 )
 
 # Provider Konfiguration
@@ -93,5 +94,11 @@ PROVIDERS_CONFIG = {
         'api_key': APIKeysConfig.GROK_API_KEY,
         'base_url': 'https://api.x.ai/v1',
         'models': GROK_MODELS
+    },
+    'deepseek': {
+        'enabled': True,
+        'api_key': APIKeysConfig.OPENROUTER_API_KEY,  # DeepSeek nutzt OpenRouter als Proxy
+        'base_url': 'https://openrouter.ai/api/v1',
+        'models': DEEPSEEK_MODELS
     }
 }

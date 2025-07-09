@@ -444,3 +444,68 @@ class FirecrawlProvider(AbstractProvider):
             result['extracted'] = extracted_data
         
         return result
+    
+    async def crawl_sources(self, discovered_sources: List[Dict], model_id: str, options: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        ÄNDERUNG 08.07.2025: Neue Methode zum Crawlen von discovered_sources
+        Crawlt Websites aus discovered_sources und extrahiert Mining-Daten
+        """
+        if not discovered_sources:
+            return {'success': False, 'error': 'Keine Quellen zum Crawlen'}
+        
+        mine_name = options.get('mine_name', '')
+        crawled_results = []
+        
+        # Gruppiere URLs nach Domain für effizientes Crawling
+        domain_groups = {}
+        for source in discovered_sources[:20]:  # Limitiere auf 20 Quellen
+            url = source.get('url', '')
+            if not url:
+                continue
+            
+            try:
+                from urllib.parse import urlparse
+                domain = urlparse(url).netloc
+                if domain not in domain_groups:
+                    domain_groups[domain] = []
+                domain_groups[domain].append(url)
+            except:
+                continue
+        
+        # Crawle jede Domain
+        for domain, urls in domain_groups.items():
+            logger.info(f"[FIRECRAWL] Crawling {domain} mit {len(urls)} URLs für {mine_name}")
+            
+            # Wähle Haupt-URL für Domain-Crawl
+            main_url = urls[0]
+            
+            # Nutze crawl Modell für Domain-weites Crawling
+            if model_id == 'crawl':
+                result = await self.search(
+                    query=f"Crawl website for mining data: {main_url}",
+                    model_id='crawl',
+                    options={**options, 'target_url': main_url, 'max_pages': 10}
+                )
+            else:
+                # Für scrape/extract nur einzelne URLs
+                result = await self.search(
+                    query=f"Extract mining data from: {main_url}",
+                    model_id=model_id,
+                    options={**options, 'target_url': main_url}
+                )
+            
+            if result.success:
+                crawled_results.append({
+                    'domain': domain,
+                    'urls': urls,
+                    'data': result.structured_data,
+                    'content_preview': result.content[:1000] if result.content else '',
+                    'crawled_at': datetime.now().isoformat()
+                })
+        
+        return {
+            'success': True,
+            'crawled_domains': len(crawled_results),
+            'results': crawled_results,
+            'mine_name': mine_name
+        }

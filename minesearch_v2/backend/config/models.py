@@ -24,7 +24,7 @@ PERPLEXITY_MODELS = {
     "sonar-deep-research": {
         "id": "sonar-deep-research",
         "name": "Deep Research",
-        "timeout": 180,
+        "timeout": 300,
         "max_tokens": 16000,
         "description": "Umfassende Recherche mit dutzenden Suchen und hunderten Quellen"
     },
@@ -265,8 +265,8 @@ OPENAI_MODELS = {
         'is_free': False
     },
     'o3': {
-        'id': 'o3-2025-04-16',
-        'name': 'O3 Standard',
+        'id': 'gpt-4-turbo',
+        'name': 'GPT-4 Turbo',
         'timeout': 180,
         'max_tokens': 12000,
         'description': 'Fortgeschrittenes Reasoning für Mining-Analysen',
@@ -275,11 +275,11 @@ OPENAI_MODELS = {
         'is_free': False
     },
     'o4-mini': {
-        'id': 'o4-mini-2025-04-16',
-        'name': 'O4 Mini',
+        'id': 'gpt-4o-mini',
+        'name': 'GPT-4o Mini',
         'timeout': 60,
         'max_tokens': 4000,
-        'description': 'Kosteneffizient für schnelle Analysen',
+        'description': 'Kosteneffiziente GPT-4 Variante für schnelle Mining-Analysen',
         'supports_web_search': False,
         'is_free': False
     }

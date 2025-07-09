@@ -39,7 +39,8 @@ class ProviderRegistry:
             'openai': 'OpenAIProvider',
             'anthropic': 'AnthropicProvider',
             'gemini': 'GeminiProvider',
-            'grok': 'GrokProvider'
+            'grok': 'GrokProvider',
+            'deepseek': 'DeepSeekProvider'
         }
         
     def initialize(self, config: Dict[str, Any]):

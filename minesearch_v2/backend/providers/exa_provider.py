@@ -76,6 +76,9 @@ class ExaProvider(AbstractProvider):
         commodity = options.get('commodity')
         region = options.get('region')
         
+        # ÄNDERUNG 08.07.2025: Nutze discovered_sources wenn vorhanden
+        discovered_sources = options.get('discovered_sources', [])
+        
         # ÄNDERUNG 05.07.2025: Nutze Specialized Prompts für bessere Ergebnisse
         # Erstelle semantische Query für Mining-Recherche
         enhanced_query = self._build_semantic_query(query, mine_name, country, commodity, region, model_id)
@@ -83,6 +86,16 @@ class ExaProvider(AbstractProvider):
         # Füge spezialisierte Restaurationskosten-Begriffe hinzu
         restoration_prompt = SpecializedPrompts.get_restoration_costs_prompt(mine_name, country, commodity)
         enhanced_query = f"{enhanced_query}\n\n{restoration_prompt}"
+        
+        # ÄNDERUNG 08.07.2025: Erweitere Query mit discovered_sources
+        if discovered_sources:
+            sources_hint = f"\n\nRelevante Quellen für {mine_name}:\n"
+            # Füge Top 20 Quellen zur Query hinzu
+            for i, source in enumerate(discovered_sources[:20], 1):
+                url = source.get('url', '')
+                if url:
+                    sources_hint += f"- {url}\n"
+            enhanced_query += sources_hint
         
         try:
             async with httpx.AsyncClient(timeout=model_config.timeout) as client:
@@ -96,7 +109,7 @@ class ExaProvider(AbstractProvider):
                     request_data = {
                         "query": enhanced_query,
                         "model": model_config.id,  # exa-research oder exa-research-pro
-                        "include_domains": self._get_mining_domains(country),
+                        "include_domains": self._get_mining_domains(country, discovered_sources),
                         "search_options": {
                             "max_searches": 50 if model_id == 'research-pro' else 30,
                             "deep_search": True,
@@ -111,7 +124,7 @@ class ExaProvider(AbstractProvider):
                         "num_results": 30,  # Mehr Ergebnisse für bessere Abdeckung
                         "type": "neural" if model_id == 'neural-search' else "keyword",
                         "useAutoprompt": True,  # Exa optimiert die Query automatisch
-                        "includeDomains": self._get_mining_domains(country),
+                        "includeDomains": self._get_mining_domains(country, discovered_sources),
                         "startCrawlDate": "2020-01-01",  # Nur aktuelle Informationen
                         "endCrawlDate": datetime.now().strftime("%Y-%m-%d"),
                         "category": "company",  # Fokus auf Unternehmensseiten
@@ -127,7 +140,7 @@ class ExaProvider(AbstractProvider):
                     request_data = {
                         "url": options['reference_url'],
                         "num_results": 20,  # ÄNDERUNG 05.07.2025: Korrigiert zu snake_case (Exa API Standard)
-                        "includeDomains": self._get_mining_domains(country),
+                        "includeDomains": self._get_mining_domains(country, discovered_sources),
                         "excludeSourceDomain": True
                     }
                 
@@ -307,7 +320,7 @@ class ExaProvider(AbstractProvider):
         
         return sources
     
-    def _get_mining_domains(self, country: str) -> List[str]:
+    def _get_mining_domains(self, country: str, discovered_sources: List[Dict] = None) -> List[str]:
         """Hole Mining-spezifische Domains"""
         domains = [
             "mining.com",
@@ -319,6 +332,19 @@ class ExaProvider(AbstractProvider):
             "infomine.com",
             "kitco.com"
         ]
+        
+        # ÄNDERUNG 08.07.2025: Füge Domains aus discovered_sources hinzu
+        if discovered_sources:
+            import urllib.parse
+            for source in discovered_sources:
+                url = source.get('url', '')
+                if url:
+                    try:
+                        parsed = urllib.parse.urlparse(url)
+                        if parsed.netloc and parsed.netloc not in domains:
+                            domains.append(parsed.netloc)
+                    except:
+                        pass
         
         # Länderspezifische Domains hinzufügen
         if country:

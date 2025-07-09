@@ -462,3 +462,39 @@ class ScrapingBeeProvider(AbstractProvider):
             return h1_match.group(1).strip()
         
         return 'Mining Data'
+    
+    async def scrape_sources(self, discovered_sources: List[Dict], model_id: str, options: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        ÄNDERUNG 08.07.2025: Neue Methode zum Scrapen von discovered_sources
+        Scrapt eine Liste von URLs und extrahiert Mining-Daten
+        """
+        if not discovered_sources:
+            return []
+        
+        mine_name = options.get('mine_name', '')
+        scraped_results = []
+        
+        # Limitiere auf Top 10 Quellen um Credits zu sparen
+        for source in discovered_sources[:10]:
+            url = source.get('url', '')
+            if not url:
+                continue
+                
+            logger.info(f"[SCRAPINGBEE] Scraping {url} für {mine_name}")
+            
+            # Nutze die normale search Methode mit der URL als Query
+            result = await self.search(
+                query=f"Extract mining data from: {url}",
+                model_id=model_id,
+                options={**options, 'target_url': url}
+            )
+            
+            if result.success and result.structured_data:
+                scraped_results.append({
+                    'url': url,
+                    'data': result.structured_data,
+                    'content': result.content[:1000],  # Erste 1000 Zeichen
+                    'scraped_at': datetime.now().isoformat()
+                })
+        
+        return scraped_results

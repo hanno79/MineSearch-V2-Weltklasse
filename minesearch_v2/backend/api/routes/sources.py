@@ -8,6 +8,7 @@ Beschreibung: Quellen-Management Routes
 from fastapi import APIRouter, HTTPException, Query, Body
 from typing import Optional
 import logging
+from database import Source
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -69,7 +70,7 @@ async def get_source_by_id(source_id: int):
     from database import db_manager
     
     with db_manager.get_session() as session:
-        source = session.query(db_manager.MiningSource).filter_by(id=source_id).first()
+        source = session.query(Source).filter_by(id=source_id).first()
         if not source:
             raise HTTPException(status_code=404, detail="Quelle nicht gefunden")
         

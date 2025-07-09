@@ -80,6 +80,9 @@ class GrokProvider(AbstractProvider):
         commodity = options.get('commodity')
         sources = options.get('sources', [])
         
+        # ÄNDERUNG 08.07.2025: Nutze discovered_sources wenn vorhanden
+        discovered_sources = options.get('discovered_sources', [])
+        
         # Erstelle erweiterte Query mit Grok's Real-time Stärken
         enhanced_query = self._build_enhanced_query(
             query=query,
@@ -88,6 +91,7 @@ class GrokProvider(AbstractProvider):
             region=region,
             commodity=commodity,
             sources=sources,
+            discovered_sources=discovered_sources,
             focus='realtime_data'
         )
         
@@ -182,7 +186,7 @@ class GrokProvider(AbstractProvider):
     
     def _build_enhanced_query(self, query: str, mine_name: str, country: Optional[str],
                             region: Optional[str], commodity: Optional[str], 
-                            sources: List[Dict], focus: str) -> str:
+                            sources: List[Dict], discovered_sources: List[Dict], focus: str) -> str:
         """Erstelle erweiterte Query mit speziellem Fokus"""
         
         # Basis-Query
@@ -243,16 +247,50 @@ ZEITLICHER FOKUS:
 - Suche nach "BREAKING" oder "UPDATE" Meldungen
 """
         
-        # Füge Quellen hinzu
-        if sources:
-            enhanced_query += f"\n\nVERIFIZIERE MIT DIESEN {len(sources)} QUELLEN:\n"
-            for i, source in enumerate(sources[:30], 1):
-                url = source.get('url', source.get('value', ''))
-                enhanced_query += f"[{i}] {url}\n"
+        # ÄNDERUNG 08.07.2025: Nutze discovered_sources für bessere Abdeckung
+        # Kombiniere discovered_sources und sources
+        all_sources = discovered_sources + sources
+        
+        if all_sources:
+            enhanced_query += f"\n\n🔍 NUTZE DIESE {len(all_sources)} VERIFIZIERTEN QUELLEN:\n"
+            enhanced_query += "Diese stammen aus unserer Mining-Datenbank und X/Twitter:\n\n"
             
-            enhanced_query += "\nSuche zusätzlich nach AKTUELLEREN Informationen!"
+            # Gruppiere nach Quellentyp
+            twitter_sources = []
+            gov_sources = []
+            other_sources = []
+            
+            for source in all_sources:
+                url = source.get('url', source.get('value', ''))
+                if 'twitter.com' in url or 'x.com' in url:
+                    twitter_sources.append(url)
+                elif source.get('type') == 'government':
+                    gov_sources.append(url)
+                else:
+                    other_sources.append(url)
+            
+            if twitter_sources:
+                enhanced_query += "X/TWITTER QUELLEN (Real-time Updates):\n"
+                for i, url in enumerate(twitter_sources[:10], 1):
+                    enhanced_query += f"[T{i}] {url}\n"
+                enhanced_query += "\n"
+            
+            if gov_sources:
+                enhanced_query += "REGIERUNGSQUELLEN (Offizielle Daten):\n"
+                for i, url in enumerate(gov_sources[:10], 1):
+                    enhanced_query += f"[G{i}] {url}\n"
+                enhanced_query += "\n"
+            
+            if other_sources:
+                enhanced_query += "WEITERE QUELLEN:\n"
+                for i, url in enumerate(other_sources[:20], 1):
+                    enhanced_query += f"[{i}] {url}\n"
+            
+            enhanced_query += "\n⚡ WICHTIG: Suche zusätzlich nach AKTUELLEREN Real-time Updates!"
+            enhanced_query += "\nNutze deine X/Twitter Integration für Breaking News!"
         else:
-            enhanced_query += "\n\nSuche besonders nach AKTUELLEN Quellen und Real-time Updates!"
+            enhanced_query += "\n\n⚡ Suche besonders nach AKTUELLEN Quellen und Real-time Updates!"
+            enhanced_query += "\nNutze deine X/Twitter Integration für Mining-News!"
         
         return enhanced_query
     

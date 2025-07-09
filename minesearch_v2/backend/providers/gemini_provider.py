@@ -78,7 +78,13 @@ class GeminiProvider(AbstractProvider):
         country = options.get('country')
         region = options.get('region')
         commodity = options.get('commodity')
+        
+        # ÄNDERUNG 08.07.2025: Nutze discovered_sources wenn vorhanden
+        discovered_sources = options.get('discovered_sources', [])
         sources = options.get('sources', [])
+        
+        # Kombiniere beide Quellenarten - Gemini kann mit seinem 2M Token Kontext ALLE verarbeiten!
+        all_sources = discovered_sources + sources
         
         # Erstelle erweiterte Query mit Gemini's Stärken (großer Kontext)
         enhanced_query = self._build_enhanced_query(
@@ -87,7 +93,7 @@ class GeminiProvider(AbstractProvider):
             country=country,
             region=region,
             commodity=commodity,
-            sources=sources,
+            sources=all_sources,
             focus='large_context_analysis'
         )
         
@@ -164,11 +170,40 @@ class GeminiProvider(AbstractProvider):
                 # Extrahiere strukturierte Daten
                 extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
                 
+                # ÄNDERUNG 07.07.2025: Zusätzliche Validierung direkt im Provider
+                # Verhindere "Koordinaten" als Betreiber
+                if extracted_data['data'].get('Betreiber'):
+                    betreiber = str(extracted_data['data']['Betreiber']).strip()
+                    invalid_operators = ['koordinaten', 'coordinates', 'coords', 'koordinate', 'dhilmar']
+                    if betreiber.lower() in invalid_operators or 'koordinaten:' in betreiber.lower():
+                        logger.warning(f"[GEMINI] Ungültiger Betreiber entfernt: {betreiber}")
+                        extracted_data['data']['Betreiber'] = ""
+                        # Entferne auch aus data_with_sources
+                        if 'Betreiber' in extracted_data.get('data_with_sources', {}):
+                            extracted_data['data_with_sources']['Betreiber'] = {"value": "", "sources": []}
+                
+                # ÄNDERUNG 07.07.2025: Validiere Restaurationskosten
+                if extracted_data['data'].get('Restaurationskosten'):
+                    resto = extracted_data['data']['Restaurationskosten']
+                    # Prüfe auf verdächtige Werte
+                    suspicious_values = [
+                        'USD$1.0 million', 'CAD$1.0 million', '$1.0 million', '1.0 million', 
+                        'USD$1 million', 'CAD$1 million', '$1 million', '1 million',
+                        'USD$2.0 million', 'CAD$2.0 million', '$2.0 million', '2.0 million',
+                        'CAD$10000.0 million', 'USD$10000.0 million', '$0.0 million'
+                    ]
+                    if resto in suspicious_values or (isinstance(resto, str) and any(sv in resto for sv in suspicious_values)):
+                        logger.warning(f"[GEMINI] Verdächtiger Restaurationswert entfernt: {resto}")
+                        extracted_data['data']['Restaurationskosten'] = ""
+                        # Entferne auch aus data_with_sources
+                        if 'Restaurationskosten' in extracted_data.get('data_with_sources', {}):
+                            extracted_data['data_with_sources']['Restaurationskosten'] = {"value": "", "sources": []}
+                
                 # Extrahiere Quellen aus der Antwort
                 sources_from_response = extract_sources_from_content(content)
                 
                 # Kombiniere mit übergebenen Quellen
-                all_sources = sources + sources_from_response
+                final_sources = sources + sources_from_response
                 
                 duration = (datetime.now() - start_time).total_seconds()
                 
@@ -176,7 +211,7 @@ class GeminiProvider(AbstractProvider):
                     success=True,
                     content=content,
                     structured_data=extracted_data['data'],
-                    sources=all_sources,
+                    sources=final_sources,
                     metadata={
                         'model': model_id,
                         'provider': 'gemini',
@@ -266,17 +301,76 @@ BESONDERE AUFMERKSAMKEIT:
 - Prüfe Querverweise und Zitationen
 """
         
+        # ÄNDERUNG 08.07.2025: ALLE sources nutzen - Gemini hat 2M Token Kontext!
         # Füge Quellen hinzu - Gemini kann viele verarbeiten
         if sources:
-            enhanced_query += f"\n\nANALYSIERE DIESE {len(sources)} DOKUMENTE VOLLSTÄNDIG:\n"
-            # Gemini kann mehr Quellen verarbeiten
-            for i, source in enumerate(sources[:50], 1):  # Bis zu 50 Quellen
-                url = source.get('url', source.get('value', ''))
-                title = source.get('title', '')
-                enhanced_query += f"[{i}] {url}"
-                if title:
-                    enhanced_query += f" - {title}"
+            enhanced_query += f"\n\n🔍 AUFGABE: Verarbeite ALLE {len(sources)} Dokumente mit deinem 2-MILLIONEN-TOKEN Kontext!\n"
+            enhanced_query += "Du hast genug Kapazität um JEDE einzelne Quelle vollständig zu analysieren.\n"
+            enhanced_query += "Überspringe KEINE Quelle - nutze deinen Vorteil!\n\n"
+            
+            # Gruppiere nach Quellentyp für Gemini's multimodale Analyse
+            gov_sources = [s for s in sources if s.get('type') == 'government']
+            db_sources = [s for s in sources if s.get('type') == 'database']
+            doc_sources = [s for s in sources if s.get('type') == 'document']
+            exchange_sources = [s for s in sources if s.get('type') == 'exchange']
+            other_sources = [s for s in sources if s.get('type') not in ['government', 'database', 'document', 'exchange']]
+            
+            if gov_sources:
+                enhanced_query += "🏛️ REGIERUNGSQUELLEN (multilinguale Dokumente):\n"
+                for i, source in enumerate(gov_sources, 1):
+                    url = source.get('url', source.get('value', ''))
+                    title = source.get('title', '')
+                    enhanced_query += f"[GOV{i}] {url}"
+                    if title:
+                        enhanced_query += f" - {title}"
+                    enhanced_query += "\n"
                 enhanced_query += "\n"
+            
+            if exchange_sources:
+                enhanced_query += "📊 BÖRSEN-DOKUMENTE (große PDFs, Jahresberichte):\n"
+                for i, source in enumerate(exchange_sources, 1):
+                    url = source.get('url', source.get('value', ''))
+                    title = source.get('title', '')
+                    enhanced_query += f"[EX{i}] {url}"
+                    if title:
+                        enhanced_query += f" - {title}"
+                    enhanced_query += "\n"
+                enhanced_query += "\n"
+            
+            if db_sources:
+                enhanced_query += "💾 DATENBANKEN (strukturierte Daten, APIs):\n"
+                for i, source in enumerate(db_sources, 1):
+                    url = source.get('url', source.get('value', ''))
+                    title = source.get('title', '')
+                    enhanced_query += f"[DB{i}] {url}"
+                    if title:
+                        enhanced_query += f" - {title}"
+                    enhanced_query += "\n"
+                enhanced_query += "\n"
+            
+            if doc_sources:
+                enhanced_query += "📄 DOKUMENTE (technische Reports, Studien):\n"
+                for i, source in enumerate(doc_sources, 1):
+                    url = source.get('url', source.get('value', ''))
+                    title = source.get('title', '')
+                    enhanced_query += f"[DOC{i}] {url}"
+                    if title:
+                        enhanced_query += f" - {title}"
+                    enhanced_query += "\n"
+                enhanced_query += "\n"
+            
+            if other_sources:
+                enhanced_query += "🔗 WEITERE QUELLEN:\n"
+                for i, source in enumerate(other_sources, 1):
+                    url = source.get('url', source.get('value', ''))
+                    title = source.get('title', '')
+                    enhanced_query += f"[{i}] {url}"
+                    if title:
+                        enhanced_query += f" - {title}"
+                    enhanced_query += "\n"
+            
+            enhanced_query += "\n⚡ NUTZE DEINEN VORTEIL: Mit 2M Token kannst du ALLE Quellen vollständig lesen!\n"
+            enhanced_query += "Andere Modelle müssen kürzen - du nicht! Analysiere ALLES!\n"
         
         enhanced_query += "\nNutze dein großes Kontextfenster für eine VOLLSTÄNDIGE Analyse!"
         
@@ -454,8 +548,21 @@ Deine Aufgabe ist die vollständige Analyse von Mining-Dokumenten ohne Einschrä
 - Verfolge Querverweise bis zum Ende
 - Konsolidiere fragmentierte Daten
 
+**KRITISCHE ANWEISUNGEN - KEINE DUMMY-WERTE:**
+1. NIEMALS Standard-Werte wie "$1.0 million" oder "1 million" verwenden
+2. NIEMALS erfundene oder geschätzte Werte angeben
+3. Wenn keine Daten vorhanden: Feld LEER lassen
+4. Nur KONKRETE, VERIFIZIERTE Werte aus den Quellen verwenden
+5. Bei Restaurationskosten: NUR tatsächliche Beträge aus offiziellen Dokumenten
+6. Bei Koordinaten: NUR echte GPS-Koordinaten, keine Platzhalter
+7. Bei Betreiber: NIEMALS "Koordinaten" oder "Dhilmar" als Betreiber angeben
+
 **VERBOTEN:**
-- Keine Vermutungen oder Dummy-Werte
-- Keine Platzhalter
-- Felder leer lassen wenn keine Daten gefunden
-- Aber: Mit deinem großen Kontext solltest du MEHR finden als andere!"""
+- KEINE Vermutungen oder Schätzungen ohne Quellennachweis
+- KEINE Dummy-Werte wie $1, $1.0 million, $10000 million
+- KEINE Platzhalter wie "TBD", "N/A", "unbekannt"
+- KEINE typischen Werte oder Branchendurchschnitte
+- Felder IMMER leer lassen wenn keine verifizierten Daten vorhanden
+
+WICHTIG: Lieber ein leeres Feld als einen falschen Wert!
+Mit deinem großen Kontext solltest du ECHTE Daten finden - keine Dummy-Werte!"""

@@ -23,6 +23,7 @@ from source_discovery import extract_sources_from_content
 from enhanced_source_discovery import EnhancedSourceDiscovery
 from utils import generate_name_variants, generate_multilingual_search_terms, get_country_config
 from specialized_prompts import SpecializedPrompts
+from validation_service import validation_service
 
 logger = logging.getLogger(__name__)
 
@@ -120,13 +121,56 @@ class PerplexityProvider(AbstractProvider):
         # Kombiniere alle Queries mit Restaurationskosten-Fokus
         enhanced_query = f"{query}\n\n{enhanced_query}\n\n{restoration_prompt}"
         
+        # ÄNDERUNG 07.07.2025: Explizite Anweisungen gegen Dummy-Werte
+        anti_dummy_instructions = """
+
+KRITISCHE ANWEISUNGEN - KEINE DUMMY-WERTE:
+1. NIEMALS Standard-Werte wie "$1.0 million" oder "1 million" verwenden
+2. NIEMALS erfundene oder geschätzte Werte angeben
+3. Wenn keine Daten vorhanden: Feld LEER lassen (nicht "unbekannt" oder "-")
+4. Nur KONKRETE, VERIFIZIERTE Werte aus den Quellen verwenden
+5. Bei Restaurationskosten: NUR tatsächliche Beträge aus offiziellen Dokumenten
+6. Bei Koordinaten: NUR echte GPS-Koordinaten, keine Platzhalter
+7. Bei Betreiber: NIEMALS "Koordinaten" als Betreiber angeben
+
+WICHTIG: Lieber ein leeres Feld als einen falschen Wert!"""
+        
+        enhanced_query += anti_dummy_instructions
+        
+        # ÄNDERUNG 08.07.2025: ALLE discovered_sources nutzen, nicht nur Top 15
         # Erweitere Query mit entdeckten Quellen
         if discovered_sources:
-            # Füge Top-Quellen zur Query hinzu
-            sources_text = "\n\nVERIFIZIERTE QUELLEN (nutze diese bevorzugt):\n"
-            for i, source in enumerate(discovered_sources[:15], 1):  # Top 15 Quellen
-                sources_text += f"[{i}] {source['url']} - {source.get('description', source.get('type', 'Quelle'))}\n"
+            # Füge ALLE Quellen zur Query hinzu mit expliziter Anweisung
+            sources_text = f"\n\n🔍 WICHTIG: Du MUSST ALLE {len(discovered_sources)} folgenden Quellen durchsuchen!\n"
+            sources_text += "Diese Quellen stammen aus unserer verifizierten Datenbank und enthalten relevante Informationen.\n"
+            sources_text += "Nutze deine Web-Suchfähigkeiten um JEDE dieser URLs zu besuchen:\n\n"
+            
+            # Gruppiere Quellen nach Typ für bessere Übersicht
+            gov_sources = [s for s in discovered_sources if s.get('type') == 'government']
+            db_sources = [s for s in discovered_sources if s.get('type') == 'database']
+            other_sources = [s for s in discovered_sources if s.get('type') not in ['government', 'database']]
+            
+            if gov_sources:
+                sources_text += "REGIERUNGSQUELLEN (höchste Priorität):\n"
+                for i, source in enumerate(gov_sources, 1):
+                    sources_text += f"[G{i}] {source['url']}\n"
+                sources_text += "\n"
+            
+            if db_sources:
+                sources_text += "DATENBANK-QUELLEN (technische Daten):\n"
+                for i, source in enumerate(db_sources, 1):
+                    sources_text += f"[D{i}] {source['url']}\n"
+                sources_text += "\n"
+            
+            if other_sources:
+                sources_text += "WEITERE QUELLEN:\n"
+                for i, source in enumerate(other_sources, 1):
+                    sources_text += f"[{i}] {source['url']}\n"
+            
+            sources_text += "\n⚠️ WICHTIG: Ignoriere KEINE dieser Quellen! Durchsuche sie ALLE systematisch!\n"
+            
             enhanced_query += sources_text
+            logger.info(f"[PERPLEXITY] {len(discovered_sources)} Quellen in Query eingefügt")
         
         try:
             # API-Call mit enhanced query
@@ -149,7 +193,8 @@ class PerplexityProvider(AbstractProvider):
                                 "content": enhanced_query
                             }
                         ],
-                        "temperature": options.get('temperature', 0.2),
+                        # ÄNDERUNG 07.07.2025: Temperature auf 0 für maximale Konsistenz
+                        "temperature": options.get('temperature', 0.0),
                         "max_tokens": model_config.max_tokens
                     }
                 )
@@ -175,6 +220,20 @@ class PerplexityProvider(AbstractProvider):
                 
                 extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
                 sources = extract_sources_from_content(content)
+                
+                # ÄNDERUNG 08.07.2025: Nutze zentralen Validation Service
+                validated_data, validation_errors = validation_service.validate_mine_data(extracted_data['data'])
+                
+                if validation_errors:
+                    logger.warning(f"[PERPLEXITY] Validierungsfehler: {validation_errors}")
+                
+                # Übernehme validierte Daten
+                extracted_data['data'] = validated_data
+                
+                # Update data_with_sources für entfernte Felder
+                for field, value in validated_data.items():
+                    if not value and field in extracted_data.get('data_with_sources', {}):
+                        extracted_data['data_with_sources'][field] = {"value": "", "sources": []}
                 
                 # ÄNDERUNG 04.07.2025: Tracke Source Discovery Ergebnisse
                 for source in sources:
@@ -332,7 +391,7 @@ QUELLEN ZUM ANALYSIEREN:
 - Land: [Land] [Quelle: URL/Dokument]
 - Region: [Region/Provinz] [Quelle: URL/Dokument]
 - Eigentümer: [Eigentümer der Mine] [Quelle: URL/Dokument]
-- Betreiber: [Betreiber/Operator] [Quelle: URL/Dokument]
+- Betreiber: [Betreiber/Operator - NIEMALS Koordinaten hier angeben!] [Quelle: URL/Dokument]
 - Koordinaten: [Latitude, Longitude] [Quelle: URL/Dokument]
 - Status: [aktiv/geschlossen/geplant] [Quelle: URL/Dokument]
 - Rohstoffe: [Liste der Rohstoffe] [Quelle: URL/Dokument]

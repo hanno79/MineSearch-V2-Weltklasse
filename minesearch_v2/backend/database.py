@@ -196,35 +196,141 @@ class Source(Base):
         Automatische Klassifizierung des Quellentyps basierend auf URL/Domain
         
         ÄNDERUNG 02.07.2025: Verbesserte Typerkennung
+        ÄNDERUNG 08.07.2025: Erweiterte Patterns aus Bereinigungsskript
         """
-        # Government domains
-        gov_patterns = ['.gov', '.gouv', '.gob', '.go.', 'government', 'regierung']
-        if any(pattern in domain.lower() for pattern in gov_patterns):
-            return 'government'
+        import re
+        
+        url_lower = url.lower()
+        domain_lower = domain.lower()
+        
+        # Government domains - erweiterte Patterns
+        gov_patterns = [
+            r'\.gov(\.|$)', r'\.gouv\.', r'\.gob\.', r'\.go\.',
+            r'mern\.gouv', r'mrnf\.gouv', r'mines\.gouv', r'bape\.gouv',
+            r'gestim.*gouv', r'nrcan\.gc\.ca', r'blm\.gov', r'usgs\.gov',
+            'government', 'regierung'
+        ]
+        for pattern in gov_patterns:
+            if re.search(pattern, domain_lower) or re.search(pattern, url_lower):
+                return 'government'
+        
+        # Database domains - erweiterte Patterns
+        db_patterns = [
+            r'mindat\.org', r'miningdataonline\.com', r'minfind\.com',
+            r'gestim.*mines',  # GESTIM ist eine Datenbank
+            r'geonames\.nrcan', 'infomine', 'mrdata', 'database', 
+            'registry', 'cadastre', 'kataster'
+        ]
+        for pattern in db_patterns:
+            if re.search(pattern, domain_lower) or re.search(pattern, url_lower):
+                return 'database'
         
         # Exchange/Financial domains  
-        exchange_patterns = ['sedar', 'sec.gov', 'asx.com', 'tsx.com', 'jse.co', 
-                           'bolsa', 'bvl.com', 'idx.co', 'exchange', 'börse']
-        if any(pattern in domain.lower() for pattern in exchange_patterns):
-            return 'exchange'
+        exchange_patterns = [
+            r'sedar\.com', r'tsx\.com', r'asx\.com\.au', r'jse\.co\.za',
+            'sec.gov', 'bolsa', 'bvl.com', 'idx.co', 'exchange', 'börse'
+        ]
+        for pattern in exchange_patterns:
+            if re.search(pattern, domain_lower):
+                return 'exchange'
         
-        # Database domains
-        db_patterns = ['gestim', 'infomine', 'mindat', 'mrdata', 'usgs', 'nrcan',
-                      'database', 'registry', 'cadastre', 'kataster']
-        if any(pattern in domain.lower() for pattern in db_patterns):
-            return 'database'
+        # Industry/Mining portals - spezifischere Patterns
+        industry_patterns = [
+            r'mining\.com$', r'miningweekly\.com', r'mining-technology\.com',
+            r'miningwatch\.ca', r'northernminer\.com', r'miningfrontier\.com',
+            r'resourceworld\.com', 'mineria', 'bergbau'
+        ]
+        for pattern in industry_patterns:
+            if re.search(pattern, domain_lower):
+                return 'industry'
         
-        # Industry/Mining portals
-        industry_patterns = ['mining', 'miningweekly', 'mineria', 'bergbau', 
-                           'mineral', 'metals', 'resource']
-        if any(pattern in domain.lower() for pattern in industry_patterns):
-            return 'industry'
+        # Document repositories - erweiterte Erkennung
+        doc_patterns = [
+            r'\.pdf$', r'/GM\d+/', r'/DV\d+/',  # Quebec mining documents
+            r'q4cdn\.com', r'kaisersearch\.com',
+            'document', 'report', '/docs/', '/publications/'
+        ]
+        for pattern in doc_patterns:
+            if re.search(pattern, url_lower):
+                return 'document'
         
-        # Document repositories
-        if 'pdf' in url.lower() or 'document' in url.lower() or 'report' in url.lower():
-            return 'document'
+        # Media sources
+        media_patterns = ['youtube.com', 'vimeo.com', 'accessnewswire.com']
+        if any(pattern in domain_lower for pattern in media_patterns):
+            return 'media'
+        
+        # Wikipedia
+        if 'wikipedia.org' in domain_lower:
+            return 'wikipedia'
         
         return 'unknown'
+    
+    @classmethod
+    def get_country_from_domain(cls, url: str, domain: str) -> Optional[str]:
+        """
+        ÄNDERUNG 08.07.2025: Ermittle Land basierend auf Domain
+        """
+        domain_lower = domain.lower()
+        
+        # Domain-zu-Land Mapping
+        domain_country_map = {
+            # Kanada
+            '.ca': 'Canada',
+            '.gc.ca': 'Canada',
+            '.qc.ca': 'Canada',
+            '.gouv.qc.ca': 'Canada',
+            'canadianmalartic.com': 'Canada',
+            'agnicoeagle.com': 'Canada',
+            'searchminerals.ca': 'Canada',
+            'glencore.ca': 'Canada',
+            # ÄNDERUNG 08.07.2025: Spezifische kanadische .com Domains
+            'sedar.com': 'Canada',
+            'sedarplus.ca': 'Canada',
+            'tsx.com': 'Canada',
+            'tmx.com': 'Canada',
+            
+            # USA
+            '.gov': 'USA',
+            'blm.gov': 'USA',
+            'usgs.gov': 'USA',
+            
+            # Australien
+            '.gov.au': 'Australia',
+            '.com.au': 'Australia',
+            
+            # Südafrika
+            '.gov.za': 'South Africa',
+            '.co.za': 'South Africa',
+        }
+        
+        # Prüfe spezifische Domains zuerst
+        for domain_pattern, country in domain_country_map.items():
+            if domain_pattern in domain_lower:
+                return country
+        
+        # Prüfe TLD
+        if domain_lower.endswith('.ca'):
+            return 'Canada'
+        elif domain_lower.endswith('.us'):
+            return 'USA'
+        elif domain_lower.endswith('.au'):
+            return 'Australia'
+        elif domain_lower.endswith('.za'):
+            return 'South Africa'
+        elif domain_lower.endswith('.cl'):
+            return 'Chile'
+        elif domain_lower.endswith('.pe'):
+            return 'Peru'
+        elif domain_lower.endswith('.mx'):
+            return 'Mexico'
+        elif domain_lower.endswith('.br'):
+            return 'Brazil'
+        elif domain_lower.endswith('.ar'):
+            return 'Argentina'
+        elif domain_lower.endswith('.co'):
+            return 'Colombia'
+        
+        return None
 
 
 class SearchResult(Base):
@@ -394,7 +500,8 @@ class ModelSummary(Base):
     avg_response_time_ms = Column(Float, nullable=False, default=0.0)
     avg_fields_found = Column(Float, nullable=False, default=0.0)
     avg_sources_count = Column(Float, nullable=False, default=0.0)
-    success_rate = Column(Float, nullable=False, default=0.0)  # 0.0 bis 1.0
+    success_rate = Column(Float, nullable=False, default=0.0)  # 0.0 bis 1.0 (API-Erfolg)
+    data_success_rate = Column(Float, nullable=False, default=0.0)  # 0.0 bis 1.0 (Daten-Erfolg)
     overall_consistency = Column(Float, nullable=False, default=0.0)  # 0.0 bis 1.0
     
     # Feld-spezifische Konsistenz
@@ -419,12 +526,48 @@ class ModelSummary(Base):
             'avg_fields_found': self.avg_fields_found,
             'avg_sources_count': self.avg_sources_count,
             'success_rate': self.success_rate,
+            'data_success_rate': self.data_success_rate,  # ÄNDERUNG 07.07.2025: Daten-Erfolgsrate
             'overall_consistency': self.overall_consistency,
             'critical_fields_consistency': self.critical_fields_consistency,
             'estimated_cost_per_request': self.estimated_cost_per_request,
             'total_estimated_cost': self.total_estimated_cost,
             'first_test_at': self.first_test_at.isoformat() if self.first_test_at else None,
             'last_test_at': self.last_test_at.isoformat() if self.last_test_at else None,
+            'last_updated': self.last_updated.isoformat() if self.last_updated else None
+        }
+
+
+class FieldStatistics(Base):
+    """Datenbank-Tabelle für Feld-spezifische Statistiken"""
+    __tablename__ = 'field_statistics'
+    
+    id = Column(Integer, primary_key=True)
+    model_id = Column(String(100), nullable=False, index=True)
+    field_name = Column(String(100), nullable=False, index=True)
+    total_searches = Column(Integer, nullable=False, default=0)
+    times_found = Column(Integer, nullable=False, default=0)
+    times_empty = Column(Integer, nullable=False, default=0)
+    success_rate = Column(Float, nullable=False, default=0.0)  # 0.0 bis 1.0
+    avg_confidence = Column(Float, nullable=True)  # Durchschnittliche Konfidenz wenn gefunden
+    last_updated = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    
+    # Indizes für Performance
+    __table_args__ = (
+        Index('idx_model_field', 'model_id', 'field_name'),
+        Index('idx_field_success', 'field_name', 'success_rate'),
+    )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Konvertiere zu Dictionary für API-Responses"""
+        return {
+            'id': self.id,
+            'model_id': self.model_id,
+            'field_name': self.field_name,
+            'total_searches': self.total_searches,
+            'times_found': self.times_found,
+            'times_empty': self.times_empty,
+            'success_rate': self.success_rate,
+            'avg_confidence': self.avg_confidence,
             'last_updated': self.last_updated.isoformat() if self.last_updated else None
         }
 
@@ -472,13 +615,20 @@ class DatabaseManager:
             base_url = url
             domain = 'document_search'
         
-        # Automatische Quellentyp-Klassifizierung
-        if source_type == 'unknown':
+        # ÄNDERUNG 08.07.2025: Automatische Quellentyp-Klassifizierung und Land-Erkennung
+        if source_type == 'unknown' or source_type == 'url':
             source_type = Source.classify_source_type(url, domain)
+        
+        # Automatische Land-Erkennung wenn nicht angegeben
+        if not country:
+            detected_country = Source.get_country_from_domain(url, domain)
+            if detected_country:
+                country = detected_country
             
         with self.get_session() as session:
-            # Prüfe ob Quelle bereits existiert - suche nach Domain statt URL
-            source = session.query(Source).filter_by(domain=domain).first()
+            # ÄNDERUNG 08.07.2025: Suche nach URL statt Domain für genaueres Tracking
+            # Prüfe ob Quelle bereits existiert - suche nach exakter URL
+            source = session.query(Source).filter_by(url=base_url).first()
             
             if source:
                 # Aktualisiere bestehende Quelle
@@ -512,7 +662,8 @@ class DatabaseManager:
             return source
     
     def get_sources_for_search(self, country: Optional[str] = None, region: Optional[str] = None,
-                              min_reliability: float = 30.0, limit: int = 50) -> List[Source]:
+                              source_type: Optional[str] = None, min_reliability: float = 30.0, 
+                              limit: int = 50, offset: int = 0) -> List[Source]:
         """Hole relevante Quellen für eine Suche"""
         with self.get_session() as session:
             query = session.query(Source).filter(Source.reliability_score >= min_reliability)
@@ -529,21 +680,49 @@ class DatabaseManager:
                         (Source.region == region) | (Source.region.is_(None))
                     )
             
+            # Filter nach Quellentyp wenn angegeben
+            if source_type:
+                query = query.filter(Source.source_type == source_type)
+            
             # Sortiere nach Zuverlässigkeit und Erfolgsquote
             sources = query.order_by(
                 Source.reliability_score.desc(),
                 Source.successful_searches.desc()
-            ).limit(limit).all()
+            ).offset(offset).limit(limit).all()
             
             return sources
     
     def update_source_statistics(self, url: str, success: bool, content_type: Optional[str] = None):
         """Aktualisiere Statistiken nach einer Suche"""
         with self.get_session() as session:
+            # ÄNDERUNG 08.07.2025: Flexible URL-Suche
             source = session.query(Source).filter_by(url=url).first()
+            
+            # Fallback: Versuche mit normalisierter URL
+            if not source:
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(url)
+                    normalized_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip('/')
+                    source = session.query(Source).filter_by(url=normalized_url).first()
+                except:
+                    pass
+            
+            # Fallback: Suche nach Domain
+            if not source:
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(url)
+                    if parsed.netloc:
+                        source = session.query(Source).filter_by(domain=parsed.netloc).first()
+                except:
+                    pass
+            
             if source:
                 source.update_access(success, content_type)
                 session.commit()
+            else:
+                logger.debug(f"[DB] Source nicht gefunden für Update: {url}")
     
     def get_statistics(self) -> Dict[str, Any]:
         """Hole Gesamt-Statistiken"""
@@ -574,6 +753,11 @@ class DatabaseManager:
                 'top_sources': [source.to_dict() for source in top_sources],
                 'average_success_rate': round(avg_success_rate, 2)
             }
+    
+    # ÄNDERUNG 07.07.2025: Fehlende Methode für Quellen-Statistiken
+    def get_source_statistics(self) -> Dict[str, Any]:
+        """Hole detaillierte Quellen-Statistiken für die API"""
+        return self.get_statistics()  # Verwende existierende Methode
     
     # ÄNDERUNG 02.07.2025: Methoden für SearchResult Management
     def save_search_result(self, result_data: Dict[str, Any]) -> SearchResult:

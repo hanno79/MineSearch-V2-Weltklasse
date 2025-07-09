@@ -8,6 +8,8 @@ Beschreibung: Tavily Search Provider für moderne KI-gestützte Websuche
 import httpx
 import logging
 import json
+import re
+import urllib.parse
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
@@ -21,6 +23,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from data_extraction import DataExtractor
 from source_discovery import extract_sources_from_content
 from utils import generate_name_variants, get_country_config, generate_multilingual_search_terms
+from validation_service import validation_service
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +77,7 @@ class TavilyProvider(AbstractProvider):
         country = options.get('country')
         commodity = options.get('commodity')
         region = options.get('region')
+        discovered_sources = options.get('discovered_sources', []) or options.get('sources', [])
         
         # Erstelle erweiterte Query für Mining-Recherche
         enhanced_query = self._build_mining_query(query, mine_name, country, commodity, region)
@@ -92,7 +96,7 @@ class TavilyProvider(AbstractProvider):
                     "search_depth": "advanced" if model_id == 'deep-research' else "basic",
                     "include_answer": True,
                     "include_raw_content": True,  # Wichtig für tiefe Datenextraktion
-                    "include_domains": self._get_priority_domains(country),
+                    "include_domains": self._get_priority_domains(country, discovered_sources),
                     "exclude_domains": ["wikipedia.org", "facebook.com", "twitter.com"],
                     "topic": "general"
                 }
@@ -119,12 +123,43 @@ class TavilyProvider(AbstractProvider):
                 # Parse Response
                 result = response.json()
                 
+                # ÄNDERUNG 09.07.2025: Erweitertes Debug-Logging für Tavily Response
+                logger.info(f"[TAVILY] Response erhalten mit {len(result.get('results', []))} Ergebnissen")
+                logger.debug(f"[TAVILY] Response Keys: {list(result.keys())}")
+                
+                # Log erste Ergebnisse für Debugging
+                if result.get('results'):
+                    first_result = result['results'][0]
+                    logger.debug(f"[TAVILY] Erstes Ergebnis: Title='{first_result.get('title')}', URL='{first_result.get('url')}'")
+                    logger.debug(f"[TAVILY] Content-Länge: {len(first_result.get('content', ''))}")
+                else:
+                    logger.warning(f"[TAVILY] KEINE ERGEBNISSE für Query: '{query}'")
+                
                 # Extrahiere Content und Quellen
                 content = self._build_content_from_results(result, mine_name)
                 sources = self._extract_tavily_sources(result)
                 
+                # ÄNDERUNG 08.07.2025: Debug-Logging für extrahierte Sources
+                logger.info(f"[TAVILY] {len(sources)} Quellen extrahiert")
+                if sources:
+                    logger.debug(f"[TAVILY] Erste Quelle: {sources[0]}")
+                
                 # Extrahiere strukturierte Daten
                 extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
+                
+                # ÄNDERUNG 08.07.2025: Nutze zentralen Validation Service
+                validated_data, validation_errors = validation_service.validate_mine_data(extracted_data['data'])
+                
+                if validation_errors:
+                    logger.warning(f"[TAVILY] Validierungsfehler: {validation_errors}")
+                
+                # Übernehme validierte Daten
+                extracted_data['data'] = validated_data
+                
+                # Update data_with_sources für entfernte Felder
+                for field, value in validated_data.items():
+                    if not value and field in extracted_data.get('data_with_sources', {}):
+                        extracted_data['data_with_sources'][field] = {"value": "", "sources": []}
                 
                 duration = (datetime.now() - start_time).total_seconds()
                 
@@ -166,54 +201,99 @@ class TavilyProvider(AbstractProvider):
     
     def _build_mining_query(self, base_query: str, mine_name: str, 
                            country: str, commodity: str, region: str) -> str:
-        """Erstelle optimierte Query für Mining-Recherche"""
+        """
+        Erstelle optimierte Query für Mining-Recherche
         
-        # ÄNDERUNG 06.07.2025: Query auf 400 Zeichen begrenzen für Tavily API
-        # Basis-Query mit Mining-Fokus - Priorisiere wichtigste Begriffe
-        query_parts = []
+        ÄNDERUNG 08.07.2025: Verbesserte Query-Generierung mit intelligenteren Suchstrategien
+        """
         
-        # Höchste Priorität: Minenname
-        query_parts.append(f'"{mine_name}" mine')
+        # Query-Templates für verschiedene Informationstypen
+        query_templates = {
+            'general': '"{mine}" ({commodity} OR mining) {country} (operator OR owner OR "operated by")',
+            'restoration': '"{mine}" ("restoration cost" OR "closure cost" OR ARO OR "asset retirement") million',
+            'location': '"{mine}" (coordinates OR GPS OR latitude OR longitude) {country} {region}',
+            'technical': '"{mine}" ("technical report" OR "NI 43-101" OR "feasibility study") PDF',
+            'environmental': '"{mine}" (environmental OR closure OR reclamation) plan {country}'
+        }
         
-        # Zweite Priorität: Land und Rohstoff
-        if country:
-            query_parts.append(country)
+        # Wähle Template basierend auf verfügbaren Daten
+        if not commodity and not region:
+            # Wenig Info vorhanden - fokussiere auf Restaurationskosten
+            template = query_templates['restoration']
+        elif region:
+            # Region vorhanden - fokussiere auf genaue Location
+            template = query_templates['location']
+        else:
+            # Standard-Suche mit allen wichtigen Begriffen
+            template = query_templates['general']
         
-        if commodity:
-            query_parts.append(commodity)
+        # Ersetze Platzhalter
+        query = template.format(
+            mine=mine_name,
+            country=country or "",
+            commodity=commodity or "mine",
+            region=region or ""
+        )
         
-        # Dritte Priorität: Kritische Datenpunkte (kurz gefasst)
-        priority_terms = [
-            'restoration costs ARO',
-            'operator owner',
-            'coordinates GPS',
-            'production'
-        ]
+        # Optimiere Query durch Entfernen von Leerzeichen und doppelten Klammern
+        query = re.sub(r'\s+', ' ', query)  # Multiple Leerzeichen zu einem
+        query = re.sub(r'\(\s*\)', '', query)  # Leere Klammern entfernen
+        query = re.sub(r'\s+\)', ')', query)  # Leerzeichen vor schließender Klammer
+        query = re.sub(r'\(\s+', '(', query)  # Leerzeichen nach öffnender Klammer
+        query = query.strip()
         
-        # Baue Query schrittweise auf und prüfe Länge
-        current_query = ' '.join(query_parts)
+        # ÄNDERUNG 09.07.2025: Query-Limit auf 600 Zeichen erhöht für bessere Ergebnisse
+        if len(query) > 600:
+            # Priorisierte Begriffe für Kürzung
+            essential_parts = [
+                f'"{mine_name}"',
+                country or "",
+                commodity or "mine",
+                '(operator OR owner)',
+                '"restoration cost"'
+            ]
+            
+            # Baue minimale Query aus essentiellen Teilen
+            query = ""
+            for part in essential_parts:
+                if not part:
+                    continue
+                test_query = f"{query} {part}".strip()
+                if len(test_query) <= 590:  # Sicherheitspuffer
+                    query = test_query
+                else:
+                    break
+            
+            # Extremer Fallback
+            if len(query) > 600:
+                query = f'"{mine_name[:150]}" mine {country or ""}'.strip()[:600]
         
-        for term in priority_terms:
-            test_query = f"{current_query} {term}"
-            if len(test_query) < 350:  # 350 Zeichen Limit, um Puffer zu lassen
-                current_query = test_query
-            else:
-                break
+        logger.info(f"[TAVILY] Optimierte Query ({len(query)} Zeichen): {query}")
+        return query
+    
+    def _generate_query_variants(self, mine_name: str, country: str, 
+                                commodity: str, region: str) -> List[str]:
+        """
+        Generiere mehrere Query-Varianten für umfassendere Suche
         
-        # Füge Region hinzu wenn noch Platz
-        if region and len(f"{current_query} {region}") < 380:
-            current_query = f"{current_query} {region}"
+        ÄNDERUNG 08.07.2025: Neue Methode für Query-Varianten
+        """
+        variants = []
         
-        # Stelle sicher dass Query nicht zu lang ist
-        if len(current_query) > 400:
-            # Fallback: Nur Minenname und Land
-            current_query = f'"{mine_name}" mine {country or ""}'.strip()
-            if len(current_query) > 400:
-                # Extremer Fallback: Kürze Minenname
-                current_query = f'"{mine_name[:100]}" mine'
+        # Variante 1: Fokus auf Betreiber und Eigentümer
+        variants.append(f'"{mine_name}" (operator OR owner OR "operated by" OR proprietor) {country or ""}')
         
-        logger.info(f"[TAVILY] Query-Länge: {len(current_query)} Zeichen")
-        return current_query
+        # Variante 2: Fokus auf Restaurationskosten
+        variants.append(f'"{mine_name}" ("restoration cost" OR "closure cost" OR "reclamation cost" OR ARO) million')
+        
+        # Variante 3: Fokus auf technische Daten
+        variants.append(f'"{mine_name}" (coordinates OR production OR reserves) {commodity or "mine"}')
+        
+        # Variante 4: Fokus auf aktuelle Nachrichten
+        variants.append(f'"{mine_name}" {country or ""} (news OR update OR status) {datetime.now().year}')
+        
+        # Kürze alle Varianten auf max. 400 Zeichen
+        return [v[:400] for v in variants]
     
     def _build_content_from_results(self, tavily_response: Dict, mine_name: str) -> str:
         """Erstelle strukturierten Content aus Tavily-Ergebnissen"""
@@ -245,25 +325,58 @@ class TavilyProvider(AbstractProvider):
         sources = []
         
         for idx, result in enumerate(response.get('results', []), 1):
-            source = {
-                'type': 'url',
-                'value': result.get('url', ''),
-                'title': result.get('title', ''),
-                'description': result.get('content', '')[:200] if result.get('content') else '',
-                'score': result.get('score', 0),
-                'provider': 'tavily'
-            }
-            sources.append(source)
+            url = result.get('url', '')
+            if url:  # Nur hinzufügen wenn URL vorhanden
+                source = {
+                    'type': 'url',
+                    'url': url,  # ÄNDERUNG 08.07.2025: Verwende 'url' statt 'value' für konsistentes Tracking
+                    'value': url,  # Behalte 'value' für Kompatibilität
+                    'title': result.get('title', ''),
+                    'description': result.get('content', '')[:200] if result.get('content') else '',
+                    'score': result.get('score', 0),
+                    'provider': 'tavily',
+                    'name': result.get('title', url)  # Name für DB-Eintrag
+                }
+                sources.append(source)
+                logger.debug(f"[TAVILY] Quelle hinzugefügt: {url}")
         
         return sources
     
-    def _get_priority_domains(self, country: str) -> List[str]:
-        """Hole prioritäre Domains für ein Land"""
-        if not country:
-            return []
+    def _get_priority_domains(self, country: str, discovered_sources: List[Dict] = None) -> List[str]:
+        """Hole prioritäre Domains für ein Land und aus discovered sources"""
+        domains = []
         
-        country_config = get_country_config(country)
-        return country_config.get('priority_domains', [])
+        # ÄNDERUNG 08.07.2025: Nutze discovered_sources für include_domains
+        if discovered_sources:
+            logger.info(f"[TAVILY] Extrahiere Domains aus {len(discovered_sources)} discovered sources")
+            source_domains = set()
+            for source in discovered_sources:
+                url = source.get('url', '')
+                if url:
+                    try:
+                        parsed = urllib.parse.urlparse(url)
+                        if parsed.netloc:
+                            source_domains.add(parsed.netloc)
+                    except:
+                        pass
+            
+            domains.extend(list(source_domains))
+            logger.info(f"[TAVILY] {len(source_domains)} unique Domains aus discovered sources extrahiert")
+        
+        # Füge country-spezifische Domains hinzu
+        if country:
+            country_config = get_country_config(country)
+            priority_domains = country_config.get('priority_domains', [])
+            domains.extend(priority_domains)
+        
+        # Entferne Duplikate und limitiere auf 100 (Tavily API Limit)
+        unique_domains = list(dict.fromkeys(domains))[:100]
+        
+        logger.info(f"[TAVILY] Verwende {len(unique_domains)} Domains für include_domains")
+        if len(unique_domains) > 10:
+            logger.debug(f"[TAVILY] Erste 10 Domains: {unique_domains[:10]}")
+        
+        return unique_domains
     
     def _handle_api_error(self, response: httpx.Response) -> str:
         """Behandle API-Fehler mit benutzerfreundlichen Nachrichten"""

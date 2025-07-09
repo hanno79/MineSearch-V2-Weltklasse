@@ -292,6 +292,195 @@ async def get_benchmark_summary():
     }
 
 
+@router.get("/field-statistics")
+async def get_field_statistics(
+    model_id: Optional[str] = Query(None, description="Filtere nach Modell-ID"),
+    field_name: Optional[str] = Query(None, description="Filtere nach Feld-Name"),
+    min_success_rate: float = Query(0.0, ge=0.0, le=1.0, description="Minimale Erfolgsrate")
+):
+    """
+    Ruft feld-spezifische Statistiken ab
+    
+    ÄNDERUNG 08.07.2025: Neuer Endpoint für detaillierte Feld-Statistiken
+    
+    Args:
+        model_id: Optional Filter nach Modell
+        field_name: Optional Filter nach Feld
+        min_success_rate: Minimale Erfolgsrate (0.0-1.0)
+        
+    Returns:
+        Liste von Feld-Statistiken pro Modell
+    """
+    with db_manager.get_session() as session:
+        from database import FieldStatistics
+        
+        query = session.query(FieldStatistics)
+        
+        if model_id:
+            query = query.filter_by(model_id=model_id)
+        if field_name:
+            query = query.filter_by(field_name=field_name)
+        
+        query = query.filter(FieldStatistics.success_rate >= min_success_rate)
+        
+        # Sortiere nach Erfolgsrate absteigend
+        results = query.order_by(
+            FieldStatistics.success_rate.desc(),
+            FieldStatistics.total_searches.desc()
+        ).all()
+        
+        # Gruppiere nach Feld für bessere Übersicht
+        field_groups = {}
+        for stat in results:
+            if stat.field_name not in field_groups:
+                field_groups[stat.field_name] = []
+            field_groups[stat.field_name].append(stat.to_dict())
+        
+        return {
+            'total_stats': len(results),
+            'fields_analyzed': len(field_groups),
+            'by_field': field_groups,
+            'all_stats': [r.to_dict() for r in results]
+        }
+
+
+@router.get("/charts")
+async def get_benchmark_charts(
+    mine_name: Optional[str] = Query(None, description="Filtere nach Mine"),
+    limit: int = Query(10, ge=1, le=50, description="Anzahl Modelle")
+):
+    """
+    Ruft Chart-Daten für Frontend-Visualisierungen ab
+    
+    ÄNDERUNG 08.07.2025: Neuer Endpoint für interaktive Charts
+    
+    Args:
+        mine_name: Optional Filter nach Mine
+        limit: Anzahl der Top-Modelle
+        
+    Returns:
+        Strukturierte Daten für verschiedene Chart-Typen
+    """
+    with db_manager.get_session() as session:
+        from database import ModelSummary
+        from sqlalchemy import desc
+        
+        query = session.query(ModelSummary)
+        
+        if mine_name:
+            # Filter nach Mine in den letzten Suchen
+            query = query.filter(ModelSummary.last_mine_searched.contains(mine_name))
+        
+        # Hole Top-Modelle nach verschiedenen Kriterien
+        summaries = query.order_by(desc(ModelSummary.total_tests)).all()
+        
+        # Limitiere auf die gewünschte Anzahl
+        summaries = summaries[:limit]
+        
+        # Bereite Daten für Charts vor
+        labels = []
+        success_rates = []
+        consistency_scores = []
+        avg_fields = []
+        response_times = []
+        
+        for summary in summaries:
+            model_name = summary.model_id.split(':')[-1]  # Entferne Provider-Präfix
+            labels.append(model_name)
+            success_rates.append(round(summary.success_rate * 100, 1))
+            consistency_scores.append(round(summary.overall_consistency * 100, 1))
+            avg_fields.append(round(summary.avg_fields_found, 1))
+            response_times.append(round(summary.avg_response_time_ms / 1000, 1))  # In Sekunden
+        
+        # Radar-Chart Daten (normalisiert auf 0-100)
+        radar_data = []
+        for i, summary in enumerate(summaries[:5]):  # Top 5 für Radar-Chart
+            radar_data.append({
+                'model': labels[i],
+                'data': [
+                    success_rates[i],  # Erfolgsrate
+                    consistency_scores[i],  # Konsistenz
+                    min(100, avg_fields[i] * 5),  # Datenqualität (20 Felder = 100%)
+                    max(0, 100 - response_times[i] * 10),  # Geschwindigkeit (10s = 0%)
+                    round(summary.data_success_rate * 100, 1) if hasattr(summary, 'data_success_rate') else success_rates[i]  # Daten-Erfolg
+                ]
+            })
+        
+        return {
+            'success_rates': {
+                'labels': labels,
+                'data': success_rates
+            },
+            'consistency_scores': {
+                'labels': labels,
+                'data': consistency_scores
+            },
+            'avg_fields': {
+                'labels': labels,
+                'data': avg_fields
+            },
+            'response_times': {
+                'labels': labels,
+                'data': response_times
+            },
+            'radar_chart': {
+                'labels': ['Erfolgsrate', 'Konsistenz', 'Datenqualität', 'Geschwindigkeit', 'Daten-Erfolg'],
+                'datasets': radar_data
+            },
+            'metadata': {
+                'total_models': len(summaries),
+                'mine_filter': mine_name,
+                'generated_at': datetime.now().isoformat()
+            }
+        }
+
+
+@router.get("/field-comparison")
+async def get_field_comparison():
+    """
+    Vergleiche Feld-Performance über alle Modelle
+    
+    ÄNDERUNG 08.07.2025: Zeigt welche Felder gut/schlecht gefunden werden
+    
+    Returns:
+        Vergleichsdaten für alle Felder über alle Modelle
+    """
+    with db_manager.get_session() as session:
+        from database import FieldStatistics
+        from sqlalchemy import func
+        
+        # Aggregiere Statistiken pro Feld
+        field_stats = session.query(
+            FieldStatistics.field_name,
+            func.avg(FieldStatistics.success_rate).label('avg_success_rate'),
+            func.sum(FieldStatistics.times_found).label('total_times_found'),
+            func.sum(FieldStatistics.total_searches).label('total_searches'),
+            func.count(FieldStatistics.model_id).label('models_tested')
+        ).group_by(FieldStatistics.field_name).all()
+        
+        # Sortiere nach durchschnittlicher Erfolgsrate
+        results = []
+        for field_name, avg_rate, times_found, searches, models in field_stats:
+            results.append({
+                'field_name': field_name,
+                'avg_success_rate': float(avg_rate) if avg_rate else 0.0,
+                'total_times_found': int(times_found) if times_found else 0,
+                'total_searches': int(searches) if searches else 0,
+                'models_tested': int(models) if models else 0,
+                'difficulty': 'Einfach' if avg_rate > 0.7 else 'Mittel' if avg_rate > 0.3 else 'Schwer'
+            })
+        
+        # Sortiere: Schwere Felder zuerst
+        results.sort(key=lambda x: x['avg_success_rate'])
+        
+        return {
+            'total_fields': len(results),
+            'hardest_fields': results[:10],  # Top 10 schwerste Felder
+            'easiest_fields': results[-10:][::-1],  # Top 10 einfachste Felder
+            'all_fields': results
+        }
+
+
 @router.delete("/session/{session_id}")
 async def delete_benchmark_session(session_id: str):
     """
@@ -316,7 +505,7 @@ async def capture_search_statistics(stats_data: Dict[str, Any]):
     """
     Erfasst Statistiken von normalen Suchen
     
-    ÄNDERUNG 07.07.2025: Normale Suchen werden auch für Statistiken erfasst
+    ÄNDERUNG 07.07.2025: Unterscheide zwischen API-Erfolg und Daten-Erfolg
     
     Args:
         stats_data: Statistik-Daten von einer normalen Suche
@@ -325,6 +514,31 @@ async def capture_search_statistics(stats_data: Dict[str, Any]):
         Bestätigung
     """
     try:
+        # ÄNDERUNG 07.07.2025: Debug-Logging für alle eingehenden Statistiken
+        logger.info(f"[BENCHMARK] 📊 Empfange Statistiken von {stats_data.get('model_id')} für {stats_data.get('mine_name')}")
+        
+        # ÄNDERUNG 07.07.2025: Bestimme Daten-Erfolg basierend auf gefüllten Feldern
+        api_success = stats_data.get('success', False)
+        fields_found = stats_data.get('fields_found', 0)
+        structured_data = stats_data.get('structured_data', {})
+        
+        # Zähle nur Felder mit echten Daten (nach Validierung)
+        real_fields_count = 0
+        critical_fields_found = []
+        
+        # Kritische Felder die wir tracken wollen
+        critical_fields = ['Eigentümer', 'Betreiber', 'Restaurationskosten', 
+                         'x-Koordinate', 'y-Koordinate', 'Aktivitätsstatus']
+        
+        for field, value in structured_data.items():
+            if value and str(value).strip():
+                real_fields_count += 1
+                if field in critical_fields:
+                    critical_fields_found.append(field)
+        
+        # Daten-Erfolg: API hat geantwortet UND mindestens 3 kritische Felder gefunden
+        data_success = api_success and real_fields_count >= 3
+        
         # Erstelle ModelStatistics-Eintrag
         with db_manager.get_session() as session:
             from database import ModelStatistics
@@ -336,22 +550,78 @@ async def capture_search_statistics(stats_data: Dict[str, Any]):
                 region=stats_data.get('region'),
                 commodity=stats_data.get('commodity'),
                 run_number=stats_data.get('run_number', 1),
-                success=stats_data.get('success', False),
+                success=data_success,  # ÄNDERUNG: Nutze data_success statt api_success
                 response_time_ms=stats_data.get('response_time_ms'),
-                fields_found=stats_data.get('fields_found', 0),
+                fields_found=real_fields_count,  # ÄNDERUNG: Nutze echte Feldanzahl
                 sources_count=stats_data.get('sources_count', 0),
-                structured_data=stats_data.get('structured_data'),
-                error_message=None if stats_data.get('success') else 'Normal search failed'
+                structured_data=structured_data,
+                error_message=None if api_success else stats_data.get('error_message', 'API call failed'),
+                # Zusätzliche Metadaten für bessere Analyse
+                metadata={
+                    'api_success': api_success,
+                    'data_success': data_success,
+                    'critical_fields_found': critical_fields_found,
+                    'raw_fields_count': fields_found,
+                    'validated_fields_count': real_fields_count
+                }
             )
             session.add(stat)
             session.commit()
             
             logger.info(f"[BENCHMARK] Statistiken erfasst für {stats_data['model_id']} - {stats_data['mine_name']}")
+            logger.info(f"[BENCHMARK] API-Erfolg: {api_success}, Daten-Erfolg: {data_success}, Felder: {real_fields_count}")
+            
+            # ÄNDERUNG 08.07.2025: Erfasse feld-spezifische Statistiken
+            from database import FieldStatistics
+            from config import CSV_COLUMNS
+            
+            # Gehe durch alle möglichen Felder
+            for field_name in CSV_COLUMNS:
+                field_stat = session.query(FieldStatistics).filter_by(
+                    model_id=stats_data['model_id'],
+                    field_name=field_name
+                ).first()
+                
+                if not field_stat:
+                    field_stat = FieldStatistics(
+                        model_id=stats_data['model_id'],
+                        field_name=field_name,
+                        total_searches=0,
+                        times_found=0,
+                        times_empty=0,
+                        success_rate=0.0
+                    )
+                    session.add(field_stat)
+                
+                # Aktualisiere Statistiken
+                field_stat.total_searches += 1
+                
+                # Prüfe ob Feld gefunden wurde
+                field_value = structured_data.get(field_name, "")
+                if field_value and str(field_value).strip():
+                    field_stat.times_found += 1
+                else:
+                    field_stat.times_empty += 1
+                
+                # Berechne Erfolgsrate
+                field_stat.success_rate = field_stat.times_found / field_stat.total_searches
+                
+            session.commit()
         
         # Aktualisiere Modell-Zusammenfassung im Hintergrund
+        # Konvertiere stats_data in das erwartete Format
+        result_format = {
+            'run_number': 1,
+            'success': data_success,
+            'response_time_ms': stats_data.get('response_time_ms', 0),
+            'fields_found': real_fields_count,
+            'sources_count': stats_data.get('sources_count', 0),
+            'structured_data': structured_data
+        }
+        
         await benchmark_service._update_model_summary(
             stats_data['model_id'], 
-            [stats_data]  # Als Liste übergeben
+            [result_format]  # Als Liste im erwarteten Format
         )
         
         return {"success": True, "message": "Statistiken erfasst"}

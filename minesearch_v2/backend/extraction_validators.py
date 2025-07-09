@@ -28,26 +28,45 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
         
     value_lower = value.lower().strip()
     
-    # Allgemeine Platzhalter
+    # ÄNDERUNG 07.07.2025: Nur offensichtliche Platzhalter entfernen
+    # "Unbekannt" und ähnliche sind GÜLTIGE Werte!
     general_placeholders = [
         'k.a', 'k.a.', 'n/a', 'n.a.', '-', '--', '---',
-        'keine angabe', 'keine daten', 'nicht gefunden',
-        'nicht verfügbar', 'unbekannt', 'unknown',
+        'keine angabe', 'keine daten',  # 'nicht gefunden' ENTFERNT
+        'nicht verfügbar',  # 'unbekannt' und 'unknown' ENTFERNT - sind gültige Werte!
         'no data', 'not found', 'not available'
     ]
     
+    # ÄNDERUNG 07.07.2025: "Keine spezifischen Daten gefunden" ist KEIN Platzhalter
+    # Diese Strings sind GÜLTIGE Aussagen über die Datenverfügbarkeit
+    valid_values = [
+        'unbekannt', 'unknown', 'nicht gefunden', 
+        'keine spezifischen daten gefunden',
+        'keine informationen verfügbar',
+        'not specified', 'nicht spezifiziert'
+    ]
+    
+    # Wenn es ein gültiger Wert ist, NICHT als Platzhalter behandeln
+    if value_lower in valid_values:
+        logger.debug(f"[PLACEHOLDER] '{value}' ist ein GÜLTIGER Wert, kein Platzhalter")
+        return False
+    
     if value_lower in general_placeholders:
+        logger.debug(f"[PLACEHOLDER] '{value}' ist ein Platzhalter")
         return True
     
     # Feldspezifische Prüfungen
     if field == 'Restaurationskosten':
         # Unrealistisch niedrige Werte
         if re.match(r'^\$?\s*[0-9]\s*(?:CAD|CDN|USD)?$', value):
+            logger.debug(f"[PLACEHOLDER] Restaurationskosten '{value}' ist Minimalwert")
             return True
         if re.match(r'^\$?\s*[1-9]\d?\s*(?:CAD|CDN|USD)?$', value) and 'million' not in value_lower:
             # Werte unter 100 ohne "million" sind unrealistisch
+            logger.debug(f"[PLACEHOLDER] Restaurationskosten '{value}' ist zu niedrig")
             return True
     
+    logger.debug(f"[PLACEHOLDER] '{value}' ist KEIN Platzhalter für Feld '{field}'")
     return False
 
 

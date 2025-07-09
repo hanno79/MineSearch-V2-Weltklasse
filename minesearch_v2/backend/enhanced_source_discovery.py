@@ -282,13 +282,16 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         from database import db_manager
         
         # Hole relevante Quellen aus DB
-        # ÄNDERUNG 02.07.2025: Erhöhte Limits für bessere Abdeckung
+        # ÄNDERUNG 08.07.2025: Erweiterte Datenbank-Quellennutzung
+        # Hole ALLE relevanten Quellen, nicht nur die mit hoher Zuverlässigkeit
         db_sources = db_manager.get_sources_for_search(
             country=country,
             region=region,
-            min_reliability=25.0,  # Gesenkt von 40% auf 25% für mehr Quellen
-            limit=50  # Erhöht von 30 auf 50 zusätzliche Quellen
+            min_reliability=10.0,  # Noch weiter gesenkt für maximale Abdeckung
+            limit=100  # Erhöht auf 100 für umfassende Quellennutzung
         )
+        
+        logger.info(f"[SOURCE DISCOVERY] {len(db_sources)} existierende Quellen aus Datenbank geladen")
         
         for db_source in db_sources:
             sources.append({
@@ -386,8 +389,10 @@ class EnhancedSourceDiscovery(SourceDiscovery):
                             max_sources: int = 25) -> str:
         """Erstelle erweiterten Prompt mit Quellenhinweisen"""
         
-        # Basis-Prompt
+        # Basis-Prompt mit expliziter Anweisung zur Quellennutzung
         prompt = f"Suche detaillierte Informationen über die Mine: {mine_name}\n\n"
+        prompt += "WICHTIG: Nutze ZUERST die unten aufgeführten bewährten Quellen aus unserer Datenbank, "\
+                 "bevor du neue Quellen suchst. Diese Quellen haben sich in der Vergangenheit als zuverlässig erwiesen.\n\n"
         
         # Füge Top-Quellen hinzu
         if discovered_sources:

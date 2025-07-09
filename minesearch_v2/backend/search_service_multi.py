@@ -9,6 +9,7 @@ import logging
 import asyncio
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
+import urllib.parse
 
 from config import config, Config, SOURCE_SHARING_CONFIG
 from providers.registry import provider_registry
@@ -21,6 +22,7 @@ from search_utils import SearchQueryBuilder, DataQualityCalculator, SourceCacheM
 from search_result_combiner import SearchResultCombiner
 from search_async_utils import AsyncSearchUtils
 from shared_sources_analyzer import SharedSourcesAnalyzer
+from database import db_manager, Source
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +109,40 @@ class MultiProviderSearchService:
                     commodity=commodity
                 )
                 logger.info(f"[MULTI-SEARCH] {len(discovered_sources)} Quellen für {mine_name} entdeckt")
+                
+                # ÄNDERUNG 08.07.2025: Markiere ALLE discovered sources als "attempted"
+                # Dies stellt sicher, dass last_attempted_access aktualisiert wird
+                marked_count = 0
+                for source in discovered_sources:
+                    try:
+                        url = source.get('url', '')
+                        if url:
+                            parsed = urllib.parse.urlparse(url)
+                            normalized_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip('/')
+                            
+                            # Markiere als "versucht" (noch nicht als erfolgreich/fehlgeschlagen)
+                            with db_manager.get_session() as db_session:
+                                # Versuche zuerst mit normalisierter URL
+                                db_source = db_session.query(Source).filter_by(url=normalized_url).first()
+                                
+                                # Fallback: Suche mit Original-URL
+                                if not db_source:
+                                    db_source = db_session.query(Source).filter_by(url=url).first()
+                                
+                                # Fallback: Suche nach Domain
+                                if not db_source and parsed.netloc:
+                                    db_source = db_session.query(Source).filter_by(domain=parsed.netloc).first()
+                                
+                                if db_source:
+                                    db_source.last_attempted_access = datetime.now()
+                                    db_session.commit()
+                                    marked_count += 1
+                                else:
+                                    logger.debug(f"[MULTI-SEARCH] Quelle nicht in DB gefunden: {url}")
+                    except Exception as e:
+                        logger.debug(f"[MULTI-SEARCH] Fehler beim Markieren der Quelle als attempted: {e}")
+                
+                logger.info(f"[MULTI-SEARCH] {marked_count}/{len(discovered_sources)} Quellen als 'attempted' markiert")
             except Exception as e:
                 logger.warning(f"[MULTI-SEARCH] Fehler bei Source Discovery: {str(e)}")
         
@@ -131,7 +167,8 @@ class MultiProviderSearchService:
             'currency': country_config.get('currency', 'USD'),
             'name_variants': name_variants,
             'multilingual_terms': multilingual_terms,  # ÄNDERUNG 04.07.2025: Füge multilingual terms hinzu
-            'discovered_sources': discovered_sources
+            'discovered_sources': discovered_sources,
+            'sources': discovered_sources  # ÄNDERUNG 08.07.2025: Auch als 'sources' für Anthropic/Gemini Provider
         }
         
         # Führe Suche durch
@@ -168,11 +205,14 @@ class MultiProviderSearchService:
                                 'mine_name': mine_name,
                                 'country': country,
                                 'success': True,
-                                'response_time_ms': (provider_result.search_duration or 0) * 1000,
+                                'response_time_ms': (result.search_duration or 0) * 1000,
                                 'fields_found': filled_fields,
-                                'sources_count': len(sources),
+                                'sources_count': len(standard_result.get('sources', [])),
                                 'structured_data': structured_data
                             }
+                            
+                            # ÄNDERUNG 07.07.2025: Debug-Logging für Statistik-Erfassung
+                            logger.info(f"[MULTI-SEARCH] Sende Statistiken für {model_id} - {mine_name}")
                             
                             async with aiohttp.ClientSession() as session:
                                 async with session.post(
@@ -181,19 +221,30 @@ class MultiProviderSearchService:
                                     timeout=aiohttp.ClientTimeout(total=5)
                                 ) as response:
                                     if response.status == 200:
-                                        logger.debug(f"[MULTI-SEARCH] Statistiken erfasst für {model_id}")
+                                        logger.info(f"[MULTI-SEARCH] ✅ Statistiken erfolgreich erfasst für {model_id}")
                                     else:
-                                        logger.debug(f"[MULTI-SEARCH] Statistik-Erfassung Status: {response.status}")
+                                        logger.warning(f"[MULTI-SEARCH] ⚠️ Statistik-Erfassung fehlgeschlagen: Status {response.status}")
                         except Exception as e:
                             # Ignoriere Fehler - fire-and-forget
-                            logger.debug(f"[MULTI-SEARCH] Statistik-Erfassung Fehler: {str(e)}")
+                            logger.warning(f"[MULTI-SEARCH] ❌ Statistik-Erfassung Fehler für {model_id}: {str(e)}")
                     
                     # Starte Task ohne zu warten
                     asyncio.create_task(capture_stats())
                     
                 except Exception as e:
                     # Ignoriere Fehler bei der Task-Erstellung
-                    logger.debug(f"[MULTI-SEARCH] Konnte Statistik-Task nicht erstellen: {str(e)}")
+                    logger.error(f"[MULTI-SEARCH] Konnte Statistik-Task nicht erstellen für {model_id}: {str(e)}")
+            
+            # ÄNDERUNG 08.07.2025: Tracke verwendete Quellen nach erfolgreicher Suche
+            # Auch bei leeren Sources müssen discovered_sources als "nicht verwendet" markiert werden
+            if standard_result.get('success'):
+                result_sources = standard_result.get('sources', [])
+                logger.info(f"[MULTI-SEARCH] Tracke Quellen: {len(result_sources)} verwendet, {len(discovered_sources)} angeboten")
+                # Fire-and-forget Source tracking
+                asyncio.create_task(self._track_used_sources(
+                    result_sources,
+                    discovered_sources
+                ))
             
             return standard_result
             
@@ -884,6 +935,98 @@ Gib konkrete Zahlen mit Währung und Jahr an."""
                 "data": {},
                 "source_sharing_used": True
             }
+    
+    async def _track_used_sources(self, result_sources: List[Dict], discovered_sources: List[Dict]):
+        """
+        Tracke welche Quellen tatsächlich verwendet wurden
+        
+        ÄNDERUNG 08.07.2025: Automatisches Source-Tracking nach jeder Suche
+        """
+        try:
+            logger.info(f"[SOURCE-TRACKING] Starte Tracking: {len(result_sources)} Results, {len(discovered_sources)} Discovered")
+            tracked_count = 0
+            new_sources_count = 0
+            not_used_count = 0
+            
+            # Erstelle Set von verwendeten URLs für schnelleren Vergleich
+            used_urls = set()
+            
+            for source in result_sources:
+                # Extrahiere URL aus verschiedenen möglichen Formaten
+                url = source.get('url') or source.get('value', '')
+                if not url:
+                    continue
+                
+                # Update source statistics für verwendete Quelle
+                try:
+                    # ÄNDERUNG 08.07.2025: Normalisiere URL vor Update
+                    parsed = urllib.parse.urlparse(url)
+                    normalized_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip('/')
+                    
+                    # Füge zu verwendeten URLs hinzu
+                    used_urls.add(normalized_url)
+                    
+                    db_manager.update_source_statistics(normalized_url, True, 'search_result')
+                    tracked_count += 1
+                    logger.debug(f"[SOURCE-TRACKING] Updated stats for: {normalized_url}")
+                except Exception as e:
+                    logger.warning(f"[SOURCE-TRACKING] Fehler beim Update von {url}: {str(e)}")
+                
+                # Prüfe ob es eine neue Quelle ist (nicht in discovered_sources)
+                # Verwende normalisierte URLs für Vergleich
+                discovered_normalized_urls = set()
+                for ds in discovered_sources:
+                    ds_url = ds.get('url', '')
+                    if ds_url:
+                        try:
+                            ds_parsed = urllib.parse.urlparse(ds_url)
+                            ds_normalized = f"{ds_parsed.scheme}://{ds_parsed.netloc}{ds_parsed.path}".rstrip('/')
+                            discovered_normalized_urls.add(ds_normalized)
+                        except:
+                            pass
+                
+                if normalized_url not in discovered_normalized_urls:
+                    try:
+                        # Parse Domain aus URL
+                        parsed = urllib.parse.urlparse(url)
+                        domain = parsed.netloc
+                        
+                        # Füge neue Quelle zur DB hinzu
+                        # ÄNDERUNG 08.07.2025: Verwende normalisierte URL für Konsistenz
+                        # ÄNDERUNG 08.07.2025: Lasse source_type automatisch klassifizieren
+                        new_source = db_manager.add_or_update_source(
+                            url=normalized_url,  # Verwende normalisierte URL
+                            domain=domain,
+                            source_type='unknown'  # Lasse database.py automatisch klassifizieren
+                        )
+                        new_sources_count += 1
+                        logger.info(f"[SOURCE-TRACKING] Neue Quelle hinzugefügt: {url}")
+                    except Exception as e:
+                        logger.warning(f"[SOURCE-TRACKING] Fehler beim Hinzufügen neuer Quelle {url}: {str(e)}")
+            
+            # Tracke auch discovered_sources die nicht verwendet wurden (als failed)
+            for discovered in discovered_sources:
+                discovered_url = discovered.get('url', '')
+                if discovered_url:
+                    try:
+                        # Normalisiere URL
+                        parsed = urllib.parse.urlparse(discovered_url)
+                        normalized_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip('/')
+                        
+                        # Prüfe ob diese URL verwendet wurde
+                        if normalized_url not in used_urls:
+                            # Diese Quelle wurde angeboten aber nicht verwendet
+                            db_manager.update_source_statistics(normalized_url, False, 'not_used')
+                            not_used_count += 1
+                            logger.debug(f"[SOURCE-TRACKING] Marked as not used: {normalized_url}")
+                    except Exception as e:
+                        logger.warning(f"[SOURCE-TRACKING] Fehler beim Markieren als nicht verwendet: {str(e)}")
+            
+            logger.info(f"[SOURCE-TRACKING] Tracking abgeschlossen: {tracked_count} verwendet, {not_used_count} nicht verwendet, {new_sources_count} neue Quellen")
+            
+        except Exception as e:
+            # Fehler beim Tracking sollen die Suche nicht beeinflussen
+            logger.error(f"[SOURCE-TRACKING] Allgemeiner Fehler: {str(e)}")
 
 
 # Globale Service-Instanz

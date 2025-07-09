@@ -310,7 +310,27 @@ def create_batch_results_table(results: List[Dict]) -> str:
     # Tabellen-Zeilen
     rows_added = 0
     for idx, r in enumerate(results):
-        if 'structured_data' in r['data']:
+        # ÄNDERUNG 07.07.2025: Erweiterte Debug-Ausgabe
+        logger.info(f"[TABLE-DEBUG] Result {idx}: keys={list(r.keys())}")
+        logger.info(f"[TABLE-DEBUG] Result {idx} - Mine: {r.get('mine_name', 'Unknown')}, Success: {r.get('success', False)}")
+        
+        # Prüfe ob structured_data vorhanden ist
+        has_structured_data = False
+        if 'data' in r and isinstance(r['data'], dict):
+            data_keys = list(r['data'].keys())
+            logger.info(f"[TABLE-DEBUG] Result {idx} data keys: {data_keys}")
+            
+            has_structured_data = 'structured_data' in r['data'] and r['data']['structured_data']
+            if has_structured_data:
+                sd_keys = list(r['data']['structured_data'].keys())
+                logger.info(f"[TABLE-DEBUG] Result {idx} structured_data keys (first 5): {sd_keys[:5]}")
+                logger.info(f"[TABLE-DEBUG] Result {idx} structured_data sample: {dict(list(r['data']['structured_data'].items())[:3])}")
+            else:
+                logger.warning(f"[TABLE-DEBUG] Result {idx} has no structured_data or it's empty")
+        else:
+            logger.warning(f"[TABLE-DEBUG] Result {idx} has no 'data' key or data is not dict")
+        
+        if has_structured_data:
             rows_added += 1
             row_style = 'style="background: #f9f9f9;"' if idx % 2 == 0 else ''
             csv_table_html += f'<tr {row_style}>'
@@ -334,15 +354,18 @@ def create_batch_results_table(results: List[Dict]) -> str:
                                 clean_sources.append(clean_source)
                     csv_values.append('; '.join(clean_sources) if clean_sources else value)
                 # Normale Felder mit Quellenreferenzen
-                elif (col not in FIELDS_WITHOUT_SOURCES and 
-                    'structured_data_with_sources' in r['data'] and
-                    value and value != '-'):
-                    source_data = r['data']['structured_data_with_sources'].get(col, {})
-                    if source_data.get('sources'):
-                        sources_str = ','.join(map(str, source_data['sources']))
-                        display_value += f' <span style="color: #6b7280; font-size: 0.85em;">[{sources_str}]</span>'
-                        csv_values.append(f"{value} [{sources_str}]")
+                elif col not in FIELDS_WITHOUT_SOURCES and value and value != '-':
+                    # Prüfe ob structured_data_with_sources vorhanden ist
+                    if 'structured_data_with_sources' in r['data']:
+                        source_data = r['data']['structured_data_with_sources'].get(col, {})
+                        if source_data.get('sources'):
+                            sources_str = ','.join(map(str, source_data['sources']))
+                            display_value += f' <span style="color: #6b7280; font-size: 0.85em;">[{sources_str}]</span>'
+                            csv_values.append(f"{value} [{sources_str}]")
+                        else:
+                            csv_values.append(value)
                     else:
+                        # Kein structured_data_with_sources vorhanden
                         csv_values.append(value)
                 else:
                     csv_values.append(value)
@@ -408,6 +431,16 @@ def create_batch_results_table(results: List[Dict]) -> str:
             
             csv_table_html += '</tr>'
             csv_lines_with_sources.append(";".join(csv_values))
+    
+    # Fallback wenn keine Zeilen hinzugefügt wurden
+    if rows_added == 0:
+        csv_table_html += """
+            <tr>
+                <td colspan="{}" style="text-align: center; padding: 20px; color: #666;">
+                    Keine Daten gefunden. Bitte überprüfen Sie die Suchergebnisse.
+                </td>
+            </tr>
+        """.format(len(CSV_COLUMNS))
     
     csv_table_html += """
                 </tbody>
@@ -500,7 +533,15 @@ def create_batch_results_table(results: List[Dict]) -> str:
         csv_table_html += source_discovery_summary
     
     logger.info(f"create_batch_results_table: {rows_added} Zeilen zur Tabelle hinzugefügt")
-    return csv_table_html
+    
+    # Wrapper hinzufügen um sicherzustellen dass die Tabelle angezeigt wird
+    wrapped_html = f"""
+    <div class="batch-results" style="display: block; visibility: visible;">
+        {csv_table_html}
+    </div>
+    """
+    
+    return wrapped_html
 
 def _create_batch_source_summary(results: List[Dict]) -> str:
     """Erstelle Zusammenfassung aller Source Discovery Sessions für Batch-Ergebnisse"""

@@ -132,7 +132,8 @@ class OpenRouterProvider(AbstractProvider):
                                 "content": enhanced_query
                             }
                         ],
-                        "temperature": options.get('temperature', 0.3),  # Etwas höher für Kreativität
+                        # ÄNDERUNG 07.07.2025: Temperature auf 0 für maximale Konsistenz
+                        "temperature": options.get('temperature', 0.0),
                         "max_tokens": model_config.max_tokens,
                         "top_p": 0.9
                     }
@@ -161,6 +162,31 @@ class OpenRouterProvider(AbstractProvider):
                 # Extrahiere strukturierte Daten
                 extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
                 sources = extract_sources_from_content(content)
+                
+                # ÄNDERUNG 07.07.2025: Zusätzliche Validierung direkt im Provider
+                # Verhindere "Koordinaten" als Betreiber
+                if extracted_data['data'].get('Betreiber'):
+                    betreiber = str(extracted_data['data']['Betreiber']).strip()
+                    if betreiber.lower() in ['koordinaten', 'coordinates', 'coords', 'koordinate'] or 'koordinaten:' in betreiber.lower():
+                        logger.warning(f"[OPENROUTER] Ungültiger Betreiber entfernt: {betreiber}")
+                        extracted_data['data']['Betreiber'] = ""
+                        # Entferne auch aus data_with_sources
+                        if 'Betreiber' in extracted_data.get('data_with_sources', {}):
+                            extracted_data['data_with_sources']['Betreiber'] = {"value": "", "sources": []}
+                
+                # ÄNDERUNG 07.07.2025: Validiere Restaurationskosten
+                if extracted_data['data'].get('Restaurationskosten'):
+                    resto = extracted_data['data']['Restaurationskosten']
+                    # Prüfe auf verdächtige Werte
+                    suspicious_values = ['USD$1.0 million', 'CAD$1.0 million', '$1.0 million', '1.0 million', 
+                                       'USD$1 million', 'CAD$1 million', '$1 million', '1 million',
+                                       'CAD$10000.0 million', 'USD$10000.0 million']
+                    if resto in suspicious_values or (isinstance(resto, str) and any(sv in resto for sv in suspicious_values)):
+                        logger.warning(f"[OPENROUTER] Verdächtiger Restaurationswert entfernt: {resto}")
+                        extracted_data['data']['Restaurationskosten'] = ""
+                        # Entferne auch aus data_with_sources
+                        if 'Restaurationskosten' in extracted_data.get('data_with_sources', {}):
+                            extracted_data['data_with_sources']['Restaurationskosten'] = {"value": "", "sources": []}
                 
                 # ÄNDERUNG 04.07.2025: Tracke Source Discovery Ergebnisse
                 for source in sources:
@@ -240,12 +266,42 @@ class OpenRouterProvider(AbstractProvider):
         # Füge zusätzlichen spezifischen Restaurationskosten-Prompt hinzu
         restoration_prompt = SpecializedPrompts.get_restoration_costs_prompt(mine_name, country, commodity)
         
-        # ÄNDERUNG 04.07.2025: Füge Quellen-URLs hinzu
+        # ÄNDERUNG 08.07.2025: ALLE Quellen nutzen, nicht nur Top 20
         sources_text = ""
         if discovered_sources:
-            sources_text = "\n\nRELEVANTE QUELLEN (bitte nutze dein Wissen über diese Quellen):\n"
-            for i, source in enumerate(discovered_sources[:20], 1):  # Top 20 Quellen
-                sources_text += f"[{i}] {source['url']} ({source.get('description', source.get('type', 'Quelle'))})\n"
+            sources_text = f"\n\n📚 WICHTIG: Nutze dein Wissen über ALLE {len(discovered_sources)} folgenden Quellen!\n"
+            sources_text += "Auch wenn du nicht direkt darauf zugreifen kannst, kennst du möglicherweise Daten aus diesen Quellen:\n\n"
+            
+            # Gruppiere nach Quellentyp
+            gov_sources = [s for s in discovered_sources if s.get('type') == 'government']
+            db_sources = [s for s in discovered_sources if s.get('type') == 'database']
+            exchange_sources = [s for s in discovered_sources if s.get('type') == 'exchange']
+            other_sources = [s for s in discovered_sources if s.get('type') not in ['government', 'database', 'exchange']]
+            
+            if gov_sources:
+                sources_text += "REGIERUNGSQUELLEN:\n"
+                for i, source in enumerate(gov_sources, 1):
+                    sources_text += f"[G{i}] {source['url']}\n"
+                sources_text += "\n"
+            
+            if exchange_sources:
+                sources_text += "BÖRSENDOKUMENTE:\n"
+                for i, source in enumerate(exchange_sources, 1):
+                    sources_text += f"[EX{i}] {source['url']}\n"
+                sources_text += "\n"
+            
+            if db_sources:
+                sources_text += "MINING-DATENBANKEN:\n"
+                for i, source in enumerate(db_sources, 1):
+                    sources_text += f"[DB{i}] {source['url']}\n"
+                sources_text += "\n"
+            
+            if other_sources:
+                sources_text += "WEITERE QUELLEN:\n"
+                for i, source in enumerate(other_sources, 1):
+                    sources_text += f"[{i}] {source['url']}\n"
+            
+            sources_text += "\n⚠️ Berücksichtige ALLE diese Quellen in deiner Antwort!"
         
         # Füge Namensvarianten hinzu
         variants_text = ""
@@ -277,6 +333,17 @@ ROHSTOFF: {commodity if commodity else 'Unbekannt'}
 {specialized_prompt}
 
 {restoration_prompt}
+
+KRITISCHE ANWEISUNGEN - KEINE DUMMY-WERTE:
+1. NIEMALS Standard-Werte wie "$1.0 million" oder "1 million" verwenden
+2. NIEMALS erfundene oder geschätzte Werte angeben
+3. Wenn keine Daten vorhanden: Feld LEER lassen oder "-" verwenden
+4. Nur KONKRETE Werte aus deinem Fachwissen verwenden
+5. Bei Restaurationskosten: NUR wenn du tatsächliche Beträge kennst
+6. Bei Koordinaten: NUR echte GPS-Koordinaten, keine Platzhalter
+7. Bei Betreiber: NIEMALS "Koordinaten" als Betreiber angeben
+
+WICHTIG: Lieber ein leeres Feld als einen falschen Wert!
 
 ANTWORTE IM STRUKTURIERTEN FORMAT wie im System-Prompt beschrieben."""
         
@@ -329,7 +396,7 @@ Antworte auf Deutsch mit STRUKTURIERTEN DATEN.
 - Land: [Land] [Quelle: Fachwissen/Schätzung]
 - Region: [Region/Provinz] [Quelle: Fachwissen/Schätzung]
 - Eigentümer: [Eigentümer oder LEER lassen] [Quelle: Fachwissen/Schätzung]
-- Betreiber: [Betreiber oder LEER lassen] [Quelle: Fachwissen/Schätzung]
+- Betreiber: [Betreiber oder LEER lassen - NIEMALS Koordinaten hier angeben!] [Quelle: Fachwissen/Schätzung]
 - Koordinaten: [Latitude, Longitude oder LEER lassen] [Quelle: Fachwissen/Schätzung]
 - Status: [aktiv/geschlossen/geplant] [Quelle: Fachwissen/Schätzung]
 - Rohstoffe: [Liste der Rohstoffe] [Quelle: Fachwissen/Schätzung]

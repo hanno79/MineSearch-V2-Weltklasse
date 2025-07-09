@@ -399,16 +399,42 @@ class ModelBenchmarkService:
                         s.response_time_ms for s in all_stats if s.response_time_ms
                     ])
                     
-                    successful_stats = [s for s in all_stats if s.success]
-                    if successful_stats:
+                    # ÄNDERUNG 07.07.2025: Unterscheide zwischen API-Erfolg und Daten-Erfolg
+                    # API-Erfolg: Modell hat geantwortet (unabhängig von Datenqualität)
+                    api_successful_stats = []
+                    data_successful_stats = []
+                    
+                    for stat in all_stats:
+                        # Prüfe Metadaten für API-Erfolg
+                        metadata = stat.metadata or {}
+                        api_success = metadata.get('api_success', stat.success)
+                        
+                        if api_success:
+                            api_successful_stats.append(stat)
+                        
+                        # Daten-Erfolg: Mindestens 3 kritische Felder gefunden
+                        if stat.success and stat.fields_found >= 3:
+                            data_successful_stats.append(stat)
+                    
+                    # Berechne beide Erfolgsraten
+                    summary.success_rate = len(api_successful_stats) / len(all_stats) if all_stats else 0
+                    summary.data_success_rate = len(data_successful_stats) / len(all_stats) if all_stats else 0
+                    
+                    if data_successful_stats:
                         summary.avg_fields_found = statistics.mean([
-                            s.fields_found for s in successful_stats
+                            s.fields_found for s in data_successful_stats
                         ])
                         summary.avg_sources_count = statistics.mean([
-                            s.sources_count for s in successful_stats
+                            s.sources_count for s in data_successful_stats
                         ])
-                    
-                    summary.success_rate = len(successful_stats) / len(all_stats)
+                    elif api_successful_stats:
+                        # Fallback auf API-erfolgreiche Stats wenn keine Daten-erfolgreichen
+                        summary.avg_fields_found = statistics.mean([
+                            s.fields_found for s in api_successful_stats
+                        ])
+                        summary.avg_sources_count = statistics.mean([
+                            s.sources_count for s in api_successful_stats
+                        ])
                 
                 # Berechne Gesamt-Konsistenz
                 all_consistencies = session.query(FieldConsistency).filter_by(
