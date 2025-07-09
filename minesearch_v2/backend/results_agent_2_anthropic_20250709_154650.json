@@ -1,0 +1,50 @@
+{
+  "agent_id": "agent_2_anthropic",
+  "provider": "anthropic",
+  "models_tested": [
+    "claude-sonnet-4",
+    "claude-3.7-sonnet",
+    "claude-opus-4"
+  ],
+  "mines_tested": [
+    "Kupfermine Cerro Verde, Peru",
+    "Lithiummine Salar de Atacama, Chile",
+    "Goldmine Super Pit, Australien"
+  ],
+  "total_duration": 141.55040049552917,
+  "total_tests": 9,
+  "successful_tests": 9,
+  "failed_tests": 0,
+  "success_rate": 100.0,
+  "validation_stats": {
+    "total_validations": 9,
+    "passed_validations": 9,
+    "failed_validations": 0,
+    "validation_details": {
+      "claude-sonnet-4": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "failures": []
+      },
+      "claude-3.7-sonnet": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "failures": []
+      },
+      "claude-opus-4": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "failures": []
+      }
+    }
+  },
+  "results": [
+    {
+      "model": "claude-sonnet-4",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": true,
+      "duration": 13.306878328323364,
+      "result": 

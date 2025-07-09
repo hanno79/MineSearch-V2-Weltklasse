@@ -1,0 +1,100 @@
+{
+  "agent_id": "agent_2_anthropic",
+  "provider": "anthropic",
+  "models_tested": [
+    "claude-sonnet-4",
+    "claude-3.7-sonnet",
+    "claude-opus-4"
+  ],
+  "mines_tested": [
+    "Kupfermine Cerro Verde, Peru",
+    "Lithiummine Salar de Atacama, Chile",
+    "Goldmine Super Pit, Australien"
+  ],
+  "total_duration": 151.2547504901886,
+  "total_tests": 9,
+  "successful_tests": 0,
+  "failed_tests": 9,
+  "success_rate": 0.0,
+  "validation_stats": {
+    "total_validations": 0,
+    "passed_validations": 0,
+    "failed_validations": 0,
+    "validation_details": {}
+  },
+  "results": [
+    {
+      "model": "claude-sonnet-4",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": false,
+      "duration": 14.00261926651001,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:40:46.092795"
+    },
+    {
+      "model": "claude-sonnet-4",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": false,
+      "duration": 12.035070419311523,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:40:58.127880"
+    },
+    {
+      "model": "claude-sonnet-4",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": false,
+      "duration": 15.37598180770874,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:41:13.503877"
+    },
+    {
+      "model": "claude-3.7-sonnet",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": false,
+      "duration": 13.845524072647095,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:41:27.349413"
+    },
+    {
+      "model": "claude-3.7-sonnet",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": false,
+      "duration": 13.530273675918579,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:41:40.879699"
+    },
+    {
+      "model": "claude-3.7-sonnet",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": false,
+      "duration": 12.555094957351685,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:41:53.434806"
+    },
+    {
+      "model": "claude-opus-4",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": false,
+      "duration": 17.401973247528076,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:42:10.836792"
+    },
+    {
+      "model": "claude-opus-4",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": false,
+      "duration": 30.033801794052124,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:42:40.870605"
+    },
+    {
+      "model": "claude-opus-4",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": false,
+      "duration": 22.474277019500732,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:43:03.344894"
+    }
+  ],
+  "timestamp": "2025-07-09T15:43:03.344906"
+}

@@ -1,0 +1,57 @@
+{
+  "agent_id": "agent_3_openai",
+  "provider": "openai",
+  "models_tested": [
+    "o3-deep-research",
+    "gpt-4.1",
+    "o3",
+    "o4-mini"
+  ],
+  "mines_tested": [
+    "Kupfermine Cerro Verde, Peru",
+    "Lithiummine Salar de Atacama, Chile",
+    "Goldmine Super Pit, Australien"
+  ],
+  "total_duration": 176.59962844848633,
+  "total_tests": 12,
+  "successful_tests": 12,
+  "failed_tests": 0,
+  "success_rate": 100.0,
+  "validation_stats": {
+    "total_validations": 12,
+    "passed_validations": 12,
+    "failed_validations": 0,
+    "validation_details": {
+      "o3-deep-research": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "failures": []
+      },
+      "gpt-4.1": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "failures": []
+      },
+      "o3": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "failures": []
+      },
+      "o4-mini": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "failures": []
+      }
+    }
+  },
+  "results": [
+    {
+      "model": "o3-deep-research",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": true,
+      "duration": 13.306139707565308,
+      "result": 

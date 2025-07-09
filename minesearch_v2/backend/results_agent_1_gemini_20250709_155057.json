@@ -1,0 +1,218 @@
+{
+  "agent_id": "agent_1_gemini",
+  "provider": "gemini",
+  "models_tested": [
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite"
+  ],
+  "mines_tested": [
+    "Kupfermine Cerro Verde, Peru",
+    "Lithiummine Salar de Atacama, Chile",
+    "Goldmine Super Pit, Australien"
+  ],
+  "total_duration": 192.94544982910156,
+  "total_tests": 9,
+  "successful_tests": 9,
+  "failed_tests": 0,
+  "success_rate": 100.0,
+  "validation_stats": {
+    "total_validations": 9,
+    "passed_validations": 9,
+    "failed_validations": 0,
+    "validation_details": {
+      "gemini-2.5-pro": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "failures": []
+      },
+      "gemini-2.5-flash": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "failures": []
+      },
+      "gemini-2.5-flash-lite": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "failures": []
+      }
+    }
+  },
+  "results": [
+    {
+      "model": "gemini-2.5-pro",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": true,
+      "duration": 52.38076138496399,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "gemini-2.5-pro",
+        "provider": "gemini"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:48:37.232886"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": true,
+      "duration": 50.163676261901855,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "gemini-2.5-pro",
+        "provider": "gemini"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:49:27.396575"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": true,
+      "duration": 54.671894788742065,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "gemini-2.5-pro",
+        "provider": "gemini"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:50:22.068480"
+    },
+    {
+      "model": "gemini-2.5-flash",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": true,
+      "duration": 10.257136106491089,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "gemini-2.5-flash",
+        "provider": "gemini"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:50:32.325630"
+    },
+    {
+      "model": "gemini-2.5-flash",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": true,
+      "duration": 2.071045398712158,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "gemini-2.5-flash",
+        "provider": "gemini"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:50:34.396688"
+    },
+    {
+      "model": "gemini-2.5-flash",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": true,
+      "duration": 21.15577483177185,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "gemini-2.5-flash",
+        "provider": "gemini"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:50:55.552474"
+    },
+    {
+      "model": "gemini-2.5-flash-lite",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": true,
+      "duration": 0.5269086360931396,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "gemini-2.5-flash-lite",
+        "provider": "gemini"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:50:56.079393"
+    },
+    {
+      "model": "gemini-2.5-flash-lite",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": true,
+      "duration": 1.101111650466919,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "gemini-2.5-flash-lite",
+        "provider": "gemini"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:50:57.180517"
+    },
+    {
+      "model": "gemini-2.5-flash-lite",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": true,
+      "duration": 0.6169884204864502,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "gemini-2.5-flash-lite",
+        "provider": "gemini"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:50:57.797522"
+    }
+  ],
+  "timestamp": "2025-07-09T15:50:57.797543"
+}

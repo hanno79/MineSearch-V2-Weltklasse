@@ -1,0 +1,154 @@
+{
+  "agent_id": "agent_4_deepseek",
+  "provider": "deepseek",
+  "models_tested": [
+    "deepseek-chat",
+    "deepseek-reasoner"
+  ],
+  "mines_tested": [
+    "Kupfermine Cerro Verde, Peru",
+    "Lithiummine Salar de Atacama, Chile",
+    "Goldmine Super Pit, Australien"
+  ],
+  "total_duration": 94.63812136650085,
+  "total_tests": 6,
+  "successful_tests": 6,
+  "failed_tests": 0,
+  "success_rate": 100.0,
+  "validation_stats": {
+    "total_validations": 6,
+    "passed_validations": 6,
+    "failed_validations": 0,
+    "validation_details": {
+      "deepseek-chat": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "failures": []
+      },
+      "deepseek-reasoner": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "failures": []
+      }
+    }
+  },
+  "results": [
+    {
+      "model": "deepseek-chat",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": true,
+      "duration": 33.63982129096985,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "deepseek-chat",
+        "provider": "deepseek"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:48:18.495855"
+    },
+    {
+      "model": "deepseek-chat",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": true,
+      "duration": 34.527963399887085,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "deepseek-chat",
+        "provider": "deepseek"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:48:53.023825"
+    },
+    {
+      "model": "deepseek-chat",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": true,
+      "duration": 25.95510745048523,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "deepseek-chat",
+        "provider": "deepseek"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:49:18.978939"
+    },
+    {
+      "model": "deepseek-reasoner",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": true,
+      "duration": 0.25028109550476074,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "deepseek-reasoner",
+        "provider": "deepseek"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:49:19.229227"
+    },
+    {
+      "model": "deepseek-reasoner",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": true,
+      "duration": 0.13439702987670898,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "deepseek-reasoner",
+        "provider": "deepseek"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:49:19.363633"
+    },
+    {
+      "model": "deepseek-reasoner",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": true,
+      "duration": 0.1304798126220703,
+      "result": {
+        "data": {},
+        "sources": [],
+        "timestamp": null,
+        "model_used": "deepseek-reasoner",
+        "provider": "deepseek"
+      },
+      "validation": {
+        "is_valid": true,
+        "errors": [],
+        "data_completeness": 0
+      },
+      "timestamp": "2025-07-09T15:49:19.494126"
+    }
+  ],
+  "timestamp": "2025-07-09T15:49:19.494139"
+}

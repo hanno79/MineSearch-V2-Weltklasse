@@ -1,0 +1,125 @@
+{
+  "agent_id": "agent_3_openai",
+  "provider": "openai",
+  "models_tested": [
+    "o3-deep-research",
+    "gpt-4.1",
+    "o3",
+    "o4-mini"
+  ],
+  "mines_tested": [
+    "Kupfermine Cerro Verde, Peru",
+    "Lithiummine Salar de Atacama, Chile",
+    "Goldmine Super Pit, Australien"
+  ],
+  "total_duration": 6.818771362304688e-05,
+  "total_tests": 12,
+  "successful_tests": 0,
+  "failed_tests": 12,
+  "success_rate": 0.0,
+  "validation_stats": {
+    "total_validations": 0,
+    "passed_validations": 0,
+    "failed_validations": 0,
+    "validation_details": {}
+  },
+  "results": [
+    {
+      "model": "o3-deep-research",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": false,
+      "duration": 1.6689300537109375e-06,
+      "error": "OpenAIProvider.search() missing 1 required positional argument: 'options'",
+      "timestamp": "2025-07-09T15:39:57.749759"
+    },
+    {
+      "model": "o3-deep-research",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": false,
+      "duration": 7.152557373046875e-07,
+      "error": "OpenAIProvider.search() missing 1 required positional argument: 'options'",
+      "timestamp": "2025-07-09T15:39:57.749764"
+    },
+    {
+      "model": "o3-deep-research",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": false,
+      "duration": 4.76837158203125e-07,
+      "error": "OpenAIProvider.search() missing 1 required positional argument: 'options'",
+      "timestamp": "2025-07-09T15:39:57.749766"
+    },
+    {
+      "model": "gpt-4.1",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": false,
+      "duration": 2.384185791015625e-07,
+      "error": "OpenAIProvider.search() missing 1 required positional argument: 'options'",
+      "timestamp": "2025-07-09T15:39:57.749769"
+    },
+    {
+      "model": "gpt-4.1",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": false,
+      "duration": 7.152557373046875e-07,
+      "error": "OpenAIProvider.search() missing 1 required positional argument: 'options'",
+      "timestamp": "2025-07-09T15:39:57.749771"
+    },
+    {
+      "model": "gpt-4.1",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": false,
+      "duration": 4.76837158203125e-07,
+      "error": "OpenAIProvider.search() missing 1 required positional argument: 'options'",
+      "timestamp": "2025-07-09T15:39:57.749773"
+    },
+    {
+      "model": "o3",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": false,
+      "duration": 4.76837158203125e-07,
+      "error": "OpenAIProvider.search() missing 1 required positional argument: 'options'",
+      "timestamp": "2025-07-09T15:39:57.749775"
+    },
+    {
+      "model": "o3",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": false,
+      "duration": 2.384185791015625e-07,
+      "error": "OpenAIProvider.search() missing 1 required positional argument: 'options'",
+      "timestamp": "2025-07-09T15:39:57.749776"
+    },
+    {
+      "model": "o3",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": false,
+      "duration": 7.152557373046875e-07,
+      "error": "OpenAIProvider.search() missing 1 required positional argument: 'options'",
+      "timestamp": "2025-07-09T15:39:57.749778"
+    },
+    {
+      "model": "o4-mini",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": false,
+      "duration": 2.384185791015625e-07,
+      "error": "OpenAIProvider.search() missing 1 required positional argument: 'options'",
+      "timestamp": "2025-07-09T15:39:57.749780"
+    },
+    {
+      "model": "o4-mini",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": false,
+      "duration": 4.76837158203125e-07,
+      "error": "OpenAIProvider.search() missing 1 required positional argument: 'options'",
+      "timestamp": "2025-07-09T15:39:57.749786"
+    },
+    {
+      "model": "o4-mini",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": false,
+      "duration": 4.76837158203125e-07,
+      "error": "OpenAIProvider.search() missing 1 required positional argument: 'options'",
+      "timestamp": "2025-07-09T15:39:57.749788"
+    }
+  ],
+  "timestamp": "2025-07-09T15:39:57.749792"
+}

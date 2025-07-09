@@ -1,0 +1,75 @@
+{
+  "agent_id": "agent_4_deepseek",
+  "provider": "deepseek",
+  "models_tested": [
+    "deepseek-chat",
+    "deepseek-reasoner"
+  ],
+  "mines_tested": [
+    "Kupfermine Cerro Verde, Peru",
+    "Lithiummine Salar de Atacama, Chile",
+    "Goldmine Super Pit, Australien"
+  ],
+  "total_duration": 88.78832697868347,
+  "total_tests": 6,
+  "successful_tests": 0,
+  "failed_tests": 6,
+  "success_rate": 0.0,
+  "validation_stats": {
+    "total_validations": 0,
+    "passed_validations": 0,
+    "failed_validations": 0,
+    "validation_details": {}
+  },
+  "results": [
+    {
+      "model": "deepseek-chat",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": false,
+      "duration": 28.524787187576294,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:41:00.614288"
+    },
+    {
+      "model": "deepseek-chat",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": false,
+      "duration": 36.714892625808716,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:41:37.329199"
+    },
+    {
+      "model": "deepseek-chat",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": false,
+      "duration": 22.983139991760254,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:42:00.312346"
+    },
+    {
+      "model": "deepseek-reasoner",
+      "mine": "Kupfermine Cerro Verde, Peru",
+      "success": false,
+      "duration": 0.2860429286956787,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:42:00.598396"
+    },
+    {
+      "model": "deepseek-reasoner",
+      "mine": "Lithiummine Salar de Atacama, Chile",
+      "success": false,
+      "duration": 0.1429309844970703,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:42:00.741334"
+    },
+    {
+      "model": "deepseek-reasoner",
+      "mine": "Goldmine Super Pit, Australien",
+      "success": false,
+      "duration": 0.1359083652496338,
+      "error": "'ValidationService' object has no attribute 'validate_result'",
+      "timestamp": "2025-07-09T15:42:00.877249"
+    }
+  ],
+  "timestamp": "2025-07-09T15:42:00.877268"
+}
