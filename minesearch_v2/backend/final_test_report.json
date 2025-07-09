@@ -1,0 +1,274 @@
+{
+  "summary": {
+    "total_models": 16,
+    "total_tests": 298,
+    "total_sources": 493,
+    "total_results": 0
+  },
+  "providers": {
+    "openrouter": {
+      "model_count": 3,
+      "models": [
+        {
+          "id": "openrouter:deepseek-chat",
+          "tests": 2,
+          "success_rate": 1.0,
+          "avg_fields": 13.0,
+          "consistency": 1.0,
+          "avg_time_ms": 7076.6639667358395
+        },
+        {
+          "id": "openrouter:deepseek-free",
+          "tests": 14,
+          "success_rate": 1.0,
+          "avg_fields": 11.5,
+          "consistency": 0.8714285714285714,
+          "avg_time_ms": 16072.517712804794
+        },
+        {
+          "id": "openrouter:deepseek-reasoner",
+          "tests": 2,
+          "success_rate": 0.0,
+          "avg_fields": 0.0,
+          "consistency": 0.0,
+          "avg_time_ms": 738.5239601135254
+        }
+      ]
+    },
+    "scrapingbee": {
+      "model_count": 1,
+      "models": [
+        {
+          "id": "scrapingbee:basic-scrape",
+          "tests": 8,
+          "success_rate": 1.0,
+          "avg_fields": 11.0,
+          "consistency": 1.0,
+          "avg_time_ms": 14210.885643959045
+        }
+      ]
+    },
+    "brightdata": {
+      "model_count": 1,
+      "models": [
+        {
+          "id": "brightdata:web-scraper",
+          "tests": 8,
+          "success_rate": 1.0,
+          "avg_fields": 11.0,
+          "consistency": 1.0,
+          "avg_time_ms": 4678.916982658387
+        }
+      ]
+    },
+    "grok": {
+      "model_count": 3,
+      "models": [
+        {
+          "id": "grok:grok-3-fast",
+          "tests": 30,
+          "success_rate": 1.0,
+          "avg_fields": 10.933333333333334,
+          "consistency": 0.5942857142857143,
+          "avg_time_ms": 28236.39934510142
+        },
+        {
+          "id": "grok:grok-3",
+          "tests": 18,
+          "success_rate": 1.0,
+          "avg_fields": 10.666666666666666,
+          "consistency": 0.7156862745098039,
+          "avg_time_ms": 31860.238506288315
+        },
+        {
+          "id": "grok:grok-3-mini",
+          "tests": 30,
+          "success_rate": 1.0,
+          "avg_fields": 10.133333333333333,
+          "consistency": 0.496969696969697,
+          "avg_time_ms": 19874.806922248332
+        }
+      ]
+    },
+    "perplexity": {
+      "model_count": 2,
+      "models": [
+        {
+          "id": "perplexity:sonar",
+          "tests": 36,
+          "success_rate": 1.0,
+          "avg_fields": 8.11111111111111,
+          "consistency": 0.91875,
+          "avg_time_ms": 19879.76075284958
+        },
+        {
+          "id": "perplexity:sonar-pro",
+          "tests": 36,
+          "success_rate": 0.9444444444444444,
+          "avg_fields": 11.058823529411764,
+          "consistency": 0.9802631578947368,
+          "avg_time_ms": 13645.898156415667
+        }
+      ]
+    },
+    "tavily": {
+      "model_count": 2,
+      "models": [
+        {
+          "id": "tavily:deep-research",
+          "tests": 18,
+          "success_rate": 1.0,
+          "avg_fields": 7.888888888888889,
+          "consistency": 0.6309523809523809,
+          "avg_time_ms": 16088.050423469544
+        },
+        {
+          "id": "tavily:search",
+          "tests": 18,
+          "success_rate": 1.0,
+          "avg_fields": 6.888888888888889,
+          "consistency": 0.5555555555555556,
+          "avg_time_ms": 7072.599234569126
+        }
+      ]
+    },
+    "firecrawl": {
+      "model_count": 1,
+      "models": [
+        {
+          "id": "firecrawl:scrape",
+          "tests": 20,
+          "success_rate": 1.0,
+          "avg_fields": 1.0,
+          "consistency": 1.0,
+          "avg_time_ms": 14855.803619731556
+        }
+      ]
+    },
+    "exa": {
+      "model_count": 3,
+      "models": [
+        {
+          "id": "exa:neural-search",
+          "tests": 18,
+          "success_rate": 0.2222222222222222,
+          "avg_fields": 2.0,
+          "consistency": 1.0,
+          "avg_time_ms": 1729.127756354592
+        },
+        {
+          "id": "exa:research",
+          "tests": 18,
+          "success_rate": 0.0,
+          "avg_fields": 0.0,
+          "consistency": 0.0,
+          "avg_time_ms": 1225.0383165147568
+        },
+        {
+          "id": "exa:research-pro",
+          "tests": 18,
+          "success_rate": 0.0,
+          "avg_fields": 0.0,
+          "consistency": 0.0,
+          "avg_time_ms": 886.8823051452637
+        }
+      ]
+    }
+  },
+  "top_models": [
+    {
+      "rank": 1,
+      "model_id": "openrouter:deepseek-chat",
+      "score": 61.666666666666664,
+      "success_rate": 1.0,
+      "avg_fields": 13.0,
+      "consistency": 1.0
+    },
+    {
+      "rank": 2,
+      "model_id": "openrouter:deepseek-free",
+      "score": 58.30952380952382,
+      "success_rate": 1.0,
+      "avg_fields": 11.5,
+      "consistency": 0.8714285714285714
+    },
+    {
+      "rank": 3,
+      "model_id": "scrapingbee:basic-scrape",
+      "score": 58.333333333333336,
+      "success_rate": 1.0,
+      "avg_fields": 11.0,
+      "consistency": 1.0
+    },
+    {
+      "rank": 4,
+      "model_id": "brightdata:web-scraper",
+      "score": 58.333333333333336,
+      "success_rate": 1.0,
+      "avg_fields": 11.0,
+      "consistency": 1.0
+    },
+    {
+      "rank": 5,
+      "model_id": "grok:grok-3-fast",
+      "score": 55.517460317460326,
+      "success_rate": 1.0,
+      "avg_fields": 10.933333333333334,
+      "consistency": 0.5942857142857143
+    },
+    {
+      "rank": 6,
+      "model_id": "grok:grok-3",
+      "score": 55.882352941176464,
+      "success_rate": 1.0,
+      "avg_fields": 10.666666666666666,
+      "consistency": 0.7156862745098039
+    },
+    {
+      "rank": 7,
+      "model_id": "grok:grok-3-mini",
+      "score": 53.53535353535353,
+      "success_rate": 1.0,
+      "avg_fields": 10.133333333333333,
+      "consistency": 0.496969696969697
+    },
+    {
+      "rank": 8,
+      "model_id": "perplexity:sonar",
+      "score": 52.97685185185185,
+      "success_rate": 1.0,
+      "avg_fields": 8.11111111111111,
+      "consistency": 0.91875
+    },
+    {
+      "rank": 9,
+      "model_id": "tavily:deep-research",
+      "score": 50.68783068783069,
+      "success_rate": 1.0,
+      "avg_fields": 7.888888888888889,
+      "consistency": 0.6309523809523809
+    },
+    {
+      "rank": 10,
+      "model_id": "tavily:search",
+      "score": 48.518518518518526,
+      "success_rate": 1.0,
+      "avg_fields": 6.888888888888889,
+      "consistency": 0.5555555555555556
+    }
+  ],
+  "failed_models": [
+    {
+      "model_id": "exa:research",
+      "tests": 18
+    },
+    {
+      "model_id": "exa:research-pro",
+      "tests": 18
+    },
+    {
+      "model_id": "openrouter:deepseek-reasoner",
+      "tests": 2
+    }
+  ]
+}
