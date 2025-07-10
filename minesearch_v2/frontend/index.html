@@ -187,8 +187,29 @@
         }
         
         .domain-content.expanded {
-            max-height: 1000px;
+            max-height: 600px;
+            overflow-y: auto;
+            overflow-x: hidden;
             transition: max-height 0.5s ease-in;
+        }
+        
+        /* ÄNDERUNG 09.07.2025: Scrollbar-Styling für bessere Sichtbarkeit */
+        .domain-content.expanded::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .domain-content.expanded::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .domain-content.expanded::-webkit-scrollbar-thumb {
+            background: #4CAF50;
+            border-radius: 4px;
+        }
+        
+        .domain-content.expanded::-webkit-scrollbar-thumb:hover {
+            background: #45a049;
         }
         
         .source-list {
@@ -794,8 +815,16 @@
                         
                         // Erstelle Checkboxen für jedes Modell
                         Object.entries(modelsByProvider).forEach(([provider, models]) => {
+                            // ÄNDERUNG 09.07.2025: Kategorie-Checkboxen für Provider
                             html += `<div style="margin-bottom: 15px;">
-                                <strong style="text-transform: capitalize;">${provider}</strong>
+                                <label style="cursor: pointer; font-weight: bold; display: block; margin-bottom: 5px;">
+                                    <input type="checkbox" 
+                                           id="provider_${provider}" 
+                                           onchange="toggleProviderModels('${provider}')"
+                                           style="margin-right: 8px;">
+                                    <span style="text-transform: capitalize;">${provider}</span>
+                                    <span style="font-weight: normal; color: #666;">(${models.length} Modelle)</span>
+                                </label>
                                 <div style="margin-left: 20px; margin-top: 5px;">`;
                             
                             models.forEach(model => {
@@ -811,7 +840,7 @@
                                         <input type="checkbox" name="model" value="${model.id}" 
                                                ${isDefault ? 'checked' : ''}
                                                style="margin-right: 8px;"
-                                               onchange="updateModelWarning(); updateBatchModels();">
+                                               onchange="updateProviderCheckboxState('${provider}'); updateModelWarning(); updateBatchModels();">
                                         <span>${icon} ${model.name}${timeInfo}${specialTag} - ${model.description}</span>
                                     </label>
                                 `;
@@ -821,11 +850,49 @@
                         });
                         
                         modelSelection.innerHTML = html;
+                        
+                        // ÄNDERUNG 09.07.2025: Aktualisiere Provider-Checkboxen basierend auf Default-Auswahl
+                        Object.keys(modelsByProvider).forEach(provider => {
+                            updateProviderCheckboxState(provider);
+                        });
                     }
                 } catch (error) {
                     console.error('Fehler beim Laden der Modelle:', error);
                     document.getElementById('model-selection').innerHTML = 
                         '<p style="color: red;">Fehler beim Laden der verfügbaren Modelle</p>';
+                }
+            }
+            
+            // ÄNDERUNG 09.07.2025: Toggle alle Modelle eines Providers
+            window.toggleProviderModels = function(provider) {
+                const providerCheckbox = document.getElementById(`provider_${provider}`);
+                const modelCheckboxes = document.querySelectorAll(`input[name="model"][value^="${provider}:"]`);
+                
+                modelCheckboxes.forEach(cb => {
+                    cb.checked = providerCheckbox.checked;
+                });
+                
+                updateModelWarning();
+                updateBatchModels();
+            }
+            
+            // ÄNDERUNG 09.07.2025: Aktualisiere Provider-Checkbox basierend auf Modell-Auswahl
+            window.updateProviderCheckboxState = function(provider) {
+                const providerCheckbox = document.getElementById(`provider_${provider}`);
+                if (!providerCheckbox) return;
+                
+                const modelCheckboxes = document.querySelectorAll(`input[name="model"][value^="${provider}:"]`);
+                const checkedCount = Array.from(modelCheckboxes).filter(cb => cb.checked).length;
+                
+                if (checkedCount === 0) {
+                    providerCheckbox.checked = false;
+                    providerCheckbox.indeterminate = false;
+                } else if (checkedCount === modelCheckboxes.length) {
+                    providerCheckbox.checked = true;
+                    providerCheckbox.indeterminate = false;
+                } else {
+                    providerCheckbox.checked = false;
+                    providerCheckbox.indeterminate = true; // Teilweise ausgewählt
                 }
             }
             
@@ -1586,7 +1653,8 @@
         let loadSourcesInProgress = false;
         let loadSourcesAbortController = null;
         
-        async function loadSources() {
+        // ÄNDERUNG 09.07.2025: Erweitert um Sortierung
+        async function loadSources(sortBy = 'count', order = 'desc') {
             // Verhindere mehrfache parallele Aufrufe
             if (loadSourcesInProgress) {
                 console.log('LoadSources bereits aktiv, breche ab');
@@ -1608,17 +1676,18 @@
             if (formData.get('country')) params.append('country', formData.get('country'));
             if (formData.get('source_type')) params.append('source_type', formData.get('source_type'));
             params.append('min_reliability', formData.get('min_reliability') || '30');
-            params.append('sort_by', 'count');  // Sortiere nach Anzahl
+            params.append('sort_by', sortBy);
+            params.append('order', order);
             
             try {
-                // ÄNDERUNG 09.07.2025: Nutze gruppierten Endpoint
+                // ÄNDERUNG 09.07.2025: Nutze gruppierten Endpoint mit Sortierung
                 const response = await fetch(`/api/sources/grouped?${params.toString()}`, {
                     signal: loadSourcesAbortController.signal
                 });
                 const data = await response.json();
                 
                 if (data.success) {
-                    displayGroupedSources(data.data);
+                    displayGroupedSources(data.data, sortBy, order);
                 }
             } catch (error) {
                 if (error.name !== 'AbortError') {
@@ -1632,8 +1701,8 @@
             }
         }
 
-        // ÄNDERUNG 09.07.2025: Neue Funktion für gruppierte Anzeige
-        function displayGroupedSources(data) {
+        // ÄNDERUNG 09.07.2025: Neue Funktion für gruppierte Anzeige mit Sortierung
+        function displayGroupedSources(data, currentSort = 'count', currentOrder = 'desc') {
             const { grouped_sources, total_domains, total_sources } = data;
             
             if (!grouped_sources || grouped_sources.length === 0) {
@@ -1642,53 +1711,80 @@
                 return;
             }
             
-            // Erstelle Accordion-HTML
-            let accordionHtml = `
+            // Erstelle sortierbare Tabelle
+            let tableHtml = `
                 <div class="sources-summary" style="margin-bottom: 20px; padding: 15px; background: #f0f0f0; border-radius: 5px;">
                     <strong>${total_domains} Domains</strong> mit insgesamt <strong>${total_sources} Quellen</strong>
-                    <button onclick="toggleAllDomains()" style="float: right; padding: 5px 15px; border: none; background: #4CAF50; color: white; border-radius: 3px; cursor: pointer;">
-                        Alle auf-/zuklappen
-                    </button>
                 </div>
-                <div class="sources-accordion">
+                <table class="sources-table sortable-table">
+                    <thead>
+                        <tr>
+                            <th onclick="loadSourcesWithSort('domain')" style="cursor: pointer;">
+                                Domain ${currentSort === 'domain' ? (currentOrder === 'desc' ? '▼' : '▲') : ''}
+                            </th>
+                            <th onclick="loadSourcesWithSort('count')" style="cursor: pointer;">
+                                Dokumente ${currentSort === 'count' ? (currentOrder === 'desc' ? '▼' : '▲') : ''}
+                            </th>
+                            <th onclick="loadSourcesWithSort('avg_score')" style="cursor: pointer;">
+                                Ø Score ${currentSort === 'avg_score' ? (currentOrder === 'desc' ? '▼' : '▲') : ''}
+                            </th>
+                            <th onclick="loadSourcesWithSort('success_rate')" style="cursor: pointer;">
+                                Erfolgsrate ${currentSort === 'success_rate' ? (currentOrder === 'desc' ? '▼' : '▲') : ''}
+                            </th>
+                            <th onclick="loadSourcesWithSort('searches')" style="cursor: pointer;">
+                                Suchen ${currentSort === 'searches' ? (currentOrder === 'desc' ? '▼' : '▲') : ''}
+                            </th>
+                            <th>Länder</th>
+                            <th>Typen</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
             `;
             
             grouped_sources.forEach((group, index) => {
                 const domainId = `domain_${index}`;
-                const primaryCountry = group.countries.length > 0 ? group.countries[0] : 'Global';
-                const primaryType = group.source_types.length > 0 ? group.source_types[0] : 'unknown';
+                const countriesStr = group.countries.join(', ') || 'Global';
+                const typesStr = group.source_types.join(', ') || 'unknown';
                 
-                accordionHtml += `
-                    <div class="domain-group" data-domain="${group.domain}">
-                        <div class="domain-header" onclick="toggleDomain('${domainId}')" id="header_${domainId}">
-                            <span class="domain-toggle">▶</span>
-                            <div class="domain-info">
-                                <div class="domain-name">${group.domain}</div>
-                                <div class="domain-stats">
-                                    <div class="domain-stat">
-                                        <span class="stat-label">Land:</span>
-                                        <strong>${primaryCountry}</strong>
-                                    </div>
-                                    <div class="domain-stat">
-                                        <span class="stat-label">Typ:</span>
-                                        <span class="badge badge-${primaryType}">${primaryType}</span>
-                                    </div>
-                                    <div class="domain-stat">
-                                        <span class="stat-label">Ø Score:</span>
-                                        <strong>${group.avg_reliability_score}%</strong>
-                                    </div>
-                                    <div class="domain-stat">
-                                        <span class="stat-label">Erfolgsrate:</span>
-                                        <strong>${group.avg_success_rate}%</strong>
-                                    </div>
-                                    <div class="domain-stat">
-                                        <span class="document-count">${group.count} ${group.count === 1 ? 'Dokument' : 'Dokumente'}</span>
-                                    </div>
-                                </div>
+                tableHtml += `
+                    <tr>
+                        <td>
+                            <a href="https://${group.domain}" target="_blank" style="font-weight: bold;">
+                                ${group.domain}
+                            </a>
+                        </td>
+                        <td style="text-align: center;">${group.count}</td>
+                        <td>
+                            <div class="reliability-bar">
+                                <div class="reliability-fill" style="width: ${group.avg_reliability_score}%"></div>
+                                <span>${group.avg_reliability_score}%</span>
                             </div>
-                        </div>
-                        <div class="domain-content" id="content_${domainId}">
-                            <div class="source-list">
+                        </td>
+                        <td>
+                            <div class="reliability-bar">
+                                <div class="reliability-fill" style="width: ${group.avg_success_rate}%"></div>
+                                <span>${group.avg_success_rate}%</span>
+                            </div>
+                        </td>
+                        <td style="text-align: center;">${group.total_searches}</td>
+                        <td>${countriesStr}</td>
+                        <td>
+                            ${group.source_types.map(type => 
+                                `<span class="badge badge-${type}">${type}</span>`
+                            ).join(' ')}
+                        </td>
+                        <td>
+                            <button onclick="toggleSourceDetails('${domainId}')" 
+                                    style="padding: 2px 8px; font-size: 12px; cursor: pointer;">
+                                Details
+                            </button>
+                        </td>
+                    </tr>
+                    <tr id="details_${domainId}" style="display: none;">
+                        <td colspan="8" style="padding: 10px 20px; background: #f9f9f9;">
+                            <div class="source-list" style="max-height: 300px; overflow-y: auto;">
+                                <strong>Einzelne Quellen:</strong>
                                 ${group.sources.map(source => {
                                     const urlPath = source.url.split(group.domain)[1] || '';
                                     const displayPath = urlPath.length > 80 ? '...' + urlPath.slice(-77) : urlPath;
@@ -1697,52 +1793,54 @@
                                         'Nie';
                                     
                                     return `
-                                        <div class="source-item">
+                                        <div class="source-item" style="margin: 5px 0; padding: 5px;">
                                             <a href="${source.url}" target="_blank" class="source-url" title="${source.url}">
                                                 ${displayPath || '/'}
                                             </a>
-                                            <div class="source-meta">
-                                                <span>Score: ${source.reliability_score.toFixed(0)}%</span>
-                                                <span>Suchen: ${source.total_searches}</span>
-                                                <span>Letzter Zugriff: ${lastAccess}</span>
-                                            </div>
+                                            <span style="color: #666; font-size: 0.9em;">
+                                                - Score: ${source.reliability_score.toFixed(0)}% | 
+                                                Suchen: ${source.total_searches} | 
+                                                Letzter Zugriff: ${lastAccess}
+                                            </span>
                                         </div>
                                     `;
                                 }).join('')}
                             </div>
-                        </div>
-                    </div>
+                        </td>
+                    </tr>
                 `;
             });
             
-            accordionHtml += '</div>';
-            document.getElementById('sources-table-container').innerHTML = accordionHtml;
+            tableHtml += `
+                    </tbody>
+                </table>
+            `;
+            document.getElementById('sources-table-container').innerHTML = tableHtml;
         }
         
-        // Hilfsfunktionen für Accordion
-        window.toggleDomain = function(domainId) {
-            const header = document.getElementById(`header_${domainId}`);
-            const content = document.getElementById(`content_${domainId}`);
+        // Hilfsfunktionen für sortierbare Tabelle
+        window.loadSourcesWithSort = function(sortBy) {
+            // Hole aktuellen Sort-Status
+            const currentParams = new URLSearchParams(window.location.search);
+            const currentSort = currentParams.get('sort_by') || 'count';
+            const currentOrder = currentParams.get('order') || 'desc';
             
-            header.classList.toggle('expanded');
-            content.classList.toggle('expanded');
+            // Toggle order wenn gleiches Feld geklickt wird
+            let newOrder = 'desc';
+            if (sortBy === currentSort) {
+                newOrder = currentOrder === 'desc' ? 'asc' : 'desc';
+            }
+            
+            // Lade Quellen mit neuer Sortierung
+            loadSources(sortBy, newOrder);
         };
         
-        window.toggleAllDomains = function() {
-            const allHeaders = document.querySelectorAll('.domain-header');
-            const allContents = document.querySelectorAll('.domain-content');
-            
-            // Prüfe ob mindestens eine Domain eingeklappt ist
-            const hasCollapsed = Array.from(allHeaders).some(h => !h.classList.contains('expanded'));
-            
-            if (hasCollapsed) {
-                // Öffne alle
-                allHeaders.forEach(h => h.classList.add('expanded'));
-                allContents.forEach(c => c.classList.add('expanded'));
+        window.toggleSourceDetails = function(domainId) {
+            const detailsRow = document.getElementById(`details_${domainId}`);
+            if (detailsRow.style.display === 'none') {
+                detailsRow.style.display = 'table-row';
             } else {
-                // Schließe alle
-                allHeaders.forEach(h => h.classList.remove('expanded'));
-                allContents.forEach(c => c.classList.remove('expanded'));
+                detailsRow.style.display = 'none';
             }
         };
         
@@ -1880,7 +1978,7 @@
             }
         }
         
-        async function loadResults() {
+        async function loadResults(sortBy = 'timestamp', order = 'desc') {
             const formData = new FormData(document.getElementById('results-filter-form'));
             const params = new URLSearchParams();
             
@@ -1890,13 +1988,15 @@
             if (formData.get('session_id')) params.append('session_id', formData.get('session_id'));
             params.append('days_back', formData.get('days_back') || '30');
             params.append('limit', '50');
+            params.append('sort_by', sortBy);
+            params.append('order', order);
             
             try {
                 const response = await fetch(`/api/results?${params}`);
                 const data = await response.json();
                 
                 if (data.success && data.data.results) {
-                    displayResultsTable(data.data.results);
+                    displayResultsTable(data.data.results, sortBy, order);
                 }
             } catch (error) {
                 console.error('Fehler beim Laden der Ergebnisse:', error);
@@ -1905,7 +2005,7 @@
             }
         }
         
-        function displayResultsTable(results) {
+        function displayResultsTable(results, currentSort = 'timestamp', currentOrder = 'desc') {
             if (!results || results.length === 0) {
                 document.getElementById('results-table-container').innerHTML = 
                     '<p style="text-align: center; color: #666;">Keine Ergebnisse gefunden</p>';
@@ -1913,14 +2013,22 @@
             }
             
             const tableHtml = `
-                <table class="sources-table">
+                <table class="sources-table sortable-table">
                     <thead>
                         <tr>
-                            <th>Zeitstempel</th>
-                            <th>Mine</th>
+                            <th onclick="loadResultsWithSort('timestamp')" style="cursor: pointer;">
+                                Zeitstempel ${currentSort === 'timestamp' ? (currentOrder === 'desc' ? '▼' : '▲') : ''}
+                            </th>
+                            <th onclick="loadResultsWithSort('mine_name')" style="cursor: pointer;">
+                                Mine ${currentSort === 'mine_name' ? (currentOrder === 'desc' ? '▼' : '▲') : ''}
+                            </th>
                             <th>Land</th>
-                            <th>Modell</th>
-                            <th>Datenqualität</th>
+                            <th onclick="loadResultsWithSort('model_id')" style="cursor: pointer;">
+                                Modell ${currentSort === 'model_id' ? (currentOrder === 'desc' ? '▼' : '▲') : ''}
+                            </th>
+                            <th onclick="loadResultsWithSort('fields_found')" style="cursor: pointer;">
+                                Datenqualität ${currentSort === 'fields_found' ? (currentOrder === 'desc' ? '▼' : '▲') : ''}
+                            </th>
                             <th>Restaurationskosten</th>
                             <th>Quellen</th>
                             <th>Aktionen</th>
@@ -1966,6 +2074,23 @@
             
             document.getElementById('results-table-container').innerHTML = tableHtml;
         }
+        
+        // Hilfsfunktion für sortierbare Ergebnistabelle
+        window.loadResultsWithSort = function(sortBy) {
+            // Hole aktuellen Sort-Status
+            const currentParams = new URLSearchParams(window.location.search);
+            const currentSort = currentParams.get('sort_by') || 'timestamp';
+            const currentOrder = currentParams.get('order') || 'desc';
+            
+            // Toggle order wenn gleiches Feld geklickt wird
+            let newOrder = 'desc';
+            if (sortBy === currentSort) {
+                newOrder = currentOrder === 'desc' ? 'asc' : 'desc';
+            }
+            
+            // Lade Ergebnisse mit neuer Sortierung
+            loadResults(sortBy, newOrder);
+        };
         
         // Mache viewResultDetail global verfügbar
         window.viewResultDetail = async function(resultId) {
@@ -2119,29 +2244,121 @@
             document.getElementById('statistics-summary').innerHTML = summaryHtml;
         }
         
-        // Zeige Statistik-Tabelle
-        function displayStatisticsTable(data) {
-            const sortBy = document.getElementById('stat_sort').value;
-            // ÄNDERUNG 09.07.2025: Stelle sicher, dass models immer ein Array ist
-            let models = Array.isArray(data.all_models) ? data.all_models : [];
-            
-            // Sortiere nach ausgewähltem Kriterium
-            models.sort((a, b) => {
-                switch(sortBy) {
-                    case 'consistency':
-                        return b.overall_consistency - a.overall_consistency;
-                    case 'success_rate':
-                        return b.success_rate - a.success_rate;
-                    case 'fields':
-                        return b.avg_fields_found - a.avg_fields_found;
-                    case 'speed':
-                        return a.avg_response_time_ms - b.avg_response_time_ms;
-                    case 'cost':
-                        return (a.estimated_cost_per_request || 0) - (b.estimated_cost_per_request || 0);
-                    default:
-                        return 0;
+        // ÄNDERUNG 09.07.2025: Neue Funktion für sortierbare Modell-Statistiken
+        async function loadModelSummaries(sortBy = 'success_rate', order = 'desc') {
+            try {
+                const response = await fetch(`/api/benchmark/model-summaries?sort_by=${sortBy}&order=${order}&exclude_disabled=true`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error('Fehler beim Laden der Daten');
                 }
+                
+                displaySortableStatisticsTable(data.data, sortBy, order);
+                
+            } catch (error) {
+                console.error('Fehler beim Laden der Modell-Zusammenfassungen:', error);
+                document.getElementById('statistics-table').innerHTML = 
+                    '<p style="color: #dc2626;">Fehler beim Laden der Modell-Statistiken</p>';
+            }
+        }
+        
+        // Zeige sortierbare Statistik-Tabelle
+        function displaySortableStatisticsTable(models, currentSort, currentOrder) {
+            const getArrow = (field) => {
+                if (currentSort === field) {
+                    return currentOrder === 'desc' ? ' ▼' : ' ▲';
+                }
+                return '';
+            };
+            
+            const toggleOrder = (field) => {
+                if (currentSort === field) {
+                    return currentOrder === 'desc' ? 'asc' : 'desc';
+                }
+                return 'desc';
+            };
+            
+            let tableHtml = `
+                <table class="sources-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th style="cursor: pointer;" onclick="loadModelSummaries('success_rate', '${toggleOrder('success_rate')}')">
+                                Modell${getArrow('success_rate')}
+                            </th>
+                            <th style="cursor: pointer;" onclick="loadModelSummaries('success_rate', '${toggleOrder('success_rate')}')">
+                                Erfolgsrate${getArrow('success_rate')}
+                            </th>
+                            <th style="cursor: pointer;" onclick="loadModelSummaries('consistency', '${toggleOrder('consistency')}')">
+                                Konsistenz${getArrow('consistency')}
+                            </th>
+                            <th style="cursor: pointer;" onclick="loadModelSummaries('fields', '${toggleOrder('fields')}')">
+                                Ø Felder${getArrow('fields')}
+                            </th>
+                            <th style="cursor: pointer;" onclick="loadModelSummaries('speed', '${toggleOrder('speed')}')">
+                                Ø Zeit${getArrow('speed')}
+                            </th>
+                            <th style="cursor: pointer;" onclick="loadModelSummaries('total_tests', '${toggleOrder('total_tests')}')">
+                                Tests${getArrow('total_tests')}
+                            </th>
+                            <th>Performance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            models.forEach(model => {
+                const successColor = model.success_rate > 0.8 ? '#10b981' : 
+                                   model.success_rate > 0.5 ? '#f59e0b' : '#ef4444';
+                const consistencyColor = model.overall_consistency > 0.8 ? '#10b981' :
+                                       model.overall_consistency > 0.5 ? '#f59e0b' : '#ef4444';
+                const speedColor = model.avg_response_time_ms < 5000 ? '#10b981' :
+                                 model.avg_response_time_ms < 20000 ? '#f59e0b' : '#ef4444';
+                
+                tableHtml += `
+                    <tr>
+                        <td><strong>${model.model_id}</strong></td>
+                        <td style="color: ${successColor};">
+                            <strong>${(model.success_rate * 100).toFixed(0)}%</strong>
+                        </td>
+                        <td style="color: ${consistencyColor};">
+                            ${(model.overall_consistency * 100).toFixed(0)}%
+                        </td>
+                        <td>${model.avg_fields_found.toFixed(1)}</td>
+                        <td style="color: ${speedColor};">
+                            ${(model.avg_response_time_ms / 1000).toFixed(1)}s
+                        </td>
+                        <td>${model.total_tests}</td>
+                        <td>
+                            <div class="reliability-bar">
+                                <div class="reliability-fill" style="width: ${model.performance_score}%; background: ${model.performance_score > 70 ? '#10b981' : model.performance_score > 40 ? '#f59e0b' : '#ef4444'}"></div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
             });
+            
+            tableHtml += `
+                    </tbody>
+                </table>
+                <style>
+                    .sources-table th:hover {
+                        background: #f3f4f6;
+                    }
+                    .sources-table th {
+                        user-select: none;
+                    }
+                </style>
+            `;
+            
+            document.getElementById('statistics-table').innerHTML = tableHtml;
+        }
+        
+        // Zeige Statistik-Tabelle (alte Funktion für Kompatibilität)
+        function displayStatisticsTable(data) {
+            // Nutze die neue sortierbare Funktion
+            loadModelSummaries();
+        }
             
             const tableHtml = `
                 <table class="sources-table">

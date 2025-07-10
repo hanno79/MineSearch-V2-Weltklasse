@@ -48,7 +48,8 @@ PROVIDERS_CONFIG = {
         'models': TAVILY_MODELS
     },
     'exa': {
-        'enabled': True,  # Aktiviert für umfassende Tests
+        # ÄNDERUNG 09.07.2025: Deaktiviert wegen Domain-Format-Problemen
+        'enabled': False,
         'api_key': APIKeysConfig.EXA_API_KEY,
         'base_url': 'https://api.exa.ai',
         'models': EXA_MODELS
@@ -96,7 +97,8 @@ PROVIDERS_CONFIG = {
         'models': GROK_MODELS
     },
     'deepseek': {
-        'enabled': True,
+        # ÄNDERUNG 09.07.2025: Deaktiviert um Duplikate zu vermeiden - DeepSeek-Modelle sind über OpenRouter verfügbar
+        'enabled': False,
         'api_key': APIKeysConfig.OPENROUTER_API_KEY,  # DeepSeek nutzt OpenRouter als Proxy
         'base_url': 'https://openrouter.ai/api/v1',
         'models': DEEPSEEK_MODELS

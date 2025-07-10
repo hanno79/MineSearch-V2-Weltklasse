@@ -48,6 +48,11 @@ class ModelBenchmarkService:
         'openrouter:deepseek-free': 0.00,
         'openrouter:deepseek-chat': 0.14,
         'openrouter:deepseek-reasoner': 0.50,
+        # ÄNDERUNG 09.07.2025: Neue kostenlose OpenRouter-Modelle
+        'openrouter:deepseek-chimera-free': 0.00,
+        'openrouter:mistral-small-free': 0.00,
+        'openrouter:cypher-alpha-free': 0.00,
+        'openrouter:minimax-m1': 0.00,
         'tavily:search': 0.01,
         'exa:neural-search': 0.01,
         'openai:gpt-4.1': 1.00,

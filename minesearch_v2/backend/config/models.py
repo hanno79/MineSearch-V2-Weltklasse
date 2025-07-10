@@ -58,14 +58,70 @@ OPENROUTER_MODELS = {
         'is_free': False
     },
     'deepseek-reasoner': {
-        'id': 'deepseek/deepseek-reasoner',
-        'name': 'DeepSeek Reasoner',
+        # ÄNDERUNG 09.07.2025: Korrigierte Model-ID für DeepSeek R1
+        'id': 'deepseek/deepseek-r1-0528',
+        'name': 'DeepSeek R1 (Reasoner) [BETA]',
         'timeout': 180,
         'max_tokens': 12000,
-        'description': 'Spezialisiert auf komplexes Reasoning',
+        'description': 'DeepSeek R1 - Experimentell: Niedriger Feldabdeckung, optimiert für Reasoning statt Datenextraktion',
         'supports_web_search': False,
         'supports_deep_research': True,
         'is_free': False
+    },
+    # ÄNDERUNG 09.07.2025: Neue kostenlose OpenRouter-Modelle hinzugefügt
+    'deepseek-chimera-free': {
+        'id': 'tngtech/deepseek-r1t2-chimera:free',
+        'name': 'DeepSeek R1 Chimera (Kostenlos)',
+        'timeout': 120,
+        'max_tokens': 4000,
+        'description': 'Kostenlose DeepSeek R1 Chimera Variante für schnelle Mining-Analysen',
+        'supports_web_search': False,
+        'is_free': True
+    },
+    'mistral-small-free': {
+        'id': 'mistralai/mistral-small-3.2-24b-instruct:free',
+        'name': 'Mistral Small 3.2 (Kostenlos)',
+        'timeout': 60,
+        'max_tokens': 4000,
+        'description': 'Kostenloses Mistral Small Modell - schnell und effizient',
+        'supports_web_search': False,
+        'is_free': True
+    },
+    'cypher-alpha-free': {
+        'id': 'openrouter/cypher-alpha:free',
+        'name': 'Cypher Alpha (Kostenlos)',
+        'timeout': 60,
+        'max_tokens': 3000,
+        'description': 'Kostenloses experimentelles Modell für Mining-Datenextraktion',
+        'supports_web_search': False,
+        'is_free': True
+    },
+    'minimax-m1': {
+        'id': 'minimax/minimax-m1',
+        'name': 'MiniMax M1',
+        'timeout': 90,
+        'max_tokens': 5000,
+        'description': 'MiniMax M1 - Ausgewogenes Modell für Mining-Analysen',
+        'supports_web_search': False,
+        'is_free': True
+    },
+    'llama-3.3-nemotron-super': {
+        'id': 'nvidia/llama-3.3-nemotron-super-49b-v1:free',
+        'name': 'Llama 3.3 Nemotron Super 49B',
+        'timeout': 90,
+        'max_tokens': 8000,
+        'description': 'NVIDIA Llama 3.3 Nemotron Super - Neuestes kostenloses NVIDIA-Modell',
+        'supports_web_search': False,
+        'is_free': True
+    },
+    'llama-3.1-nemotron-ultra': {
+        'id': 'nvidia/llama-3.1-nemotron-ultra-253b-v1',  # WICHTIG: Ohne :free suffix!
+        'name': 'Llama 3.1 Nemotron Ultra 253B',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'NVIDIA Llama 3.1 Nemotron Ultra - Hochleistungs-LLM mit 253B Parametern',
+        'supports_web_search': False,
+        'is_free': True
     }
 }
 
@@ -119,21 +175,23 @@ EXA_MODELS = {
         'is_free': False
     },
     'research': {
-        'id': 'exa-research',
-        'name': 'Exa Research',
+        # ÄNDERUNG 09.07.2025: Research nutzt neural search mit erweiterten Parametern
+        'id': 'neural',  # Nutze neural search endpoint
+        'name': 'Exa Research (Neural Enhanced)',
         'timeout': 120,
         'max_tokens': 10000,
-        'description': 'Deep Research mit mehreren Suchen und umfassender Analyse',
+        'description': 'Erweiterte Neural Search mit Research-Fokus',
         'supports_web_search': True,
         'supports_deep_research': True,
         'is_free': False
     },
     'research-pro': {
-        'id': 'exa-research-pro',
-        'name': 'Exa Research Pro',
+        # ÄNDERUNG 09.07.2025: Research Pro nutzt neural search mit maximalen Parametern
+        'id': 'neural',  # Nutze neural search endpoint
+        'name': 'Exa Research Pro (Neural Max)',
         'timeout': 180,
         'max_tokens': 15000,
-        'description': 'Maximale Qualität für komplexe Research-Aufgaben',
+        'description': 'Maximale Neural Search für komplexe Research-Aufgaben',
         'supports_web_search': True,
         'supports_deep_research': True,
         'is_free': False
@@ -396,11 +454,12 @@ DEEPSEEK_MODELS = {
         'is_free': False
     },
     'deepseek-reasoner': {
-        'id': 'deepseek/deepseek-reasoner',
-        'name': 'DeepSeek Reasoner',
+        # ÄNDERUNG 09.07.2025: Korrigierte Model-ID für DeepSeek R1
+        'id': 'deepseek/deepseek-r1-0528',
+        'name': 'DeepSeek R1 (Reasoner) [BETA]',
         'timeout': 180,
         'max_tokens': 12000,
-        'description': 'Spezialisiert auf komplexes logisches Denken',
+        'description': 'DeepSeek R1 - Experimentell: Niedriger Feldabdeckung, optimiert für Reasoning statt Datenextraktion',
         'supports_web_search': False,
         'supports_deep_research': True,
         'is_free': False

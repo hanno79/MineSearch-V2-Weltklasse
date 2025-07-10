@@ -20,7 +20,8 @@ async def get_grouped_sources(
     region: Optional[str] = Query(None),
     source_type: Optional[str] = Query(None),
     min_reliability: float = Query(0.0),
-    sort_by: str = Query("count", description="Sort by: count, domain, avg_score")
+    sort_by: str = Query("count", description="Sort by: count, domain, avg_score, success_rate, searches"),
+    order: str = Query("desc", description="Order: asc or desc")
 ):
     """
     ÄNDERUNG 09.07.2025: Neuer Endpoint für gruppierte Quellen-Darstellung
@@ -89,13 +90,19 @@ async def get_grouped_sources(
         }
         result.append(domain_group)
     
-    # Sortierung
+    # ÄNDERUNG 09.07.2025: Erweiterte Sortierung mit auf-/absteigender Reihenfolge
+    reverse_order = (order == "desc")
+    
     if sort_by == "count":
-        result.sort(key=lambda x: x["count"], reverse=True)
+        result.sort(key=lambda x: x["count"], reverse=reverse_order)
     elif sort_by == "domain":
-        result.sort(key=lambda x: x["domain"])
+        result.sort(key=lambda x: x["domain"], reverse=reverse_order)
     elif sort_by == "avg_score":
-        result.sort(key=lambda x: x["avg_reliability_score"], reverse=True)
+        result.sort(key=lambda x: x["avg_reliability_score"], reverse=reverse_order)
+    elif sort_by == "success_rate":
+        result.sort(key=lambda x: x["avg_success_rate"], reverse=reverse_order)
+    elif sort_by == "searches":
+        result.sort(key=lambda x: x["total_searches"], reverse=reverse_order)
     
     return {
         "success": True,

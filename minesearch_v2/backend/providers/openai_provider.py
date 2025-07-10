@@ -237,7 +237,8 @@ Analysiere die folgenden Aspekte mit HÖCHSTER PRIORITÄT:
                             {"role": "user", "content": enhanced_query}
                         ],
                         "temperature": 0.1,
-                        "max_tokens": model_config.max_tokens
+                        # ÄNDERUNG 09.07.2025: Reduziere max_tokens für o3 Modell
+                        "max_tokens": min(model_config.max_tokens, 4096) if model_config.id == 'gpt-4-turbo' else model_config.max_tokens
                     }
                 )
                 
@@ -326,7 +327,8 @@ Analysiere die folgenden Aspekte mit HÖCHSTER PRIORITÄT:
                             }
                         ],
                         "temperature": options.get('temperature', 0.1),
-                        "max_tokens": model_config.max_tokens,
+                        # ÄNDERUNG 09.07.2025: Reduziere max_tokens für o3 Modell
+                        "max_tokens": min(model_config.max_tokens, 4096) if model_config.id == 'gpt-4-turbo' else model_config.max_tokens,
                         "response_format": {"type": "text"}
                     }
                 )

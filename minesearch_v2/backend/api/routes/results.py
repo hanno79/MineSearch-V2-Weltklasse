@@ -19,32 +19,90 @@ async def get_results(
     session_id: Optional[str] = Query(None),
     days_back: int = Query(30),
     limit: int = Query(50),
-    offset: int = Query(0)
+    offset: int = Query(0),
+    sort_by: str = Query("timestamp", description="Sort by: timestamp, mine_name, model_id, fields_found, response_time"),
+    order: str = Query("desc", description="Order: asc or desc"),
+    exclude_exa: bool = Query(True, description="Exa-Modelle ausblenden")
 ):
-    """Hole gespeicherte Suchergebnisse mit Filtern"""
-    from database import db_manager
+    """
+    Hole gespeicherte Suchergebnisse mit Filtern und Sortierung
     
-    results = db_manager.get_search_results(
-        limit=limit,
-        offset=offset,
-        mine_name=mine_name,
-        country=country,
-        session_id=session_id,
-        days_back=days_back
-    )
+    ÄNDERUNG 09.07.2025: Erweitert um Sortierung und Exa-Filter
+    """
+    from database import db_manager, SearchResult
+    from sqlalchemy import desc as sql_desc, asc as sql_asc
     
-    # Total count für Pagination
-    total = len(db_manager.get_search_results(limit=1000, days_back=days_back))
-    
-    return {
-        "success": True,
-        "data": {
-            "results": [r.to_dict() for r in results],
-            "total": total,
-            "limit": limit,
-            "offset": offset
+    with db_manager.get_session() as session:
+        query = session.query(SearchResult)
+        
+        # Filter
+        if exclude_exa:
+            query = query.filter(~SearchResult.model_id.like('exa:%'))
+        
+        if mine_name:
+            query = query.filter(SearchResult.mine_name == mine_name)
+            
+        if country:
+            query = query.filter(SearchResult.country == country)
+            
+        if session_id:
+            query = query.filter(SearchResult.session_id == session_id)
+        
+        # Zeitfilter
+        if days_back > 0:
+            from datetime import datetime, timedelta
+            cutoff = datetime.now() - timedelta(days=days_back)
+            query = query.filter(SearchResult.timestamp >= cutoff)
+        
+        # Sortierung
+        sort_columns = {
+            'timestamp': SearchResult.timestamp,
+            'mine_name': SearchResult.mine_name,
+            'model_id': SearchResult.model_id,
+            'fields_found': SearchResult.fields_found,
+            'response_time': SearchResult.search_duration_ms
         }
-    }
+        sort_column = sort_columns.get(sort_by, SearchResult.timestamp)
+        
+        if order == 'asc':
+            query = query.order_by(sql_asc(sort_column))
+        else:
+            query = query.order_by(sql_desc(sort_column))
+        
+        # Gesamtanzahl
+        total = query.count()
+        
+        # Pagination
+        results = query.offset(offset).limit(limit).all()
+        
+        # Erweitere Ergebnisse mit zusätzlichen Infos
+        data = []
+        for result in results:
+            item = result.to_dict()
+            
+            # Provider extrahieren
+            item['provider'] = result.model_id.split(':')[0] if ':' in result.model_id else 'unknown'
+            
+            # Datenqualität berechnen
+            if result.structured_data:
+                filled_fields = sum(1 for v in result.structured_data.values() if v)
+                item['data_quality'] = round((filled_fields / 18) * 100, 1)
+            else:
+                item['data_quality'] = 0
+            
+            data.append(item)
+        
+        return {
+            "success": True,
+            "data": {
+                "results": data,
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "sort_by": sort_by,
+                "order": order
+            }
+        }
 
 @router.get("/results/stats")
 async def get_result_statistics():

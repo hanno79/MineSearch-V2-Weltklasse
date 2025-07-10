@@ -172,10 +172,12 @@ Gib die Informationen strukturiert und vollständig zurück.
                 return self._create_error_result(query, "Keine Antwort von API erhalten")
             
             # Extrahiere Daten
-            extracted_data = await self.data_extractor.extract_from_text(
+            # ÄNDERUNG 09.07.2025: Korrigiere Methodenaufruf mit richtigen Parametern
+            mine_name = options.get('mine_name', query)
+            extracted_data = self.data_extractor.extract_structured_data_with_sources(
                 content, 
-                mine_type, 
-                query
+                mine_name,
+                country
             )
             
             # Extrahiere Quellen
@@ -184,7 +186,7 @@ Gib die Informationen strukturiert und vollständig zurück.
             return SearchResult(
                 success=True,
                 content=content,
-                structured_data=extracted_data,
+                structured_data=extracted_data.get('data', {}),
                 sources=sources,
                 metadata={
                     'provider': 'deepseek',
@@ -196,6 +198,8 @@ Gib die Informationen strukturiert und vollständig zurück.
                         'name': model.name,
                         'supports_reasoning': model.supports_deep_research
                     },
+                    'structured_data_with_sources': extracted_data.get('data_with_sources', {}),
+                    'source_index': extracted_data.get('source_index', {}),
                     'timestamp': datetime.now().isoformat()
                 },
                 error=None

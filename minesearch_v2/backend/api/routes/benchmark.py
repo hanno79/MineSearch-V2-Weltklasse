@@ -644,3 +644,79 @@ async def capture_search_statistics(stats_data: Dict[str, Any]):
         logger.error(f"[BENCHMARK] Fehler beim Erfassen der Statistiken: {str(e)}")
         # Keine Exception werfen, da dies eine fire-and-forget Operation ist
         return {"success": False, "error": str(e)}
+
+
+@router.get("/model-summaries")
+async def get_model_summaries(
+    sort_by: str = Query("success_rate", description="Sortierung: success_rate, consistency, fields, speed, total_tests"),
+    order: str = Query("desc", description="Reihenfolge: asc oder desc"),
+    exclude_disabled: bool = Query(True, description="Deaktivierte Provider ausblenden"),
+    limit: int = Query(50, ge=1, le=200)
+):
+    """
+    Ruft sortierbare Modell-Zusammenfassungen ab
+    
+    ÄNDERUNG 09.07.2025: Neuer Endpoint für sortierbare Modell-Statistiken mit Exa-Filter
+    
+    Args:
+        sort_by: Sortierkriterium
+        order: Sortierreihenfolge (asc/desc)
+        exclude_disabled: Deaktivierte Provider (z.B. Exa) ausblenden
+        limit: Maximale Anzahl der Ergebnisse
+        
+    Returns:
+        Sortierte Liste von Modell-Zusammenfassungen
+    """
+    with db_manager.get_session() as session:
+        from database import ModelSummary
+        from sqlalchemy import desc as sql_desc, asc as sql_asc
+        
+        query = session.query(ModelSummary)
+        
+        # Filter deaktivierte Provider (Exa) wenn gewünscht
+        if exclude_disabled:
+            query = query.filter(~ModelSummary.model_id.like('exa:%'))
+        
+        # Sortierung
+        sort_column = {
+            'success_rate': ModelSummary.success_rate,
+            'consistency': ModelSummary.overall_consistency,
+            'fields': ModelSummary.avg_fields_found,
+            'speed': ModelSummary.avg_response_time_ms,
+            'total_tests': ModelSummary.total_tests
+        }.get(sort_by, ModelSummary.success_rate)
+        
+        if order == 'asc':
+            query = query.order_by(sql_asc(sort_column))
+        else:
+            query = query.order_by(sql_desc(sort_column))
+        
+        # Limitiere Ergebnisse
+        summaries = query.limit(limit).all()
+        
+        # Konvertiere zu Dict und füge zusätzliche Informationen hinzu
+        results = []
+        for summary in summaries:
+            result = summary.to_dict()
+            
+            # Füge Provider-Info hinzu
+            provider = summary.model_id.split(':')[0] if ':' in summary.model_id else 'unknown'
+            result['provider'] = provider
+            
+            # Füge Performance-Indikatoren hinzu
+            result['performance_score'] = (
+                (summary.success_rate * 100 * 0.3) +  # 30% Gewicht
+                (summary.overall_consistency * 100 * 0.3) +  # 30% Gewicht
+                (min(summary.avg_fields_found / 18, 1) * 100 * 0.3) +  # 30% Gewicht
+                (max(0, 100 - summary.avg_response_time_ms / 100) * 0.1)  # 10% Gewicht
+            )
+            
+            results.append(result)
+        
+        return {
+            'success': True,
+            'total': len(results),
+            'sort_by': sort_by,
+            'order': order,
+            'data': results
+        }

@@ -102,19 +102,22 @@ class ExaProvider(AbstractProvider):
                 # Exa API Request
                 endpoint = f"{self.api_url}/search"
                 
-                # ÄNDERUNG 05.07.2025: Unterstützung für Research-Modelle
+                # ÄNDERUNG 09.07.2025: Research-Modelle nutzen normalen search Endpoint
                 if 'research' in model_id:
-                    # Exa Research API nutzt anderen Endpoint
-                    endpoint = f"{self.api_url}/research"
+                    # Research nutzt normalen search endpoint mit erweiterten Parametern
+                    endpoint = f"{self.api_url}/search"
                     request_data = {
                         "query": enhanced_query,
-                        "model": model_config.id,  # exa-research oder exa-research-pro
-                        "include_domains": self._get_mining_domains(country, discovered_sources),
-                        "search_options": {
-                            "max_searches": 50 if model_id == 'research-pro' else 30,
-                            "deep_search": True,
-                            "include_pdfs": True,
-                            "extract_structured_data": True
+                        "num_results": 50 if 'pro' in model_id else 30,  # Mehr Ergebnisse für Research
+                        "type": "neural",  # Nutze neuronale Suche für Research
+                        "useAutoprompt": True,
+                        "includeDomains": self._get_mining_domains(country, discovered_sources),
+                        "startCrawlDate": "2020-01-01",
+                        "endCrawlDate": datetime.now().strftime("%Y-%m-%d"),
+                        "category": "company",
+                        "contents": {
+                            "text": True,
+                            "highlights": True
                         }
                     }
                 else:
