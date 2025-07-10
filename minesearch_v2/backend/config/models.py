@@ -323,11 +323,12 @@ OPENAI_MODELS = {
         'is_free': False
     },
     'o3': {
-        'id': 'gpt-4-turbo',
-        'name': 'GPT-4 Turbo',
+        # ÄNDERUNG 10.07.2025: O3 ist noch nicht veröffentlicht, nutze GPT-4 Turbo als Fallback
+        'id': 'gpt-4-turbo-2024-04-09',
+        'name': 'O3 (GPT-4 Turbo Fallback)',
         'timeout': 180,
         'max_tokens': 12000,
-        'description': 'Fortgeschrittenes Reasoning für Mining-Analysen',
+        'description': 'O3 noch nicht verfügbar - nutzt GPT-4 Turbo als Fallback',
         'supports_web_search': False,
         'supports_deep_research': False,
         'is_free': False

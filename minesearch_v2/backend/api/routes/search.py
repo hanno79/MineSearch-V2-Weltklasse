@@ -13,6 +13,7 @@ from datetime import datetime
 from ..models import MineSearchRequest, MineSearchResponse, MultiSearchRequest, SmartSearchRequest
 from search_service import MineSearchService
 from search_service_multi import multi_search_service
+from search_service_multi_enhanced import EnhancedMultiProviderSearchService
 from providers.registry import provider_registry
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ router = APIRouter()
 
 # Service-Instanzen
 mine_search_service = MineSearchService()
+enhanced_search_service = EnhancedMultiProviderSearchService()
 
 @router.post("/search", response_model=MineSearchResponse)
 async def search_mine(request: MineSearchRequest, model: str = "sonar-pro"):
@@ -235,6 +237,48 @@ async def enhanced_search(
         return result
     except Exception as e:
         logger.error(f"Fehler bei Enhanced Search: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/search/comprehensive")
+async def comprehensive_search(request: MineSearchRequest):
+    """
+    Umfassende Suche mit Enhanced Service (10/10 System)
+    - Phase 1: Alle Modelle sammeln Quellen
+    - Phase 2: Alle Modelle analysieren alle Quellen
+    """
+    try:
+        result = await enhanced_search_service.search_comprehensive(
+            mine_name=request.mine_name,
+            country=request.country,
+            commodity=request.commodity,
+            region=request.region
+        )
+        
+        # Speichere Ergebnis
+        if result.get('success') and result.get('data'):
+            try:
+                from database import db_manager
+                db_manager.save_search_result({
+                    'mine_name': request.mine_name,
+                    'country': request.country,
+                    'region': request.region,
+                    'commodity': request.commodity,
+                    'model_used': 'comprehensive_enhanced',
+                    'search_type': 'comprehensive',
+                    'search_duration': result.get('search_duration'),
+                    'structured_data': result.get('data'),
+                    'sources': result.get('sources'),
+                    'confidence_scores': result.get('confidence_scores'),
+                    'phase1_sources': result.get('phase1_sources'),
+                    'phase2_models': result.get('phase2_models'),
+                    'success': True
+                })
+            except Exception as e:
+                logger.error(f"Fehler beim Speichern des Comprehensive-Ergebnisses: {str(e)}")
+        
+        return result
+    except Exception as e:
+        logger.error(f"Fehler bei Comprehensive Search: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/search/html")
