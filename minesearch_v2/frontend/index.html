@@ -339,7 +339,7 @@
             <div id="csv_form" class="search-form active">
                 <h2>CSV-Datei mit Minen hochladen</h2>
                 <form id="csv-upload-form" 
-                      hx-post="http://localhost:8000/api/upload-csv" 
+                      hx-post="/api/upload-csv" 
                       hx-encoding="multipart/form-data"
                       hx-target="#csv-info"
                       hx-indicator="#loading">
@@ -1591,14 +1591,14 @@
         // ÄNDERUNG 02.07.2025: Funktionen für Quellen-Datenbank
         async function loadSourcesStats() {
             try {
-                const response = await fetch('http://localhost:8000/api/sources/stats');
+                const response = await fetch('/api/sources/stats');
                 const data = await response.json();
                 
                 if (data.success) {
                     const stats = data.data;
                     
                     // ÄNDERUNG 09.07.2025: Berechne Domain-Statistiken
-                    const sourcesResponse = await fetch('http://localhost:8000/api/sources?limit=300');
+                    const sourcesResponse = await fetch('/api/sources?limit=300');
                     const sourcesData = await sourcesResponse.json();
                     const domainCounts = {};
                     if (sourcesData.success) {
@@ -1916,7 +1916,7 @@
         // ÄNDERUNG 02.07.2025: Funktionen für Ergebnis-Datenbank
         async function loadResultsStats() {
             try {
-                const response = await fetch('http://localhost:8000/api/results/stats');
+                const response = await fetch('/api/results/stats');
                 const data = await response.json();
                 
                 if (data.success) {
@@ -1958,7 +1958,7 @@
         
         async function loadSessions() {
             try {
-                const response = await fetch('http://localhost:8000/api/results/sessions');
+                const response = await fetch('/api/results/sessions');
                 const data = await response.json();
                 
                 if (data.success && data.data) {

@@ -6,7 +6,7 @@ Beschreibung: ScrapingBee Provider für Web-Scraping mit JavaScript-Rendering
 """
 
 import asyncio
-import aiohttp
+import httpx
 import json
 import logging
 from typing import Dict, List, Any, Optional
@@ -71,7 +71,7 @@ class ScrapingBeeProvider(AbstractProvider):
         scraped_data = []
         successful_sources = []
         
-        async with aiohttp.ClientSession() as session:
+        async with httpx.AsyncClient() as client:
             # Scrape nur URL-basierte Quellen
             url_sources = [s for s in sources if s.get('type') in ['url', 'website', None]]
             
@@ -81,7 +81,7 @@ class ScrapingBeeProvider(AbstractProvider):
                     continue
                     
                 try:
-                    result = await self._scrape_url(session, url, model_id, options)
+                    result = await self._scrape_url(client, url, model_id, options)
                     if result:
                         scraped_data.append(result['content'])
                         successful_sources.append({
@@ -179,10 +179,10 @@ class ScrapingBeeProvider(AbstractProvider):
             scraped_data = []
             sources = []
             
-            async with aiohttp.ClientSession() as session:
+            async with httpx.AsyncClient() as client:
                 for url in search_urls[:5]:  # Limitiere auf 5 URLs
                     try:
-                        result = await self._scrape_url(session, url, model_id, options)
+                        result = await self._scrape_url(client, url, model_id, options)
                         if result:
                             scraped_data.append(result['content'])
                             sources.append({
@@ -253,7 +253,7 @@ class ScrapingBeeProvider(AbstractProvider):
         
         return urls
     
-    async def _scrape_url(self, session: aiohttp.ClientSession, url: str, 
+    async def _scrape_url(self, client: httpx.AsyncClient, url: str, 
                          model_id: str, options: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Scraped eine einzelne URL mit ScrapingBee"""
         
@@ -291,17 +291,17 @@ class ScrapingBeeProvider(AbstractProvider):
         params = {k: v for k, v in params.items() if v is not None}
         
         try:
-            timeout = aiohttp.ClientTimeout(total=self.models[model_id]['timeout'])
+            timeout = httpx.Timeout(self.models[model_id]['timeout'])
             # Verwende GET-Request mit query parameters
-            async with session.get(self.base_url, params=params, timeout=timeout) as response:
-                if response.status == 200:
-                    # Prüfe Content-Type für PDF-Handhabung
+            response = await client.get(self.base_url, params=params, timeout=timeout)
+            if response.status_code == 200:
+                # Prüfe Content-Type für PDF-Handhabung
                     content_type = response.headers.get('Content-Type', '')
                     
                     if 'application/pdf' in content_type:
                         # PDF-Datei - speichere als Binary
                         logger.info(f"[ScrapingBee] PDF erkannt für {url}")
-                        pdf_content = await response.read()  # Binary content
+                        pdf_content = response.content  # Binary content
                         return {
                             'url': url,
                             'content': f"[PDF-Dokument gefunden - {len(pdf_content)} bytes]\nURL: {url}\n\nPDF-Analyse:\n- Größe: {len(pdf_content)/1024:.1f} KB\n- Typ: {content_type}\n\nHinweis: PDF müsste mit spezialisierten Tools extrahiert werden.",
@@ -312,7 +312,7 @@ class ScrapingBeeProvider(AbstractProvider):
                     elif model_id == 'ai-extract':
                         # JSON Response erwartet
                         try:
-                            data = await response.json()
+                            data = response.json()
                             return {
                                 'url': url,
                                 'content': json.dumps(data) if isinstance(data, dict) else str(data),
@@ -320,7 +320,7 @@ class ScrapingBeeProvider(AbstractProvider):
                             }
                         except json.JSONDecodeError:
                             # Fallback auf Text
-                            text_content = await response.text()
+                            text_content = response.text
                             return {
                                 'url': url,
                                 'content': text_content,
@@ -329,7 +329,7 @@ class ScrapingBeeProvider(AbstractProvider):
                     else:
                         # Standard Text/HTML Response
                         try:
-                            text_content = await response.text()
+                            text_content = response.text
                             return {
                                 'url': url,
                                 'content': text_content,
@@ -337,7 +337,7 @@ class ScrapingBeeProvider(AbstractProvider):
                             }
                         except UnicodeDecodeError:
                             # Binary content das kein PDF ist
-                            binary_content = await response.read()
+                            binary_content = response.content
                             return {
                                 'url': url,
                                 'content': f"[Binary-Datei - {len(binary_content)} bytes]\nContent-Type: {content_type}",
@@ -345,8 +345,8 @@ class ScrapingBeeProvider(AbstractProvider):
                                 'is_binary': True
                             }
                 else:
-                    error_text = await response.text()
-                    logger.error(f"[ScrapingBee] HTTP {response.status} für {url}: {error_text[:200]}")
+                    error_text = response.text
+                    logger.error(f"[ScrapingBee] HTTP {response.status_code} für {url}: {error_text[:200]}")
                     return None
                     
         except asyncio.TimeoutError:

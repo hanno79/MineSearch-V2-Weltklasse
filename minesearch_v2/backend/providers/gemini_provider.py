@@ -150,9 +150,9 @@ class GeminiProvider(AbstractProvider):
                 
                 # Extrahiere Text aus Gemini's Response-Format
                 content = ""
-                if "candidates" in result and result["candidates"]:
+                if "candidates" in result and result["candidates"] and len(result["candidates"]) > 0:
                     candidate = result["candidates"][0]
-                    if "content" in candidate and "parts" in candidate["content"]:
+                    if "content" in candidate and "parts" in candidate["content"] and candidate["content"]["parts"]:
                         for part in candidate["content"]["parts"]:
                             if "text" in part:
                                 content += part["text"]
