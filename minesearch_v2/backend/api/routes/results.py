@@ -37,7 +37,7 @@ async def get_results(
         
         # Filter
         if exclude_exa:
-            query = query.filter(~SearchResult.model_id.like('exa:%'))
+            query = query.filter(~SearchResult.model_used.like('exa:%'))
         
         if mine_name:
             query = query.filter(SearchResult.mine_name == mine_name)
@@ -52,17 +52,16 @@ async def get_results(
         if days_back > 0:
             from datetime import datetime, timedelta
             cutoff = datetime.now() - timedelta(days=days_back)
-            query = query.filter(SearchResult.timestamp >= cutoff)
+            query = query.filter(SearchResult.search_timestamp >= cutoff)
         
         # Sortierung
         sort_columns = {
-            'timestamp': SearchResult.timestamp,
+            'timestamp': SearchResult.search_timestamp,
             'mine_name': SearchResult.mine_name,
-            'model_id': SearchResult.model_id,
-            'fields_found': SearchResult.fields_found,
-            'response_time': SearchResult.search_duration_ms
+            'model_id': SearchResult.model_used,
+            'response_time': SearchResult.search_duration
         }
-        sort_column = sort_columns.get(sort_by, SearchResult.timestamp)
+        sort_column = sort_columns.get(sort_by, SearchResult.search_timestamp)
         
         if order == 'asc':
             query = query.order_by(sql_asc(sort_column))
@@ -81,12 +80,13 @@ async def get_results(
             item = result.to_dict()
             
             # Provider extrahieren
-            item['provider'] = result.model_id.split(':')[0] if ':' in result.model_id else 'unknown'
+            item['provider'] = result.model_used.split(':')[0] if ':' in result.model_used else 'unknown'
             
             # Datenqualität berechnen
             if result.structured_data:
                 filled_fields = sum(1 for v in result.structured_data.values() if v)
-                item['data_quality'] = round((filled_fields / 18) * 100, 1)
+                total_fields = len(result.structured_data)
+                item['data_quality'] = round((filled_fields / total_fields) * 100, 1) if total_fields > 0 else 0
             else:
                 item['data_quality'] = 0
             

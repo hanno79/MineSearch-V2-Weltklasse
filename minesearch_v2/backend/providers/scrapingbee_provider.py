@@ -296,59 +296,59 @@ class ScrapingBeeProvider(AbstractProvider):
             response = await client.get(self.base_url, params=params, timeout=timeout)
             if response.status_code == 200:
                 # Prüfe Content-Type für PDF-Handhabung
-                    content_type = response.headers.get('Content-Type', '')
-                    
-                    if 'application/pdf' in content_type:
-                        # PDF-Datei - speichere als Binary
-                        logger.info(f"[ScrapingBee] PDF erkannt für {url}")
-                        pdf_content = response.content  # Binary content
+                content_type = response.headers.get('Content-Type', '')
+                
+                if 'application/pdf' in content_type:
+                    # PDF-Datei - speichere als Binary
+                    logger.info(f"[ScrapingBee] PDF erkannt für {url}")
+                    pdf_content = response.content  # Binary content
+                    return {
+                        'url': url,
+                        'content': f"[PDF-Dokument gefunden - {len(pdf_content)} bytes]\nURL: {url}\n\nPDF-Analyse:\n- Größe: {len(pdf_content)/1024:.1f} KB\n- Typ: {content_type}\n\nHinweis: PDF müsste mit spezialisierten Tools extrahiert werden.",
+                        'title': 'PDF Document',
+                        'is_pdf': True,
+                        'pdf_size': len(pdf_content)
+                    }
+                elif model_id == 'ai-extract':
+                    # JSON Response erwartet
+                    try:
+                        data = response.json()
                         return {
                             'url': url,
-                            'content': f"[PDF-Dokument gefunden - {len(pdf_content)} bytes]\nURL: {url}\n\nPDF-Analyse:\n- Größe: {len(pdf_content)/1024:.1f} KB\n- Typ: {content_type}\n\nHinweis: PDF müsste mit spezialisierten Tools extrahiert werden.",
-                            'title': 'PDF Document',
-                            'is_pdf': True,
-                            'pdf_size': len(pdf_content)
+                            'content': json.dumps(data) if isinstance(data, dict) else str(data),
+                            'title': data.get('title', '') if isinstance(data, dict) else 'Mining Data'
                         }
-                    elif model_id == 'ai-extract':
-                        # JSON Response erwartet
-                        try:
-                            data = response.json()
-                            return {
-                                'url': url,
-                                'content': json.dumps(data) if isinstance(data, dict) else str(data),
-                                'title': data.get('title', '') if isinstance(data, dict) else 'Mining Data'
-                            }
-                        except json.JSONDecodeError:
-                            # Fallback auf Text
-                            text_content = response.text
-                            return {
-                                'url': url,
-                                'content': text_content,
-                                'title': 'Mining Data'
-                            }
-                    else:
-                        # Standard Text/HTML Response
-                        try:
-                            text_content = response.text
-                            return {
-                                'url': url,
-                                'content': text_content,
-                                'title': self._extract_title_from_html(text_content)
-                            }
-                        except UnicodeDecodeError:
-                            # Binary content das kein PDF ist
-                            binary_content = response.content
-                            return {
-                                'url': url,
-                                'content': f"[Binary-Datei - {len(binary_content)} bytes]\nContent-Type: {content_type}",
-                                'title': 'Binary File',
-                                'is_binary': True
-                            }
+                    except json.JSONDecodeError:
+                        # Fallback auf Text
+                        text_content = response.text
+                        return {
+                            'url': url,
+                            'content': text_content,
+                            'title': 'Mining Data'
+                        }
                 else:
-                    error_text = response.text
-                    logger.error(f"[ScrapingBee] HTTP {response.status_code} für {url}: {error_text[:200]}")
-                    return None
-                    
+                    # Standard Text/HTML Response
+                    try:
+                        text_content = response.text
+                        return {
+                            'url': url,
+                            'content': text_content,
+                            'title': self._extract_title_from_html(text_content)
+                        }
+                    except UnicodeDecodeError:
+                        # Binary content das kein PDF ist
+                        binary_content = response.content
+                        return {
+                            'url': url,
+                            'content': f"[Binary-Datei - {len(binary_content)} bytes]\nContent-Type: {content_type}",
+                            'title': 'Binary File',
+                            'is_binary': True
+                        }
+            else:
+                error_text = response.text
+                logger.error(f"[ScrapingBee] HTTP {response.status_code} für {url}: {error_text[:200]}")
+                return None
+                
         except asyncio.TimeoutError:
             logger.error(f"[ScrapingBee] Timeout beim Scrapen von {url}")
             return None
