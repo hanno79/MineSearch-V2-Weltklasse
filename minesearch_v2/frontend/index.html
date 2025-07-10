@@ -796,7 +796,7 @@
             // Funktion zum Laden verfügbarer Modelle
             async function loadAvailableModels() {
                 try {
-                    const response = await fetch('http://localhost:8000/api/models');
+                    const response = await fetch('/api/models');
                     const data = await response.json();
                     
                     if (data.success && data.models) {
@@ -2358,83 +2358,6 @@
         function displayStatisticsTable(data) {
             // Nutze die neue sortierbare Funktion
             loadModelSummaries();
-        }
-            
-            const tableHtml = `
-                <table class="sources-table">
-                    <thead>
-                        <tr>
-                            <th>Modell</th>
-                            <th>Tests</th>
-                            <th>Erfolgsrate</th>
-                            <th>Konsistenz</th>
-                            <th>Ø Felder</th>
-                            <th>Ø Zeit</th>
-                            <th>Kosten/Request</th>
-                            <th>Kritische Felder</th>
-                            <th>Aktionen</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${models.map(model => {
-                            // ÄNDERUNG 07.07.2025: Nutze data_success_rate wenn vorhanden
-                            const successRate = model.data_success_rate !== undefined ? model.data_success_rate : model.success_rate;
-                            const successColor = successRate > 0.8 ? '#10b981' : 
-                                               successRate > 0.5 ? '#f59e0b' : '#ef4444';
-                            const consistencyColor = model.overall_consistency > 0.8 ? '#10b981' : 
-                                                   model.overall_consistency > 0.5 ? '#f59e0b' : '#ef4444';
-                            
-                            // Kritische Felder Zusammenfassung
-                            const criticalFields = model.critical_fields_consistency || {};
-                            const criticalFieldsHtml = Object.entries(criticalFields)
-                                .map(([field, score]) => {
-                                    const color = score > 0.8 ? '#10b981' : score > 0.5 ? '#f59e0b' : '#ef4444';
-                                    const fieldAbbr = field === 'Restaurationskosten' ? 'Res' :
-                                                    field === 'Eigentümer' ? 'Eig' :
-                                                    field === 'Betreiber' ? 'Bet' :
-                                                    field === 'x-Koordinate' ? 'x-K' :
-                                                    field === 'y-Koordinate' ? 'y-K' :
-                                                    field === 'Aktivitätsstatus' ? 'Akt' :
-                                                    field.substring(0, 3);
-                                    return `<span style="color: ${color};" title="${field}: ${(score * 100).toFixed(0)}%">
-                                        ${fieldAbbr}
-                                    </span>`;
-                                }).join(', ') || 'Keine Daten';
-                            
-                            return `
-                            <tr>
-                                <td><strong>${model.model_id}</strong></td>
-                                <td>${model.total_tests}</td>
-                                <td>
-                                    <div class="reliability-bar">
-                                        <div class="reliability-fill" style="width: ${successRate * 100}%; background: ${successColor}"></div>
-                                        <span>${(successRate * 100).toFixed(0)}%</span>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="reliability-bar">
-                                        <div class="reliability-fill" style="width: ${model.overall_consistency * 100}%; background: ${consistencyColor}"></div>
-                                        <span>${(model.overall_consistency * 100).toFixed(0)}%</span>
-                                    </div>
-                                </td>
-                                <td>${model.avg_fields_found.toFixed(1)}</td>
-                                <td>${model.avg_response_time_ms.toFixed(0)}ms</td>
-                                <td>$${(model.estimated_cost_per_request || 0).toFixed(3)}</td>
-                                <td style="font-size: 12px;">${criticalFieldsHtml}</td>
-                                <td>
-                                    <button onclick="viewModelDetails('${model.model_id}')" 
-                                            style="background: #3b82f6; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                        Details
-                                    </button>
-                                </td>
-                            </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            `;
-            
-            document.getElementById('statistics-table-container').innerHTML = tableHtml;
         }
         
         // Neuen Benchmark starten
