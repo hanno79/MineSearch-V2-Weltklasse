@@ -380,7 +380,8 @@ BESONDERE AUFMERKSAMKEIT:
         """Behandle API-Fehler mit benutzerfreundlichen Nachrichten"""
         try:
             error_data = response.json()
-        except:
+        except (ValueError, TypeError, AttributeError) as e:
+            logger.warning(f"Could not parse error response JSON: {e}")
             error_data = {}
         
         if response.status_code == 400:
@@ -542,10 +543,22 @@ Deine Aufgabe ist die vollständige Analyse von Mining-Dokumenten ohne Einschrä
    - Zeiträume (jährlich, total, NPV)
    - Inflationsanpassungen
 
+**KRITISCHE DATENQUALITÄTS-REGELN:**
+1. JEDE Information MUSS mit [Quelle: ...] gekennzeichnet werden
+2. Bei fehlenden Daten: Feld LEER lassen - KEINE Platzhalter!
+3. WICHTIG: Lasse Felder LEER wenn keine Daten gefunden - KEINE Platzhalter!
+
+**VERBOTENE PLATZHALTER:**
+- NIEMALS "unbekannt", "unknown", "nicht gefunden" als Datenfeld-Werte verwenden
+- KEINE "k.A.", "n/a", "-", "nicht verfügbar" etc.
+- Bei Restaurationskosten: NUR realistische Beträge (mind. $10,000) oder LEER lassen
+- KEINE Dummy-Werte wie "$1 CAD", "$2 CAD", "$3 CAD" verwenden
+
 **QUALITÄTSSICHERUNG:**
 - Nutze deinen großen Kontext für Vollständigkeit
 - Verpasse keine Information durch Platzmangel
 - Verfolge Querverweise bis zum Ende
+- NIEMALS Platzhalter oder Dummy-Werte verwenden
 - Konsolidiere fragmentierte Daten
 
 **KRITISCHE ANWEISUNGEN - KEINE DUMMY-WERTE:**

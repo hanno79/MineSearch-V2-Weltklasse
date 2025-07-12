@@ -411,6 +411,16 @@ GEMINI_MODELS = {
 
 # xAI Grok Modelle
 GROK_MODELS = {
+    'grok-4': {
+        'id': 'grok-4',
+        'name': 'Grok 4 (Flagship)',
+        'timeout': 180,
+        'max_tokens': 12000,
+        'description': 'Neuestes xAI Flaggschiff-Modell - führend in allen Benchmarks',
+        'supports_web_search': True,
+        'supports_deep_research': True,
+        'is_free': False
+    },
     'grok-3': {
         'id': 'grok-3',
         'name': 'Grok 3',

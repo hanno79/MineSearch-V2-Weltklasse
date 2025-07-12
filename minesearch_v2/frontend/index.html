@@ -9,7 +9,7 @@
     <title>MineSearch 2.0 - Mining Recherche System</title>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="/static/style.css?v=2.0.1">
+    <link rel="stylesheet" href="style.css?v=2.0.1">
     <style>
         /* Tab-Navigation Styles */
         .tab-navigation {
@@ -351,7 +351,7 @@
             <div id="csv_form" class="search-form active">
                 <h2>CSV-Datei mit Minen hochladen</h2>
                 <form id="csv-upload-form" 
-                      hx-post="http://localhost:8000/api/upload-csv" 
+                      hx-post="http://localhost:8000/api/upload-csv"
                       hx-encoding="multipart/form-data"
                       hx-target="#csv-info"
                       hx-indicator="#loading">
@@ -706,7 +706,7 @@
         </main>
 
         <footer>
-            <p>MineSearch 2.0 - Radikal vereinfacht | <a href="http://localhost:8000/health" target="_blank">System Status</a></p>
+            <p>MineSearch 2.0 - Radikal vereinfacht | <a href="/health" target="_blank">System Status</a></p>
         </footer>
     </div>
 
@@ -1447,7 +1447,9 @@
                         <p>Es gab ein Problem bei der Kommunikation mit dem Server.</p>
                         <details>
                             <summary>Technische Details</summary>
-                            <pre>${JSON.stringify(evt.detail, null, 2)}</pre>
+                            <pre>Status: ${evt.detail.xhr?.status || 'unbekannt'}
+URL: ${evt.detail.pathInfo?.requestPath || 'unbekannt'}
+Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                         </details>
                     </div>
                 `;
@@ -1457,6 +1459,9 @@
         // Debug HTMX Requests
         document.body.addEventListener('htmx:beforeRequest', function(evt) {
             console.log('HTMX Request gestartet:', evt.detail.pathInfo.requestPath);
+            if (evt.detail.pathInfo.requestPath.includes('upload-csv')) {
+                console.log('CSV Upload Request Details:', evt.detail);
+            }
         });
 
         document.body.addEventListener('htmx:afterRequest', function(evt) {
@@ -1468,7 +1473,7 @@
 
         // Anpassung für CSV Batch-Form nach Upload
         document.body.addEventListener('htmx:afterRequest', function(evt) {
-            if (evt.detail.pathInfo.requestPath === '/api/upload-csv' && evt.detail.successful) {
+            if ((evt.detail.pathInfo.requestPath === '/api/upload-csv' || evt.detail.pathInfo.requestPath.includes('/api/upload-csv')) && evt.detail.successful) {
                 // Nach erfolgreichem CSV Upload, füge versteckte Felder für Such-Modus hinzu
                 setTimeout(() => {
                     const batchForm = document.getElementById('batch-form');
@@ -2451,32 +2456,14 @@
             document.getElementById('benchmark-status').style.display = 'none';
         }
         
-        // ÄNDERUNG 09.07.2025: Implementiere fehlende Feld-Statistik Funktionen
-        window.loadFieldStatistics = async function() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/benchmark/field-statistics`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                if (data.success) {
-                    displayFieldStatistics(data.data);
-                } else {
-                    alert('Fehler beim Laden der Feld-Statistiken: ' + (data.error || 'Unbekannter Fehler'));
-                }
-            } catch (error) {
-                console.error('Fehler beim Laden der Feld-Statistiken:', error);
-                alert('Fehler beim Laden der Feld-Statistiken: ' + error.message);
-            }
-        }
+        // ÄNDERUNG 11.07.2025: Korrigierte Feld-Statistik Funktion (entfernt - Duplikat)
         
         window.loadFieldComparison = async function() {
             const container = document.getElementById('statistics-table-container');
             container.innerHTML = '<p style="text-align: center;">Lade Feld-Vergleich...</p>';
             
             try {
-                const response = await fetch('http://localhost:8000/api/benchmark/field-comparison');
+                const response = await fetch(`${API_BASE_URL}/api/benchmark/field-comparison`);
                 const data = await response.json();
                 
                 let html = `
@@ -2858,7 +2845,7 @@
             container.innerHTML = '<p style="text-align: center;">Lade Feld-Statistiken...</p>';
             
             try {
-                const response = await fetch('http://localhost:8000/api/benchmark/field-statistics');
+                const response = await fetch(`${API_BASE_URL}/api/benchmark/field-statistics`);
                 const data = await response.json();
                 
                 if (!data.by_field || Object.keys(data.by_field).length === 0) {

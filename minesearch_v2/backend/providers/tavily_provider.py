@@ -357,7 +357,8 @@ class TavilyProvider(AbstractProvider):
                         parsed = urllib.parse.urlparse(url)
                         if parsed.netloc:
                             source_domains.add(parsed.netloc)
-                    except:
+                    except (ValueError, TypeError) as e:
+                        logger.debug(f"Could not parse discovered source URL {url}: {e}")
                         pass
             
             domains.extend(list(source_domains))
@@ -393,7 +394,8 @@ class TavilyProvider(AbstractProvider):
             try:
                 error_data = response.json()
                 return f"Tavily API Fehler: {error_data.get('detail', 'Unbekannter Fehler')}"
-            except:
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.warning(f"Could not parse Tavily error response: {e}")
                 return f"API Fehler: {response.status_code} - {response.text[:200]}"
     
     def get_models(self) -> Dict[str, ModelConfig]:
@@ -425,7 +427,8 @@ class TavilyProvider(AbstractProvider):
                     }
                 )
                 return response.status_code in [200, 401]  # 401 = Key ungültig, aber API erreichbar
-        except:
+        except (httpx.RequestError, httpx.HTTPStatusError, Exception) as e:
+            logger.warning(f"Tavily API health check failed: {e}")
             return False
     
     def get_system_prompt(self, options: Dict[str, Any]) -> str:

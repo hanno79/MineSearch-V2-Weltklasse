@@ -18,6 +18,16 @@ from .benchmark import router as benchmark_router
 # Haupt-Router erstellen
 router = APIRouter()
 
+# Health-Check Endpoint
+@router.get("/health")
+async def health_check():
+    """Health-Check Endpoint für Service-Management"""
+    return {
+        "status": "healthy",
+        "service": "MineSearch v2.1", 
+        "timestamp": "2025-07-12"
+    }
+
 # Sub-Router einbinden
 router.include_router(static_router)
 router.include_router(search_router, prefix="/api", tags=["search"])

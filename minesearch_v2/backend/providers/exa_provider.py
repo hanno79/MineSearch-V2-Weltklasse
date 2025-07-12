@@ -346,7 +346,8 @@ class ExaProvider(AbstractProvider):
                         parsed = urllib.parse.urlparse(url)
                         if parsed.netloc and parsed.netloc not in domains:
                             domains.append(parsed.netloc)
-                    except:
+                    except (ValueError, TypeError) as e:
+                        logger.debug(f"Could not parse URL {url}: {e}")
                         pass
         
         # Länderspezifische Domains hinzufügen
@@ -372,7 +373,8 @@ class ExaProvider(AbstractProvider):
             try:
                 error_data = response.json()
                 return f"Exa API Fehler: {error_data.get('detail', error_data.get('error', 'Unbekannter Fehler'))}"
-            except:
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.warning(f"Could not parse error response: {e}")
                 return f"API Fehler: {response.status_code} - {response.text[:200]}"
     
     def get_models(self) -> Dict[str, ModelConfig]:
@@ -402,7 +404,8 @@ class ExaProvider(AbstractProvider):
                     }
                 )
                 return response.status_code in [200, 401]  # 401 = Key ungültig, aber API erreichbar
-        except:
+        except (httpx.RequestError, httpx.HTTPStatusError, Exception) as e:
+            logger.warning(f"Exa API health check failed: {e}")
             return False
     
     def get_system_prompt(self, options: Dict[str, Any]) -> str:

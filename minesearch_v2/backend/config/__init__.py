@@ -14,7 +14,7 @@ from .api_keys import APIKeysConfig
 from .providers import PROVIDERS_CONFIG
 from .models import MODELS_CONFIG
 from .country_config import COUNTRY_CONFIG
-from .source_sharing import SOURCE_SHARING_CONFIG
+from .source_sharing import SOURCE_SHARING_CONFIG, CACHE_CONFIG
 
 # Zentrale Config-Instanz
 config = Config()
@@ -29,5 +29,6 @@ __all__ = [
     'PROVIDERS_CONFIG',
     'MODELS_CONFIG',
     'COUNTRY_CONFIG',
-    'SOURCE_SHARING_CONFIG'
+    'SOURCE_SHARING_CONFIG',
+    'CACHE_CONFIG'
 ]

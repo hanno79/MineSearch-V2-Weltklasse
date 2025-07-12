@@ -274,7 +274,7 @@ class DataExtractor:
             ]
             
             # Prüfe auf exakte Übereinstimmung
-            if resto.lower() in [dv.lower() for dv in dummy_values]:
+            if str(resto).lower() in [dv.lower() for dv in dummy_values]:
                 logger.warning(f"Dummy-Restaurationskostenwert entfernt: {resto}")
                 data['Restaurationskosten'] = ""
             # Prüfe auf Muster wie "$X.0 million" wo X eine einzelne Ziffer ist
@@ -464,7 +464,7 @@ def _find_sources_in_context(context: str, all_sources: List[Dict[str, Any]]) ->
     
     # Prüfe jede Quelle
     for idx, source in enumerate(all_sources, 1):
-        source_value = source['value'].lower()
+        source_value = str(source.get('value', '')).lower()
         
         # Direkte Erwähnung
         if source_value in context_lower:

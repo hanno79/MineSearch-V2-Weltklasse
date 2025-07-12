@@ -236,9 +236,46 @@ Gib die Informationen strukturiert und vollständig zurück.
         """Gibt alle verfügbaren Modelle zurück"""
         return self.models
     
-    def get_system_prompt(self, mine_type: str = None) -> str:
-        """Gibt System-Prompt für das Modell zurück"""
-        return "Du bist ein Experte für Mining-Projekte mit tiefem Verständnis für Bergbauprojekte."
+    def get_system_prompt(self, options: Dict[str, Any] = None) -> str:
+        """System-Prompt für DeepSeek mit Anti-Dummy-Regeln"""
+        if options is None:
+            options = {}
+        currency = options.get('currency', 'USD')
+        
+        return f"""Du bist ein Experte für Mining-Projekte mit tiefem Verständnis für Bergbauprojekte.
+Deine Aufgabe ist die präzise Extraktion von Mining-Daten ohne jegliche Dummy-Werte.
+
+**STRUKTURIERTES AUSGABEFORMAT:**
+- Name: [exakter Name] [Quelle: URL/Dokument]
+- Land: [Land] [Quelle: URL/Dokument]
+- Region: [Region/Provinz] [Quelle: URL/Dokument]
+- Eigentümer: [Eigentümer der Mine] [Quelle: URL/Dokument]
+- Betreiber: [Betreiber/Operator] [Quelle: URL/Dokument]
+- Koordinaten: [Latitude, Longitude] [Quelle: URL/Dokument]
+- Status: [aktiv/geschlossen/geplant] [Quelle: URL/Dokument]
+- Rohstoffe: [Liste der Rohstoffe] [Quelle: URL/Dokument]
+- Minentyp: [Untertage/Open-Pit/etc] [Quelle: URL/Dokument]
+- Produktionsstart: [Jahr] [Quelle: URL/Dokument]
+- Produktionsende: [Jahr oder 'aktiv'] [Quelle: URL/Dokument]
+- Fördermenge: [Menge/Jahr mit Einheit] [Quelle: URL/Dokument]
+- Fläche: [in km²] [Quelle: URL/Dokument]
+- Restaurationskosten: [Betrag in {currency}$ mit Jahr] [Quelle: URL/Dokument]
+
+**KRITISCHE DATENQUALITÄTS-REGELN:**
+1. JEDE Information MUSS mit [Quelle: ...] gekennzeichnet werden
+2. Bei fehlenden Daten: Feld LEER lassen - KEINE Platzhalter!
+3. WICHTIG: Lasse Felder LEER wenn keine Daten gefunden - KEINE Platzhalter!
+
+**VERBOTENE PLATZHALTER:**
+- NIEMALS "unbekannt", "unknown", "nicht gefunden" als Datenfeld-Werte verwenden
+- KEINE "k.A.", "n/a", "-", "nicht verfügbar" etc.
+- Bei Restaurationskosten: NUR realistische Beträge (mind. $10,000) oder LEER lassen
+- KEINE Dummy-Werte wie "$1 CAD", "$2 CAD", "$3 CAD" verwenden
+
+**STRIKT VERBOTEN:**
+- Verwendung von Platzhaltern oder Dummy-Werten
+- Spekulation über fehlende Daten
+- Fallback-Werte bei Unsicherheit"""
     
     def validate_config(self) -> bool:
         """Validiere Provider-Konfiguration"""

@@ -135,7 +135,8 @@ def get_country_from_domain(url: str) -> str:
         elif domain.endswith('.mx'):
             return 'Mexico'
         
-    except:
+    except (ValueError, TypeError, AttributeError) as e:
+        logger.debug(f"Could not parse domain from URL {url}: {e}")
         pass
     
     return None

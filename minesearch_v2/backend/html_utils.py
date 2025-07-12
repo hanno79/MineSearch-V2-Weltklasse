@@ -1,708 +1,177 @@
 """
 Author: rahn
-Datum: 01.07.2025
-Version: 1.0
-Beschreibung: HTML-Utility-Funktionen für MineSearch Frontend-Generierung
+Datum: 12.07.2025  
+Version: 2.0
+Beschreibung: Refactored HTML-Utility-Funktionen für MineSearch Frontend (CLAUDE.md konform)
 """
 
 from typing import Dict, List, Any, Optional
-from config import CSV_COLUMNS, FIELDS_WITHOUT_SOURCES
-import re
 
-def create_result_card(result: Dict) -> str:
-    """Erstelle HTML für ein Suchergebnis"""
-    mine = result['mine']
-    data = result['data']
-    
-    # Erstelle strukturierte Tabelle
-    structured_html = ""
-    if 'structured_data' in data:
-        structured = data['structured_data']
-        structured_html = """
-        <h5>Extrahierte Daten:</h5>
-        <table class="data-table" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-            <tr style="background-color: #f0f0f0;">
-                <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Feld</th>
-                <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Wert</th>
-            </tr>
-        """
-        
-        # Definiere Finanzspalten für Hervorhebung
-        finanz_spalten = ['Restaurationskosten', 'Jahr der Aufnahme der Kosten', 'Jahr der Erstellung des Dokumentes']
-        
-        # Verwende structured_data_with_sources für Quellennummern
-        data_with_sources = data.get('structured_data_with_sources', {})
-        
-        # Zeige ALLE CSV-Spalten
-        for field in CSV_COLUMNS:
-            if field == 'ID':
-                continue  # ID wird separat behandelt oder übersprungen
-                
-            value = structured.get(field, '-')
-            sources_refs = ''
-            
-            # Hole Quellennummern nur bei echten Infos und erlaubten Feldern
-            if (field not in FIELDS_WITHOUT_SOURCES and 
-                field in data_with_sources and
-                value and 
-                value != '-' and
-                value.lower() not in ['k.a', 'k.a.', 'keine daten', 'nicht gefunden']):
-                sources = data_with_sources[field].get('sources', [])
-                if sources:
-                    sources_refs = f' <span style="color: #6b7280; font-size: 0.85em;">[{",".join(map(str, sources))}]</span>'
-            
-            # Spezielle Formatierung für verschiedene Spaltentypen
-            row_style = ''
-            display_value = value
-            
-            # Finanzspalten gelb hinterlegen
-            if field in finanz_spalten:
-                row_style = 'style="background-color: #fef3c7;"'
-                
-                # Restaurationskosten rot hervorheben wenn vorhanden
-                if field == 'Restaurationskosten' and value != '-' and value:
-                    display_value = f'<span style="color: #dc2626; font-weight: bold;">{value}</span>'
-                elif value == '-':
-                    display_value = '<span style="color: #9ca3af; font-style: italic;">Keine Daten gefunden</span>'
-            
-            # Status farbig darstellen
-            elif field == 'Aktivitätsstatus' and value != '-':
-                if 'aktiv' in value.lower():
-                    display_value = f'<span style="color: #10b981; font-weight: 500;">{value}</span>'
-                elif 'geplant' in value.lower():
-                    display_value = f'<span style="color: #f59e0b; font-weight: 500;">{value}</span>'
-                elif 'geschlossen' in value.lower():
-                    display_value = f'<span style="color: #ef4444; font-weight: 500;">{value}</span>'
-            
-            # Füge Quellennummern an
-            display_value += sources_refs
-            
-            structured_html += f"""
-            <tr {row_style}>
-                <td style="padding: 8px; border: 1px solid #ddd;"><strong>{field}</strong></td>
-                <td style="padding: 8px; border: 1px solid #ddd;">{display_value}</td>
-            </tr>
-            """
-        
-        structured_html += "</table>"
-    
-    # Quellen-Anzeige
-    sources_html = ""
-    if 'sources' in data and data['sources']:
-        sources = data['sources']
-        source_summary = data.get('source_summary', {})
-        
-        sources_html = f"""
-        <h5 style="margin-top: 20px;">📚 Gefundene Quellen ({source_summary.get('total', 0)} insgesamt):</h5>
-        <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px;">
-        """
-        
-        # URLs
-        url_sources = [s for s in sources if s['type'] == 'url']
-        if url_sources:
-            sources_html += "<strong>🌐 Websites:</strong><ul style='margin: 5px 0;'>"
-            for source in url_sources[:5]:  # Max 5 URLs anzeigen
-                sources_html += f"<li><a href='{source['value']}' target='_blank' style='color: #0066cc;'>{source['value']}</a></li>"
-            if len(url_sources) > 5:
-                sources_html += f"<li><em>... und {len(url_sources) - 5} weitere URLs</em></li>"
-            sources_html += "</ul>"
-        
-        # Dokumente
-        doc_sources = [s for s in sources if s['type'] == 'document']
-        if doc_sources:
-            sources_html += "<strong>📄 Dokumente:</strong><ul style='margin: 5px 0;'>"
-            for source in doc_sources[:5]:
-                sources_html += f"<li>{source['value']}</li>"
-            if len(doc_sources) > 5:
-                sources_html += f"<li><em>... und {len(doc_sources) - 5} weitere Dokumente</em></li>"
-            sources_html += "</ul>"
-        
-        # Organisationen
-        org_sources = [s for s in sources if s['type'] == 'organization']
-        if org_sources:
-            sources_html += "<strong>🏢 Organisationen/Datenbanken:</strong><ul style='margin: 5px 0;'>"
-            for source in org_sources[:3]:
-                sources_html += f"<li>{source['value']}</li>"
-            if len(org_sources) > 3:
-                sources_html += f"<li><em>... und {len(org_sources) - 3} weitere Organisationen</em></li>"
-            sources_html += "</ul>"
-        
-        sources_html += "</div>"
-    
-    # Source Discovery Tab
-    source_discovery_html = ""
-    if 'source_discovery_session' in data:
-        source_discovery_html = create_source_discovery_tab(data['source_discovery_session'])
-    
-    # CSV Download-Link
-    csv_download = ""
-    if 'structured_data' in data:
-        # Verwende | als Trennzeichen und füge Quellennummern hinzu
-        csv_values = []
-        data_with_sources = data.get('structured_data_with_sources', {})
-        
-        for col in CSV_COLUMNS:
-            val = data['structured_data'].get(col, '')
-            # Füge Quellennummern hinzu wenn vorhanden
-            if col in data_with_sources and data_with_sources[col].get('sources'):
-                sources = data_with_sources[col]['sources']
-                val += f" [{','.join(map(str, sources))}]"
-            csv_values.append(val)
-        
-        csv_line = "|".join(csv_values)
-        csv_download = f"""
-        <details style="margin-top: 10px;">
-            <summary>CSV-Format (zum Kopieren)</summary>
-            <pre style="font-size: 0.8em; background: #f5f5f5; padding: 10px; overflow-x: auto;">{csv_line}</pre>
-        </details>
-        """
-    
-    # Original-Antwort als Details
-    original_content = f"""
-    <details style="margin-top: 10px;">
-        <summary>Vollständige Antwort anzeigen</summary>
-        <pre style="font-size: 0.9em; max-height: 300px; overflow-y: auto;">{data.get('content', 'Keine Daten')}</pre>
-    </details>
-    """
-    
-    return f"""
-    <div class="result-card success">
-        <h4>✓ {mine['mine_name']}</h4>
-        <div class="result-content">
-            {structured_html}
-            {sources_html}
-            {source_discovery_html}
-            {csv_download}
-            {original_content}
-        </div>
-    </div>
-    """
+# Import aller refactoriserten Module
+from html_cards import create_result_card, create_error_card
+from html_batch import create_batch_results_table, _create_batch_source_summary
+from html_sources import create_source_discovery_tab, _create_sources_section, create_sources_overview
 
-def create_error_card(error: Dict) -> str:
-    """Erstelle HTML für einen Fehler"""
-    mine = error['mine']
-    err = error['error']
-    
-    # ÄNDERUNG 02.07.2025: Verbesserte Fehlerdarstellung mit Lösungshinweisen
-    error_html = f"""
-    <div class="result-card error">
-        <h4>❌ {mine['mine_name']}</h4>
-    """
-    
-    # Spezielle Behandlung für API-Fehler
-    if "🔐" in err or "💳" in err or "🔑" in err:
-        # Formatiere mehrzeilige Fehlermeldungen besser
-        error_lines = err.split('\n')
-        error_html += "<div style='background: #fee; padding: 15px; border-radius: 5px; margin: 10px 0;'>"
-        
-        for line in error_lines:
-            if line.strip():
-                if "→" in line:
-                    # Lösungshinweise hervorheben
-                    error_html += f"<p style='margin: 5px 0; padding-left: 20px; color: #666;'>➜ {line.replace('→', '').strip()}</p>"
-                elif "http" in line:
-                    # Links klickbar machen
-                    url_match = line.split()[-1] if line.split() else ""
-                    if url_match.startswith('http'):
-                        error_html += f"<p style='margin: 10px 0;'><a href='{url_match}' target='_blank' style='color: #0066cc; text-decoration: underline;'>🔗 {url_match}</a></p>"
-                    else:
-                        error_html += f"<p style='margin: 5px 0;'>{line}</p>"
-                elif any(emoji in line for emoji in ['🔐', '💳', '🔑', '⏱️', '🔧', '❓']):
-                    # Zeilen mit Emojis hervorheben
-                    error_html += f"<p style='margin: 8px 0; font-weight: bold; color: #d32f2f;'>{line}</p>"
-                else:
-                    # Normale Zeilen
-                    error_html += f"<p style='margin: 5px 0;'>{line}</p>"
-        
-        error_html += "</div>"
-        
-        # Zusätzliche Hilfe-Box je nach Fehlertyp
-        if "Budget" in err or "aufgebraucht" in err or "💳" in err:
-            error_html += """
-            <div style='background: #fff3cd; padding: 12px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #ffc107;'>
-                <strong>💡 Schnelle Lösung:</strong>
-                <ol style='margin: 5px 0 0 20px;'>
-                    <li>Öffnen Sie <a href='https://www.perplexity.ai/settings/api' target='_blank'>Perplexity API Settings</a></li>
-                    <li>Laden Sie Ihr API-Guthaben auf</li>
-                    <li>Starten Sie die Suche erneut</li>
-                </ol>
-            </div>
-            """
-        elif "ungültig" in err or "abgelaufen" in err or "🔑" in err:
-            error_html += """
-            <div style='background: #fff3cd; padding: 12px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #ffc107;'>
-                <strong>💡 Schnelle Lösung:</strong>
-                <ol style='margin: 5px 0 0 20px;'>
-                    <li>Generieren Sie einen neuen API-Key: <a href='https://www.perplexity.ai/settings/api' target='_blank'>Perplexity API</a></li>
-                    <li>Ersetzen Sie den Key in der .env Datei</li>
-                    <li>Starten Sie den Server neu</li>
-                </ol>
-            </div>
-            """
-        elif "Rate Limit" in err or "⏱️" in err:
-            error_html += """
-            <div style='background: #e3f2fd; padding: 12px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #2196f3;'>
-                <strong>ℹ️ Info:</strong> Das API-Limit wurde temporär erreicht. 
-                Die Suche wird automatisch in wenigen Minuten wieder funktionieren.
-            </div>
-            """
-    else:
-        # Standard-Fehlerbehandlung
-        error_html += f"<p style='padding: 10px; background: #fee; border-radius: 5px;'>Fehler: {err}</p>"
-    
-    error_html += "</div>"
-    return error_html
+# Re-exportiere alle Funktionen für Kompatibilität
+__all__ = [
+    'create_result_card',
+    'create_error_card', 
+    'create_batch_results_table',
+    'create_source_discovery_tab',
+    'create_sources_overview'
+]
 
-def create_batch_results_table(results: List[Dict]) -> str:
-    """Erstelle HTML-Tabelle für Batch-Ergebnisse"""
+
+def create_comprehensive_results_page(results: List[Dict], sources_data: Optional[Dict] = None,
+                                    title: str = "MineSearch Ergebnisse") -> str:
+    """
+    Erstellt eine umfassende HTML-Seite mit allen Ergebnissen
+    
+    Args:
+        results: Liste der Suchergebnisse
+        sources_data: Optional - Source Discovery Daten
+        title: Titel der Seite
+        
+    Returns:
+        Vollständige HTML-Seite
+    """
     if not results:
-        return ""
-    
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"create_batch_results_table: Verarbeite {len(results)} Ergebnisse")
-    
-    # CSV-Daten für Export vorbereiten
-    csv_lines_with_sources = [";".join(CSV_COLUMNS)]  # Header
-    
-    # HTML-Tabelle vorbereiten
-    csv_table_html = f"""
-    <div style="margin: 0; padding: 10px 0; background: #f0fff4; width: 100%;">
-        <div style="max-width: 1400px; margin: 0 auto; padding: 0 15px;">
-            <h4>📊 Ergebnistabelle mit Quellenreferenzen</h4>
-            <p style="margin-bottom: 10px;">Die Tabelle zeigt alle gefundenen Daten. Zahlen in eckigen Klammern [1,2,3] verweisen auf die Quellen unten.</p>
+        return f"""
+        <div style="text-align: center; padding: 50px; color: #666;">
+            <h3>{title}</h3>
+            <p>Keine Ergebnisse verfügbar.</p>
         </div>
-        
-        <div style="overflow-x: auto; padding: 0 10px;">
-            <table id="results-table" style="width: 100%; border-collapse: collapse; font-size: 13px; background: white; table-layout: fixed;">
-                <thead>
-                    <tr style="background: #4CAF50; color: white;">
-    """
+        """
     
-    # Tabellen-Header mit optimierten Breiten
-    column_widths = {
-        'ID': '40px',
-        'Name': '150px',
-        'Country': '80px',
-        'Region': '100px',
-        'Eigentümer': '120px',
-        'Betreiber': '120px',
-        'x-Koordinate': '90px',
-        'y-Koordinate': '90px',
-        'Aktivitätsstatus': '100px',
-        'Restaurationskosten': '130px',
-        'Jahr der Aufnahme der Kosten': '80px',
-        'Jahr der Erstellung des Dokumentes': '80px',
-        'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': '100px',
-        'Minentyp (Untertage/ Open-Pit/ usw.)': '100px',
-        'Produktionsstart': '80px',
-        'Produktionsende': '80px',
-        'Fördermenge/Jahr': '100px',
-        'Fläche der Mine in qkm': '80px',
-        'Quellenangaben': '120px'
-    }
+    # Kategorisiere Ergebnisse
+    successful_results = [r for r in results if r.get('success', False)]
+    failed_results = [r for r in results if not r.get('success', False)]
     
-    for col in CSV_COLUMNS:
-        width = column_widths.get(col, 'auto')
-        csv_table_html += f'<th style="padding: 8px 6px; border: 1px solid #ddd; text-align: left; position: sticky; top: 0; background: #4CAF50; width: {width}; min-width: {width}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{col}</th>'
-    csv_table_html += '</tr></thead><tbody>'
+    # Erstelle Statistiken
+    total_mines = len(results)
+    successful_mines = len(successful_results)
+    success_rate = (successful_mines / total_mines * 100) if total_mines > 0 else 0
     
-    # Tabellen-Zeilen
-    rows_added = 0
-    for idx, r in enumerate(results):
-        # ÄNDERUNG 07.07.2025: Erweiterte Debug-Ausgabe
-        logger.info(f"[TABLE-DEBUG] Result {idx}: keys={list(r.keys())}")
-        logger.info(f"[TABLE-DEBUG] Result {idx} - Mine: {r.get('mine_name', 'Unknown')}, Success: {r.get('success', False)}")
-        
-        # Prüfe ob structured_data vorhanden ist
-        has_structured_data = False
-        if 'data' in r and isinstance(r['data'], dict):
-            data_keys = list(r['data'].keys())
-            logger.info(f"[TABLE-DEBUG] Result {idx} data keys: {data_keys}")
-            
-            has_structured_data = 'structured_data' in r['data'] and r['data']['structured_data']
-            if has_structured_data:
-                sd_keys = list(r['data']['structured_data'].keys())
-                logger.info(f"[TABLE-DEBUG] Result {idx} structured_data keys (first 5): {sd_keys[:5]}")
-                logger.info(f"[TABLE-DEBUG] Result {idx} structured_data sample: {dict(list(r['data']['structured_data'].items())[:3])}")
-            else:
-                logger.warning(f"[TABLE-DEBUG] Result {idx} has no structured_data or it's empty")
-        else:
-            logger.warning(f"[TABLE-DEBUG] Result {idx} has no 'data' key or data is not dict")
-        
-        if has_structured_data:
-            rows_added += 1
-            row_style = 'style="background: #f9f9f9;"' if idx % 2 == 0 else ''
-            csv_table_html += f'<tr {row_style}>'
-            
-            # CSV-Zeile für Export vorbereiten
-            csv_values = []
-            
-            for col in CSV_COLUMNS:
-                value = r['data']['structured_data'].get(col, '')
-                display_value = value if value else '-'
-                
-                # ÄNDERUNG 02.07.2025: Spezialbehandlung für Quellenangaben im CSV
-                if col == 'Quellenangaben' and value and value != '-' and value != 'Keine spezifischen Quellen dokumentiert':
-                    # Für CSV: Entferne Nummerierung aus Quellen
-                    clean_sources = []
-                    if '+++' in value:
-                        for source in value.split('+++'):
-                            # Entferne [X] Präfix mit regex
-                            clean_source = re.sub(r'^\[\d+\]\s*', '', source.strip())
-                            if clean_source:
-                                clean_sources.append(clean_source)
-                    csv_values.append('; '.join(clean_sources) if clean_sources else value)
-                # Normale Felder mit Quellenreferenzen
-                elif col not in FIELDS_WITHOUT_SOURCES and value and value != '-':
-                    # Prüfe ob structured_data_with_sources vorhanden ist
-                    if 'structured_data_with_sources' in r['data']:
-                        source_data = r['data']['structured_data_with_sources'].get(col, {})
-                        if source_data.get('sources'):
-                            sources_str = ','.join(map(str, source_data['sources']))
-                            display_value += f' <span style="color: #6b7280; font-size: 0.85em;">[{sources_str}]</span>'
-                            csv_values.append(f"{value} [{sources_str}]")
-                        else:
-                            csv_values.append(value)
-                    else:
-                        # Kein structured_data_with_sources vorhanden
-                        csv_values.append(value)
-                else:
-                    csv_values.append(value)
-                
-                # Spezielle Formatierung
-                cell_style = 'padding: 6px; border: 1px solid #ddd;'
-                
-                # Finanzspalten hervorheben
-                if col in ['Restaurationskosten', 'Jahr der Aufnahme der Kosten', 'Jahr der Erstellung des Dokumentes']:
-                    cell_style += ' background-color: #fef3c7;'
-                    if col == 'Restaurationskosten' and value and value != '-':
-                        display_value = f'<strong style="color: #dc2626;">{display_value}</strong>'
-                
-                # Status farbig
-                elif col == 'Aktivitätsstatus' and value and value != '-':
-                    if 'aktiv' in value.lower():
-                        display_value = f'<span style="color: #10b981; font-weight: 600;">{display_value}</span>'
-                    elif 'geplant' in value.lower():
-                        display_value = f'<span style="color: #f59e0b; font-weight: 600;">{display_value}</span>'
-                    elif 'geschlossen' in value.lower():
-                        display_value = f'<span style="color: #ef4444; font-weight: 600;">{display_value}</span>'
-                
-                # ÄNDERUNG 02.07.2025: Kompakte Quellendarstellung
-                elif col == 'Quellenangaben' and value and value != '-' and value != 'Keine spezifischen Quellen dokumentiert':
-                    # Zähle Quellen (getrennt durch +++)
-                    sources_list = value.split('+++')
-                    num_sources = len(sources_list)
-                    
-                    # Erstelle kompakte Darstellung mit Toggle
-                    row_id = f"row_{idx}_{col.replace(' ', '_')}"
-                    display_value = f"""
-                    <div class="sources-compact" onclick="toggleSources('{row_id}')" style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
-                        <span>📚</span>
-                        <span>{num_sources} Quellen</span>
-                        <span id="toggle_{row_id}" style="font-size: 0.8em;">▶</span>
-                    </div>
-                    <div id="sources_{row_id}" class="sources-expanded" style="display: none; margin-top: 5px; font-size: 0.85em; max-height: 150px; overflow-y: auto; background: #f9f9f9; padding: 5px; border-radius: 3px;">
-                    """
-                    
-                    # Zeige erste 3 Quellen
-                    for i, source in enumerate(sources_list[:3]):
-                        display_value += f"{source.strip()}<br>"
-                    
-                    if num_sources > 3:
-                        display_value += f"<span style='color: #666; font-style: italic;'>... und {num_sources - 3} weitere</span><br>"
-                        # Versteckte weitere Quellen
-                        display_value += f"<div id='more_{row_id}' style='display: none; margin-top: 5px;'>"
-                        for source in sources_list[3:]:
-                            display_value += f"{source.strip()}<br>"
-                        display_value += "</div>"
-                        display_value += f"<a href='#' onclick='toggleMore(\"{row_id}\"); return false;' style='color: #2563eb; font-size: 0.9em;'>Alle anzeigen</a>"
-                    
-                    display_value += "</div>"
-                
-                # Standard-Zellinhalt mit Overflow-Handling (außer bei Quellenangaben)
-                if col != 'Quellenangaben':
-                    cell_style += ' overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'
-                    if col in ['Name', 'Eigentümer', 'Betreiber'] and len(str(display_value)) > 30:
-                        # Tooltip für lange Texte
-                        cell_style += f' title="{value}"'
-                
-                csv_table_html += f'<td style="{cell_style}">{display_value}</td>'
-            
-            csv_table_html += '</tr>'
-            csv_lines_with_sources.append(";".join(csv_values))
-    
-    # Fallback wenn keine Zeilen hinzugefügt wurden
-    if rows_added == 0:
-        csv_table_html += """
-            <tr>
-                <td colspan="{}" style="text-align: center; padding: 20px; color: #666;">
-                    Keine Daten gefunden. Bitte überprüfen Sie die Suchergebnisse.
-                </td>
-            </tr>
-        """.format(len(CSV_COLUMNS))
-    
-    csv_table_html += """
-                </tbody>
-            </table>
+    # Kopfbereich mit Statistiken
+    header_html = f"""
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; margin-bottom: 30px;">
+        <h2 style="margin: 0; font-size: 2.5em;">🏔️ {title}</h2>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px;">
+            <div style="text-align: center;">
+                <div style="font-size: 2em; font-weight: bold;">{total_mines}</div>
+                <div>Minen untersucht</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 2em; font-weight: bold;">{successful_mines}</div>
+                <div>Erfolgreich analysiert</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 2em; font-weight: bold;">{success_rate:.1f}%</div>
+                <div>Erfolgsquote</div>
+            </div>
         </div>
-        
-        <div style="max-width: 1400px; margin: 15px auto 0; padding: 0 15px; display: flex; gap: 10px;">
-            <button onclick="copyTableAsCSV()" style="padding: 8px 15px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                📋 Als CSV kopieren
-            </button>
-            <button onclick="copyTableAsHTML()" style="padding: 8px 15px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                📋 Als Tabelle kopieren
-            </button>
-            <button onclick="toggleAllSources()" style="padding: 8px 15px; background: #9333ea; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                📚 Alle Quellen ein-/ausklappen
-            </button>
-        </div>
-        
-        <script>
-            function copyTableAsCSV() {
-                const csvData = `""" + '\\n'.join(csv_lines_with_sources).replace('`', '\\`').replace("'", "\\'") + """`;
-                navigator.clipboard.writeText(csvData).then(() => {
-                    alert('CSV-Daten wurden in die Zwischenablage kopiert!');
-                });
-            }
-            
-            function copyTableAsHTML() {
-                const table = document.getElementById('results-table');
-                const range = document.createRange();
-                range.selectNode(table);
-                window.getSelection().removeAllRanges();
-                window.getSelection().addRange(range);
-                document.execCommand('copy');
-                window.getSelection().removeAllRanges();
-                alert('Tabelle wurde in die Zwischenablage kopiert!');
-            }
-            
-            // Toggle-Funktionen für kompakte Quellen
-            function toggleSources(rowId) {
-                const sourcesDiv = document.getElementById('sources_' + rowId);
-                const toggleIcon = document.getElementById('toggle_' + rowId);
-                
-                if (sourcesDiv.style.display === 'none') {
-                    sourcesDiv.style.display = 'block';
-                    toggleIcon.textContent = '▼';
-                } else {
-                    sourcesDiv.style.display = 'none';
-                    toggleIcon.textContent = '▶';
-                }
-            }
-            
-            function toggleMore(rowId) {
-                const moreDiv = document.getElementById('more_' + rowId);
-                const link = event.target;
-                
-                if (moreDiv.style.display === 'none') {
-                    moreDiv.style.display = 'block';
-                    link.textContent = 'Weniger anzeigen';
-                } else {
-                    moreDiv.style.display = 'none';
-                    link.textContent = 'Alle anzeigen';
-                }
-            }
-            
-            // Alle Quellen ein-/ausklappen
-            if (typeof window.allSourcesExpanded === 'undefined') {
-                window.allSourcesExpanded = false;
-            }
-            
-            function toggleAllSources() {
-                window.allSourcesExpanded = !window.allSourcesExpanded;
-                const allSourceDivs = document.querySelectorAll('[id^="sources_row_"]');
-                const allToggleIcons = document.querySelectorAll('[id^="toggle_row_"]');
-                
-                allSourceDivs.forEach(div => {
-                    div.style.display = window.allSourcesExpanded ? 'block' : 'none';
-                });
-                
-                allToggleIcons.forEach(icon => {
-                    icon.textContent = window.allSourcesExpanded ? '▼' : '▶';
-                });
-            }
-        </script>
     </div>
     """
     
-    # Source Discovery Zusammenfassung für Batch
-    source_discovery_summary = _create_batch_source_summary(results)
-    if source_discovery_summary:
-        csv_table_html += source_discovery_summary
+    # Hauptinhalt
+    content_html = ""
     
-    logger.info(f"create_batch_results_table: {rows_added} Zeilen zur Tabelle hinzugefügt")
+    # Source Discovery Tab (falls verfügbar)
+    if sources_data:
+        content_html += create_source_discovery_tab(sources_data)
     
-    # Wrapper hinzufügen um sicherzustellen dass die Tabelle angezeigt wird
-    wrapped_html = f"""
-    <div class="batch-results" style="display: block; visibility: visible;">
-        {csv_table_html}
-    </div>
-    """
+    # Batch-Tabelle (falls mehrere Ergebnisse)
+    if len(successful_results) > 1:
+        content_html += create_batch_results_table(successful_results)
     
-    return wrapped_html
-
-def _create_batch_source_summary(results: List[Dict]) -> str:
-    """Erstelle Zusammenfassung aller Source Discovery Sessions für Batch-Ergebnisse"""
+    # Einzelne Ergebniskarten
+    content_html += '<div style="margin-top: 30px;">'
     
-    # Sammle alle Sessions
-    sessions = []
-    for r in results:
-        if 'data' in r and 'source_discovery_session' in r['data']:
-            session = r['data']['source_discovery_session']
-            if session:
-                sessions.append({
-                    'mine_name': r['data'].get('mine_name', 'Unbekannt'),
-                    'stats': session.get('statistics', {}),
-                    'duration': session.get('duration_seconds', 0)
-                })
+    if successful_results:
+        content_html += '<h3>✅ Erfolgreiche Analysen</h3>'
+        for result in successful_results:
+            content_html += create_result_card(result)
     
-    if not sessions:
-        return ""
+    if failed_results:
+        content_html += '<h3 style="margin-top: 40px;">❌ Fehlgeschlagene Analysen</h3>'
+        for result in failed_results:
+            content_html += create_error_card(result)
     
-    # Berechne Gesamtstatistiken
-    total_discovered = sum(s['stats'].get('discovered', 0) for s in sessions)
-    total_searched = sum(s['stats'].get('searched', 0) for s in sessions)
-    total_successful = sum(s['stats'].get('successful', 0) for s in sessions)
-    avg_success_rate = (total_successful / total_searched * 100) if total_searched > 0 else 0
-    total_duration = sum(s['duration'] for s in sessions)
+    content_html += '</div>'
     
-    html = f"""
-    <div style="margin: 20px 0; padding: 15px; background: #f0f9ff; border-radius: 5px;">
-        <h4>📊 Source Discovery Zusammenfassung</h4>
-        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 10px;">
-            <div style="text-align: center; padding: 10px; background: white; border-radius: 4px;">
-                <div style="font-size: 20px; font-weight: bold; color: #3b82f6;">{len(sessions)}</div>
-                <div style="font-size: 12px; color: #6b7280;">Minen durchsucht</div>
-            </div>
-            <div style="text-align: center; padding: 10px; background: white; border-radius: 4px;">
-                <div style="font-size: 20px; font-weight: bold; color: #8b5cf6;">{total_discovered}</div>
-                <div style="font-size: 12px; color: #6b7280;">Quellen entdeckt</div>
-            </div>
-            <div style="text-align: center; padding: 10px; background: white; border-radius: 4px;">
-                <div style="font-size: 20px; font-weight: bold; color: #f59e0b;">{total_searched}</div>
-                <div style="font-size: 12px; color: #6b7280;">Quellen durchsucht</div>
-            </div>
-            <div style="text-align: center; padding: 10px; background: white; border-radius: 4px;">
-                <div style="font-size: 20px; font-weight: bold; color: #10b981;">{total_successful}</div>
-                <div style="font-size: 12px; color: #6b7280;">Erfolgreiche Quellen</div>
-            </div>
-            <div style="text-align: center; padding: 10px; background: white; border-radius: 4px;">
-                <div style="font-size: 20px; font-weight: bold; color: {'#10b981' if avg_success_rate >= 50 else '#f59e0b'};">{avg_success_rate:.0f}%</div>
-                <div style="font-size: 12px; color: #6b7280;">Ø Erfolgsquote</div>
-            </div>
-        </div>
-        <p style="margin-top: 10px; font-size: 12px; color: #6b7280;">
-            ⏱️ Gesamtdauer: {total_duration:.1f} Sekunden ({total_duration/60:.1f} Minuten)
+    # Fußbereich
+    footer_html = f"""
+    <div style="margin-top: 50px; padding: 20px; background: #f8f9fa; border-radius: 8px; text-align: center; color: #666;">
+        <p>
+            📊 Generiert am {datetime.now().strftime('%d.%m.%Y um %H:%M:%S')} | 
+            🔍 MineSearch v2.0 | 
+            ⚡ Powered by Multiple AI Models
         </p>
     </div>
     """
     
-    return html
+    return header_html + content_html + footer_html
 
-def create_source_discovery_tab(session_data: Dict[str, Any]) -> str:
-    """Erstelle HTML für Source Discovery Tab"""
-    if not session_data:
+
+def create_quick_summary(results: List[Dict]) -> str:
+    """
+    Erstellt eine schnelle Zusammenfassung der Ergebnisse
+    
+    Args:
+        results: Liste der Suchergebnisse
+        
+    Returns:
+        HTML-String mit Zusammenfassung
+    """
+    if not results:
         return ""
     
-    stats = session_data.get('statistics', {})
-    sources = session_data.get('sources', {})
+    # Berechne Statistiken
+    total_results = len(results)
+    successful_results = [r for r in results if r.get('success', False)]
+    total_fields_found = 0
+    mines_with_coordinates = 0
+    mines_with_operators = 0
+    mines_with_costs = 0
     
-    html = f"""
-    <div class="source-discovery-tab" style="margin: 20px 0; padding: 15px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
-        <h4>🔍 Quellen-Discovery für {session_data.get('mine_name', 'Mine')}</h4>
+    for result in successful_results:
+        data = result.get('data', {})
+        structured_data = data.get('structured_data', {})
         
-        <!-- Statistiken -->
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0;">
-            <div style="background: white; padding: 10px; border-radius: 6px; text-align: center; border: 1px solid #e5e7eb;">
-                <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">{stats.get('discovered', 0)}</div>
-                <div style="font-size: 12px; color: #6b7280;">Entdeckte Quellen</div>
-            </div>
-            <div style="background: white; padding: 10px; border-radius: 6px; text-align: center; border: 1px solid #e5e7eb;">
-                <div style="font-size: 24px; font-weight: bold; color: #8b5cf6;">{stats.get('searched', 0)}</div>
-                <div style="font-size: 12px; color: #6b7280;">Durchsuchte Quellen</div>
-            </div>
-            <div style="background: white; padding: 10px; border-radius: 6px; text-align: center; border: 1px solid #e5e7eb;">
-                <div style="font-size: 24px; font-weight: bold; color: #10b981;">{stats.get('successful', 0)}</div>
-                <div style="font-size: 12px; color: #6b7280;">Erfolgreiche Quellen</div>
-            </div>
-            <div style="background: white; padding: 10px; border-radius: 6px; text-align: center; border: 1px solid #e5e7eb;">
-                <div style="font-size: 24px; font-weight: bold; color: {
-                    '#10b981' if stats.get('success_rate', 0) >= 50 else '#f59e0b' if stats.get('success_rate', 0) >= 25 else '#ef4444'
-                };">
-                    {stats.get('success_rate', 0):.0f}%
-                </div>
-                <div style="font-size: 12px; color: #6b7280;">Erfolgsquote</div>
-            </div>
-        </div>
+        # Zähle gefüllte Felder
+        filled_fields = len([v for v in structured_data.values() if v and str(v).strip()])
+        total_fields_found += filled_fields
         
-        <!-- Erfolgreiche Quellen -->
-        {_create_sources_section('Erfolgreiche Quellen', sources.get('successful', []), '#10b981', True)}
+        # Prüfe spezifische Felder
+        if structured_data.get('x-Koordinate') or structured_data.get('y-Koordinate'):
+            mines_with_coordinates += 1
         
-        <!-- Fehlgeschlagene Quellen -->
-        {_create_sources_section('Durchsuchte Quellen ohne Ergebnis', sources.get('failed', []), '#ef4444', False)}
+        if structured_data.get('Betreiber') or structured_data.get('Eigentümer'):
+            mines_with_operators += 1
         
-        <!-- Dauer -->
-        <div style="margin-top: 15px; font-size: 12px; color: #6b7280;">
-            ⏱️ Suchdauer: {session_data.get('duration_seconds', 0):.1f} Sekunden
+        if structured_data.get('Restaurationskosten'):
+            mines_with_costs += 1
+    
+    avg_fields = total_fields_found / len(successful_results) if successful_results else 0
+    
+    return f"""
+    <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; border-left: 5px solid #4caf50; margin: 20px 0;">
+        <h4 style="color: #2e7d32; margin-top: 0;">📋 Schnelle Zusammenfassung</h4>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+            <div>
+                <strong>Erfolgreiche Analysen:</strong> {len(successful_results)}/{total_results}<br>
+                <strong>Durchschnittliche Felder:</strong> {avg_fields:.1f} pro Mine<br>
+                <strong>Minen mit Koordinaten:</strong> {mines_with_coordinates}
+            </div>
+            <div>
+                <strong>Minen mit Betreiber:</strong> {mines_with_operators}<br>
+                <strong>Minen mit Kosten:</strong> {mines_with_costs}<br>
+                <strong>Gesamt gefundene Daten:</strong> {total_fields_found} Felder
+            </div>
         </div>
     </div>
     """
-    
-    return html
 
-def _create_sources_section(title: str, sources: List[Dict], color: str, show_details: bool) -> str:
-    """Hilfsfunktion für expandierbare Quellenlisten"""
-    if not sources:
-        return ""
-    
-    section_id = title.lower().replace(' ', '-')
-    
-    html = f"""
-    <details style="margin-top: 15px;">
-        <summary style="cursor: pointer; font-weight: 500; color: {color};">
-            {title} ({len(sources)})
-        </summary>
-        <div style="margin-top: 10px; padding-left: 20px;">
-    """
-    
-    for i, source in enumerate(sources[:10]):  # Zeige max 10
-        url = source.get('url', '')
-        timestamp = source.get('timestamp', '')
-        details = source.get('details', {})
-        
-        # Kürze lange URLs
-        display_url = url if len(url) <= 80 else url[:77] + '...'
-        
-        html += f"""
-        <div style="margin: 5px 0; padding: 5px; background: white; border-radius: 4px;">
-            <a href="{url}" target="_blank" style="color: #0066cc; text-decoration: none; font-size: 14px;">
-                {display_url}
-            </a>
-            """
-        
-        if show_details and details:
-            fields = details.get('fields', [])
-            if fields:
-                html += f"""
-                <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">
-                    Gefundene Felder: {', '.join(fields[:5])}{'...' if len(fields) > 5 else ''}
-                </div>
-                """
-        
-        html += "</div>"
-    
-    if len(sources) > 10:
-        html += f"""
-        <div style="margin-top: 5px; font-style: italic; color: #6b7280; font-size: 12px;">
-            ... und {len(sources) - 10} weitere Quellen
-        </div>
-        """
-    
-    html += """
-        </div>
-    </details>
-    """
-    
-    return html
+
+# Legacy-Kompatibilität: Importiere datetime für Footer
+from datetime import datetime

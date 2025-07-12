@@ -10,6 +10,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from .api_keys import APIKeysConfig
 from .providers import PROVIDERS_CONFIG
+from .models import MODELS_CONFIG
 
 # CSV-Spalten Definition
 CSV_COLUMNS = [
@@ -56,6 +57,17 @@ class Config(APIKeysConfig):
     
     # Provider Konfiguration
     PROVIDERS = PROVIDERS_CONFIG
+    
+    # Modell Konfigurationen
+    PERPLEXITY_MODELS = MODELS_CONFIG['perplexity']
+    ANTHROPIC_MODELS = MODELS_CONFIG['anthropic']
+    GEMINI_MODELS = MODELS_CONFIG['gemini']
+    GROK_MODELS = MODELS_CONFIG['grok']
+    OPENAI_MODELS = MODELS_CONFIG['openai']
+    DEEPSEEK_MODELS = MODELS_CONFIG['deepseek']
+    OPENROUTER_MODELS = MODELS_CONFIG['openrouter']
+    EXA_MODELS = MODELS_CONFIG['exa']
+    TAVILY_MODELS = MODELS_CONFIG['tavily']
     
     # Globale Mining-Begriffe und Abkürzungen
     MINING_ABBREVIATIONS = {

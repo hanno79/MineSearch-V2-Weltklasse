@@ -11,7 +11,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from config import config
-from api import router, setup_middleware
+from api import router, setup_middleware, setup_exception_handlers
 from providers.registry import provider_registry
 from api_key_validator import APIKeyValidator
 
@@ -22,6 +22,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ÄNDERUNG 10.07.2025: Lifespan-Funktion implementiert für Startup/Shutdown Events
+# Ersetzt die vorherige on_event-Decorator-Methode für bessere Fehlerbehandlung
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup und Shutdown Events"""
@@ -100,8 +102,11 @@ app = FastAPI(
 # Middleware konfigurieren
 setup_middleware(app)
 
+# Exception Handler aktivieren
+setup_exception_handlers(app)
+
 # Statische Dateien für Frontend
-app.mount("/static", StaticFiles(directory="../frontend"), name="static")
+app.mount("/static", StaticFiles(directory="/app/minesearch_v2/frontend"), name="static")
 
 # API-Router einbinden
 app.include_router(router)

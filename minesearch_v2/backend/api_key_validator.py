@@ -12,14 +12,16 @@ from typing import Dict, Tuple, Optional
 logger = logging.getLogger(__name__)
 
 
+# ÄNDERUNG 10.07.2025: APIKeyValidator implementiert für zentrale API-Key-Validierung
+# Validiert Format aller Provider-API-Keys vor Initialisierung
 class APIKeyValidator:
     """Validiert API-Keys für verschiedene Provider"""
     
     # API-Key Format-Patterns
     KEY_PATTERNS = {
         'perplexity': {
-            'pattern': r'^pplx-[a-fA-F0-9]{48}$',
-            'description': 'Format: pplx-[48 hexadezimale Zeichen]',
+            'pattern': r'^pplx-[a-zA-Z0-9]{48,52}$',
+            'description': 'Format: pplx-[48-52 alphanumerische Zeichen]',
             'example': 'pplx-1234567890abcdef...'
         },
         'openrouter': {
@@ -28,8 +30,8 @@ class APIKeyValidator:
             'example': 'sk-or-v1-1234567890abcdef...'
         },
         'tavily': {
-            'pattern': r'^tvly-[a-zA-Z0-9]{32}$',
-            'description': 'Format: tvly-[32 alphanumerische Zeichen]',
+            'pattern': r'^tvly-[a-zA-Z0-9-]{32,40}$',
+            'description': 'Format: tvly-[32-40 alphanumerische Zeichen und Bindestriche]',
             'example': 'tvly-abc123def456...'
         },
         'exa': {
@@ -53,9 +55,9 @@ class APIKeyValidator:
             'example': 'user123-zone456_key789'
         },
         'openai': {
-            'pattern': r'^sk-[a-zA-Z0-9]{48}$',
-            'description': 'Format: sk-[48 alphanumerische Zeichen]',
-            'example': 'sk-abc123def456...'
+            'pattern': r'^sk-[a-zA-Z0-9-_]{20,200}$',
+            'description': 'Format: sk-[20-200 alphanumerische Zeichen, _ oder -]',
+            'example': 'sk-proj-abc123def456...'
         },
         'anthropic': {
             'pattern': r'^sk-ant-api03-[a-zA-Z0-9-_]{95}$',
@@ -68,14 +70,19 @@ class APIKeyValidator:
             'example': 'AIzaSyAbc123def456...'
         },
         'grok': {
-            'pattern': r'^xai-[a-zA-Z0-9]{48,64}$',
-            'description': 'Format: xai-[48-64 alphanumerische Zeichen]',
+            'pattern': r'^xai-[a-zA-Z0-9]{48,100}$',
+            'description': 'Format: xai-[48-100 alphanumerische Zeichen]',
             'example': 'xai-abc123def456...'
         },
         'abacus': {
             'pattern': r'^[a-zA-Z0-9]{32,}$',
             'description': 'Format: Mindestens 32 alphanumerische Zeichen',
             'example': 'abc123def456ghi789...'
+        },
+        'deepseek': {
+            'pattern': r'^sk-[a-zA-Z0-9]{32,}$',
+            'description': 'Format: sk-[mindestens 32 alphanumerische Zeichen]',
+            'example': 'sk-25b005b973344e3c99939b39a90434eb'
         }
     }
     

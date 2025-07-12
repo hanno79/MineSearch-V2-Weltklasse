@@ -126,7 +126,7 @@ class BrightdataProvider(AbstractProvider):
                 result = await self._web_scraper_search(query, options)
             elif model_id == 'browser-api':
                 result = await self._browser_automation_search(query, options)
-            elif model_id == 'search-api':
+            elif model_id == 'serp':
                 result = await self._search_engine_scraping(query, options)
             else:
                 result = await self._web_scraper_search(query, options)
@@ -260,7 +260,8 @@ class BrightdataProvider(AbstractProvider):
             for search_query in search_queries[:3]:  # Limitiere auf 3 Suchqueries
                 try:
                     # Brightdata SERP API (Search Engine Results Page)
-                    proxy_url = f"http://brd-customer-{self.customer_id}-zone-serp:{self.password}@brd.superproxy.io:22225"
+                    # ÄNDERUNG 11.07.2025: Korrigiere Zone-Namen für SERP
+                    proxy_url = f"http://brd-customer-{self.customer_id}-zone-datacenter_proxy:{self.password}@brd.superproxy.io:22225"
                     
                     # Encode search query
                     encoded_query = quote_plus(search_query)
@@ -310,7 +311,7 @@ class BrightdataProvider(AbstractProvider):
             sources=sources,
             metadata={
                 'provider': 'brightdata',
-                'model': 'search-api',
+                'model': 'serp',
                 'queries_executed': len(search_queries),
                 'results_found': len(sources)
             }

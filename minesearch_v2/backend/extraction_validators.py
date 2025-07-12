@@ -26,33 +26,41 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
     if not value:
         return False
         
-    value_lower = value.lower().strip()
+    value_lower = str(value).lower().strip()
     
-    # ÄNDERUNG 07.07.2025: Nur offensichtliche Platzhalter entfernen
-    # "Unbekannt" und ähnliche sind GÜLTIGE Werte!
+    # ÄNDERUNG 11.07.2025: REGEL 10 ENFORCEMENT - Alle Platzhalter entfernen
+    # Gemäß Regel 10: Felder LEER lassen wenn keine Daten gefunden
     general_placeholders = [
         'k.a', 'k.a.', 'n/a', 'n.a.', '-', '--', '---',
-        'keine angabe', 'keine daten',  # 'nicht gefunden' ENTFERNT
-        'nicht verfügbar',  # 'unbekannt' und 'unknown' ENTFERNT - sind gültige Werte!
+        'keine angabe', 'keine daten', 'nicht verfügbar',
         'no data', 'not found', 'not available'
     ]
     
-    # ÄNDERUNG 07.07.2025: "Keine spezifischen Daten gefunden" ist KEIN Platzhalter
-    # Diese Strings sind GÜLTIGE Aussagen über die Datenverfügbarkeit
-    valid_values = [
+    # ÄNDERUNG 11.07.2025: REGEL 10 ENFORCEMENT - ALLE unklaren Werte sind Platzhalter!
+    # Gemäß Regel 10: "STRIKT VERBOTEN: Dummy-Werte und Fallback-Werte"
+    # Wenn keine Daten gefunden werden: Feld LEER lassen - KEINE Platzhalter!
+    dummy_expressions = [
         'unbekannt', 'unknown', 'nicht gefunden', 
         'keine spezifischen daten gefunden',
         'keine informationen verfügbar',
-        'not specified', 'nicht spezifiziert'
+        'not specified', 'nicht spezifiziert',
+        'not found', 'nicht verfügbar',
+        'no data', 'keine daten',
+        'information not available'
     ]
     
-    # Wenn es ein gültiger Wert ist, NICHT als Platzhalter behandeln
-    if value_lower in valid_values:
-        logger.debug(f"[PLACEHOLDER] '{value}' ist ein GÜLTIGER Wert, kein Platzhalter")
-        return False
+    # ALLE unklaren Aussagen sind Platzhalter und müssen entfernt werden
+    if value_lower in dummy_expressions:
+        logger.debug(f"[PLACEHOLDER] '{value}' ist ein DUMMY-Wert - REGEL 10 Verstoß!")
+        return True
     
     if value_lower in general_placeholders:
         logger.debug(f"[PLACEHOLDER] '{value}' ist ein Platzhalter")
+        return True
+    
+    # Grok-spezifische Probleme für alle Felder
+    if any(marker in value.upper() for marker in ['UPDATE', 'NEU', 'CHANGED', 'AKTUELL', 'BREAKING']):
+        logger.debug(f"[PLACEHOLDER] '{value}' enthält Grok UPDATE-Marker")
         return True
     
     # Feldspezifische Prüfungen
@@ -64,6 +72,12 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
         if re.match(r'^\$?\s*[1-9]\d?\s*(?:CAD|CDN|USD)?$', value) and 'million' not in value_lower:
             # Werte unter 100 ohne "million" sind unrealistisch
             logger.debug(f"[PLACEHOLDER] Restaurationskosten '{value}' ist zu niedrig")
+            return True
+    
+    elif field == 'Eigentümer' or field == 'Betreiber':
+        # Grok-spezifische Eigentümer-Probleme
+        if value.upper() in ['UPDATE', 'CHANGED', 'UNKNOWN', 'AKTUELL']:
+            logger.debug(f"[PLACEHOLDER] Eigentümer/Betreiber '{value}' ist Grok-Marker")
             return True
     
     logger.debug(f"[PLACEHOLDER] '{value}' ist KEIN Platzhalter für Feld '{field}'")
@@ -161,6 +175,24 @@ def validate_restoration_cost(value: str, currency: str = 'USD') -> Optional[str
         Validierter Wert oder None bei unrealistischen Werten
     """
     if not value:
+        return None
+    
+    # ÄNDERUNG 11.07.2025: Jahr-Pattern Detection für Grok-Fehler
+    # Prüfe ob der Wert wie ein Jahr aussieht (z.B. "CAD$2024.0 million")
+    year_pattern_match = re.search(r'\$?(20[0-9]{2})\.?0?\s*(?:million|mio|millionen|billion)', value.lower())
+    if year_pattern_match:
+        year = int(year_pattern_match.group(1))
+        logger.warning(f"Jahr als Restaurationskosten erkannt und gefiltert: {value} (Jahr: {year})")
+        return None
+    
+    # Prüfe auf direkte Jahr-Pattern ohne Währungszeichen
+    if re.match(r'^(20[0-9]{2})\.?0?$', value.strip()):
+        logger.warning(f"Direktes Jahr als Restaurationskosten erkannt und gefiltert: {value}")
+        return None
+    
+    # Prüfe auf UPDATE-Marker oder andere Grok-spezifische Probleme
+    if any(marker in value.upper() for marker in ['UPDATE', 'NEU', 'CHANGED', 'AKTUELL']):
+        logger.warning(f"UPDATE-Marker in Restaurationskosten erkannt und gefiltert: {value}")
         return None
     
     # ÄNDERUNG 06.07.2025: Erweiterte Pattern-Erkennung für k/K und thousand

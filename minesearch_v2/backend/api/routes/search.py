@@ -26,17 +26,31 @@ enhanced_search_service = EnhancedMultiProviderSearchService()
 @router.post("/search", response_model=MineSearchResponse)
 async def search_mine(request: MineSearchRequest, model: str = "sonar-pro"):
     """
-    Sucht nach Mining-Informationen über Perplexity API.
+    Sucht nach Mining-Informationen über Multi-Provider System.
     """
     try:
-        # Delegiere an den MineSearchService
-        result = await mine_search_service.search_mine(
-            mine_name=request.mine_name,
-            country=request.country,
-            commodity=request.commodity,
-            model=model,
-            region=request.region
-        )
+        # ÄNDERUNG 11.07.2025: Nutze Enhanced Service für alle Provider-Modelle
+        logger.info(f"[SEARCH API] Request mit model='{model}', mine='{request.mine_name}'")
+        if ":" in model:  # Provider:Model Format (z.B. anthropic:claude-3.7-sonnet)
+            logger.info(f"[SEARCH API] Verwende Enhanced Service für {model}")
+            # Nutze Enhanced Service für Provider-basierte Suche
+            result = await enhanced_search_service.search_single_model(
+                model_id=model,
+                mine_name=request.mine_name,
+                country=request.country,
+                commodity=request.commodity,
+                region=request.region
+            )
+        else:
+            logger.info(f"[SEARCH API] Verwende Legacy Service für {model}")
+            # Legacy Support für Perplexity-Modelle
+            result = await mine_search_service.search_mine(
+                mine_name=request.mine_name,
+                country=request.country,
+                commodity=request.commodity,
+                model=model,
+                region=request.region
+            )
         
         # Speichere erfolgreiches Ergebnis in DB
         if result.get('success') and result.get('data'):
@@ -44,22 +58,22 @@ async def search_mine(request: MineSearchRequest, model: str = "sonar-pro"):
                 from database import db_manager
                 search_duration = result.get('data', {}).get('search_duration')
                 
-                db_manager.save_search_result({
-                    'mine_name': request.mine_name,
-                    'country': request.country,
-                    'region': request.region,
-                    'commodity': request.commodity,
-                    'model_used': model,
-                    'search_type': 'standard',
-                    'search_duration': search_duration,
-                    'structured_data': result['data'].get('structured_data'),
-                    'structured_data_with_sources': result['data'].get('structured_data_with_sources'),
-                    'sources': result['data'].get('sources'),
-                    'source_index': result['data'].get('source_index'),
-                    'data_quality': result['data'].get('data_quality'),
-                    'source_discovery_session': result['data'].get('source_discovery_session'),
-                    'success': True
-                })
+                db_manager.save_search_result(
+                    mine_name=request.mine_name,
+                    model_used=model,
+                    structured_data=result['data'].get('structured_data', {}),
+                    sources=result['data'].get('sources', []),
+                    country=request.country,
+                    region=request.region,
+                    commodity=request.commodity,
+                    search_type='standard',
+                    search_duration=search_duration,
+                    structured_data_with_sources=result['data'].get('structured_data_with_sources'),
+                    source_index=result['data'].get('source_index'),
+                    data_quality=result['data'].get('data_quality'),
+                    source_discovery_session=result['data'].get('source_discovery_session'),
+                    success=True
+                )
             except Exception as e:
                 logger.error(f"Fehler beim Speichern des Ergebnisses: {str(e)}")
         
@@ -90,21 +104,21 @@ async def search_two_phase(request: MineSearchRequest):
         if result.get('success') and result.get('data'):
             try:
                 from database import db_manager
-                db_manager.save_search_result({
-                    'mine_name': request.mine_name,
-                    'country': request.country,
-                    'region': request.region,
-                    'commodity': request.commodity,
-                    'model_used': 'two_phase',
-                    'search_type': 'two_phase',
-                    'search_duration': result.get('search_duration'),
-                    'structured_data': result.get('data'),
-                    'sources': result.get('sources'),
-                    'confidence_scores': result.get('confidence_scores'),
-                    'phase1_sources': result.get('phase1_sources'),
-                    'phase2_models': result.get('phase2_models'),
-                    'success': True
-                })
+                db_manager.save_search_result(
+                    mine_name=request.mine_name,
+                    model_used='two_phase',
+                    structured_data=result.get('data', {}),
+                    sources=result.get('sources', []),
+                    country=request.country,
+                    region=request.region,
+                    commodity=request.commodity,
+                    search_type='two_phase',
+                    search_duration=result.get('search_duration'),
+                    confidence_scores=result.get('confidence_scores'),
+                    phase1_sources=result.get('phase1_sources'),
+                    phase2_models=result.get('phase2_models'),
+                    success=True
+                )
             except Exception as e:
                 logger.error(f"Fehler beim Speichern des Zwei-Phasen-Ergebnisses: {str(e)}")
         
@@ -131,21 +145,21 @@ async def search_multiple_models(request: MultiSearchRequest):
             for model_id, model_result in result['results'].items():
                 if model_result.get('success') and model_result.get('data'):
                     try:
-                        db_manager.save_search_result({
-                            'mine_name': request.mine_name,
-                            'country': request.country,
-                            'region': request.region,
-                            'commodity': request.commodity,
-                            'model_used': model_id,
-                            'search_type': 'multi_model',
-                            'search_duration': model_result.get('search_duration'),
-                            'structured_data': model_result['data'].get('structured_data'),
-                            'structured_data_with_sources': model_result['data'].get('structured_data_with_sources'),
-                            'sources': model_result['data'].get('sources'),
-                            'source_index': model_result['data'].get('source_index'),
-                            'data_quality': model_result['data'].get('data_quality'),
-                            'success': True
-                        })
+                        db_manager.save_search_result(
+                            mine_name=request.mine_name,
+                            model_used=model_id,
+                            structured_data=model_result['data'].get('structured_data', {}),
+                            sources=model_result['data'].get('sources', []),
+                            country=request.country,
+                            region=request.region,
+                            commodity=request.commodity,
+                            search_type='multi_model',
+                            search_duration=model_result.get('search_duration'),
+                            structured_data_with_sources=model_result['data'].get('structured_data_with_sources'),
+                            source_index=model_result['data'].get('source_index'),
+                            data_quality=model_result['data'].get('data_quality'),
+                            success=True
+                        )
                     except Exception as e:
                         logger.error(f"Fehler beim Speichern für Modell {model_id}: {str(e)}")
         
@@ -170,21 +184,21 @@ async def smart_search(request: SmartSearchRequest):
             from database import db_manager
             try:
                 models_used = ", ".join(result.get('models_used', []))
-                db_manager.save_search_result({
-                    'mine_name': request.mine_name,
-                    'country': request.country,
-                    'region': request.region,
-                    'commodity': request.commodity,
-                    'model_used': models_used,
-                    'search_type': 'smart_search',
-                    'search_duration': result.get('total_duration'),
-                    'structured_data': result['data'].get('structured_data'),
-                    'structured_data_with_sources': result['data'].get('structured_data_with_sources'),
-                    'sources': result['data'].get('sources'),
-                    'source_index': result['data'].get('source_index'),
-                    'data_quality': result['data'].get('data_quality'),
-                    'success': True
-                })
+                db_manager.save_search_result(
+                    mine_name=request.mine_name,
+                    model_used=models_used,
+                    structured_data=result['data'].get('structured_data', {}),
+                    sources=result['data'].get('sources', []),
+                    country=request.country,
+                    region=request.region,
+                    commodity=request.commodity,
+                    search_type='smart_search',
+                    search_duration=result.get('total_duration'),
+                    structured_data_with_sources=result['data'].get('structured_data_with_sources'),
+                    source_index=result['data'].get('source_index'),
+                    data_quality=result['data'].get('data_quality'),
+                    success=True
+                )
             except Exception as e:
                 logger.error(f"Fehler beim Speichern des Smart-Search-Ergebnisses: {str(e)}")
         
@@ -215,22 +229,22 @@ async def enhanced_search(
         if result.get('success') and result.get('data'):
             from database import db_manager
             try:
-                db_manager.save_search_result({
-                    'mine_name': mine_name,
-                    'country': country,
-                    'region': region,
-                    'commodity': commodity,
-                    'model_used': model,
-                    'search_type': 'enhanced',
-                    'search_duration': result['data'].get('search_duration'),
-                    'structured_data': result['data'].get('structured_data'),
-                    'structured_data_with_sources': result['data'].get('structured_data_with_sources'),
-                    'sources': result['data'].get('sources'),
-                    'source_index': result['data'].get('source_index'),
-                    'data_quality': result['data'].get('data_quality'),
-                    'source_discovery_session': result['data'].get('source_discovery_session'),
-                    'success': True
-                })
+                db_manager.save_search_result(
+                    mine_name=mine_name,
+                    model_used=model,
+                    structured_data=result['data'].get('structured_data', {}),
+                    sources=result['data'].get('sources', []),
+                    country=country,
+                    region=region,
+                    commodity=commodity,
+                    search_type='enhanced',
+                    search_duration=result['data'].get('search_duration'),
+                    structured_data_with_sources=result['data'].get('structured_data_with_sources'),
+                    source_index=result['data'].get('source_index'),
+                    data_quality=result['data'].get('data_quality'),
+                    source_discovery_session=result['data'].get('source_discovery_session'),
+                    success=True
+                )
             except Exception as e:
                 logger.error(f"Fehler beim Speichern des Enhanced-Search-Ergebnisses: {str(e)}")
         
@@ -258,21 +272,21 @@ async def comprehensive_search(request: MineSearchRequest):
         if result.get('success') and result.get('data'):
             try:
                 from database import db_manager
-                db_manager.save_search_result({
-                    'mine_name': request.mine_name,
-                    'country': request.country,
-                    'region': request.region,
-                    'commodity': request.commodity,
-                    'model_used': 'comprehensive_enhanced',
-                    'search_type': 'comprehensive',
-                    'search_duration': result.get('search_duration'),
-                    'structured_data': result.get('data'),
-                    'sources': result.get('sources'),
-                    'confidence_scores': result.get('confidence_scores'),
-                    'phase1_sources': result.get('phase1_sources'),
-                    'phase2_models': result.get('phase2_models'),
-                    'success': True
-                })
+                db_manager.save_search_result(
+                    mine_name=request.mine_name,
+                    model_used='comprehensive_enhanced',
+                    structured_data=result.get('data', {}),
+                    sources=result.get('sources', []),
+                    country=request.country,
+                    region=request.region,
+                    commodity=request.commodity,
+                    search_type='comprehensive',
+                    search_duration=result.get('search_duration'),
+                    confidence_scores=result.get('confidence_scores'),
+                    phase1_sources=result.get('phase1_sources'),
+                    phase2_models=result.get('phase2_models'),
+                    success=True
+                )
             except Exception as e:
                 logger.error(f"Fehler beim Speichern des Comprehensive-Ergebnisses: {str(e)}")
         
