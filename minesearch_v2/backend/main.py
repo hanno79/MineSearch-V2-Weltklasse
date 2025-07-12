@@ -105,8 +105,11 @@ setup_middleware(app)
 # Exception Handler aktivieren
 setup_exception_handlers(app)
 
-# Statische Dateien für Frontend
+# Statische Dateien für Frontend  
 app.mount("/static", StaticFiles(directory="/app/minesearch_v2/frontend"), name="static")
+
+# Statische Dateien für CSV-Zugriff
+app.mount("/csv", StaticFiles(directory="/app/minesearch_v2"), name="csv")
 
 # API-Router einbinden
 app.include_router(router)

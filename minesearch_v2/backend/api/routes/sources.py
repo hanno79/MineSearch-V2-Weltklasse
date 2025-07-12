@@ -158,7 +158,7 @@ async def get_source_statistics():
     """Hole Statistiken über die Quellen-Datenbank"""
     from database import db_manager
     
-    stats = db_manager.get_source_statistics()
+    stats = db_manager.get_statistics()
     return {
         "success": True,
         "data": stats

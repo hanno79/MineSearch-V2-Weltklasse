@@ -109,7 +109,7 @@ async def get_result_statistics():
     """Hole Statistiken über gespeicherte Ergebnisse"""
     from database import db_manager
     
-    stats = db_manager.get_result_statistics()
+    stats = db_manager.get_statistics()
     return {
         "success": True,
         "data": stats

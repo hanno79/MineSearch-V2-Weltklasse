@@ -21,7 +21,7 @@ class MineSearchResponse(BaseModel):
     data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     timestamp: datetime = datetime.now()
-    search_query: str
+    search_query: Optional[str] = None
 
 class MultiSearchRequest(BaseModel):
     mine_name: str
