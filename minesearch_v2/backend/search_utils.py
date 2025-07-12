@@ -3,6 +3,7 @@ Author: rahn
 Datum: 05.07.2025
 Version: 1.0
 Beschreibung: Utility-Funktionen für Multi-Provider Suchen
+ÄNDERUNG 12.07.2025: count_filled_fields Funktion hinzugefügt
 """
 
 import hashlib
@@ -15,6 +16,42 @@ from config import CSV_COLUMNS
 from utils import generate_name_variants, generate_multilingual_search_terms, get_country_config
 
 logger = logging.getLogger(__name__)
+
+
+def count_filled_fields(structured_data: Dict[str, Any]) -> int:
+    """
+    Zählt korrekt gefüllte Felder aus structured_data
+    
+    ÄNDERUNG 12.07.2025: Neue Funktion für korrektes Feld-Tracking
+    
+    Args:
+        structured_data: Dictionary mit Mining-Daten aus CSV_COLUMNS
+        
+    Returns:
+        Anzahl der korrekt gefüllten Felder
+    """
+    if not structured_data:
+        return 0
+    
+    filled_count = 0
+    
+    # Dummy-Werte die als "leer" gelten
+    dummy_values = {
+        'n/a', 'k.a', 'k.a.', 'keine angabe', 'keine daten', 'unbekannt', 
+        'nicht verfügbar', 'nicht gefunden', '$1', '$2', '$3', '$4', '$5',
+        'null', 'none', '', 'unknown'
+    }
+    
+    for field in CSV_COLUMNS:
+        value = structured_data.get(field, '')
+        
+        if value and str(value).strip():
+            value_str = str(value).strip().lower()
+            # Prüfe ob es ein echter Wert ist (nicht dummy)
+            if value_str not in dummy_values and len(value_str) > 1:
+                filled_count += 1
+    
+    return filled_count
 
 
 class SearchQueryBuilder:

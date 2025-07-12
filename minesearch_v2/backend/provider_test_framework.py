@@ -21,6 +21,8 @@ from search_service_multi_enhanced import enhanced_search_service
 from database import db_manager
 from database.models import ModelStatistics, FieldStatistics, Source
 from config import CSV_COLUMNS
+from config.providers import PROVIDERS_CONFIG
+from search_utils import count_filled_fields
 
 logger = logging.getLogger(__name__)
 
@@ -260,39 +262,109 @@ class ProviderTestFramework:
     async def _test_single_run(self, model_id: str, mine: TestMine, run_number: int) -> TestResult:
         """
         Führt einen einzelnen Test-Durchlauf durch
+        KORRIGIERT: Provider-spezifische Timeouts werden nun berücksichtigt
         """
         start_time = time.time()
         
+        # Bestimme Provider-spezifische Konfiguration
+        provider_name = model_id.split(':')[0]
+        provider_config = PROVIDERS_CONFIG.get(provider_name, {})
+        model_timeout = provider_config.get('timeout', 120)  # Default 120s
+        retry_attempts = provider_config.get('retry_attempts', 2)
+        retry_delay = provider_config.get('retry_delay', 5)
+        
+        # Retry-Mechanismus mit provider-spezifischer Konfiguration
+        for attempt in range(retry_attempts + 1):
+            try:
+                # Bestimme Search-Service
+                if self.provider_registry.is_model_available(model_id):
+                    # Enhanced Multi-Provider Service mit Timeout
+                    result = await asyncio.wait_for(
+                        enhanced_search_service.search_single_model(
+                            model_id, mine.name, mine.country, mine.commodity, mine.region
+                        ),
+                        timeout=model_timeout
+                    )
+                elif model_id.startswith('perplexity:'):
+                    # Legacy Perplexity Service mit Timeout
+                    model_name = model_id.split(':')[1]
+                    result = await asyncio.wait_for(
+                        search_service.search_mine(
+                            mine.name, mine.country, mine.commodity, model_name, mine.region
+                        ),
+                        timeout=model_timeout
+                    )
+                else:
+                    # Fallback Multi-Provider Service mit Timeout
+                    result = await asyncio.wait_for(
+                        multi_search_service.search_with_model(
+                            model_id, mine.name, mine.country, mine.commodity, mine.region
+                        ),
+                        timeout=model_timeout
+                    )
+                
+                # Erfolgreicher Test - beende Retry-Loop
+                break
+                
+            except asyncio.TimeoutError:
+                if attempt < retry_attempts:
+                    logger.warning(f"⏰ Timeout bei {model_id} (Versuch {attempt + 1}/{retry_attempts + 1}), retry in {retry_delay}s")
+                    await asyncio.sleep(retry_delay)
+                    continue
+                else:
+                    logger.error(f"💥 Finaler Timeout bei {model_id} nach {retry_attempts + 1} Versuchen")
+                    raise
+            except Exception as e:
+                if attempt < retry_attempts:
+                    logger.warning(f"🔄 Fehler bei {model_id} (Versuch {attempt + 1}/{retry_attempts + 1}): {e}")
+                    await asyncio.sleep(retry_delay)
+                    continue
+                else:
+                    logger.error(f"💥 Finaler Fehler bei {model_id}: {e}")
+                    raise
+        
+        response_time = (time.time() - start_time) * 1000
+        
         try:
-            # Bestimme Search-Service
-            if self.provider_registry.is_model_available(model_id):
-                # Enhanced Multi-Provider Service
-                result = await enhanced_search_service.search_single_model(
-                    model_id, mine.name, mine.country, mine.commodity, mine.region
-                )
-            elif model_id.startswith('perplexity:'):
-                # Legacy Perplexity Service
-                model_name = model_id.split(':')[1]
-                result = await search_service.search_mine(
-                    mine.name, mine.country, mine.commodity, model_name, mine.region
-                )
-            else:
-                # Fallback Multi-Provider Service
-                result = await multi_search_service.search_with_model(
-                    model_id, mine.name, mine.country, mine.commodity, mine.region
-                )
-            
-            response_time = (time.time() - start_time) * 1000
-            
             # Analysiere Ergebnis
             success = result.get('success', False)
             data = result.get('data', {})
             structured_data = data.get('structured_data', {})
             sources = data.get('sources', [])
             
-            # Validiere Datenqualität
-            fields_found = self._count_real_fields(structured_data)
+            # Validiere Datenqualität - KORRIGIERT: Nutze neue count_filled_fields Funktion
+            fields_found = count_filled_fields(structured_data)
             data_quality = self._calculate_data_quality(structured_data, mine)
+            
+            # ERWEITERT: Speichere auch model_statistics und field_statistics in Datenbank
+            try:
+                benchmark_service = ModelBenchmarkService()
+                
+                # Save model statistics
+                await benchmark_service.save_model_statistics(
+                    model_id=model_id,
+                    mine_name=mine.name,
+                    country=mine.country,
+                    region=mine.region,
+                    commodity=mine.commodity,
+                    run_number=run_number,
+                    success=success,
+                    response_time_ms=response_time,
+                    fields_found=fields_found,
+                    sources_count=len(sources),
+                    raw_result=result,
+                    structured_data=structured_data
+                )
+                
+                # Update field statistics if successful
+                if success and structured_data:
+                    await benchmark_service.update_field_statistics(model_id, structured_data)
+                    
+                logger.debug(f"[DB-INTEGRATION] Statistics saved for {model_id} - {mine.name}")
+                
+            except Exception as db_error:
+                logger.warning(f"[DB-INTEGRATION] Database save failed for {model_id}: {db_error}")
+                # Continue with test result even if DB save fails
             
             return TestResult(
                 model_id=model_id,
@@ -328,26 +400,10 @@ class ProviderTestFramework:
     
     def _count_real_fields(self, structured_data: Dict[str, Any]) -> int:
         """
-        Zählt echte Datenfelder (keine Dummy-Werte)
+        DEPRECATED: Ersetzt durch count_filled_fields() aus search_utils.py
+        Kept for backwards compatibility, redirects to new function
         """
-        if not structured_data:
-            return 0
-        
-        dummy_values = {
-            'n/a', 'k.a', 'k.a.', 'keine angabe', 'keine daten', 'unbekannt',
-            'nicht verfügbar', 'nicht gefunden', '$1', '$2', '$3', '$4', '$5',
-            'company a', 'company b', 'mine operator', 'unknown company',
-            '0', '0.0', '0,0', 'null', 'none'
-        }
-        
-        real_fields = 0
-        for value in structured_data.values():
-            if value and str(value).strip():
-                value_str = str(value).strip().lower()
-                if value_str not in dummy_values and len(value_str) > 1:
-                    real_fields += 1
-        
-        return real_fields
+        return count_filled_fields(structured_data)
     
     def _calculate_data_quality(self, structured_data: Dict[str, Any], mine: TestMine) -> float:
         """
@@ -359,8 +415,8 @@ class ProviderTestFramework:
         quality_score = 0.0
         total_checks = 0
         
-        # Basis-Qualität: Anteil gefüllter Felder
-        filled_fields = self._count_real_fields(structured_data)
+        # Basis-Qualität: Anteil gefüllter Felder - KORRIGIERT: count_filled_fields verwenden
+        filled_fields = count_filled_fields(structured_data)
         quality_score += (filled_fields / len(CSV_COLUMNS)) * 0.5
         
         # Erwartete Werte prüfen

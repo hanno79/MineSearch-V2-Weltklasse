@@ -166,8 +166,9 @@ class ModelBenchmarkService:
             structured_data = data.get('structured_data', {})
             sources = data.get('sources', [])
             
-            # Zähle gefüllte Felder
-            fields_found = self._count_filled_fields(structured_data)
+            # Zähle gefüllte Felder - KORRIGIERT: Nutze count_filled_fields
+            from search_utils import count_filled_fields
+            fields_found = count_filled_fields(structured_data)
             
             # Speichere in Datenbank
             await self._save_test_result(
@@ -208,24 +209,11 @@ class ModelBenchmarkService:
     
     def _count_filled_fields(self, structured_data: Dict[str, Any]) -> int:
         """
-        Zählt echte gefüllte Felder (keine Dummy-Werte)
+        DEPRECATED: Ersetzt durch count_filled_fields() aus search_utils.py
+        Kept for backwards compatibility
         """
-        if not structured_data:
-            return 0
-        
-        filled_count = 0
-        dummy_values = {
-            'n/a', 'k.a', 'k.a.', 'keine angabe', 'keine daten', 'unbekannt', 
-            'nicht verfügbar', 'nicht gefunden', '$1', '$2', '$3', '$4', '$5'
-        }
-        
-        for value in structured_data.values():
-            if value and str(value).strip():
-                value_str = str(value).strip().lower()
-                if value_str not in dummy_values and len(value_str) > 1:
-                    filled_count += 1
-        
-        return filled_count
+        from search_utils import count_filled_fields
+        return count_filled_fields(structured_data)
     
     async def _save_test_result(self, model_id: str, mine_name: str, country: Optional[str],
                               region: Optional[str], commodity: Optional[str], run_number: int,
@@ -515,3 +503,90 @@ class ModelBenchmarkService:
             logger.error(f"[BENCHMARK] Fehler bei Datenbank-Validierung: {e}")
         
         return validation_results
+    
+    async def save_model_statistics(self, model_id: str, mine_name: str, country: Optional[str],
+                                   region: Optional[str], commodity: Optional[str], run_number: int,
+                                   success: bool, response_time_ms: float, fields_found: int,
+                                   sources_count: int, raw_result: Optional[Dict] = None,
+                                   structured_data: Optional[Dict] = None, error_message: Optional[str] = None):
+        """
+        Speichert Model-Statistiken für API-Calls
+        
+        ÄNDERUNG 12.07.2025: Neue Methode für Standard-API Integration
+        """
+        try:
+            with db_manager.get_session() as session:
+                stat_entry = ModelStatistics(
+                    model_id=model_id,
+                    mine_name=mine_name,
+                    country=country,
+                    region=region,
+                    commodity=commodity,
+                    run_number=run_number,
+                    timestamp=datetime.now(),
+                    success=success,
+                    response_time_ms=response_time_ms,
+                    fields_found=fields_found,
+                    sources_count=sources_count,
+                    raw_result=raw_result,
+                    structured_data=structured_data,
+                    error_message=error_message
+                )
+                session.add(stat_entry)
+                session.commit()
+                
+                logger.debug(f"[BENCHMARK] Model statistics saved: {model_id}, success={success}, fields={fields_found}")
+                
+        except Exception as e:
+            logger.error(f"[BENCHMARK] Error saving model statistics: {e}")
+            raise
+    
+    async def update_field_statistics(self, model_id: str, structured_data: Dict[str, Any]):
+        """
+        Aktualisiert Field-Statistiken für ein Modell
+        
+        ÄNDERUNG 12.07.2025: Neue Methode für Field-Tracking
+        """
+        try:
+            with db_manager.get_session() as session:
+                for field_name in CSV_COLUMNS:
+                    value = structured_data.get(field_name, '')
+                    is_found = bool(value and str(value).strip() and 
+                                  str(value).lower() not in ['n/a', 'unknown', '', 'null', 'none'])
+                    
+                    # Hole oder erstelle FieldStatistics
+                    field_stat = session.query(FieldStatistics).filter_by(
+                        model_id=model_id, 
+                        field_name=field_name
+                    ).first()
+                    
+                    if not field_stat:
+                        field_stat = FieldStatistics(
+                            model_id=model_id,
+                            field_name=field_name,
+                            total_searches=0,
+                            times_found=0,
+                            times_empty=0,
+                            success_rate=0.0,
+                            avg_confidence=0.0,
+                            last_updated=datetime.now()
+                        )
+                        session.add(field_stat)
+                    
+                    # Update Statistiken
+                    field_stat.total_searches += 1
+                    if is_found:
+                        field_stat.times_found += 1
+                    else:
+                        field_stat.times_empty += 1
+                    
+                    # Berechne neue Success-Rate
+                    field_stat.success_rate = field_stat.times_found / field_stat.total_searches
+                    field_stat.last_updated = datetime.now()
+                
+                session.commit()
+                logger.debug(f"[BENCHMARK] Field statistics updated for {model_id}")
+                
+        except Exception as e:
+            logger.error(f"[BENCHMARK] Error updating field statistics: {e}")
+            raise

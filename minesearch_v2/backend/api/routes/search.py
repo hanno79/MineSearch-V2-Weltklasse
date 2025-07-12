@@ -15,6 +15,9 @@ from search_service import MineSearchService
 from search_service_multi import multi_search_service
 from search_service_multi_enhanced import EnhancedMultiProviderSearchService
 from providers.registry import provider_registry
+from model_benchmark_service import ModelBenchmarkService
+from search_utils import count_filled_fields
+from config import CSV_COLUMNS
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -22,12 +25,16 @@ router = APIRouter()
 # Service-Instanzen
 mine_search_service = MineSearchService()
 enhanced_search_service = EnhancedMultiProviderSearchService()
+benchmark_service = ModelBenchmarkService()
 
 @router.post("/search", response_model=MineSearchResponse)
 async def search_mine(request: MineSearchRequest, model: str = "sonar-pro"):
     """
     Sucht nach Mining-Informationen über Multi-Provider System.
+    ÄNDERUNG 12.07.2025: Erweitert um model_statistics und field_statistics Tracking
     """
+    search_start_time = datetime.now()
+    
     try:
         # ÄNDERUNG 11.07.2025: Nutze Enhanced Service für alle Provider-Modelle
         logger.info(f"[SEARCH API] Request mit model='{model}', mine='{request.mine_name}'")
@@ -52,16 +59,25 @@ async def search_mine(request: MineSearchRequest, model: str = "sonar-pro"):
                 region=request.region
             )
         
-        # Speichere erfolgreiches Ergebnis in DB
+        # Berechne Response-Zeit
+        response_time_ms = (datetime.now() - search_start_time).total_seconds() * 1000
+        
+        # ÄNDERUNG 12.07.2025: Erweiterte Datenbank-Speicherung
         if result.get('success') and result.get('data'):
             try:
                 from database import db_manager
                 search_duration = result.get('data', {}).get('search_duration')
+                structured_data = result['data'].get('structured_data', {})
                 
+                # Zähle gefüllte Felder korrekt
+                filled_fields = count_filled_fields(structured_data)
+                sources_count = len(result['data'].get('sources', []))
+                
+                # 1. Speichere search_result (bestehend)
                 db_manager.save_search_result(
                     mine_name=request.mine_name,
                     model_used=model,
-                    structured_data=result['data'].get('structured_data', {}),
+                    structured_data=structured_data,
                     sources=result['data'].get('sources', []),
                     country=request.country,
                     region=request.region,
@@ -74,8 +90,53 @@ async def search_mine(request: MineSearchRequest, model: str = "sonar-pro"):
                     source_discovery_session=result['data'].get('source_discovery_session'),
                     success=True
                 )
+                
+                # 2. NEUE model_statistics Speicherung
+                await benchmark_service.save_model_statistics(
+                    model_id=model,
+                    mine_name=request.mine_name,
+                    country=request.country,
+                    region=request.region,
+                    commodity=request.commodity,
+                    run_number=1,  # API-Calls sind immer Run 1
+                    success=True,
+                    response_time_ms=response_time_ms,
+                    fields_found=filled_fields,
+                    sources_count=sources_count,
+                    raw_result=result,
+                    structured_data=structured_data
+                )
+                
+                # 3. NEUE field_statistics Update
+                await benchmark_service.update_field_statistics(
+                    model_id=model,
+                    structured_data=structured_data
+                )
+                
+                logger.info(f"[SEARCH API] Statistiken gespeichert: {model}, {filled_fields} Felder, {response_time_ms:.0f}ms")
+                
             except Exception as e:
-                logger.error(f"Fehler beim Speichern des Ergebnisses: {str(e)}")
+                logger.error(f"Fehler beim Speichern der Statistiken: {str(e)}")
+        else:
+            # Auch fehlgeschlagene Suchen tracken
+            try:
+                error_message = result.get('error', 'Unbekannter Fehler')
+                await benchmark_service.save_model_statistics(
+                    model_id=model,
+                    mine_name=request.mine_name,
+                    country=request.country,
+                    region=request.region,
+                    commodity=request.commodity,
+                    run_number=1,
+                    success=False,
+                    response_time_ms=response_time_ms,
+                    fields_found=0,
+                    sources_count=0,
+                    error_message=error_message
+                )
+                logger.info(f"[SEARCH API] Fehler-Statistik gespeichert: {model}, {error_message}")
+            except Exception as e:
+                logger.error(f"Fehler beim Speichern der Fehler-Statistik: {str(e)}")
         
         return MineSearchResponse(**result)
     except ValueError as e:
