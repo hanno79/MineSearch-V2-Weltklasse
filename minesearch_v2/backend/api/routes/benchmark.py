@@ -283,7 +283,7 @@ async def get_benchmark_summary():
     by_success_rate = sorted(summaries, key=lambda x: x['success_rate'], reverse=True)
     by_consistency = sorted(summaries, key=lambda x: x['overall_consistency'], reverse=True)
     by_fields = sorted(summaries, key=lambda x: x['avg_fields_found'], reverse=True)
-    by_speed = sorted(summaries, key=lambda x: x['avg_response_time_ms'])
+    by_speed = sorted(summaries, key=lambda x: x['avg_response_time'])
     
     return {
         'total_models': len(summaries),
@@ -438,39 +438,55 @@ async def get_benchmark_charts(
         }
 
 
+def _get_exclusion_reason(field_name: str) -> str:
+    """Gibt Begründung für Feld-Ausschlüsse zurück"""
+    exclusion_reasons = {
+        "Produktionsende": "Aktive/geplante Minen ausgeschlossen (haben logisch kein Produktionsende)",
+        "Fördermenge/Jahr": "Nicht-produzierende Minen ausgeschlossen (haben keine aktuellen Fördermengen)"
+    }
+    return exclusion_reasons.get(field_name, "Conditional logic angewendet")
+
 @router.get("/field-comparison")
 async def get_field_comparison():
     """
     Vergleiche Feld-Performance über alle Modelle
     
     ÄNDERUNG 08.07.2025: Zeigt welche Felder gut/schlecht gefunden werden
+    ÄNDERUNG 13.07.2025: Erweitert um conditional logic für mining-spezifische Statistiken
     
     Returns:
-        Vergleichsdaten für alle Felder über alle Modelle
+        Vergleichsdaten für alle Felder über alle Modelle mit conditional metadata
     """
     with db_manager.get_session() as session:
         from database import FieldStatistics
         from sqlalchemy import func
         
-        # Aggregiere Statistiken pro Feld
+        # Aggregiere Statistiken pro Feld mit conditional logic awareness
         field_stats = session.query(
             FieldStatistics.field_name,
             func.avg(FieldStatistics.success_rate).label('avg_success_rate'),
             func.sum(FieldStatistics.times_found).label('total_times_found'),
             func.sum(FieldStatistics.total_searches).label('total_searches'),
-            func.count(FieldStatistics.model_id).label('models_tested')
+            func.sum(FieldStatistics.excluded_count).label('total_excluded'),
+            func.count(FieldStatistics.model_id).label('models_tested'),
+            func.bool_or(FieldStatistics.conditional_logic_applied).label('has_conditional_logic')
         ).group_by(FieldStatistics.field_name).all()
         
-        # Sortiere nach durchschnittlicher Erfolgsrate
+        # Sortiere nach durchschnittlicher Erfolgsrate mit conditional metadata
         results = []
-        for field_name, avg_rate, times_found, searches, models in field_stats:
+        for field_name, avg_rate, times_found, searches, excluded, models, has_conditional in field_stats:
             results.append({
                 'field_name': field_name,
                 'avg_success_rate': float(avg_rate) if avg_rate else 0.0,
                 'total_times_found': int(times_found) if times_found else 0,
                 'total_searches': int(searches) if searches else 0,
                 'models_tested': int(models) if models else 0,
-                'difficulty': 'Einfach' if avg_rate > 0.7 else 'Mittel' if avg_rate > 0.3 else 'Schwer'
+                'difficulty': 'Einfach' if avg_rate > 0.7 else 'Mittel' if avg_rate > 0.3 else 'Schwer',
+                # ÄNDERUNG 13.07.2025: Conditional logic metadata
+                'excluded_count': int(excluded) if excluded else 0,
+                'conditional_logic_applied': bool(has_conditional) if has_conditional is not None else False,
+                'effective_searches': int(searches) if searches else 0,  # Für UI-Kompatibilität
+                'exclusion_reason': _get_exclusion_reason(field_name) if has_conditional else None
             })
         
         # Sortiere: Schwere Felder zuerst
