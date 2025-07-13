@@ -164,18 +164,23 @@ class ModelBenchmarkService:
             success = result.get('success', False)
             data = result.get('data', {})
             structured_data = data.get('structured_data', {})
-            sources = data.get('sources', [])
+            sources = data.get('sources', []) or []  # KORRIGIERT: Ensure not None
             
             # Zähle gefüllte Felder - KORRIGIERT: Nutze count_filled_fields
             from search_utils import count_filled_fields
             fields_found = count_filled_fields(structured_data)
+            sources_count = len(sources) if sources else 0  # KORRIGIERT: Safe source counting
             
             # Speichere in Datenbank
             await self._save_test_result(
                 model_id, mine_name, country, region, commodity, run_number,
-                success, response_time, fields_found, len(sources),
+                success, response_time, fields_found, sources_count,
                 structured_data, result.get('raw_content', ''), result.get('error')
             )
+            
+            # Update Sources table if successful and sources found
+            if success and sources:
+                await self._update_sources_from_result(sources, country, region)
             
             return {
                 'success': success,
@@ -184,7 +189,7 @@ class ModelBenchmarkService:
                 'run_number': run_number,
                 'response_time_ms': response_time,
                 'fields_found': fields_found,
-                'sources_count': len(sources),
+                'sources_count': sources_count,
                 'data': data
             }
             
@@ -289,6 +294,36 @@ class ModelBenchmarkService:
                 )
                 session.add(field_stat)
     
+    async def _update_sources_from_result(self, sources: List[Dict], country: Optional[str], region: Optional[str]):
+        """Update Sources table from test result sources"""
+        if not sources:
+            return
+            
+        from database import db_manager
+        from urllib.parse import urlparse
+        
+        # Update max 5 sources to avoid spam
+        for source in sources[:5]:
+            try:
+                url = source.get('url', '')
+                if not url or not url.startswith('http'):
+                    continue
+                    
+                domain = urlparse(url).netloc
+                if domain:
+                    db_manager.add_or_update_source(
+                        url=url,
+                        domain=domain,
+                        country=country,
+                        region=region,
+                        source_type='url'
+                    )
+                    logger.debug(f"[SOURCES] Updated source: {domain}")
+                    
+            except Exception as e:
+                logger.debug(f"[SOURCES] Source update failed: {e}")
+                continue  # Silent fail for source updates
+
     async def get_all_benchmarks(self) -> List[Dict[str, Any]]:
         """
         Ruft alle Benchmark-Zusammenfassungen ab

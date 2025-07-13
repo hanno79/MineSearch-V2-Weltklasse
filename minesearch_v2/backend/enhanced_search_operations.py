@@ -408,13 +408,18 @@ Gib URLs und Beschreibungen zurück."""
 Quellen:
 {sources_text}
 
-Finde:
-- Restaurationskosten/Rekultivierungskosten
+Finde VORRANGIG:
+- Restaurationskosten/Rekultivierungskosten (ARO, closure costs, environmental provisions)
+- Environmental liabilities und rehabilitation bonds
+- Closure bonds und decommissioning obligations
+- Asset retirement obligations mit konkreten Beträgen
+
+ZUSÄTZLICH finde:
 - Investitionen und Betriebskosten
-- Umsätze und Gewinne
+- Umsätze und Gewinne  
 - Finanzierungsquellen
 
-Gib konkrete Zahlen mit Währung und Jahr an.""",
+WICHTIG: Gib konkrete Zahlen mit Währung und Jahr an. Priorisiere Restaurationskosten-Daten!""",
 
             'technical': f"""Analysiere technische Daten der Mine "{mine_name}"{location}:
 

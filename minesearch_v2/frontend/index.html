@@ -718,6 +718,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Lade verfügbare Modelle beim Start
             loadAvailableModels();
+            // Lade automatisch Test-CSV für Demonstration
+            loadTestCSV();
             // Timer-Variablen
             let searchTimerInterval = null;
             let searchStartTime = null;
@@ -806,6 +808,45 @@
                         window.location.reload();
                     }
                 }, 1000);
+            }
+            
+            // Funktion zum automatischen Laden der Test-CSV
+            async function loadTestCSV() {
+                try {
+                    console.log('Lade Test-CSV automatisch...');
+                    const response = await fetch(`${API_BASE_URL}/csv/test_mines.csv`);
+                    if (response.ok) {
+                        const csvText = await response.text();
+                        const lines = csvText.trim().split('\n');
+                        const header = lines[0];
+                        const dataLines = lines.slice(1);
+                        
+                        // Zeige CSV-Info an
+                        const csvInfo = document.getElementById('csv-info');
+                        if (csvInfo) {
+                            csvInfo.innerHTML = `
+                                <div class="csv-info-card">
+                                    <h3>📄 Test-Minen geladen</h3>
+                                    <p><strong>${dataLines.length} Minen</strong> aus der Test-Datei verfügbar:</p>
+                                    <ul style="margin: 10px 0; padding-left: 20px;">
+                                        ${dataLines.slice(0, 5).map(line => {
+                                            const cols = line.split(',');
+                                            return `<li><strong>${cols[0]}</strong> (${cols[1]})</li>`;
+                                        }).join('')}
+                                        ${dataLines.length > 5 ? `<li><em>... und ${dataLines.length - 5} weitere</em></li>` : ''}
+                                    </ul>
+                                    <p style="color: #666; font-size: 0.9em;">Sie können jetzt die Batch-Suche starten oder eine der Minen einzeln durchsuchen.</p>
+                                </div>
+                            `;
+                        }
+                        
+                        console.log(`✓ Test-CSV geladen: ${dataLines.length} Minen verfügbar`);
+                    } else {
+                        console.warn('Test-CSV konnte nicht geladen werden');
+                    }
+                } catch (error) {
+                    console.error('Fehler beim Laden der Test-CSV:', error);
+                }
             }
             
             // Funktion zum Laden verfügbarer Modelle
@@ -1651,7 +1692,7 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                             </div>
                             <div class="stat-card">
                                 <h4>Durchschnittliche Erfolgsquote</h4>
-                                <p class="stat-number">${stats.average_success_rate.toFixed(1)}%</p>
+                                <p class="stat-number">${(stats.average_success_rate || 0).toFixed(1)}%</p>
                             </div>
                             <div class="stat-card">
                                 <h4>Quellen nach Land</h4>
@@ -1831,7 +1872,7 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                                                 ${displayPath || '/'}
                                             </a>
                                             <span style="color: #666; font-size: 0.9em;">
-                                                - Score: ${source.reliability_score.toFixed(0)}% | 
+                                                - Score: ${(source.reliability_score || 0).toFixed(0)}% | 
                                                 Suchen: ${source.total_searches} | 
                                                 Letzter Zugriff: ${lastAccess}
                                             </span>
@@ -1929,11 +1970,11 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                                 <td>
                                     <div class="reliability-bar">
                                         <div class="reliability-fill" style="width: ${source.reliability_score}%"></div>
-                                        <span>${source.reliability_score.toFixed(0)}%</span>
+                                        <span>${(source.reliability_score || 0).toFixed(0)}%</span>
                                     </div>
                                 </td>
                                 <td>${source.total_searches}</td>
-                                <td>${source.success_rate.toFixed(0)}%</td>
+                                <td>${(source.success_rate || 0).toFixed(0)}%</td>
                                 <td>${source.last_successful_access ? 
                                     new Date(source.last_successful_access).toLocaleDateString('de-DE') : 
                                     'Nie'}</td>
@@ -1966,7 +2007,7 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                             </div>
                             <div class="stat-card">
                                 <h4>Durchschn. Datenqualität</h4>
-                                <p class="stat-number">${stats.average_data_quality.toFixed(0)}%</p>
+                                <p class="stat-number">${(stats.average_data_quality || 0).toFixed(0)}%</p>
                             </div>
                             <div class="stat-card">
                                 <h4>Suchen nach Modell</h4>
@@ -2236,21 +2277,21 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                         <h4>🏆 Bestes Modell (Erfolg)</h4>
                         <div class="stat-value" style="font-size: 14px;">
                             ${data.top_by_success_rate?.[0]?.model_id || 'Noch keine Daten'}
-                            ${data.top_by_success_rate?.[0] ? `<br><small>${(data.top_by_success_rate[0].success_rate * 100).toFixed(0)}% Erfolg</small>` : ''}
+                            ${data.top_by_success_rate?.[0] ? `<br><small>${((data.top_by_success_rate[0].success_rate || 0) * 100).toFixed(0)}% Erfolg</small>` : ''}
                         </div>
                     </div>
                     <div class="stat-card">
                         <h4>🎯 Konsistentestes Modell</h4>
                         <div class="stat-value" style="font-size: 14px;">
                             ${data.top_by_consistency?.[0]?.model_id || 'Noch keine Daten'}
-                            ${data.top_by_consistency?.[0] ? `<br><small>${(data.top_by_consistency[0].overall_consistency * 100).toFixed(0)}% konsistent</small>` : ''}
+                            ${data.top_by_consistency?.[0] ? `<br><small>${((data.top_by_consistency[0].overall_consistency || 0) * 100).toFixed(0)}% konsistent</small>` : ''}
                         </div>
                     </div>
                     <div class="stat-card">
                         <h4>⚡ Schnellstes Modell</h4>
                         <div class="stat-value" style="font-size: 14px;">
                             ${data.fastest_models?.[0]?.model_id || 'Noch keine Daten'}
-                            ${data.fastest_models?.[0] ? `<br><small>Ø ${data.fastest_models[0].avg_response_time_ms.toFixed(0)}ms</small>` : ''}
+                            ${data.fastest_models?.[0] ? `<br><small>Ø ${(data.fastest_models[0].avg_response_time_ms || 0).toFixed(0)}ms</small>` : ''}
                         </div>
                     </div>
                 </div>
@@ -2354,14 +2395,14 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                     <tr>
                         <td><strong>${model.model_id}</strong></td>
                         <td style="color: ${successColor};">
-                            <strong>${(model.success_rate * 100).toFixed(0)}%</strong>
+                            <strong>${((model.success_rate || 0) * 100).toFixed(0)}%</strong>
                         </td>
                         <td style="color: ${consistencyColor};">
-                            ${(model.overall_consistency * 100).toFixed(0)}%
+                            ${((model.overall_consistency || 0) * 100).toFixed(0)}%
                         </td>
-                        <td>${model.avg_fields_found.toFixed(1)}</td>
+                        <td>${(model.avg_fields_found || 0).toFixed(1)}</td>
                         <td style="color: ${speedColor};">
-                            ${(model.avg_response_time_ms / 1000).toFixed(1)}s
+                            ${((model.avg_response_time_ms || 0) / 1000).toFixed(1)}s
                         </td>
                         <td>${model.total_tests}</td>
                         <td>
@@ -2483,7 +2524,7 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                             <strong>${field.field_name}</strong>
                             <br>
                             <small style="color: #666;">
-                                Ø ${(field.avg_success_rate * 100).toFixed(0)}% Erfolg | 
+                                Ø ${((field.avg_success_rate || 0) * 100).toFixed(0)}% Erfolg | 
                                 ${field.total_times_found}/${field.total_searches} gefunden
                             </small>
                         </li>
@@ -2505,7 +2546,7 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                             <strong>${field.field_name}</strong>
                             <br>
                             <small style="color: #666;">
-                                Ø ${(field.avg_success_rate * 100).toFixed(0)}% Erfolg | 
+                                Ø ${((field.avg_success_rate || 0) * 100).toFixed(0)}% Erfolg | 
                                 ${field.total_times_found}/${field.total_searches} gefunden
                             </small>
                         </li>
@@ -2542,7 +2583,7 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                             <td>
                                 <div class="reliability-bar">
                                     <div class="reliability-fill" style="width: ${field.avg_success_rate * 100}%; background: ${difficultyColor}"></div>
-                                    <span>${(field.avg_success_rate * 100).toFixed(0)}%</span>
+                                    <span>${((field.avg_success_rate || 0) * 100).toFixed(0)}%</span>
                                 </div>
                             </td>
                             <td style="color: ${difficultyColor};">
@@ -2602,8 +2643,8 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                         <tr>
                             <td><strong>${stat.field_name}</strong></td>
                             <td>${stat.model_id}</td>
-                            <td style="color: ${successColor};">${(stat.success_rate * 100).toFixed(1)}%</td>
-                            <td>${stat.avg_confidence ? stat.avg_confidence.toFixed(2) : 'N/A'}</td>
+                            <td style="color: ${successColor};">${((stat.success_rate || 0) * 100).toFixed(1)}%</td>
+                            <td>${stat.avg_confidence ? (stat.avg_confidence || 0).toFixed(2) : 'N/A'}</td>
                             <td>${stat.total_searches}</td>
                         </tr>
                     `;
@@ -2652,7 +2693,7 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                         if (value) {
                             const color = value.success_rate > 0.8 ? '#10b981' : 
                                         value.success_rate > 0.5 ? '#f59e0b' : '#ef4444';
-                            html += `<td style="color: ${color};">${(value.success_rate * 100).toFixed(0)}%</td>`;
+                            html += `<td style="color: ${color};">${((value.success_rate || 0) * 100).toFixed(0)}%</td>`;
                         } else {
                             html += '<td>-</td>';
                         }
@@ -2731,7 +2772,7 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                 const response = await fetch(`${API_BASE_URL}/api/benchmark/status/${benchmarkSessionId}`);
                 const status = await response.json();
                 
-                const progressText = `${(status.progress * 100).toFixed(0)}% - ${status.models_completed}/${status.total_models} Modelle`;
+                const progressText = `${((status.progress || 0) * 100).toFixed(0)}% - ${status.models_completed || 0}/${status.total_models || 0} Modelle`;
                 document.getElementById('benchmark-progress').textContent = progressText;
                 
                 if (status.status === 'completed') {
@@ -2772,7 +2813,7 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                 const data = await response.json();
                 
                 // TODO: Detaillierte Ansicht implementieren
-                alert(`Details für ${modelId}:\n\nErfolgsrate: ${(data.success_rate * 100).toFixed(0)}%\nKonsistenz: ${(data.overall_consistency * 100).toFixed(0)}%\nTests: ${data.total_tests}`);
+                alert(`Details für ${modelId}:\n\nErfolgsrate: ${((data.success_rate || 0) * 100).toFixed(0)}%\nKonsistenz: ${((data.overall_consistency || 0) * 100).toFixed(0)}%\nTests: ${data.total_tests || 0}`);
                 
             } catch (error) {
                 console.error('Fehler beim Laden der Modell-Details:', error);
@@ -2889,7 +2930,7 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                             <tr>
                                 <td><strong>${stat.model_id}</strong></td>
                                 <td style="color: ${successColor};">
-                                    <strong>${(stat.success_rate * 100).toFixed(0)}%</strong>
+                                    <strong>${((stat.success_rate || 0) * 100).toFixed(0)}%</strong>
                                 </td>
                                 <td>${stat.times_found}</td>
                                 <td>${stat.total_searches}</td>

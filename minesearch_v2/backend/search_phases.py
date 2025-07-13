@@ -45,16 +45,30 @@ class SearchPhaseManager:
     
     def build_phase2_query(self, mine_name: str, country: str, region: str, 
                           commodity: str, sources: List[Dict]) -> str:
-        """Erstelle spezialisierte Query für Phase 2"""
+        """Erstelle spezialisierte Query für Phase 2 - ERWEITERT für Restaurationskosten"""
         
-        query = f"""DETAILLIERTE DATENEXTRAKTION für {mine_name}
+        query = f"""DETAILLIERTE FINANZ- UND DATENEXTRAKTION für {mine_name}
 
-FOKUS auf folgende kritische Felder:
-1. Restaurationskosten (ARO, closure costs, environmental liability)
+PRIORITÄT 1 - RESTAURATIONSKOSTEN (ARO/Closure Costs):
+- Asset Retirement Obligations (ARO)
+- Environmental liabilities/provisions
+- Closure costs/bonds
+- Rehabilitation provisions
+- Decommissioning obligations
+- Site restoration costs
+- Mine closure bonds/guarantees
+
+PRIORITÄT 2 - WEITERE KRITISCHE FELDER:
 2. GPS-Koordinaten (exakte Latitude/Longitude)
 3. Eigentümer und Betreiber (aktuelle Struktur)
 4. Produktionsdaten (Jahresproduktion, Start/Ende)
 5. Rohstoffe und Minentyp
+
+SUCHE SPEZIFISCH NACH:
+- Geschäftsberichten (Annual Reports, 10-K, NI 43-101)
+- ESG-Berichten (Environmental, Social, Governance)
+- Behördendokumenten (Umweltgenehmigungen)
+- Börsenunterlagen (SEDAR, SEC filings)
 
 NUTZE DIESE VERIFIZIERTEN QUELLEN:"""
         
@@ -95,9 +109,12 @@ BEREITS GEFUNDENE DATEN (nicht wiederholen):
         
         query += f"""
 
-SPEZIFISCHER FOKUS:
-1. Nutze ALLE verfügbaren Ressourcen und Datenbanken
-2. Suche in MEHREREN SPRACHEN (Englisch, Französisch, lokale Sprachen)
+SPEZIFISCHER FOKUS FÜR RESTAURATIONSKOSTEN:
+1. Suche nach Finanzberichten mit ESG/Environmental-Sektionen
+2. Prüfe Regierungsdatenbanken für Umweltgenehmigungen
+3. Analysiere Börsenunterlagen für ARO/Environmental Provisions
+4. Nutze mehrsprachige Suche (Englisch, Französisch, Spanisch, lokale Sprachen)
+5. Fokus auf Millionen-/Tausender-Beträge mit Währungsangaben
 3. Prüfe HISTORISCHE DOKUMENTE und Archive
 4. Konsultiere SPEZIALISIERTE Mining-Datenbanken
 5. Analysiere REGIERUNGSDOKUMENTE und offizielle Berichte

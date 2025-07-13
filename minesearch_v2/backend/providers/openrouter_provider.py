@@ -161,7 +161,8 @@ class OpenRouterProvider(AbstractProvider):
                 
                 # Extrahiere strukturierte Daten
                 extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
-                sources = extract_sources_from_content(content)
+                # KORRIGIERT: OpenRouter LLMs liefern keine zuverlässigen Sources - ehrlich 0 angeben
+                sources = []  # LLM-Content ist nicht source-traceable
                 
                 # ÄNDERUNG 07.07.2025: Zusätzliche Validierung direkt im Provider
                 # Verhindere "Koordinaten" als Betreiber
@@ -188,15 +189,7 @@ class OpenRouterProvider(AbstractProvider):
                         if 'Restaurationskosten' in extracted_data.get('data_with_sources', {}):
                             extracted_data['data_with_sources']['Restaurationskosten'] = {"value": "", "sources": []}
                 
-                # ÄNDERUNG 04.07.2025: Tracke Source Discovery Ergebnisse
-                for source in sources:
-                    if source.get('url'):
-                        source_discovery.track_source_result(
-                            url=source['url'],
-                            success=True,
-                            content_type=source.get('type', 'general'),
-                            found_data={'mine': mine_name, 'fields': list(extracted_data['data'].keys())}
-                        )
+                # KORRIGIERT: Keine Source Discovery bei LLM-Providern da keine echten Sources
                 
                 # Finalisiere Session
                 session_summary = source_discovery.finalize_session()

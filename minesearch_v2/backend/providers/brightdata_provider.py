@@ -186,7 +186,7 @@ class BrightdataProvider(AbstractProvider):
             success=True,
             content=content,
             structured_data=structured_data,
-            sources=sources,
+            sources=sources,  # KORRIGIERT: Sources werden in _web_scraping_search korrekt befüllt
             metadata={
                 'provider': 'brightdata',
                 'model': 'web-scraper',

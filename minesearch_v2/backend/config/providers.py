@@ -38,7 +38,7 @@ PROVIDERS_CONFIG = {
         'api_key': APIKeysConfig.OPENROUTER_API_KEY,
         'base_url': 'https://openrouter.ai/api/v1',
         'models': OPENROUTER_MODELS,
-        'timeout': 120,  # Standard für OpenRouter
+        'timeout': 300,  # KORRIGIERT: Weitere Erhöhung für minimax-m1 Timeout-Problem
         'retry_attempts': 3,
         'retry_delay': 10
     },

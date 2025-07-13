@@ -13,8 +13,9 @@ from .providers import PROVIDERS_CONFIG
 from .models import MODELS_CONFIG
 
 # CSV-Spalten Definition
+# ÄNDERUNG 13.07.2025: ID-Feld entfernt - wird systemseitig generiert, nicht aus Quellen extrahiert
 CSV_COLUMNS = [
-    'ID', 'Name', 'Country', 'Region', 'Eigentümer', 'Betreiber', 'x-Koordinate', 
+    'Name', 'Country', 'Region', 'Eigentümer', 'Betreiber', 'x-Koordinate', 
     'y-Koordinate', 'Aktivitätsstatus',
     'Restaurationskosten', 'Jahr der Aufnahme der Kosten',
     'Jahr der Erstellung des Dokumentes', 
@@ -25,8 +26,9 @@ CSV_COLUMNS = [
 ]
 
 # Felder die KEINE Quellennummern brauchen
+# ÄNDERUNG 13.07.2025: ID entfernt da nicht mehr in CSV_COLUMNS
 FIELDS_WITHOUT_SOURCES = [
-    'ID', 'Name', 'Country', 'Region', 'Eigentümer', 'Quellenangaben'
+    'Name', 'Country', 'Region', 'Eigentümer', 'Quellenangaben'
 ]
 
 # Lade Umgebungsvariablen

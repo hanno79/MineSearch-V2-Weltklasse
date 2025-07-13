@@ -117,6 +117,12 @@ async def main():
             print(f"   ✅ Keine kritischen Probleme gefunden")
         
         print(f"\n📄 Detaillierter Report gespeichert: {report_filename}")
+        
+        # ERWEITERT: Automatische Markdown-Report Information
+        if test_results.get("success"):
+            print(f"📝 Markdown-Report automatisch generiert im /app/documentation/ Ordner")
+            print(f"   Format: PROVIDER_TEST_REPORT_VOLLSTAENDIG_[TIMESTAMP].md")
+        
         print("="*80)
         
         # Empfehlungen
