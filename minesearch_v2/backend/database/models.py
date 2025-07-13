@@ -541,6 +541,9 @@ class FieldStatistics(Base):
     times_empty = Column(Integer, nullable=False, default=0)
     success_rate = Column(Float, nullable=False, default=0.0)  # 0.0 bis 1.0
     avg_confidence = Column(Float, nullable=True)  # Durchschnittliche Konfidenz wenn gefunden
+    # ÄNDERUNG 13.07.2025: Conditional statistics tracking
+    excluded_count = Column(Integer, nullable=False, default=0)  # Anzahl ausgeschlossener Einträge
+    conditional_logic_applied = Column(Boolean, nullable=False, default=False)  # Flag für conditional fields
     last_updated = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     
     # Indizes für Performance
@@ -560,5 +563,9 @@ class FieldStatistics(Base):
             'times_empty': self.times_empty,
             'success_rate': self.success_rate,
             'avg_confidence': self.avg_confidence,
+            # ÄNDERUNG 13.07.2025: Conditional statistics in API response
+            'excluded_count': getattr(self, 'excluded_count', 0),
+            'conditional_logic_applied': getattr(self, 'conditional_logic_applied', False),
+            'effective_searches': self.total_searches,  # Für Rückwärtskompatibilität
             'last_updated': self.last_updated.isoformat() if self.last_updated else None
         }
