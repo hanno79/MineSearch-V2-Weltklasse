@@ -2554,16 +2554,22 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                             <ol style="margin: 0; padding-left: 20px;">
                 `;
                 
-                // Schwerste Felder
+                // Schwerste Felder mit conditional logic Hinweisen
                 for (const field of data.hardest_fields.slice(0, 10)) {
+                    const conditionalIndicator = field.conditional_logic_applied ? ' ⓘ' : '';
+                    const excludedNote = field.excluded_count > 0 ? 
+                        ` (${field.excluded_count} ausgeschlossen)` : '';
+                    
                     html += `
                         <li style="margin-bottom: 8px;">
-                            <strong>${field.field_name}</strong>
+                            <strong>${field.field_name}${conditionalIndicator}</strong>
                             <br>
                             <small style="color: #666;">
                                 Ø ${((field.avg_success_rate || 0) * 100).toFixed(0)}% Erfolg | 
-                                ${field.total_times_found}/${field.total_searches} gefunden
+                                ${field.total_times_found}/${field.total_searches} gefunden${excludedNote}
                             </small>
+                            ${field.conditional_logic_applied && field.exclusion_reason ? 
+                                `<br><small style="color: #9ca3af; font-style: italic;">ⓘ ${field.exclusion_reason}</small>` : ''}
                         </li>
                     `;
                 }
@@ -2576,16 +2582,22 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                             <ol style="margin: 0; padding-left: 20px;">
                 `;
                 
-                // Einfachste Felder
+                // Einfachste Felder mit conditional logic Hinweisen
                 for (const field of data.easiest_fields.slice(0, 10)) {
+                    const conditionalIndicator = field.conditional_logic_applied ? ' ⓘ' : '';
+                    const excludedNote = field.excluded_count > 0 ? 
+                        ` (${field.excluded_count} ausgeschlossen)` : '';
+                    
                     html += `
                         <li style="margin-bottom: 8px;">
-                            <strong>${field.field_name}</strong>
+                            <strong>${field.field_name}${conditionalIndicator}</strong>
                             <br>
                             <small style="color: #666;">
                                 Ø ${((field.avg_success_rate || 0) * 100).toFixed(0)}% Erfolg | 
-                                ${field.total_times_found}/${field.total_searches} gefunden
+                                ${field.total_times_found}/${field.total_searches} gefunden${excludedNote}
                             </small>
+                            ${field.conditional_logic_applied && field.exclusion_reason ? 
+                                `<br><small style="color: #9ca3af; font-style: italic;">ⓘ ${field.exclusion_reason}</small>` : ''}
                         </li>
                     `;
                 }
@@ -2615,9 +2627,15 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                     const difficultyColor = field.difficulty === 'Einfach' ? '#10b981' : 
                                           field.difficulty === 'Mittel' ? '#f59e0b' : '#ef4444';
                     
+                    const conditionalIndicator = field.conditional_logic_applied ? ' ⓘ' : '';
+                    const excludedInfo = field.excluded_count > 0 ? 
+                        ` <span style="color: #9ca3af; font-size: 12px;">(${field.excluded_count} ausgeschlossen)</span>` : '';
+                    const tooltipTitle = field.conditional_logic_applied && field.exclusion_reason ? 
+                        `title="${field.exclusion_reason}"` : '';
+                    
                     html += `
                         <tr>
-                            <td><strong>${field.field_name}</strong></td>
+                            <td ${tooltipTitle}><strong>${field.field_name}${conditionalIndicator}</strong>${excludedInfo}</td>
                             <td>
                                 <div class="reliability-bar">
                                     <div class="reliability-fill" style="width: ${field.avg_success_rate * 100}%; background: ${difficultyColor}"></div>
