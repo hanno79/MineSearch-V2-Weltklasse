@@ -430,8 +430,11 @@ class SearchServiceAdvanced(SearchServiceOperations):
         # Filtere verfügbare Modelle
         selected_models = [m for m in smart_models if m in available_models]
         if not selected_models:
-            # Fallback zu Perplexity-Modellen
-            selected_models = [m for m in available_models if m.startswith('perplexity:')][:2]
+            # Fallback zu kostenlosen Modellen
+            selected_models = [m for m in available_models if m.startswith('openrouter:deepseek')][:2]
+            if not selected_models:
+                # Als letzter Fallback: Erste verfügbare Modelle
+                selected_models = available_models[:2]
         
         if not selected_models:
             return {

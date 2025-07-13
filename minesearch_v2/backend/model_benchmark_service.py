@@ -357,7 +357,7 @@ class ModelBenchmarkService:
                     avg_response_time = sum(s.response_time_ms for s in successful_stats) / len(successful_stats) if successful_stats else 0.0
                     
                     # Durchschnittliche Feldanzahl
-                    avg_fields = sum(s.fields_filled for s in successful_stats) / len(successful_stats) if successful_stats else 0.0
+                    avg_fields = sum(s.fields_found for s in successful_stats) / len(successful_stats) if successful_stats else 0.0
                     
                     # Hole Feld-Statistiken für Konsistenz
                     field_stats = session.query(FieldStatistics).filter_by(model_id=model_id).all()
@@ -375,7 +375,7 @@ class ModelBenchmarkService:
                         "successful_tests": successful_tests,
                         "success_rate": success_rate,
                         "avg_response_time": avg_response_time,
-                        "avg_fields_filled": avg_fields,
+                        "avg_fields_found": avg_fields,
                         "overall_consistency": overall_consistency,
                         "tested_mines": tested_mines,
                         "mine_count": len(tested_mines),

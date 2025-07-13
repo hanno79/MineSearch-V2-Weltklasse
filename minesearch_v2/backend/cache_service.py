@@ -227,8 +227,8 @@ def cached_search(ttl: Optional[int] = None):
             ...
     """
     def decorator(func):
-        async def wrapper(self, mine_name: str, country: Optional[str] = None, 
-                         model: str = "sonar", **kwargs):
+        async def wrapper(self, mine_name: str, model: str, country: Optional[str] = None, 
+                         **kwargs):  # model als required parameter
             cache = get_cache_service()
             
             # Versuche aus Cache zu holen

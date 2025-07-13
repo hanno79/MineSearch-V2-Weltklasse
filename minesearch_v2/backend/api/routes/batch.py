@@ -51,7 +51,7 @@ async def upload_csv(csv_file: UploadFile = File(...)):
 @router.post("/batch-search")
 async def batch_search(
     session_id: str = Form(...),
-    model: str = Form("sonar-pro"),
+    model: str = Form(..., description="Modell-ID (z.B. 'openrouter:deepseek-free')"),
     search_type: str = Form("standard"),
     count: Optional[int] = Form(None),
     search_all: Optional[str] = Form("false"),
@@ -563,7 +563,7 @@ async def batch_search(
 @router.post("/process-batch")
 async def process_batch(
     cache_key: str = Form(...),
-    model: str = Form("sonar-pro")
+    model: str = Form(..., description="Modell-ID (z.B. 'openrouter:deepseek-free')")
 ):
     """Batch-Verarbeitung der hochgeladenen Minen"""
     try:

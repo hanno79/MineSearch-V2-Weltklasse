@@ -99,6 +99,35 @@
             margin-top: 20px;
         }
         
+        /* ÄNDERUNG 13.07.2025: Sortier-Indikatoren für Tabellen */
+        .sort-indicator {
+            font-weight: bold;
+            font-size: 12px;
+            color: #666;
+            margin-left: 5px;
+            transition: color 0.2s;
+        }
+        
+        th:hover .sort-indicator {
+            color: #4CAF50;
+        }
+        
+        th {
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            transition: background-color 0.2s;
+        }
+        
+        th:hover {
+            background: #e9ecef;
+        }
+        
+        .sources-table th {
+            user-select: none;
+            position: relative;
+        }
+        
         .domain-group {
             border: 1px solid #ddd;
             margin-bottom: 5px;
@@ -884,7 +913,7 @@
                                 <div style="margin-left: 20px; margin-top: 5px;">`;
                             
                             models.forEach(model => {
-                                const isDefault = model.id === 'perplexity:sonar-pro' || model.id === 'openrouter:deepseek-free';
+                                const isDefault = model.id === 'openrouter:deepseek-free'; // Nur kostenlose Modelle als Default
                                 // ÄNDERUNG 04.07.2025: Spezial-Icon für Abacus AI
                                 const isAbacus = model.id.includes('abacus:');
                                 const icon = isAbacus ? '🔬' : (model.is_free ? '🆓' : model.supports_web_search ? '🌐' : '🤖');
@@ -2012,7 +2041,7 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                             <div class="stat-card">
                                 <h4>Suchen nach Modell</h4>
                                 <div class="stat-list">
-                                    ${Object.entries(stats.results_by_model)
+                                    ${Object.entries(stats.results_by_model || {})
                                         .map(([model, count]) => 
                                             `<div>${model}: ${count}</div>`
                                         ).join('')}
@@ -2428,6 +2457,14 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
             `;
             
             document.getElementById('statistics-table-container').innerHTML = tableHtml;
+            
+            // Mache Tabelle sortierbar
+            setTimeout(() => {
+                const table = document.querySelector('#statistics-table-container table');
+                if (table) {
+                    makeSortable(table);
+                }
+            }, 100);
         }
         
         // Zeige Statistik-Tabelle (alte Funktion für Kompatibilität)
@@ -2572,8 +2609,9 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                         <tbody>
                 `;
                 
-                // Alle Felder
+                // Alle Felder (ID-Feld ausschließen)
                 for (const field of data.all_fields) {
+                    if (field.field_name === 'ID') continue;
                     const difficultyColor = field.difficulty === 'Einfach' ? '#10b981' : 
                                           field.difficulty === 'Mittel' ? '#f59e0b' : '#ef4444';
                     
@@ -2601,6 +2639,14 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                 `;
                 
                 container.innerHTML = html;
+                
+                // Mache Feld-Vergleich-Tabelle sortierbar
+                setTimeout(() => {
+                    const table = container.querySelector('table.sources-table');
+                    if (table) {
+                        makeSortable(table);
+                    }
+                }, 100);
                 
             } catch (error) {
                 console.error('Fehler beim Laden des Feld-Vergleichs:', error);
@@ -2899,9 +2945,9 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                     <p style="color: #666; margin-bottom: 20px;">Diese Tabelle zeigt, wie gut jedes Modell die einzelnen Felder findet.</p>
                 `;
                 
-                // Für jedes Feld eine Tabelle
+                // Für jedes Feld eine Tabelle (ID-Feld ausschließen)
                 for (const [fieldName, stats] of Object.entries(data.by_field)) {
-                    if (stats.length === 0) continue;
+                    if (stats.length === 0 || fieldName === 'ID') continue;
                     
                     // Sortiere nach Erfolgsrate
                     stats.sort((a, b) => b.success_rate - a.success_rate);
@@ -2951,6 +2997,12 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
                 }
                 
                 container.innerHTML = html;
+                
+                // Mache alle Feld-Statistik-Tabellen sortierbar
+                setTimeout(() => {
+                    const tables = container.querySelectorAll('table.sources-table');
+                    tables.forEach(table => makeSortable(table));
+                }, 100);
                 
             } catch (error) {
                 console.error('Fehler beim Laden der Feld-Statistiken:', error);
@@ -3340,6 +3392,93 @@ Error: ${evt.detail.error || 'Keine Details verfügbar'}</pre>
         }
         
         }); // Ende DOMContentLoaded
+        
+        // ============================================
+        // UNIVERSELLE TABELLEN-SORTIERUNG
+        // ============================================
+        
+        function makeSortable(table) {
+            if (!table) return;
+            
+            const headers = table.querySelectorAll('thead th');
+            const tbody = table.querySelector('tbody');
+            
+            if (!tbody) return;
+            
+            // Speichere Original-Reihenfolge
+            const originalRows = Array.from(tbody.querySelectorAll('tr'));
+            let sortStates = {};
+            
+            headers.forEach((header, index) => {
+                // Mache Header klickbar
+                header.style.cursor = 'pointer';
+                header.style.userSelect = 'none';
+                header.style.position = 'relative';
+                
+                // Füge Sortier-Indikator hinzu
+                const indicator = document.createElement('span');
+                indicator.className = 'sort-indicator';
+                indicator.style.marginLeft = '5px';
+                indicator.textContent = '—';
+                header.appendChild(indicator);
+                
+                // Initialize sort state
+                sortStates[index] = 0; // 0 = none, 1 = asc, 2 = desc
+                
+                header.addEventListener('click', () => {
+                    // Reset andere Spalten
+                    headers.forEach((h, i) => {
+                        if (i !== index) {
+                            sortStates[i] = 0;
+                            const ind = h.querySelector('.sort-indicator');
+                            if (ind) ind.textContent = '—';
+                        }
+                    });
+                    
+                    // Aktualisiere aktuellen Zustand
+                    sortStates[index] = (sortStates[index] + 1) % 3;
+                    
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    
+                    if (sortStates[index] === 0) {
+                        // Zurück zu Original
+                        indicator.textContent = '—';
+                        tbody.innerHTML = '';
+                        originalRows.forEach(row => tbody.appendChild(row));
+                    } else if (sortStates[index] === 1) {
+                        // Aufwärts sortieren
+                        indicator.textContent = '▲';
+                        sortRows(rows, index, true);
+                    } else {
+                        // Abwärts sortieren
+                        indicator.textContent = '▼';
+                        sortRows(rows, index, false);
+                    }
+                });
+            });
+            
+            function sortRows(rows, columnIndex, ascending) {
+                rows.sort((a, b) => {
+                    const cellA = a.cells[columnIndex]?.textContent.trim() || '';
+                    const cellB = b.cells[columnIndex]?.textContent.trim() || '';
+                    
+                    // Versuche numerische Sortierung
+                    const numA = parseFloat(cellA.replace(/[^0-9.-]/g, ''));
+                    const numB = parseFloat(cellB.replace(/[^0-9.-]/g, ''));
+                    
+                    if (!isNaN(numA) && !isNaN(numB)) {
+                        return ascending ? numA - numB : numB - numA;
+                    }
+                    
+                    // Text-Sortierung
+                    const result = cellA.localeCompare(cellB);
+                    return ascending ? result : -result;
+                });
+                
+                tbody.innerHTML = '';
+                rows.forEach(row => tbody.appendChild(row));
+            }
+        }
     </script>
 </body>
 </html>

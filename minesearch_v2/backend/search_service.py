@@ -32,9 +32,9 @@ class MineSearchService(LegacySearchFunctions):
         self.registry = provider_registry
         self.enhanced_discovery = EnhancedSourceDiscovery()
     
-    async def search_mine(self, mine_name: str, country: Optional[str] = None, 
-                         commodity: Optional[str] = None, model: str = "sonar-pro",
-                         region: Optional[str] = None, _is_auto_enhanced: bool = False) -> Dict[str, Any]:
+    async def search_mine(self, mine_name: str, model: str, country: Optional[str] = None, 
+                         commodity: Optional[str] = None, region: Optional[str] = None, 
+                         _is_auto_enhanced: bool = False) -> Dict[str, Any]:
         """
         Hauptsuchfunktion für Mining-Informationen
         
@@ -78,9 +78,9 @@ class MineSearchService(LegacySearchFunctions):
             # Fallback auf Legacy-Suche
             return await self._legacy_search(mine_name, country, commodity, model, region)
     
-    async def enhanced_search(self, mine_name: str, country: Optional[str] = None,
-                            commodity: Optional[str] = None, model: str = "sonar-pro",
-                            region: Optional[str] = None, _from_auto: bool = False) -> Dict[str, Any]:
+    async def enhanced_search(self, mine_name: str, model: str, country: Optional[str] = None,
+                            commodity: Optional[str] = None, region: Optional[str] = None, 
+                            _from_auto: bool = False) -> Dict[str, Any]:
         """
         Erweiterte Zwei-Phasen-Suche für umfangreichere Ergebnisse
         

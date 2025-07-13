@@ -28,7 +28,7 @@ enhanced_search_service = EnhancedMultiProviderSearchService()
 benchmark_service = ModelBenchmarkService()
 
 @router.post("/search", response_model=MineSearchResponse)
-async def search_mine(request: MineSearchRequest, model: str = "sonar-pro"):
+async def search_mine(request: MineSearchRequest, model: str):
     """
     Sucht nach Mining-Informationen über Multi-Provider System.
     ÄNDERUNG 12.07.2025: Erweitert um model_statistics und field_statistics Tracking
@@ -274,7 +274,7 @@ async def enhanced_search(
     country: str = Query(None),
     commodity: str = Query(None),
     region: str = Query(None),
-    model: str = Query("sonar")
+    model: str = Query(..., description="Modell-ID (z.B. 'openrouter:deepseek-free')")
 ):
     """Erweiterte Suche mit Source Discovery"""
     try:
@@ -357,7 +357,7 @@ async def comprehensive_search(request: MineSearchRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/search/html")
-async def search_mine_html(request: MineSearchRequest, model: str = "sonar-pro"):
+async def search_mine_html(request: MineSearchRequest, model: str):
     """Sucht nach Mining-Informationen und gibt HTML zurück"""
     try:
         from html_utils import create_result_card, create_error_card

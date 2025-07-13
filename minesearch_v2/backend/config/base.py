@@ -53,8 +53,8 @@ class Config(APIKeysConfig):
     API_TIMEOUT = 30  # Sekunden
     MAX_RETRIES = 3
     
-    # Default Modell
-    DEFAULT_MODEL = "sonar-pro"
+    # Default Modell - ENTFERNT: Keine automatische Perplexity-Auswahl mehr
+    DEFAULT_MODEL = None
     PERPLEXITY_TEMPERATURE = 0.2
     
     # Provider Konfiguration

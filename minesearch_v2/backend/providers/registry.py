@@ -239,13 +239,13 @@ class ProviderRegistry:
         """
         defaults = []
         
-        # Perplexity Standard-Modell
-        if 'perplexity:sonar-pro' in self._available_models:
-            defaults.append('perplexity:sonar-pro')
-        
-        # Kostenloses OpenRouter Modell als Alternative
+        # Kostenloses OpenRouter Modell als primäre Option
         if 'openrouter:deepseek-free' in self._available_models:
             defaults.append('openrouter:deepseek-free')
+        
+        # Weitere kostenlose Modelle priorisieren
+        if 'openrouter:deepseek-chat' in self._available_models:
+            defaults.append('openrouter:deepseek-chat')
         
         return defaults
 

@@ -148,7 +148,7 @@ class LegacySearchFunctions:
         }
         
         payload = {
-            "model": model_config.get("model", "sonar-pro"),
+            "model": model_config.get("model", "sonar"),  # Kein automatischer Fallback auf kostenpflichtige Modelle
             "messages": [
                 {"role": "system", "content": self._get_system_prompt()},
                 {"role": "user", "content": search_query}
