@@ -257,13 +257,43 @@ class ModelBenchmarkService:
         except Exception as e:
             logger.error(f"[BENCHMARK] Fehler beim Speichern der Test-Ergebnisse: {e}")
     
+    def _should_exclude_field_for_status(self, field_name: str, activity_status: str) -> bool:
+        """
+        Prüft ob ein Feld basierend auf Aktivitätsstatus ausgeschlossen werden soll
+        
+        ÄNDERUNG 13.07.2025: Regulatory-aware conditional field statistics
+        """
+        # Conditional logic nur für Felder mit echtem statistischen Bias
+        CONDITIONAL_FIELDS = {
+            "Produktionsende": ["aktiv", "explorativ", "geplant", "entwicklung"],
+            "Fördermenge/Jahr": ["geschlossen", "explorativ", "geplant", "entwicklung"]
+        }
+        
+        if field_name not in CONDITIONAL_FIELDS:
+            return False
+            
+        if not activity_status:
+            return False
+            
+        excluded_statuses = CONDITIONAL_FIELDS[field_name]
+        activity_lower = activity_status.lower()
+        
+        return any(status in activity_lower for status in excluded_statuses)
+
     async def _update_field_statistics(self, session, model_id: str, structured_data: Dict):
         """
-        Aktualisiert Feld-spezifische Statistiken
+        Aktualisiert Feld-spezifische Statistiken mit conditional logic
+        
+        ÄNDERUNG 13.07.2025: Conditional statistics für regulatorik-bewusste Auswertung
         """
+        activity_status = structured_data.get("Aktivitätsstatus", "")
+        
         for field_name in CSV_COLUMNS:
             value = structured_data.get(field_name)
             found = bool(value and str(value).strip() and str(value).strip().lower() not in ['n/a', 'k.a', 'keine daten'])
+            
+            # Prüfe ob Feld für diesen Status ausgeschlossen werden soll
+            should_exclude = self._should_exclude_field_for_status(field_name, activity_status)
             
             # Suche existierenden Eintrag
             field_stat = session.query(FieldStatistics).filter_by(
@@ -271,27 +301,59 @@ class ModelBenchmarkService:
                 field_name=field_name
             ).first()
             
+            # Bestimme ob conditional logic für dieses Feld angewendet wird
+            is_conditional_field = field_name in ["Produktionsende", "Fördermenge/Jahr"]
+            
             if field_stat:
                 # Aktualisiere existierenden Eintrag
-                field_stat.total_searches += 1
-                if found:
-                    field_stat.times_found += 1
+                if should_exclude:
+                    # Zähle als ausgeschlossen, aber tracke für Transparenz
+                    field_stat.excluded_count = getattr(field_stat, 'excluded_count', 0) + 1
+                    field_stat.conditional_logic_applied = True
                 else:
-                    field_stat.times_empty += 1
-                field_stat.success_rate = field_stat.times_found / field_stat.total_searches
+                    # Normale Statistik-Aktualisierung
+                    field_stat.total_searches += 1
+                    if found:
+                        field_stat.times_found += 1
+                    else:
+                        field_stat.times_empty += 1
+                    field_stat.success_rate = field_stat.times_found / field_stat.total_searches if field_stat.total_searches > 0 else 0.0
+                    
+                    # Markiere conditional fields auch bei normalen Updates
+                    if is_conditional_field:
+                        field_stat.conditional_logic_applied = True
+                
                 field_stat.last_updated = datetime.now()
             else:
                 # Erstelle neuen Eintrag
-                field_stat = FieldStatistics(
-                    model_id=model_id,
-                    field_name=field_name,
-                    total_searches=1,
-                    times_found=1 if found else 0,
-                    times_empty=0 if found else 1,
-                    success_rate=1.0 if found else 0.0,
-                    avg_confidence=1.0 if found else 0.0,
-                    last_updated=datetime.now()
-                )
+                if should_exclude:
+                    # Erstelle Eintrag mit Ausschluss-Zählung
+                    field_stat = FieldStatistics(
+                        model_id=model_id,
+                        field_name=field_name,
+                        total_searches=0,
+                        times_found=0,
+                        times_empty=0,
+                        success_rate=0.0,
+                        avg_confidence=0.0,
+                        excluded_count=1,
+                        conditional_logic_applied=True,
+                        last_updated=datetime.now()
+                    )
+                else:
+                    # Normale Erstellung
+                    field_stat = FieldStatistics(
+                        model_id=model_id,
+                        field_name=field_name,
+                        total_searches=1,
+                        times_found=1 if found else 0,
+                        times_empty=0 if found else 1,
+                        success_rate=1.0 if found else 0.0,
+                        avg_confidence=1.0 if found else 0.0,
+                        excluded_count=0,
+                        conditional_logic_applied=is_conditional_field,
+                        last_updated=datetime.now()
+                    )
                 session.add(field_stat)
     
     async def _update_sources_from_result(self, sources: List[Dict], country: Optional[str], region: Optional[str]):
