@@ -10,54 +10,79 @@ from typing import Dict, Any
 import logging
 from datetime import datetime
 
+# Import helper für konsistente Pfad-Auflösung
+import sys
+from pathlib import Path
+backend_root = Path(__file__).parent.parent.parent
+if str(backend_root) not in sys.path:
+    sys.path.insert(0, str(backend_root))
+
+# API Models (relative imports)
 from ..models import MineSearchRequest, MineSearchResponse, MultiSearchRequest, SmartSearchRequest
+
+# Backend Services (absolute imports)
 from search_service import MineSearchService
 from search_service_multi import multi_search_service
 from search_service_multi_enhanced import EnhancedMultiProviderSearchService
 from providers.registry import provider_registry
 from model_benchmark_service import ModelBenchmarkService
 from search_utils import count_filled_fields
-from config import CSV_COLUMNS
+from config.base import CSV_COLUMNS
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Service-Instanzen
-mine_search_service = MineSearchService()
-enhanced_search_service = EnhancedMultiProviderSearchService()
-benchmark_service = ModelBenchmarkService()
+# Shared Service Container
+from services_container import services
 
 @router.post("/search", response_model=MineSearchResponse)
-async def search_mine(request: MineSearchRequest, model: str):
+async def search_mine(request: MineSearchRequest):
     """
     Sucht nach Mining-Informationen über Multi-Provider System.
     ÄNDERUNG 12.07.2025: Erweitert um model_statistics und field_statistics Tracking
+    FIXED 14.07.2025: Explizite Query Parameter für model
     """
     search_start_time = datetime.now()
     
     try:
-        # ÄNDERUNG 11.07.2025: Nutze Enhanced Service für alle Provider-Modelle
-        logger.info(f"[SEARCH API] Request mit model='{model}', mine='{request.mine_name}'")
-        if ":" in model:  # Provider:Model Format (z.B. anthropic:claude-3.7-sonnet)
-            logger.info(f"[SEARCH API] Verwende Enhanced Service für {model}")
-            # Nutze Enhanced Service für Provider-basierte Suche
-            result = await enhanced_search_service.search_single_model(
-                model_id=model,
+        model = request.model  # Model aus Request Body holen
+        logger.info(f"[SEARCH API] Received request: model='{model}', mine='{request.mine_name}', country='{request.country}'")
+        
+        # DEFENSIVE-FIX 19.07.2025: Verwende robusten Wrapper
+        # BUGFIX 20.07.2025: Async Wrapper Call
+        try:
+            from api_fix_wrapper import defensive_search
+            logger.info(f"[SEARCH API] Verwende defensiven Wrapper für {model}")
+            result = await defensive_search.safe_search(
                 mine_name=request.mine_name,
-                country=request.country,
-                commodity=request.commodity,
-                region=request.region
+                country=request.country or "Canada",
+                provider=model.split(':')[0] if ':' in model else "perplexity",
+                model=model
             )
-        else:
-            logger.info(f"[SEARCH API] Verwende Legacy Service für {model}")
-            # Legacy Support für Perplexity-Modelle
-            result = await mine_search_service.search_mine(
-                mine_name=request.mine_name,
-                country=request.country,
-                commodity=request.commodity,
-                model=model,
-                region=request.region
-            )
+        except Exception as wrapper_error:
+            logger.warning(f"[SEARCH API] Wrapper-Fehler, versuche Original-Logic: {wrapper_error}")
+            
+            # Fallback auf Original-Logic
+            if ":" in model:  # Provider:Model Format (z.B. anthropic:claude-3.7-sonnet)
+                logger.info(f"[SEARCH API] Verwende Enhanced Service für {model}")
+                # Nutze Enhanced Service für Provider-basierte Suche
+                result = await services.enhanced_search_service.search_single_model(
+                    model_id=model,
+                    mine_name=request.mine_name,
+                    country=request.country,
+                    commodity=request.commodity,
+                    region=request.region
+                )
+            else:
+                logger.info(f"[SEARCH API] Verwende Legacy Service für {model}")
+                # Legacy Support für Perplexity-Modelle
+                result = await services.mine_search_service.search_mine(
+                    mine_name=request.mine_name,
+                    country=request.country,
+                    commodity=request.commodity,
+                    model=model,
+                    region=request.region
+                )
         
         # Berechne Response-Zeit
         response_time_ms = (datetime.now() - search_start_time).total_seconds() * 1000
@@ -92,7 +117,7 @@ async def search_mine(request: MineSearchRequest, model: str):
                 )
                 
                 # 2. NEUE model_statistics Speicherung
-                await benchmark_service.save_model_statistics(
+                await services.benchmark_service.save_model_statistics(
                     model_id=model,
                     mine_name=request.mine_name,
                     country=request.country,
@@ -121,7 +146,7 @@ async def search_mine(request: MineSearchRequest, model: str):
             # Auch fehlgeschlagene Suchen tracken
             try:
                 error_message = result.get('error', 'Unbekannter Fehler')
-                await benchmark_service.save_model_statistics(
+                await services.benchmark_service.save_model_statistics(
                     model_id=model,
                     mine_name=request.mine_name,
                     country=request.country,
@@ -154,7 +179,7 @@ async def search_two_phase(request: MineSearchRequest):
     Phase 2: Detaillierte Datenextraktion mit Premium-Modellen
     """
     try:
-        result = await multi_search_service.search_two_phase(
+        result = await services.multi_search_service.search_two_phase(
             mine_name=request.mine_name,
             country=request.country,
             commodity=request.commodity,
@@ -192,7 +217,7 @@ async def search_two_phase(request: MineSearchRequest):
 async def search_multiple_models(request: MultiSearchRequest):
     """Suche mit mehreren Modellen gleichzeitig"""
     try:
-        result = await multi_search_service.search_with_multiple_models(
+        result = await services.multi_search_service.search_with_multiple_models(
             model_ids=request.model_ids,
             mine_name=request.mine_name,
             country=request.country,
@@ -233,7 +258,7 @@ async def search_multiple_models(request: MultiSearchRequest):
 async def smart_search(request: SmartSearchRequest):
     """Intelligente Suche mit automatischer Modell-Auswahl"""
     try:
-        result = await multi_search_service.smart_search(
+        result = await services.multi_search_service.smart_search(
             mine_name=request.mine_name,
             country=request.country,
             commodity=request.commodity,
@@ -269,21 +294,15 @@ async def smart_search(request: SmartSearchRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/search/enhanced")
-async def enhanced_search(
-    mine_name: str = Query(...),
-    country: str = Query(None),
-    commodity: str = Query(None),
-    region: str = Query(None),
-    model: str = Query(..., description="Modell-ID (z.B. 'openrouter:deepseek-free')")
-):
+async def enhanced_search(request: MineSearchRequest):
     """Erweiterte Suche mit Source Discovery"""
     try:
-        result = await mine_search_service.enhanced_search(
-            mine_name=mine_name,
-            country=country,
-            commodity=commodity,
-            region=region,
-            model=model
+        result = await services.mine_search_service.enhanced_search(
+            mine_name=request.mine_name,
+            country=request.country,
+            commodity=request.commodity,
+            region=request.region,
+            model=request.model
         )
         
         # Speichere Ergebnis
@@ -362,7 +381,7 @@ async def search_mine_html(request: MineSearchRequest, model: str):
     try:
         from html_utils import create_result_card, create_error_card
         
-        result = await mine_search_service.search_mine(
+        result = await services.mine_search_service.search_mine(
             mine_name=request.mine_name,
             country=request.country,
             commodity=request.commodity,

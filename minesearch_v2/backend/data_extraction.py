@@ -23,6 +23,7 @@ from extraction_processors import (
     split_country_region, find_region_from_content,
     process_sources, post_process_data, clean_field_value
 )
+from source_manager import SourceManager
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,45 @@ class DataExtractor:
     def __init__(self):
         self.patterns = get_extraction_patterns()
         self.coordinate_patterns = get_enhanced_coordinate_patterns()
+        self.source_manager = SourceManager()
     
-    def extract_structured_data(self, content: str, mine_name: str, country: Optional[str] = None) -> Dict[str, str]:
+    def _get_field_status_marker(self, field: str, activity_status: str) -> str:
+        """
+        CONDITIONAL-FIELDS-FIX 15.07.2025: Generiert aussagekräftige Status-Marker
+        
+        Args:
+            field: Feldname
+            activity_status: Aktivitätsstatus der Mine
+            
+        Returns:
+            Passender Status-Marker für das Feld
+        """
+        if not activity_status:
+            return 'X'  # Standard "nicht gefunden"
+            
+        activity_lower = activity_status.lower()
+        
+        # Produktionsende bei aktiven Minen
+        if field == 'Produktionsende':
+            if any(status in activity_lower for status in ['aktiv', 'explorativ', 'geplant', 'entwicklung']):
+                return 'noch aktiv'
+                
+        # Fördermenge bei inaktiven Minen
+        if field == 'Fördermenge/Jahr':
+            if any(status in activity_lower for status in ['geschlossen', 'explorativ', 'geplant', 'entwicklung']):
+                if 'geschlossen' in activity_lower:
+                    return 'Mine geschlossen'
+                elif 'explorativ' in activity_lower:
+                    return 'nur Exploration'
+                elif 'geplant' in activity_lower:
+                    return 'noch geplant'
+                elif 'entwicklung' in activity_lower:
+                    return 'in Entwicklung'
+                    
+        # Standard für alle anderen Fälle
+        return 'X'
+    
+    def extract_structured_data(self, content: str, mine_name: str, country: Optional[str] = None) -> Dict[str, Any]:
         """
         Extrahiere strukturierte Daten aus dem Perplexity-Response
         
@@ -44,9 +82,15 @@ class DataExtractor:
             country: Land (optional)
             
         Returns:
-            Dict mit extrahierten Daten
+            Dict mit extrahierten Daten und Quellen-Mapping
         """
         try:
+            # Reset SourceManager für neue Extraktion
+            self.source_manager = SourceManager()
+            
+            # Extrahiere Quellen aus Response
+            response_sources = self.source_manager.extract_sources_from_response(content)
+            
             data = {col: '' for col in CSV_COLUMNS}
             data['Name'] = mine_name
             
@@ -61,13 +105,23 @@ class DataExtractor:
                     # ÄNDERUNG 07.07.2025: Debug-Logging vor Platzhalter-Check
                     logger.debug(f"[EXTRACTION-PRE] Feld '{field}' extrahiert: '{value[:100]}...'")
                     
+                    # QUELLENREFERENZEN-FIX 19.07.2025: Parse Quellen aus Feld-Text
+                    clean_value, field_sources = self.source_manager.parse_field_with_sources(value)
+                    
                     # Platzhalter-Validierung
-                    if is_placeholder_value(value, field):
-                        logger.info(f"[PLACEHOLDER REMOVED] Platzhalter '{value}' für Feld '{field}' entfernt")
-                        data[field] = ""
+                    if is_placeholder_value(clean_value, field):
+                        logger.info(f"[PLACEHOLDER REMOVED] Platzhalter '{clean_value}' für Feld '{field}' zu X konvertiert")
+                        data[field] = "X"  # Nicht gefunden markieren
                     else:
-                        logger.debug(f"[EXTRACTION-POST] Feld '{field}' behalten: '{value[:100]}...'")
-                        data[field] = value
+                        logger.debug(f"[EXTRACTION-POST] Feld '{field}' behalten: '{clean_value[:100]}...'")
+                        data[field] = clean_value
+                        
+                        # Wenn Feldquellen gefunden, zuordnen; sonst alle Response-Quellen verwenden
+                        if field_sources:
+                            self.source_manager.assign_field_sources(field, field_sources)
+                        elif response_sources and clean_value not in ['X', '']:
+                            # Für alle Felder mit echten Daten: alle gefundenen Quellen zuordnen
+                            self.source_manager.assign_field_sources(field, response_sources)
             
             # Spezielle Behandlung für Koordinaten mit erweiterten Patterns
             data = self._extract_coordinates(content, data)
@@ -78,18 +132,42 @@ class DataExtractor:
             # Validierung spezifischer Felder
             data = self._validate_fields(data, currency)
             
-            # Bereinige alle Feldwerte
-            for field in data:
-                if data[field] and field not in FIELDS_WITHOUT_SOURCES:
-                    data[field] = clean_field_value(data[field], field)
+            # QUELLENREFERENZEN-FIX 19.07.2025: Erstelle Quellenangaben mit neuer Logik
+            data['Quellenangaben'] = self.source_manager.get_sources_summary()
             
-            # Quellen verarbeiten
-            all_sources = extract_sources_from_content(content)
-            data = process_sources(data, all_sources)
+            # Füge Quellen-Mapping für JSON-Speicherung hinzu
+            data['_source_mapping'] = self.source_manager.get_sources_dict()
             
-            # ÄNDERUNG 07.07.2025: Detailliertes Logging der extrahierten Felder
-            filled_fields = [(k, v) for k, v in data.items() if v and str(v).strip()]
-            logger.info(f"[DATA EXTRACTION] Erfolgreich {len(filled_fields)} Felder extrahiert")
+            # Bereinige alle Feldwerte NACH Quellen-Zuordnung
+            for field in CSV_COLUMNS:
+                if field in data and data[field] and field not in FIELDS_WITHOUT_SOURCES:
+                    if isinstance(data[field], str):  # Nur String-Werte bereinigen
+                        data[field] = clean_field_value(data[field], field)
+            
+            # QUELLENREFERENZEN-FIX 19.07.2025: Formatiere Felder mit Quellen-Referenzen NACH Bereinigung
+            for field in CSV_COLUMNS:
+                if field not in ['Name', 'Quellenangaben'] and data.get(field) and data[field] not in ['X', '']:
+                    formatted_value = self.source_manager.format_field_with_sources(data[field], field)
+                    if formatted_value != data[field]:
+                        logger.debug(f"[SOURCE] Feld '{field}' mit Quellen formatiert: '{formatted_value}'")
+                        data[field] = formatted_value
+            
+            # FELDMARKIERUNG-FIX 15.07.2025: Markiere leere Felder mit passenden Status-Markern
+            activity_status = data.get('Aktivitätsstatus', '')
+            
+            for field in CSV_COLUMNS:
+                if field != 'Name' and field != 'Quellenangaben':  # Name und Quellenangaben ausschließen
+                    if not data.get(field) or str(data[field]).strip() == '':
+                        # Prüfe auf logische Ausschlüsse
+                        status_marker = self._get_field_status_marker(field, activity_status)
+                        data[field] = status_marker
+                        logger.debug(f"[FIELD MARKER] Feld '{field}' als '{status_marker}' markiert")
+            
+            # ÄNDERUNG 15.07.2025: Detailliertes Logging der extrahierten Felder
+            filled_fields = [(k, v) for k, v in data.items() if v and str(v).strip() and str(v).strip() not in ['X', 'noch aktiv', 'Mine geschlossen', 'nur Exploration', 'noch geplant', 'in Entwicklung']]
+            x_marked_fields = [(k, v) for k, v in data.items() if str(v).strip() == 'X']
+            status_marked_fields = [(k, v) for k, v in data.items() if str(v).strip() in ['noch aktiv', 'Mine geschlossen', 'nur Exploration', 'noch geplant', 'in Entwicklung']]
+            logger.info(f"[DATA EXTRACTION] {len(filled_fields)} Felder mit Daten, {len(x_marked_fields)} als 'X' markiert, {len(status_marked_fields)} Status-Marker")
             
             # Log die ersten gefüllten Felder
             for field, value in filled_fields[:10]:
@@ -340,6 +418,11 @@ def assign_sources_to_data(data: Dict[str, str], content: str,
     
     for field, value in data.items():
         if not value or field in FIELDS_WITHOUT_SOURCES:
+            data_with_sources[field] = {'value': value, 'sources': []}
+            continue
+        
+        # BUGFIX 20.07.2025: Skip dictionary values (z.B. _source_mapping)
+        if isinstance(value, dict):
             data_with_sources[field] = {'value': value, 'sources': []}
             continue
         

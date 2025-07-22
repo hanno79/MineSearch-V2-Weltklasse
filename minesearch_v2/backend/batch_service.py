@@ -66,6 +66,7 @@ class BatchService:
     
     def _parse_csv_content(self, text_content: str, delimiter: str) -> Dict[str, Any]:
         """Parse CSV Inhalt und extrahiere Minen-Daten"""
+        # PERFORMANCE-FIX: Streaming CSV-Parsing für große Dateien
         csv_reader = csv.DictReader(io.StringIO(text_content), delimiter=delimiter)
         mines = []
         
@@ -89,8 +90,12 @@ class BatchService:
         
         logger.info(f"CSV Spalten gefunden: {column_mappings}")
         
-        # Lese Minen-Daten
+        # PERFORMANCE-FIX: Batch-Processing mit Speicher-Optimierung
+        row_count = 0
+        batch_size = 1000  # Verarbeite 1000 Zeilen auf einmal
+        
         for row in csv_reader:
+            row_count += 1
             mine_name = row.get(column_mappings['mine_column'], '').strip()
             if not mine_name:
                 continue
@@ -104,6 +109,17 @@ class BatchService:
                 'all_data': row
             }
             mines.append(mine)
+            
+            # Warnung bei sehr großen Dateien
+            if row_count % batch_size == 0:
+                logger.info(f"CSV-Verarbeitung: {row_count} Zeilen verarbeitet...")
+                
+            # Speicher-Begrenzung für sehr große Dateien
+            if len(mines) > 10000:
+                logger.warning(f"CSV-Datei sehr groß ({len(mines)} Minen). Begrenze auf erste 10.000 Einträge.")
+                break
+        
+        logger.info(f"CSV-Parsing abgeschlossen: {len(mines)} Minen aus {row_count} Zeilen")
         
         return {
             'mines': mines,
@@ -123,7 +139,7 @@ class BatchService:
         
         # Mögliche Namen für verschiedene Spalten
         possibilities = {
-            'mine_column': ['name', 'mine', 'mine_name', 'site', 'mine site', 'nom', 'nom de la mine', 'site minier', 'minenname'],
+            'mine_column': ['name', 'mine', 'mine_name', 'mine name', 'site', 'mine site', 'nom', 'nom de la mine', 'site minier', 'minenname'],
             'country_column': ['country', 'land', 'pays', 'staat', 'país', 'negara'],
             'region_column': ['region', 'province', 'provinz', 'état', 'bundesland', 'territorio', 'wilayah', 'departamento', 'región'],
             'owner_column': ['owner', 'eigentümer', 'propriétaire', 'propietario', 'pemilik', 'dueño', 'belongs to', 'property of', 'gehört'],

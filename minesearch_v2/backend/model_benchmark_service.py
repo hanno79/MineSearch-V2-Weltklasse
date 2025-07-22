@@ -250,7 +250,7 @@ class ModelBenchmarkService:
                 
                 # Aktualisiere Feld-Statistiken
                 if success and structured_data:
-                    await self._update_field_statistics(session, model_id, structured_data)
+                    self._update_field_statistics_sync(session, model_id, structured_data)
                 
                 session.commit()
                 
@@ -259,11 +259,15 @@ class ModelBenchmarkService:
     
     def _should_exclude_field_for_status(self, field_name: str, activity_status: str) -> bool:
         """
-        Prüft ob ein Feld basierend auf Aktivitätsstatus ausgeschlossen werden soll
+        CONDITIONAL-FIELDS-FIX 15.07.2025: Logische Ausschlüsse für unmögliche Daten
         
-        ÄNDERUNG 13.07.2025: Regulatory-aware conditional field statistics
+        Felder werden ausgeschlossen wenn sie logisch unmöglich sind:
+        - "Produktionsende" bei aktiven Minen: Logisch unmöglich
+        - "Fördermenge/Jahr" bei geschlossenen Minen: Logisch unmöglich
+        
+        Diese Felder werden mit aussagekräftigen Status-Markern gefüllt.
         """
-        # Conditional logic nur für Felder mit echtem statistischen Bias
+        # Conditional logic für logisch unmögliche Felder
         CONDITIONAL_FIELDS = {
             "Produktionsende": ["aktiv", "explorativ", "geplant", "entwicklung"],
             "Fördermenge/Jahr": ["geschlossen", "explorativ", "geplant", "entwicklung"]
@@ -687,3 +691,129 @@ class ModelBenchmarkService:
         except Exception as e:
             logger.error(f"[BENCHMARK] Error updating field statistics: {e}")
             raise
+    
+    def _update_field_statistics_sync(self, session, model_id: str, structured_data: Dict[str, Any]):
+        """
+        Synchrone Version der Feld-Statistik-Aktualisierung
+        """
+        try:
+            for field_name in CSV_COLUMNS:
+                value = structured_data.get(field_name, '')
+                is_found = bool(value and str(value).strip() and 
+                              str(value).lower() not in ['n/a', 'unknown', '', 'null', 'none'])
+                
+                # Hole oder erstelle FieldStatistics
+                field_stat = session.query(FieldStatistics).filter_by(
+                    model_id=model_id, 
+                    field_name=field_name
+                ).first()
+                
+                if not field_stat:
+                    field_stat = FieldStatistics(
+                        model_id=model_id,
+                        field_name=field_name,
+                        total_searches=0,
+                        times_found=0,
+                        times_empty=0,
+                        success_rate=0.0,
+                        avg_confidence=0.0,
+                        last_updated=datetime.now()
+                    )
+                    session.add(field_stat)
+                
+                # Update Statistiken
+                field_stat.total_searches += 1
+                if is_found:
+                    field_stat.times_found += 1
+                else:
+                    field_stat.times_empty += 1
+                
+                # Berechne neue Success-Rate
+                field_stat.success_rate = field_stat.times_found / field_stat.total_searches
+                field_stat.last_updated = datetime.now()
+                
+            logger.debug(f"[BENCHMARK] Field statistics updated for {model_id}")
+                
+        except Exception as e:
+            logger.error(f"[BENCHMARK] Error updating field statistics: {e}")
+            # Kein raise, da dies eine Hilfsfunktion ist
+    
+    async def benchmark_model(self, model_id: str, mine_data: Dict[str, str], runs: int, session_id: str) -> Dict[str, Any]:
+        """
+        Führt Benchmark für ein einzelnes Modell durch
+        
+        Args:
+            model_id: ID des zu testenden Modells
+            mine_data: Dictionary mit Mine-Daten (name, country, region, commodity)
+            runs: Anzahl der Durchläufe
+            session_id: ID der Benchmark-Session
+            
+        Returns:
+            Dictionary mit Benchmark-Ergebnissen
+        """
+        logger.info(f"[BENCHMARK] Starte Benchmark für {model_id} mit {runs} Runs")
+        
+        mine_name = mine_data.get('name', '')
+        country = mine_data.get('country', '')
+        region = mine_data.get('region', '')
+        commodity = mine_data.get('commodity', '')
+        
+        results = []
+        total_success = 0
+        total_fields = 0
+        total_response_time = 0
+        
+        try:
+            for run in range(1, runs + 1):
+                logger.info(f"[BENCHMARK] {model_id}: Run {run}/{runs} für {mine_name}")
+                
+                # Führe einzelnen Test durch
+                result = await self._test_single_model(
+                    model_id, mine_name, country, region, commodity, run
+                )
+                
+                results.append(result)
+                
+                if result.get('success'):
+                    total_success += 1
+                    total_fields += result.get('fields_found', 0)
+                    total_response_time += result.get('response_time_ms', 0)
+                
+                # Kurze Pause zwischen den Runs
+                await asyncio.sleep(1)
+            
+            # Berechne Aggregate
+            success_rate = total_success / runs if runs > 0 else 0
+            avg_fields = total_fields / total_success if total_success > 0 else 0
+            avg_response_time = total_response_time / total_success if total_success > 0 else 0
+            
+            # MIKRO-TASK 3 FIX 15.07.2025: Entferne fehlenden _update_model_summary Aufruf
+            # await self._update_model_summary(model_id, results)  # Methode nicht implementiert, deaktiviert
+            
+            benchmark_result = {
+                'model_id': model_id,
+                'mine_name': mine_name,
+                'session_id': session_id,
+                'total_runs': runs,
+                'successful_runs': total_success,
+                'success_rate': success_rate,
+                'avg_fields_found': avg_fields,
+                'avg_response_time_ms': avg_response_time,
+                'results': results,
+                'completed_at': datetime.now().isoformat()
+            }
+            
+            logger.info(f"[BENCHMARK] {model_id} abgeschlossen: {total_success}/{runs} erfolgreich, {avg_fields:.1f} Felder im Schnitt")
+            
+            return benchmark_result
+            
+        except Exception as e:
+            logger.error(f"[BENCHMARK] Fehler bei {model_id}: {str(e)}")
+            return {
+                'model_id': model_id,
+                'mine_name': mine_name,
+                'session_id': session_id,
+                'error': str(e),
+                'success': False,
+                'completed_at': datetime.now().isoformat()
+            }

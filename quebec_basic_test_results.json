@@ -1,0 +1,75 @@
+{
+  "start_time": "2025-07-19T14:27:27.941255",
+  "tests": {
+    "1_1_quebec_detection": {
+      "status": "PASS",
+      "canada_config_found": true,
+      "restoration_terms_count": 34,
+      "french_terms_count": 3,
+      "english_terms_count": 12,
+      "priority_domains": [
+        "mern.gouv.qc.ca",
+        "nrcan.gc.ca",
+        "gestim.quebec",
+        "mining.ca",
+        "sedar.com",
+        "tse.ca",
+        "gov.bc.ca"
+      ]
+    },
+    "1_2_database_models": {
+      "status": "FAIL",
+      "error": "cannot import name 'db_manager' from 'database.manager' (/app/minesearch_v2/backend/database/manager.py)"
+    },
+    "1_3_source_discovery": {
+      "status": "PARTIAL",
+      "total_sources": 1,
+      "quebec_sources": 1,
+      "sample_sources": [
+        "https://mern.gouv.qc.ca/mines/"
+      ]
+    },
+    "2_1_source_classification": {
+      "status": "PASS",
+      "classifications": [
+        {
+          "url": "https://mern.gouv.qc.ca/mines/",
+          "type": "government",
+          "country": "Canada"
+        },
+        {
+          "url": "https://gestim.mines.gouv.qc.ca/",
+          "type": "government",
+          "country": "Canada"
+        },
+        {
+          "url": "https://sedar.com/filings/",
+          "type": "exchange",
+          "country": "Canada"
+        },
+        {
+          "url": "https://mining.com/article/",
+          "type": "industry",
+          "country": null
+        },
+        {
+          "url": "https://somecompany.com/report.pdf",
+          "type": "document",
+          "country": null
+        }
+      ],
+      "gov_sources": 2,
+      "canada_sources": 3
+    }
+  },
+  "summary": {
+    "total_tests": 4,
+    "passed": 2,
+    "partial": 1,
+    "failed": 1,
+    "success_rate": 50.0,
+    "partial_rate": 25.0,
+    "overall_status": "\ud83d\udfe1 NEEDS WORK"
+  },
+  "end_time": "2025-07-19T14:27:28.129452"
+}

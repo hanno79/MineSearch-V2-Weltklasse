@@ -171,21 +171,63 @@ class SearchServiceOperations(SearchServiceCore):
             else:
                 failed_results.append(result)
         
-        # Kombiniere erfolgreiche Ergebnisse
+        # FIXED 15.07.2025: Gebe Ergebnisse im Batch-kompatiblen Format zurück
+        # Erstelle ein Dictionary mit einzelnen Modell-Ergebnissen für die Batch-Verarbeitung
+        results_dict = {}
+        
+        # FIXED 15.07.2025: Korrigiere Feldname - verwende 'model_id' statt 'model_used'
+        for result in successful_results:
+            if 'model_id' in result:
+                model_id = result['model_id']
+                results_dict[model_id] = result
+            elif 'model_used' in result:
+                # Fallback für mögliche Legacy-Formate
+                model_id = result['model_used']
+                results_dict[model_id] = result
+        
+        # Füge fehlgeschlagene Ergebnisse hinzu
+        for failed in failed_results:
+            if 'model_id' in failed:
+                model_id = failed['model_id']
+                results_dict[model_id] = {
+                    'success': False,
+                    'error': failed.get('error', 'Unknown error'),
+                    'data': {}
+                }
+        
+        # ENHANCED 15.07.2025: Validiere results_dict vor Rückgabe
+        logger.info(f"[OPERATIONS] Results dict enthält {len(results_dict)} Modell-Ergebnisse")
+        for model_id, result in results_dict.items():
+            success = result.get('success', False)
+            has_data = bool(result.get('data', {}))
+            logger.info(f"[OPERATIONS] {model_id}: success={success}, has_data={has_data}")
+            
+            # Detaillierte Struktur-Validierung
+            if success and has_data:
+                data = result.get('data', {})
+                structured_data = data.get('structured_data', {})
+                filled_fields = len([v for v in structured_data.values() if v and str(v).strip()])
+                logger.info(f"[OPERATIONS] {model_id}: {filled_fields} gefüllte Felder in structured_data")
+            
+        # Erstelle das finale Ergebnis im erwarteten Format
+        combined_result = {
+            'success': len(successful_results) > 0,
+            'mine_name': mine_name,
+            'country': country,
+            'models_searched': model_ids,
+            'results': results_dict,
+            'failed_models': failed_results,
+            'total_models': len(model_ids),
+            'successful_models': len(successful_results),
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Füge auch aggregierte Daten hinzu (für Rückwärtskompatibilität)
         if successful_results:
-            combined_result = self.search_result_combiner.combine_results(successful_results)
-            combined_result['failed_models'] = failed_results
-            combined_result['total_models'] = len(model_ids)
-            combined_result['successful_models'] = len(successful_results)
+            combined_result['data'] = successful_results[0].get('data', {})
         else:
-            combined_result = {
-                'success': False,
-                'error': 'Alle Modelle fehlgeschlagen',
-                'failed_models': failed_results,
-                'total_models': len(model_ids),
-                'successful_models': 0,
-                'data': {}
-            }
+            combined_result['data'] = {}
+            combined_result['error'] = 'Alle Modelle fehlgeschlagen'
         
         logger.info(f"[OPERATIONS] Parallele Suche abgeschlossen: {len(successful_results)}/{len(model_ids)} erfolgreich")
         return combined_result
@@ -298,7 +340,7 @@ class SearchServiceOperations(SearchServiceCore):
                 try:
                     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
                         async with session.post(
-                            'http://localhost:8000/api/statistics/capture',
+                            'http://localhost:8000/api/benchmark/capture',
                             json=stats_data,
                             headers={'Content-Type': 'application/json'}
                         ) as response:
@@ -333,7 +375,7 @@ class SearchServiceOperations(SearchServiceCore):
                 try:
                     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
                         async with session.post(
-                            'http://localhost:8000/api/statistics/capture_error',
+                            'http://localhost:8000/api/benchmark/capture',
                             json=error_data,
                             headers={'Content-Type': 'application/json'}
                         ) as response:

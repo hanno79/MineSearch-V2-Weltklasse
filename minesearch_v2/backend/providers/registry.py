@@ -50,39 +50,83 @@ class ProviderRegistry:
         Args:
             config: Provider-Konfiguration aus config.py
         """
+        logger.info(f"[REGISTRY] 🚀 Starte Provider-Initialisierung für {len(config)} Provider")
+        
+        # Zähle erwartete Modelle pro Provider
+        expected_models = {}
+        for provider_name, provider_config in config.items():
+            if provider_config.get('enabled', False):
+                models = provider_config.get('models', {})
+                expected_models[provider_name] = len(models)
+                logger.info(f"[REGISTRY] 📋 Provider {provider_name}: {len(models)} Modelle erwartet")
+        
         for provider_name, provider_config in config.items():
             if not provider_config.get('enabled', False):
-                logger.info(f"[REGISTRY] Provider {provider_name} ist deaktiviert")
+                logger.info(f"[REGISTRY] ⏭️  Provider {provider_name} ist deaktiviert")
                 continue
                 
+            logger.info(f"[REGISTRY] 🔧 Initialisiere Provider: {provider_name}")
+            
             try:
                 # Lade Provider-Klasse dynamisch
                 provider_class = self._load_provider_class(provider_name)
                 if not provider_class:
+                    logger.error(f"[REGISTRY] ❌ Provider-Klasse für {provider_name} konnte nicht geladen werden")
                     continue
+                
+                logger.info(f"[REGISTRY] ✅ Provider-Klasse {provider_class.__name__} geladen")
                 
                 # Initialisiere Provider
                 api_key = provider_config.get('api_key', '')
+                api_key_status = "✅ Verfügbar" if api_key else "❌ Fehlt"
+                logger.info(f"[REGISTRY] 🔑 API-Key Status für {provider_name}: {api_key_status}")
+                
                 provider = provider_class(api_key, provider_config)
                 
                 # Validiere Provider
                 if not provider.validate_config():
-                    logger.error(f"[REGISTRY] Provider {provider_name} Validierung fehlgeschlagen")
+                    logger.error(f"[REGISTRY] ❌ Provider {provider_name} Validierung fehlgeschlagen")
                     continue
+                
+                logger.info(f"[REGISTRY] ✅ Provider {provider_name} Validierung erfolgreich")
                 
                 # Registriere Provider und seine Modelle
                 self._providers[provider_name] = provider
                 
+                # Hole verfügbare Modelle vom Provider
+                provider_models = provider.get_models()
+                logger.info(f"[REGISTRY] 📊 Provider {provider_name} stellt {len(provider_models)} Modelle bereit")
+                
                 # Registriere Modelle mit Provider-Präfix
-                for model_key, model_config in provider.get_models().items():
+                registered_count = 0
+                for model_key, model_config in provider_models.items():
                     full_model_id = f"{provider_name}:{model_key}"
                     self._available_models[full_model_id] = model_config
-                    logger.info(f"[REGISTRY] Modell registriert: {full_model_id}")
+                    logger.info(f"[REGISTRY] ✅ Modell registriert: {full_model_id}")
+                    registered_count += 1
                 
-                logger.info(f"[REGISTRY] Provider {provider_name} erfolgreich initialisiert")
+                expected_count = expected_models.get(provider_name, 0)
+                if registered_count == expected_count:
+                    logger.info(f"[REGISTRY] ✅ Provider {provider_name} erfolgreich initialisiert: {registered_count}/{expected_count} Modelle")
+                else:
+                    logger.warning(f"[REGISTRY] ⚠️  Provider {provider_name}: Nur {registered_count}/{expected_count} Modelle registriert")
                 
             except Exception as e:
-                logger.error(f"[REGISTRY] Fehler beim Initialisieren von {provider_name}: {str(e)}")
+                logger.error(f"[REGISTRY] ❌ Fehler beim Initialisieren von {provider_name}: {str(e)}")
+                import traceback
+                logger.error(f"[REGISTRY] 🔍 Traceback: {traceback.format_exc()}")
+        
+        # Final Summary
+        total_models = len(self._available_models)
+        total_providers = len(self._providers)
+        logger.info(f"[REGISTRY] 🏁 INITIALIZATION COMPLETE: {total_providers} Provider, {total_models} Modelle registriert")
+        
+        if total_models == 0:
+            logger.error(f"[REGISTRY] 🚨 CRITICAL: Keine Modelle registriert! Alle Provider fehlgeschlagen.")
+        else:
+            logger.info(f"[REGISTRY] 📋 Registrierte Modelle:")
+            for model_id in sorted(self._available_models.keys()):
+                logger.info(f"[REGISTRY]   ✅ {model_id}")
     
     def _load_provider_class(self, provider_name: str) -> Optional[Type[AbstractProvider]]:
         """
@@ -145,6 +189,10 @@ class ProviderRegistry:
             Dict mit allen Modellen (model_id -> ModelConfig)
         """
         return self._available_models.copy()
+    
+    def get_available_models(self) -> Dict[str, ModelConfig]:
+        """Alias für get_all_models für Backward-Compatibility"""
+        return self.get_all_models()
     
     def get_models_by_provider(self, provider_name: str) -> Dict[str, ModelConfig]:
         """
@@ -239,13 +287,19 @@ class ProviderRegistry:
         """
         defaults = []
         
-        # Kostenloses OpenRouter Modell als primäre Option
+        # ÄNDERUNG 14.07.2025: Kimi K2 als primäre Option für beste Performance
+        if 'openrouter:kimi-k2' in self._available_models:
+            defaults.append('openrouter:kimi-k2')
+        
+        # Weitere kostenlose OpenRouter Modelle als Fallback
         if 'openrouter:deepseek-free' in self._available_models:
             defaults.append('openrouter:deepseek-free')
         
-        # Weitere kostenlose Modelle priorisieren
         if 'openrouter:deepseek-chat' in self._available_models:
             defaults.append('openrouter:deepseek-chat')
+        
+        if 'openrouter:mistral-small-free' in self._available_models:
+            defaults.append('openrouter:mistral-small-free')
         
         return defaults
 

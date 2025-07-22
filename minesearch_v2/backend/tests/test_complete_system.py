@@ -10,10 +10,13 @@ import logging
 from datetime import datetime
 import json
 import sys
+import os
 from typing import Dict, List, Any
 
-from minesearch_v2.backend.search_service_multi import MultiProviderSearchService
-from minesearch_v2.backend.config import config
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from search_service_multi import MultiProviderSearchService
+from config.base import config
 
 # Logging konfigurieren
 logging.basicConfig(

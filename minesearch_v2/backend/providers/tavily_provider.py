@@ -56,6 +56,18 @@ class TavilyProvider(AbstractProvider):
         
         return models
     
+    def get_models(self) -> Dict[str, ModelConfig]:
+        """Gibt alle verfügbaren Modelle zurück (AbstractProvider Interface)"""
+        return self.models
+    
+    def get_available_models(self) -> Dict[str, ModelConfig]:
+        """Alias für get_models für Backward-Compatibility"""
+        return self.models
+    
+    def validate_config(self) -> bool:
+        """Validiert die Provider-Konfiguration"""
+        return bool(self.api_key and self.api_url)
+    
     async def search(self, query: str, model_id: str, options: Dict[str, Any]) -> SearchResult:
         """Führe Suche mit Tavily durch"""
         start_time = datetime.now()
@@ -242,8 +254,8 @@ class TavilyProvider(AbstractProvider):
         query = re.sub(r'\(\s+', '(', query)  # Leerzeichen nach öffnender Klammer
         query = query.strip()
         
-        # ÄNDERUNG 09.07.2025: Query-Limit auf 600 Zeichen erhöht für bessere Ergebnisse
-        if len(query) > 600:
+        # KORRIGIERT 13.07.2025: Tavily Query-Limit ist 400 Zeichen (nicht 600)
+        if len(query) > 400:
             # Priorisierte Begriffe für Kürzung
             essential_parts = [
                 f'"{mine_name}"',

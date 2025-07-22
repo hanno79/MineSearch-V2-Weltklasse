@@ -1,0 +1,30 @@
+{
+  "name": "minesearch-v2-investigation-tests",
+  "version": "1.0.0",
+  "description": "Comprehensive Playwright tests for MineSearch v2.1 API and database investigation",
+  "main": "comprehensive_api_database_investigation.js",
+  "scripts": {
+    "test": "playwright test comprehensive_api_database_investigation.js",
+    "test:headed": "playwright test comprehensive_api_database_investigation.js --headed",
+    "test:debug": "playwright test comprehensive_api_database_investigation.js --debug",
+    "install-playwright": "playwright install",
+    "report": "playwright show-report"
+  },
+  "keywords": [
+    "playwright",
+    "testing",
+    "api",
+    "database",
+    "investigation",
+    "minesearch"
+  ],
+  "author": "rahn",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  },
+  "dependencies": {
+    "fs": "^0.0.1-security",
+    "path": "^0.12.7"
+  }
+}

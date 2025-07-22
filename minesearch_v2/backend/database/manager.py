@@ -12,7 +12,7 @@ import logging
 from datetime import datetime
 from urllib.parse import urlparse
 
-from config import Config
+from config.base import config
 from .models import Base, Source, SearchResult, ModelStatistics, FieldConsistency, ModelSummary, FieldStatistics
 
 logger = logging.getLogger(__name__)
@@ -22,17 +22,25 @@ class DatabaseManager:
     """Verwaltung der Datenbankverbindung und -operationen"""
     
     def __init__(self, database_url: Optional[str] = None):
-        self.database_url = database_url or Config.DATABASE_URL
+        self.database_url = database_url or config.DATABASE_URL
+        
+        # PERFORMANCE-FIX: Connection Pool für bessere Performance
         self.engine = create_engine(
             self.database_url, 
             echo=False,  # Setze auf True für SQL-Debugging
-            connect_args={"check_same_thread": False}  # Nur für SQLite
+            connect_args={"check_same_thread": False},  # Nur für SQLite
+            # Connection Pool Einstellungen
+            pool_size=20,  # Anzahl permanenter Verbindungen
+            max_overflow=30,  # Zusätzliche Verbindungen bei Bedarf
+            pool_timeout=30,  # Timeout für neue Verbindungen
+            pool_recycle=3600,  # Verbindungen nach 1 Stunde recyceln
+            pool_pre_ping=True  # Teste Verbindung vor Nutzung
         )
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         
         # Erstelle Tabellen wenn nicht vorhanden
         Base.metadata.create_all(bind=self.engine)
-        logger.info(f"Datenbank initialisiert: {self.database_url}")
+        logger.info(f"Datenbank initialisiert mit Connection Pool: {self.database_url}")
     
     def get_session(self) -> Session:
         """Hole eine neue Datenbank-Session"""
@@ -272,10 +280,40 @@ class DatabaseManager:
         with self.get_session() as session:
             from sqlalchemy import func
             
+            # ÄNDERUNG 15.07.2025: Frontend-kompatible Statistiken hinzufügen
+            total_results = session.query(SearchResult).count()
+            successful_results = session.query(SearchResult).filter(
+                SearchResult.success == True
+            ).count()
+            
+            # Berechne durchschnittliche Datenqualität aus structured_data
+            quality_sum = 0
+            quality_count = 0
+            for result in session.query(SearchResult).filter(SearchResult.structured_data.isnot(None)).all():
+                if result.structured_data:
+                    filled = sum(1 for v in result.structured_data.values() if v and str(v).strip())
+                    total = len(result.structured_data)
+                    if total > 0:
+                        quality_sum += (filled / total) * 100
+                        quality_count += 1
+            
+            average_data_quality = (quality_sum / quality_count) if quality_count > 0 else 0
+            
+            # Ergebnisse nach Modell
+            model_counts = session.query(
+                SearchResult.model_used, 
+                func.count(SearchResult.id)
+            ).group_by(SearchResult.model_used).all()
+            results_by_model = {model: count for model, count in model_counts}
+            
             # Basis-Statistiken
             stats = {
+                'total_results': total_results,
+                'successful_results': successful_results,
+                'average_data_quality': round(average_data_quality, 1),
+                'results_by_model': results_by_model,
                 'total_sources': session.query(Source).count(),
-                'total_search_results': session.query(SearchResult).count(),
+                'total_search_results': total_results,  # Backward compatibility
                 'sources_by_type': {},
                 'sources_by_country': {},
                 'model_performance': {},
@@ -285,6 +323,11 @@ class DatabaseManager:
             # Quellen nach Typ
             type_counts = session.query(Source.source_type, func.count(Source.id)).group_by(Source.source_type).all()
             stats['sources_by_type'] = {type_name: count for type_name, count in type_counts}
+            
+            # ÄNDERUNG 15.07.2025: Overall success rate für Sources hinzufügen
+            total_source_searches = session.query(func.sum(Source.total_searches)).scalar() or 0
+            total_source_successes = session.query(func.sum(Source.successful_searches)).scalar() or 0
+            stats['overall_success_rate'] = round((total_source_successes / total_source_searches * 100), 1) if total_source_searches > 0 else 0
             
             # Quellen nach Land
             country_counts = session.query(Source.country, func.count(Source.id)).filter(
@@ -316,11 +359,13 @@ class DatabaseManager:
             # Erstelle Dict mit getesteten Modellen
             tested_models = {}
             for model_stat in model_stats_query:
-                reliability_score = (model_stat.success_rate or 0) * 100 * 0.7 + (model_stat.avg_fields / 19.0 * 100) * 0.3
+                # KORRIGIERT 15.07.2025: success_rate ist bereits 0.0-1.0, nicht nochmal * 100
+                success_rate_pct = (model_stat.success_rate or 0) * 100
+                reliability_score = success_rate_pct * 0.7 + (model_stat.avg_fields / 19.0 * 100) * 0.3
                 
                 tested_models[model_stat.model_id] = {
                     'total_tests': model_stat.total_tests,
-                    'average_success_rate': round((model_stat.success_rate or 0) * 100, 1),
+                    'average_success_rate': round(success_rate_pct, 1),
                     'average_fields_found': round(model_stat.avg_fields or 0, 1),
                     'reliability_score': round(reliability_score, 1),
                     'average_response_time': round((model_stat.avg_response_time or 0) / 1000, 2),

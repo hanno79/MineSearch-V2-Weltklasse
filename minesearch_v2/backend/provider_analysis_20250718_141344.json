@@ -1,0 +1,689 @@
+{
+  "timestamp": "2025-07-18T14:13:44.953636",
+  "summary": {
+    "total_providers": 13,
+    "enabled_providers": 13,
+    "valid_api_keys": 12,
+    "total_models": 58,
+    "free_models": 8,
+    "web_search_models": 23,
+    "deep_research_models": 14,
+    "testable_models": 57,
+    "estimated_test_hours": 9.7
+  },
+  "api_keys": {
+    "total_keys": 13,
+    "valid_keys": 12,
+    "missing_keys": 1,
+    "invalid_keys": 0,
+    "details": {
+      "perplexity": {
+        "status": "valid",
+        "key_preview": "pplx-K0y...",
+        "length": 53
+      },
+      "openrouter": {
+        "status": "valid",
+        "key_preview": "sk-or-v1...",
+        "length": 73
+      },
+      "abacus": {
+        "status": "missing",
+        "key_preview": "",
+        "length": 0
+      },
+      "tavily": {
+        "status": "valid",
+        "key_preview": "tvly-dev...",
+        "length": 41
+      },
+      "exa": {
+        "status": "valid",
+        "key_preview": "60b2cf3e...",
+        "length": 36
+      },
+      "scrapingbee": {
+        "status": "valid",
+        "key_preview": "SQK2VF9V...",
+        "length": 80
+      },
+      "firecrawl": {
+        "status": "valid",
+        "key_preview": "fc-abb6f...",
+        "length": 35
+      },
+      "brightdata": {
+        "status": "valid",
+        "key_preview": "359b5a2b...",
+        "length": 64
+      },
+      "openai": {
+        "status": "valid",
+        "key_preview": "sk-proj-...",
+        "length": 164
+      },
+      "anthropic": {
+        "status": "valid",
+        "key_preview": "sk-ant-a...",
+        "length": 108
+      },
+      "gemini": {
+        "status": "valid",
+        "key_preview": "AIzaSyBv...",
+        "length": 39
+      },
+      "grok": {
+        "status": "valid",
+        "key_preview": "xai-LLQC...",
+        "length": 84
+      },
+      "deepseek": {
+        "status": "valid",
+        "key_preview": "sk-25b00...",
+        "length": 35
+      }
+    }
+  },
+  "providers": {
+    "total_providers": 13,
+    "enabled_providers": 13,
+    "disabled_providers": 0,
+    "enabled_list": [
+      "perplexity",
+      "openrouter",
+      "abacus",
+      "tavily",
+      "exa",
+      "scrapingbee",
+      "firecrawl",
+      "brightdata",
+      "openai",
+      "anthropic",
+      "gemini",
+      "grok",
+      "deepseek"
+    ],
+    "disabled_list": [],
+    "details": {
+      "perplexity": {
+        "name": "perplexity",
+        "enabled": true,
+        "has_api_key": true,
+        "model_count": 4,
+        "timeout": 90,
+        "base_url": "",
+        "retry_attempts": 2,
+        "retry_delay": 5
+      },
+      "openrouter": {
+        "name": "openrouter",
+        "enabled": true,
+        "has_api_key": true,
+        "model_count": 10,
+        "timeout": 300,
+        "base_url": "https://openrouter.ai/api/v1",
+        "retry_attempts": 3,
+        "retry_delay": 10
+      },
+      "abacus": {
+        "name": "abacus",
+        "enabled": true,
+        "has_api_key": false,
+        "model_count": 1,
+        "timeout": 60,
+        "base_url": "https://api.abacus.ai",
+        "retry_attempts": 1,
+        "retry_delay": 5
+      },
+      "tavily": {
+        "name": "tavily",
+        "enabled": true,
+        "has_api_key": true,
+        "model_count": 2,
+        "timeout": 80,
+        "base_url": "https://api.tavily.com",
+        "retry_attempts": 2,
+        "retry_delay": 5
+      },
+      "exa": {
+        "name": "exa",
+        "enabled": true,
+        "has_api_key": true,
+        "model_count": 3,
+        "timeout": 60,
+        "base_url": "https://api.exa.ai",
+        "retry_attempts": 1,
+        "retry_delay": 5
+      },
+      "scrapingbee": {
+        "name": "scrapingbee",
+        "enabled": true,
+        "has_api_key": true,
+        "model_count": 3,
+        "timeout": 180,
+        "base_url": "https://app.scrapingbee.com/api/v1",
+        "retry_attempts": 2,
+        "retry_delay": 15
+      },
+      "firecrawl": {
+        "name": "firecrawl",
+        "enabled": true,
+        "has_api_key": true,
+        "model_count": 3,
+        "timeout": 200,
+        "base_url": "https://api.firecrawl.dev/v1",
+        "retry_attempts": 2,
+        "retry_delay": 20
+      },
+      "brightdata": {
+        "name": "brightdata",
+        "enabled": true,
+        "has_api_key": true,
+        "model_count": 3,
+        "timeout": 150,
+        "base_url": "https://api.brightdata.com",
+        "retry_attempts": 3,
+        "retry_delay": 10
+      },
+      "openai": {
+        "name": "openai",
+        "enabled": true,
+        "has_api_key": true,
+        "model_count": 8,
+        "timeout": 140,
+        "base_url": "https://api.openai.com/v1",
+        "retry_attempts": 3,
+        "retry_delay": 12
+      },
+      "anthropic": {
+        "name": "anthropic",
+        "enabled": true,
+        "has_api_key": true,
+        "model_count": 5,
+        "timeout": 150,
+        "base_url": "https://api.anthropic.com/v1",
+        "retry_attempts": 3,
+        "retry_delay": 15
+      },
+      "gemini": {
+        "name": "gemini",
+        "enabled": true,
+        "has_api_key": true,
+        "model_count": 6,
+        "timeout": 120,
+        "base_url": "https://generativelanguage.googleapis.com/v1",
+        "retry_attempts": 3,
+        "retry_delay": 8
+      },
+      "grok": {
+        "name": "grok",
+        "enabled": true,
+        "has_api_key": true,
+        "model_count": 8,
+        "timeout": 180,
+        "base_url": "https://api.x.ai/v1",
+        "retry_attempts": 2,
+        "retry_delay": 20
+      },
+      "deepseek": {
+        "name": "deepseek",
+        "enabled": true,
+        "has_api_key": true,
+        "model_count": 2,
+        "timeout": 60,
+        "base_url": "https://api.deepseek.com/v1",
+        "retry_attempts": 1,
+        "retry_delay": 5
+      }
+    }
+  },
+  "models": {
+    "total_models": 58,
+    "total_free_models": 8,
+    "total_web_search_models": 23,
+    "total_deep_research_models": 14,
+    "provider_stats": {
+      "perplexity": {
+        "total_models": 4,
+        "free_models": 0,
+        "paid_models": 4,
+        "web_search_models": 0,
+        "deep_research_models": 0,
+        "model_list": [
+          "sonar",
+          "sonar-pro",
+          "sonar-deep-research",
+          "sonar-reasoning"
+        ],
+        "free_model_list": [],
+        "web_search_list": [],
+        "deep_research_list": []
+      },
+      "openrouter": {
+        "total_models": 10,
+        "free_models": 8,
+        "paid_models": 2,
+        "web_search_models": 0,
+        "deep_research_models": 1,
+        "model_list": [
+          "deepseek-free",
+          "deepseek-chat",
+          "deepseek-reasoner",
+          "deepseek-chimera-free",
+          "mistral-small-free",
+          "cypher-alpha-free",
+          "minimax-m1",
+          "llama-3.3-nemotron-super",
+          "llama-3.1-nemotron-ultra",
+          "kimi-k2"
+        ],
+        "free_model_list": [
+          "deepseek-free",
+          "deepseek-chimera-free",
+          "mistral-small-free",
+          "cypher-alpha-free",
+          "minimax-m1",
+          "llama-3.3-nemotron-super",
+          "llama-3.1-nemotron-ultra",
+          "kimi-k2"
+        ],
+        "web_search_list": [],
+        "deep_research_list": [
+          "deepseek-reasoner"
+        ]
+      },
+      "abacus": {
+        "total_models": 1,
+        "free_models": 0,
+        "paid_models": 1,
+        "web_search_models": 1,
+        "deep_research_models": 1,
+        "model_list": [
+          "deep-agent"
+        ],
+        "free_model_list": [],
+        "web_search_list": [
+          "deep-agent"
+        ],
+        "deep_research_list": [
+          "deep-agent"
+        ]
+      },
+      "tavily": {
+        "total_models": 2,
+        "free_models": 0,
+        "paid_models": 2,
+        "web_search_models": 2,
+        "deep_research_models": 1,
+        "model_list": [
+          "search",
+          "deep-research"
+        ],
+        "free_model_list": [],
+        "web_search_list": [
+          "search",
+          "deep-research"
+        ],
+        "deep_research_list": [
+          "deep-research"
+        ]
+      },
+      "exa": {
+        "total_models": 3,
+        "free_models": 0,
+        "paid_models": 3,
+        "web_search_models": 3,
+        "deep_research_models": 2,
+        "model_list": [
+          "neural-search",
+          "research",
+          "research-pro"
+        ],
+        "free_model_list": [],
+        "web_search_list": [
+          "neural-search",
+          "research",
+          "research-pro"
+        ],
+        "deep_research_list": [
+          "research",
+          "research-pro"
+        ]
+      },
+      "scrapingbee": {
+        "total_models": 3,
+        "free_models": 0,
+        "paid_models": 3,
+        "web_search_models": 3,
+        "deep_research_models": 1,
+        "model_list": [
+          "basic-scrape",
+          "js-render",
+          "ai-extract"
+        ],
+        "free_model_list": [],
+        "web_search_list": [
+          "basic-scrape",
+          "js-render",
+          "ai-extract"
+        ],
+        "deep_research_list": [
+          "ai-extract"
+        ]
+      },
+      "firecrawl": {
+        "total_models": 3,
+        "free_models": 0,
+        "paid_models": 3,
+        "web_search_models": 3,
+        "deep_research_models": 2,
+        "model_list": [
+          "scrape",
+          "crawl",
+          "extract"
+        ],
+        "free_model_list": [],
+        "web_search_list": [
+          "scrape",
+          "crawl",
+          "extract"
+        ],
+        "deep_research_list": [
+          "crawl",
+          "extract"
+        ]
+      },
+      "brightdata": {
+        "total_models": 3,
+        "free_models": 0,
+        "paid_models": 3,
+        "web_search_models": 3,
+        "deep_research_models": 1,
+        "model_list": [
+          "web-scraper",
+          "browser-api",
+          "serp"
+        ],
+        "free_model_list": [],
+        "web_search_list": [
+          "web-scraper",
+          "browser-api",
+          "serp"
+        ],
+        "deep_research_list": [
+          "browser-api"
+        ]
+      },
+      "openai": {
+        "total_models": 8,
+        "free_models": 0,
+        "paid_models": 8,
+        "web_search_models": 0,
+        "deep_research_models": 1,
+        "model_list": [
+          "o3-deep-research",
+          "gpt-4.1",
+          "o3",
+          "o4-mini",
+          "gpt-4o",
+          "gpt-4-turbo",
+          "gpt-3.5-turbo",
+          "gpt-3.5-turbo-16k"
+        ],
+        "free_model_list": [],
+        "web_search_list": [],
+        "deep_research_list": [
+          "o3-deep-research"
+        ]
+      },
+      "anthropic": {
+        "total_models": 5,
+        "free_models": 0,
+        "paid_models": 5,
+        "web_search_models": 0,
+        "deep_research_models": 2,
+        "model_list": [
+          "claude-sonnet-4",
+          "claude-3.7-sonnet",
+          "claude-opus-4",
+          "claude-3-haiku",
+          "claude-3-opus"
+        ],
+        "free_model_list": [],
+        "web_search_list": [],
+        "deep_research_list": [
+          "claude-opus-4",
+          "claude-3-opus"
+        ]
+      },
+      "gemini": {
+        "total_models": 6,
+        "free_models": 0,
+        "paid_models": 6,
+        "web_search_models": 0,
+        "deep_research_models": 0,
+        "model_list": [
+          "gemini-2.5-pro",
+          "gemini-2.5-flash",
+          "gemini-2.5-flash-lite",
+          "gemini-1.5-pro",
+          "gemini-1.5-flash",
+          "gemini-2.0-flash"
+        ],
+        "free_model_list": [],
+        "web_search_list": [],
+        "deep_research_list": []
+      },
+      "grok": {
+        "total_models": 8,
+        "free_models": 0,
+        "paid_models": 8,
+        "web_search_models": 8,
+        "deep_research_models": 1,
+        "model_list": [
+          "grok-4",
+          "grok-3",
+          "grok-3-mini",
+          "grok-3-fast",
+          "grok-2",
+          "grok-2-mini",
+          "grok-beta",
+          "grok-vision-beta"
+        ],
+        "free_model_list": [],
+        "web_search_list": [
+          "grok-4",
+          "grok-3",
+          "grok-3-mini",
+          "grok-3-fast",
+          "grok-2",
+          "grok-2-mini",
+          "grok-beta",
+          "grok-vision-beta"
+        ],
+        "deep_research_list": [
+          "grok-4"
+        ]
+      },
+      "deepseek": {
+        "total_models": 2,
+        "free_models": 0,
+        "paid_models": 2,
+        "web_search_models": 0,
+        "deep_research_models": 1,
+        "model_list": [
+          "deepseek-chat",
+          "deepseek-reasoner"
+        ],
+        "free_model_list": [],
+        "web_search_list": [],
+        "deep_research_list": [
+          "deepseek-reasoner"
+        ]
+      }
+    }
+  },
+  "test_duration": {
+    "total_test_time_minutes": 583.2,
+    "total_test_time_hours": 9.7,
+    "provider_times": {
+      "perplexity": {
+        "model_count": 4,
+        "avg_timeout": 90,
+        "time_per_model": 345.0,
+        "total_time_minutes": 23.0,
+        "total_time_seconds": 1380.0
+      },
+      "openrouter": {
+        "model_count": 10,
+        "avg_timeout": 300,
+        "time_per_model": 1080.0,
+        "total_time_minutes": 180.0,
+        "total_time_seconds": 10800.0
+      },
+      "abacus": {
+        "model_count": 1,
+        "avg_timeout": 60,
+        "time_per_model": 240.0,
+        "total_time_minutes": 4.0,
+        "total_time_seconds": 240.0
+      },
+      "tavily": {
+        "model_count": 2,
+        "avg_timeout": 80,
+        "time_per_model": 310.0,
+        "total_time_minutes": 10.3,
+        "total_time_seconds": 620.0
+      },
+      "exa": {
+        "model_count": 3,
+        "avg_timeout": 60,
+        "time_per_model": 240.0,
+        "total_time_minutes": 12.0,
+        "total_time_seconds": 720.0
+      },
+      "scrapingbee": {
+        "model_count": 3,
+        "avg_timeout": 180,
+        "time_per_model": 660.0,
+        "total_time_minutes": 33.0,
+        "total_time_seconds": 1980.0
+      },
+      "firecrawl": {
+        "model_count": 3,
+        "avg_timeout": 200,
+        "time_per_model": 730.0,
+        "total_time_minutes": 36.5,
+        "total_time_seconds": 2190.0
+      },
+      "brightdata": {
+        "model_count": 3,
+        "avg_timeout": 150,
+        "time_per_model": 555.0,
+        "total_time_minutes": 27.8,
+        "total_time_seconds": 1665.0
+      },
+      "openai": {
+        "model_count": 8,
+        "avg_timeout": 140,
+        "time_per_model": 520.0,
+        "total_time_minutes": 69.3,
+        "total_time_seconds": 4160.0
+      },
+      "anthropic": {
+        "model_count": 5,
+        "avg_timeout": 150,
+        "time_per_model": 555.0,
+        "total_time_minutes": 46.2,
+        "total_time_seconds": 2775.0
+      },
+      "gemini": {
+        "model_count": 6,
+        "avg_timeout": 120,
+        "time_per_model": 450.0,
+        "total_time_minutes": 45.0,
+        "total_time_seconds": 2700.0
+      },
+      "grok": {
+        "model_count": 8,
+        "avg_timeout": 180,
+        "time_per_model": 660.0,
+        "total_time_minutes": 88.0,
+        "total_time_seconds": 5280.0
+      },
+      "deepseek": {
+        "model_count": 2,
+        "avg_timeout": 60,
+        "time_per_model": 240.0,
+        "total_time_minutes": 8.0,
+        "total_time_seconds": 480.0
+      }
+    },
+    "test_scenarios": [
+      "Simple Mining Query",
+      "Complex Mining Research",
+      "Web Search Integration",
+      "Deep Research Analysis",
+      "Error Handling Test"
+    ]
+  },
+  "test_list": [
+    "perplexity:sonar",
+    "perplexity:sonar-pro",
+    "perplexity:sonar-deep-research",
+    "perplexity:sonar-reasoning",
+    "openrouter:deepseek-free",
+    "openrouter:deepseek-chat",
+    "openrouter:deepseek-reasoner",
+    "openrouter:deepseek-chimera-free",
+    "openrouter:mistral-small-free",
+    "openrouter:cypher-alpha-free",
+    "openrouter:minimax-m1",
+    "openrouter:llama-3.3-nemotron-super",
+    "openrouter:llama-3.1-nemotron-ultra",
+    "openrouter:kimi-k2",
+    "tavily:search",
+    "tavily:deep-research",
+    "exa:neural-search",
+    "exa:research",
+    "exa:research-pro",
+    "scrapingbee:basic-scrape",
+    "scrapingbee:js-render",
+    "scrapingbee:ai-extract",
+    "firecrawl:scrape",
+    "firecrawl:crawl",
+    "firecrawl:extract",
+    "brightdata:web-scraper",
+    "brightdata:browser-api",
+    "brightdata:serp",
+    "openai:o3-deep-research",
+    "openai:gpt-4.1",
+    "openai:o3",
+    "openai:o4-mini",
+    "openai:gpt-4o",
+    "openai:gpt-4-turbo",
+    "openai:gpt-3.5-turbo",
+    "openai:gpt-3.5-turbo-16k",
+    "anthropic:claude-sonnet-4",
+    "anthropic:claude-3.7-sonnet",
+    "anthropic:claude-opus-4",
+    "anthropic:claude-3-haiku",
+    "anthropic:claude-3-opus",
+    "gemini:gemini-2.5-pro",
+    "gemini:gemini-2.5-flash",
+    "gemini:gemini-2.5-flash-lite",
+    "gemini:gemini-1.5-pro",
+    "gemini:gemini-1.5-flash",
+    "gemini:gemini-2.0-flash",
+    "grok:grok-4",
+    "grok:grok-3",
+    "grok:grok-3-mini",
+    "grok:grok-3-fast",
+    "grok:grok-2",
+    "grok:grok-2-mini",
+    "grok:grok-beta",
+    "grok:grok-vision-beta",
+    "deepseek:deepseek-chat",
+    "deepseek:deepseek-reasoner"
+  ]
+}

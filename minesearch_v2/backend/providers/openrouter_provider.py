@@ -161,8 +161,16 @@ class OpenRouterProvider(AbstractProvider):
                 
                 # Extrahiere strukturierte Daten
                 extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
-                # KORRIGIERT: OpenRouter LLMs liefern keine zuverlässigen Sources - ehrlich 0 angeben
-                sources = []  # LLM-Content ist nicht source-traceable
+                # BUGFIX 20.07.2025: Verwende discovered sources für Source-Tracking
+                # Konvertiere discovered_sources zu standardisierten Source-Format
+                sources = []
+                for source in discovered_sources[:10]:  # Limitiere auf Top 10 für Performance
+                    sources.append({
+                        'url': source.get('url', ''),
+                        'title': source.get('title', source.get('url', '')),
+                        'type': source.get('type', 'unknown'),
+                        'reliability': source.get('reliability_score', 0.5)
+                    })
                 
                 # ÄNDERUNG 07.07.2025: Zusätzliche Validierung direkt im Provider
                 # Verhindere "Koordinaten" als Betreiber
@@ -384,21 +392,25 @@ ANTWORTE IM STRUKTURIERTEN FORMAT wie im System-Prompt beschrieben."""
         return f"""Du bist ein Mining-Recherche-Experte mit umfassendem Wissen über die globale Bergbauindustrie. 
 Antworte auf Deutsch mit STRUKTURIERTEN DATEN.
 
-**GEFUNDENE DATEN FÜR [MINENNAME]:**
+**VOLLSTÄNDIGE DATEN FÜR [MINENNAME] - ALLE 18 FELDER AUSFÜLLEN:**
 - Name: [exakter Name] [Quelle: Fachwissen/Schätzung]
-- Land: [Land] [Quelle: Fachwissen/Schätzung]
+- Country: [Land] [Quelle: Fachwissen/Schätzung]
 - Region: [Region/Provinz] [Quelle: Fachwissen/Schätzung]
 - Eigentümer: [Eigentümer oder LEER lassen] [Quelle: Fachwissen/Schätzung]
 - Betreiber: [Betreiber oder LEER lassen - NIEMALS Koordinaten hier angeben!] [Quelle: Fachwissen/Schätzung]
-- Koordinaten: [Latitude, Longitude oder LEER lassen] [Quelle: Fachwissen/Schätzung]
-- Status: [aktiv/geschlossen/geplant] [Quelle: Fachwissen/Schätzung]
-- Rohstoffe: [Liste der Rohstoffe] [Quelle: Fachwissen/Schätzung]
-- Minentyp: [Untertage/Open-Pit/etc] [Quelle: Fachwissen/Schätzung]
-- Produktionsstart: [Jahr oder LEER lassen] [Quelle: Fachwissen/Schätzung]
-- Produktionsende: [Jahr oder 'aktiv'] [Quelle: Fachwissen/Schätzung]
-- Fördermenge: [Menge/Jahr oder LEER lassen] [Quelle: Fachwissen/Schätzung]
-- Fläche: [in km² oder LEER lassen] [Quelle: Fachwissen/Schätzung]
+- x-Koordinate: [Latitude in Dezimalgrad oder LEER lassen] [Quelle: Fachwissen/Schätzung]
+- y-Koordinate: [Longitude in Dezimalgrad oder LEER lassen] [Quelle: Fachwissen/Schätzung]
+- Aktivitätsstatus: [aktiv/geschlossen/geplant oder LEER lassen] [Quelle: Fachwissen/Schätzung]
 - Restaurationskosten: [NUR realistische Beträge in {currency}$ oder LEER] [Quelle: Fachwissen/Schätzung]
+- Jahr der Aufnahme der Kosten: [Jahr der Kostenschätzung oder LEER] [Quelle: Fachwissen/Schätzung]
+- Jahr der Erstellung des Dokumentes: [Jahr des Reports/Studies oder LEER] [Quelle: Fachwissen/Schätzung]
+- Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.): [Liste der Rohstoffe oder LEER] [Quelle: Fachwissen/Schätzung]
+- Minentyp (Untertage/ Open-Pit/ usw.): [Untertage/Open-Pit/etc oder LEER] [Quelle: Fachwissen/Schätzung]
+- Produktionsstart: [Jahr oder LEER lassen] [Quelle: Fachwissen/Schätzung]
+- Produktionsende: [Jahr oder 'aktiv' oder LEER] [Quelle: Fachwissen/Schätzung]
+- Fördermenge/Jahr: [Menge/Jahr mit Einheit oder LEER lassen] [Quelle: Fachwissen/Schätzung]
+- Fläche der Mine in qkm: [Fläche in km² oder LEER lassen] [Quelle: Fachwissen/Schätzung]
+- Quellenangaben: [Referenzen oder 'Allgemeines Fachwissen'] [Quelle: Fachwissen/Schätzung]
 
 **KRITISCHE REGELN FÜR RESTAURATIONSKOSTEN:**
 - NIEMALS "$1 CAD", "$2 CAD", "$3 CAD" oder ähnliche Platzhalter verwenden!

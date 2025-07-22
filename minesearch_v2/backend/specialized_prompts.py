@@ -113,6 +113,236 @@ VERBOTEN:
 - Wenn unsicher: Feld LEER lassen"""
     
     @staticmethod
+    def get_quebec_mining_prompt(mine_name: str, field_type: str = "comprehensive") -> str:
+        """Quebec-spezifischer Mining-Prompt für lokale Datenquellen"""
+        
+        return f"""FOKUS: QUEBEC MINING DATA für {mine_name}
+
+PRIORITÄRE QUEBEC-QUELLEN:
+1. GESTIM (Système de gestion des titres miniers)
+   - https://gestim.mines.gouv.qc.ca/
+   - Titre minier details
+   - Garanties financières
+   - Status d'exploitation
+
+2. MERN (Ministère de l'Énergie et des Ressources naturelles)
+   - Mining claims database
+   - Environmental permits
+   - Closure plans
+
+3. SEDAR (Quebec mining companies)
+   - NI 43-101 Technical Reports
+   - Annual Reports
+   - Feasibility Studies
+
+4. Quebec Government Sources
+   - Environmental assessments
+   - BAPE reports
+   - Mining regulations
+
+BILINGUALE SUCHSTRATEGIE:
+FRANZÖSISCH:
+- "{mine_name} mine Québec"
+- "{mine_name} exploitation minière"
+- "{mine_name} titre minier"
+- "{mine_name} GESTIM"
+- "{mine_name} MERN"
+- "{mine_name} garantie financière"
+- "{mine_name} plan fermeture"
+- "{mine_name} coûts restauration"
+- "{mine_name} exploitant"
+- "{mine_name} propriétaire"
+
+ENGLISCH:
+- "{mine_name} mine Quebec"
+- "{mine_name} mining operation"
+- "{mine_name} mining title"
+- "{mine_name} financial guarantee"
+- "{mine_name} closure plan"
+- "{mine_name} restoration costs"
+- "{mine_name} operator"
+- "{mine_name} owner"
+
+QUEBEC MINING TERMINOLOGY:
+- Exploitant = Operator
+- Propriétaire = Owner
+- Titre minier = Mining title
+- Claims miniers = Mining claims
+- Garantie financière = Financial guarantee
+- Cautionnement = Surety bond
+- Plan de fermeture = Closure plan
+- Coûts de restauration = Restoration costs
+- Résidus miniers = Mining waste
+- Permis d'exploitation = Operating permit
+
+KRITISCHE FELDER FÜR QUEBEC:
+1. Restaurationskosten (CAD$ Beträge)
+2. Eigentümer/Betreiber (Quebec corporations)
+3. GESTIM Titre minier numbers
+4. Environmental permits
+5. Financial guarantees (Banque Nationale, Caisse Desjardins, etc.)
+
+VALIDIERUNG:
+- Alle Dollarbeträge in CAD konvertieren
+- Quebec corporate entities validieren
+- GESTIM reference numbers prüfen
+- Bilinguale Terminologie respektieren"""
+
+    @staticmethod
+    def get_comprehensive_extraction_prompt(mine_name: str, name_variants: List[str], 
+                                          country: str, commodity: str, 
+                                          discovered_sources: List[Dict] = None) -> str:
+        """Umfassender Extraktions-Prompt mit allen verfügbaren Quellen"""
+        
+        sources_text = ""
+        if discovered_sources:
+            sources_text = "\n\nVERFÜGBARE QUELLEN:\n"
+            for i, source in enumerate(discovered_sources[:10], 1):
+                if isinstance(source, dict):
+                    url = source.get('url', 'Keine URL')
+                    title = source.get('title', source.get('value', 'Kein Titel'))
+                    sources_text += f"{i}. {title[:60]}... ({url})\n"
+        
+        variants_text = ", ".join(name_variants[:5]) if name_variants else mine_name
+        
+        return f"""COMPREHENSIVE MINING DATA EXTRACTION für {mine_name}
+
+MINE VARIANTS: {variants_text}
+LAND: {country}
+ROHSTOFF: {commodity}
+
+{sources_text}
+
+SYSTEMATIC FIELD EXTRACTION:
+Extrahiere ALLE verfügbaren Informationen für folgende Felder:
+
+1. EIGENTÜMER (Owner)
+   - Aktuelle Muttergesellschaft
+   - Prozentuale Anteile bei Joint Ventures
+   - Änderungen in letzten 5 Jahren
+
+2. BETREIBER (Operator)
+   - Operierendes Unternehmen
+   - Management Company
+   - Unterschied zu Eigentümer
+
+3. RESTAURATIONSKOSTEN (Restoration Costs)
+   - Asset Retirement Obligation (ARO)
+   - Closure costs/Mine closure costs
+   - Environmental liabilities
+   - Financial assurance/Closure bonds
+   - Betrag, Währung, Jahr der Schätzung
+
+4. KOORDINATEN (Coordinates)
+   - GPS-Koordinaten (Dezimalgrad)
+   - Latitude/Longitude
+   - Zentrum der Mine
+
+5. AKTIVITÄTSSTATUS (Activity Status)
+   - Aktueller Betriebsstatus
+   - Explorations-/Produktions-/Stilllegungsphase
+   - Geplante Änderungen
+
+6. ROHSTOFFABBAU (Commodities)
+   - Hauptrohstoffe
+   - Nebenprodukte
+   - Erzgehalte
+
+7. MINENTYP (Mine Type)
+   - Untertage/Open-Pit/Kombination
+   - Abbaumethoden
+
+8. PRODUKTION (Production)
+   - Produktionsstart/-ende
+   - Jährliche Fördermengen
+   - Reserven/Ressourcen
+
+9. FLÄCHE (Area)
+   - Minenfläche in qkm
+   - Konzessionsfläche
+
+EXTRACTION RULES:
+- Verwende ALLE verfügbaren Quellen systematisch
+- Keine Auslassung bei negativen Zwischenergebnissen
+- Plausibilitätsprüfung aller Werte
+- Quellenreferenzen für jeden extrahierten Wert
+- Bei Unsicherheit: Feld als 'X' markieren (gesucht aber nicht gefunden)
+- NIEMALS leere Felder ohne Suchversuch lassen
+
+QUALITY ASSURANCE:
+- Mindestens 3 unabhängige Quellen pro kritischem Feld
+- Cross-Validation zwischen Quellen
+- Aktualitätsprüfung (nicht älter als 5 Jahre)
+- Konsistenzprüfung zwischen verwandten Feldern"""
+
+    @staticmethod
+    def get_source_discovery_prompt(mine_name: str, name_variants: List[str], 
+                                  country: str, commodity: str) -> str:
+        """Prompt für systematische Quellenentdeckung"""
+        
+        variants_text = ", ".join(name_variants[:5]) if name_variants else mine_name
+        
+        return f"""SOURCE DISCOVERY MISSION für {mine_name}
+
+MINE VARIANTS: {variants_text}
+LAND: {country}  
+ROHSTOFF: {commodity}
+
+ZIEL: Finde ALLE verfügbaren Datenquellen für diese Mine
+
+PRIORITÄRE QUELLENTYPEN:
+
+1. CORPORATE SOURCES (Höchste Priorität)
+   - Unternehmenswebseiten
+   - Investor Relations
+   - Annual Reports
+   - Press Releases
+   - Sustainability Reports
+
+2. REGULATORY SOURCES
+   - Securities filings (SEDAR, EDGAR)
+   - NI 43-101 Technical Reports
+   - Environmental Impact Assessments
+   - Mining permits and licenses
+   - Government databases
+
+3. TECHNICAL SOURCES
+   - Feasibility Studies
+   - Resource/Reserve Reports
+   - Geological surveys
+   - Mining engineering reports
+   - Academic studies
+
+4. NEWS & INDUSTRY SOURCES
+   - Mining news websites
+   - Industry publications
+   - Trade magazines
+   - Conference presentations
+
+5. FINANCIAL SOURCES
+   - Stock exchange filings
+   - Financial analysis reports
+   - Credit rating reports
+   - Banking documents
+
+SEARCH STRATEGY:
+- Verwende alle Mine-Name Varianten
+- Kombiniere mit Rohstoff-Begriffen
+- Inklusive historischer Informationen
+- Mehrsprachige Suche wenn relevant
+
+OUTPUT FORMAT:
+Für jede gefundene Quelle:
+- URL (falls verfügbar)
+- Titel/Beschreibung
+- Quellentyp
+- Relevanz-Score (1-5)
+- Letzte Aktualisierung
+- Sprache
+
+GOAL: Mindestens 10 hochwertige Quellen identifizieren"""
+    
+    @staticmethod
     def get_ownership_prompt(mine_name: str, country: str) -> str:
         """Spezialisierter Prompt für Eigentümer/Betreiber-Informationen"""
         

@@ -22,5 +22,6 @@ class MultiProviderSearchService(SearchServiceAdvanced):
         """Initialisiert den Multi-Provider Search Service"""
         super().__init__()
 
-# Service-Instanz für Kompatibilität
-multi_search_service = MultiProviderSearchService()
+# Service-Instanz für Kompatibilität (DEPRECATED - use services_container)
+from services_container import services
+multi_search_service = services.multi_search_service

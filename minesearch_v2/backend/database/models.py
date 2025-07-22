@@ -5,9 +5,10 @@ Version: 1.0
 Beschreibung: Datenbank-Modelle für MineSearch v2 (aufgeteilt aus database.py)
 """
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Text, Boolean, Index
+from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Text, Boolean, Index, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 import re
@@ -342,11 +343,16 @@ class SearchResult(Base):
     search_type = Column(String(50), nullable=True)  # standard, enhanced, deep-research
     search_duration = Column(Float, nullable=True)  # Sekunden
     
+    # Foreign Key Relationships - DEAKTIVIERT für CSV-Export Kompatibilität
+    # mine_id = Column(Integer, ForeignKey('mines.id'), nullable=True)
+    # mine = relationship("Mine", backref="search_results")
+    
     # Ergebnisse
     structured_data = Column(JSON, nullable=True)  # Alle extrahierten Felder
     structured_data_with_sources = Column(JSON, nullable=True)  # Mit Quellennummern
     sources = Column(JSON, nullable=True)  # Gefundene Quellen
     source_index = Column(JSON, nullable=True)  # Quellen-Index
+    source_mapping = Column(JSON, nullable=True)  # QUELLENREFERENZEN-FIX 19.07.2025: Neues Quellen-Mapping
     
     # Qualitätsmetriken
     data_quality = Column(JSON, nullable=True)  # Qualitäts-Informationen
@@ -384,6 +390,7 @@ class SearchResult(Base):
             'structured_data_with_sources': self.structured_data_with_sources or {},
             'sources': self.sources or [],
             'source_index': self.source_index or {},
+            'source_mapping': self.source_mapping or {},  # QUELLENREFERENZEN-FIX 19.07.2025
             'data_quality': self.data_quality or {},
             'success': self.success,
             'error_message': self.error_message,
@@ -416,6 +423,10 @@ class ModelStatistics(Base):
     raw_result = Column(JSON, nullable=True)  # Komplette API-Antwort
     structured_data = Column(JSON, nullable=True)  # Extrahierte Felder
     error_message = Column(Text, nullable=True)
+    
+    # Foreign Key Relationships - DEAKTIVIERT für CSV-Export Kompatibilität
+    # mine_id = Column(Integer, ForeignKey('mines.id'), nullable=True)
+    # mine = relationship("Mine", backref="model_statistics")
     
     # Indizes
     __table_args__ = (
@@ -458,6 +469,10 @@ class FieldConsistency(Base):
     total_runs = Column(Integer, nullable=False, default=5)
     is_consistent = Column(Boolean, nullable=False, default=False)  # True wenn >80% gleich
     last_updated = Column(DateTime, nullable=False, server_default=func.now())
+    
+    # Foreign Key Relationships - DEAKTIVIERT für CSV-Export Kompatibilität
+    # mine_id = Column(Integer, ForeignKey('mines.id'), nullable=True)
+    # mine = relationship("Mine", backref="field_consistencies")
     
     # Indizes
     __table_args__ = (

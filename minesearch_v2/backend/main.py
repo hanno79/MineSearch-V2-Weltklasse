@@ -5,15 +5,23 @@ Version: 2.1
 Beschreibung: MineSearch 2.1 - Refactored Main Application
 """
 
+# ABACUS-FIX 18.07.2025: Force correct .env loading before any imports
+from dotenv import load_dotenv
+from pathlib import Path
+env_path = Path(__file__).parent.parent / '.env'
+load_dotenv(env_path, override=True)
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import logging
 from contextlib import asynccontextmanager
 
-from config import config
-from api import router, setup_middleware, setup_exception_handlers
+from config.base import config
+from api.routes import router
+from api.middleware import setup_middleware
+from api.handlers import setup_exception_handlers
 from providers.registry import provider_registry
-from api_key_validator import APIKeyValidator
+from config.api_keys import APIKeysConfig
 
 # Logging auf Deutsch
 logging.basicConfig(
@@ -34,19 +42,12 @@ async def lifespan(app: FastAPI):
     try:
         # Validiere API-Keys vor Provider-Initialisierung
         logger.info("Validiere API-Keys...")
-        validation_results = APIKeyValidator.validate_all_keys(config.PROVIDERS)
+        api_keys_valid = APIKeysConfig.validate_all_keys()
         
-        # Zeige Validierungsergebnisse
-        valid_providers = []
-        for provider, result in validation_results.items():
-            if result['enabled'] and result['validated']:
-                valid_providers.append(provider)
-                logger.info(f"✓ {provider}: {result['message']}")
-            elif result['enabled']:
-                logger.warning(f"✗ {provider}: {result['message']}")
-        
-        if not valid_providers:
-            raise ValueError("Keine Provider mit gültigen API-Keys gefunden. Bitte .env-Datei prüfen.")
+        if not api_keys_valid:
+            missing_keys = APIKeysConfig.get_missing_keys()
+            logger.warning(f"⚠️  Fehlende API-Keys: {', '.join(missing_keys)}")
+            logger.warning("Einige Provider sind möglicherweise nicht verfügbar.")
         
         provider_registry.initialize(config.PROVIDERS)
         available_models = list(provider_registry.get_all_models().keys())

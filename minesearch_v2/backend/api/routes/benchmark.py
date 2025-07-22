@@ -14,13 +14,121 @@ from datetime import datetime
 
 from model_benchmark_service import ModelBenchmarkService
 from database import db_manager
+from model_summary_auto_updater import ModelSummaryAutoUpdater
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/benchmark", tags=["benchmark"])
 
-# Benchmark-Service Instanz
+@router.get("/recent")
+async def get_recent_search_results(
+    days_back: int = Query(7, description="Tage zurück"),
+    limit: int = Query(50, description="Maximale Anzahl Ergebnisse"),
+    sort_by: str = Query("search_timestamp", description="Sortierfeld"),
+    order: str = Query("desc", description="Sortierreihenfolge (asc/desc)"),
+    mine_name: Optional[str] = Query(None, description="Filter nach Mine"),
+    country: Optional[str] = Query(None, description="Filter nach Land"),
+    session_id: Optional[str] = Query(None, description="Filter nach Session")
+):
+    """
+    FRONTEND-FIX 19.07.2025: Erweitert um Sortierung und Filterung
+    """
+    try:
+        from database import SearchResult
+        from sqlalchemy import desc, asc, func
+        from datetime import datetime, timedelta
+        
+        with db_manager.get_session() as session:
+            query = session.query(SearchResult)
+            
+            # Zeitfilter
+            if days_back < 9999:
+                cutoff_date = datetime.now() - timedelta(days=days_back)
+                query = query.filter(SearchResult.search_timestamp >= cutoff_date)
+            
+            # Filter anwenden
+            if mine_name:
+                query = query.filter(SearchResult.mine_name.ilike(f"%{mine_name}%"))
+            if country:
+                query = query.filter(SearchResult.country == country)
+            if session_id:
+                query = query.filter(SearchResult.session_id == session_id)
+            
+            # Hole alle Ergebnisse erstmal ohne Sortierung für berechnete Felder
+            results = query.limit(limit * 2).all()  # Mehr holen für korrekte Sortierung
+            
+            # Erweitere Daten um berechnete Felder
+            enriched_data = []
+            for result in results:
+                result_dict = result.to_dict()
+                
+                # Berechne fields_count aus structured_data
+                if result_dict.get('structured_data'):
+                    fields_count = len([k for k, v in result_dict['structured_data'].items() 
+                                      if v and str(v).strip() and v != 'X' and v != '-'])
+                    result_dict['fields_count'] = fields_count
+                    result_dict['score'] = fields_count  # Score als Alias
+                else:
+                    result_dict['fields_count'] = 0
+                    result_dict['score'] = 0
+                
+                enriched_data.append(result_dict)
+            
+            # Python-Sortierung für berechnete Felder
+            if sort_by in ["fields_count", "score"]:
+                reverse_order = order.lower() == "desc"
+                enriched_data.sort(key=lambda x: x[sort_by], reverse=reverse_order)
+            elif sort_by in ["search_timestamp", "mine_name", "model_used", "country"]:
+                # Für Datenbankfelder: nochmal sortieren
+                sort_column_map = {
+                    "search_timestamp": SearchResult.search_timestamp,
+                    "mine_name": SearchResult.mine_name,
+                    "model_used": SearchResult.model_used,
+                    "country": SearchResult.country
+                }
+                
+                sort_column = sort_column_map.get(sort_by, SearchResult.search_timestamp)
+                
+                if order.lower() == "asc":
+                    query = query.order_by(asc(sort_column))
+                else:
+                    query = query.order_by(desc(sort_column))
+                
+                # Re-hole mit korrekter Sortierung
+                results = query.limit(limit).all()
+                enriched_data = []
+                for result in results:
+                    result_dict = result.to_dict()
+                    
+                    # Berechne fields_count aus structured_data
+                    if result_dict.get('structured_data'):
+                        fields_count = len([k for k, v in result_dict['structured_data'].items() 
+                                          if v and str(v).strip() and v != 'X' and v != '-'])
+                        result_dict['fields_count'] = fields_count
+                        result_dict['score'] = fields_count
+                    else:
+                        result_dict['fields_count'] = 0
+                        result_dict['score'] = 0
+                    
+                    enriched_data.append(result_dict)
+            
+            # Limitiere auf gewünschte Anzahl
+            enriched_data = enriched_data[:limit]
+            
+            return {
+                "success": True,
+                "data": enriched_data,
+                "total": len(enriched_data),
+                "sort_by": sort_by,
+                "order": order
+            }
+    except Exception as e:
+        logger.error(f"Error fetching recent results: {e}")
+        return {"success": False, "error": str(e), "data": []}
+
+# Service-Instanzen
 benchmark_service = ModelBenchmarkService()
+summary_updater = ModelSummaryAutoUpdater()
 
 # Laufende Benchmark-Sessions
 benchmark_sessions = {}
@@ -461,6 +569,7 @@ async def get_field_comparison():
         from database import FieldStatistics
         from sqlalchemy import func
         
+        # REPARIERT 14.07.2025: SQLite-kompatible Aggregation (bool_or existiert nicht in SQLite)
         # Aggregiere Statistiken pro Feld mit conditional logic awareness
         field_stats = session.query(
             FieldStatistics.field_name,
@@ -469,7 +578,7 @@ async def get_field_comparison():
             func.sum(FieldStatistics.total_searches).label('total_searches'),
             func.sum(FieldStatistics.excluded_count).label('total_excluded'),
             func.count(FieldStatistics.model_id).label('models_tested'),
-            func.bool_or(FieldStatistics.conditional_logic_applied).label('has_conditional_logic')
+            func.max(FieldStatistics.conditional_logic_applied).label('has_conditional_logic')
         ).group_by(FieldStatistics.field_name).all()
         
         # Sortiere nach durchschnittlicher Erfolgsrate mit conditional metadata
@@ -736,3 +845,51 @@ async def get_model_summaries(
             'order': order,
             'data': results
         }
+
+
+@router.post("/regenerate-summaries")
+async def regenerate_model_summaries():
+    """
+    ÄNDERUNG 14.07.2025: Regeneriert alle ModelSummary-Einträge
+    
+    Endpoint für Frontend um Model-Summaries zu regenerieren wenn sie fehlen
+    """
+    try:
+        from model_summary_generator import ModelSummaryGenerator
+        
+        generator = ModelSummaryGenerator()
+        result = generator.generate_all_model_summaries()
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "message": f"{result['summaries_generated']} Model-Summaries regeneriert",
+                "total_generated": result["summaries_generated"],
+                "duration_seconds": result["duration_seconds"]
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Fehler bei Regenerierung: {result.get('error', 'Unbekannter Fehler')}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Fehler bei ModelSummary-Regenerierung: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/summary-status")
+async def get_summary_status():
+    """
+    ÄNDERUNG 14.07.2025: Status der ModelSummary-Tabelle
+    
+    Returns:
+        Status über ModelSummary-Coverage und fehlende Einträge
+    """
+    try:
+        status = summary_updater.get_summary_status()
+        return status
+        
+    except Exception as e:
+        logger.error(f"Fehler bei Summary-Status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

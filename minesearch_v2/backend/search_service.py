@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
-from config import config, Config, CSV_COLUMNS, FIELDS_WITHOUT_SOURCES
+from config.base import config, Config, CSV_COLUMNS, FIELDS_WITHOUT_SOURCES
 from utils import normalize_accents, generate_name_variants, generate_multilingual_search_terms, get_country_config
 from data_extraction import DataExtractor, assign_sources_to_data
 from source_discovery import extract_sources_from_content
@@ -18,6 +18,8 @@ from providers.registry import provider_registry
 from providers.base_provider import SearchResult
 from cache_service import get_cache_service, cached_search
 from search_service_legacy import LegacySearchFunctions
+from cost_monitor import cost_monitor
+from database.manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,8 @@ class MineSearchService(LegacySearchFunctions):
         provider_registry.initialize(config.PROVIDERS)
         self.registry = provider_registry
         self.enhanced_discovery = EnhancedSourceDiscovery()
+        # Database Manager für Persistierung
+        self.db_manager = DatabaseManager()
     
     async def search_mine(self, mine_name: str, model: str, country: Optional[str] = None, 
                          commodity: Optional[str] = None, region: Optional[str] = None, 
@@ -51,25 +55,38 @@ class MineSearchService(LegacySearchFunctions):
         """
         logger.info(f"[SEARCH] Starte Suche für: {mine_name}, Land: {country}, Modell: {model}")
         
-        # Cache-Check
-        cache_key = f"{mine_name}_{country}_{model}_{commodity}_{region}"
-        cached_result = await self._check_cache(cache_key)
-        if cached_result:
-            logger.info(f"[SEARCH] Cache-Hit für {mine_name}")
-            return cached_result
+        # ÄNDERUNG 14.07.2025: Generische Provider-Unterstützung statt nur Perplexity
+        # Prüfe ob Modell verfügbar ist (mit Provider-Präfix)
+        full_model_id = model if ':' in model else f"openrouter:{model}"
         
-        # Prüfe ob Modell verfügbar ist
-        if not self.registry.is_model_available(f"perplexity:{model}"):
-            # Fallback auf direkte API-Nutzung
-            return await self._legacy_search(mine_name, country, commodity, model, region)
+        # Cache-Check - BUGFIX 20.07.2025: Temporär deaktiviert für Tests
+        # cached_result = await self._check_cache(mine_name, country or "", full_model_id, commodity=commodity, region=region)
+        # if cached_result:
+        #     logger.info(f"[SEARCH] Cache-Hit für {mine_name} mit Model {full_model_id}")
+        #     return cached_result
+        logger.info(f"[SEARCH] Cache temporär deaktiviert - jede Suche wird frisch ausgeführt")
+        if not self.registry.is_model_available(full_model_id):
+            # Fallback auf Default-Modell
+            logger.warning(f"Modell {full_model_id} nicht verfügbar, verwende Default: {config.DEFAULT_MODEL}")
+            full_model_id = config.DEFAULT_MODEL
+        
+        # ÄNDERUNG 14.07.2025: Kostenüberwachung für Premium-Modelle
+        if not cost_monitor.check_model_costs(full_model_id, "search"):
+            logger.error(f"Verwendung von kostenpflichtigem Modell {full_model_id} blockiert")
+            alternatives = cost_monitor.suggest_free_alternatives(full_model_id)
+            if alternatives:
+                full_model_id = alternatives[0]
+                logger.info(f"Verwende kostenlose Alternative: {full_model_id}")
+            else:
+                full_model_id = config.DEFAULT_MODEL
         
         # Verwende Provider-basierte Suche
         try:
-            result = await self._search_with_provider(mine_name, country, commodity, model, region)
+            result = await self._search_with_provider(mine_name, country, commodity, full_model_id, region)
             
-            # Cache das Ergebnis
-            if result.get('success'):
-                await self._cache_result(cache_key, result)
+            # Cache das Ergebnis - BUGFIX 20.07.2025: Temporär deaktiviert für Tests
+            # if result.get('success'):
+            #     await self._cache_result(mine_name, country or "", full_model_id, result, commodity=commodity, region=region)
             
             return result
             
@@ -136,7 +153,7 @@ class MineSearchService(LegacySearchFunctions):
         return combined_result
     
     async def _search_with_provider(self, mine_name: str, country: Optional[str],
-                                  commodity: Optional[str], model: str, 
+                                  commodity: Optional[str], full_model_id: str, 
                                   region: Optional[str]) -> Dict[str, Any]:
         """
         Suche mit Provider-System
@@ -145,16 +162,20 @@ class MineSearchService(LegacySearchFunctions):
             mine_name: Name der Mine
             country: Land
             commodity: Rohstoff
-            model: Modell
+            full_model_id: Vollständige Modell-ID mit Provider-Präfix
             region: Region
             
         Returns:
             Provider-basiertes Suchergebnis
         """
-        # Hole Provider für Perplexity
-        provider = self.registry.get_provider("perplexity")
+        # ÄNDERUNG 14.07.2025: Generische Provider-Extraktion aus model_id
+        provider_name = full_model_id.split(':')[0] if ':' in full_model_id else 'openrouter'
+        provider = self.registry.get_provider(provider_name)
         if not provider:
-            raise Exception("Perplexity Provider nicht verfügbar")
+            logger.warning(f"Provider {provider_name} nicht verfügbar, verwende Default-Provider")
+            provider = self.registry.get_provider("openrouter")
+            if not provider:
+                raise Exception("Kein verfügbarer Provider gefunden")
         
         # Bereite Suchkontext vor
         name_variants = generate_name_variants(mine_name)
@@ -180,11 +201,12 @@ class MineSearchService(LegacySearchFunctions):
             'multilingual_terms': multilingual_terms
         }
         
-        # Führe Suche durch
-        result = await provider.search(query, model, options)
+        # ÄNDERUNG 14.07.2025: Führe Suche durch mit korrektem Model-Namen
+        model_name = full_model_id.split(':')[1] if ':' in full_model_id else full_model_id
+        result = await provider.search(query, model_name, options)
         
         # Verarbeite Ergebnis
-        return await self._process_search_result(result, mine_name, country, model)
+        return await self._process_search_result(result, mine_name, country, full_model_id)
     
     async def _legacy_search(self, mine_name: str, country: Optional[str],
                            commodity: Optional[str], model: str, 
@@ -215,16 +237,29 @@ class MineSearchService(LegacySearchFunctions):
             mine_name, name_variants, country, currency, restoration_terms
         )
         
-        # Modell-Konfiguration
-        model_config = {
-            "model": model,
-            "temperature": 0.2,
-            "max_tokens": 4000,
-            "top_p": 0.9
+        # ÄNDERUNG 14.07.2025: Generischer Provider-Aufruf statt nur Perplexity
+        # Berechne tatsächlich verwendetes Modell für Legacy
+        legacy_full_model_id = model if ':' in model else f"openrouter:{model}"
+        provider_name = legacy_full_model_id.split(':')[0]
+        provider = self.registry.get_provider(provider_name)
+        if not provider:
+            logger.warning(f"Provider {provider_name} nicht verfügbar, verwende Default-Provider")
+            provider = self.registry.get_provider("openrouter")
+            legacy_full_model_id = config.DEFAULT_MODEL  # Aktualisiere auf tatsächlich verwendetes Modell
+            if not provider:
+                raise Exception("Kein verfügbarer Provider gefunden")
+        
+        model_name = legacy_full_model_id.split(':')[1] if ':' in legacy_full_model_id else legacy_full_model_id
+        
+        # Erstelle Options für Legacy-Suche
+        legacy_options = {
+            'mine_name': mine_name,
+            'country': country,
+            'commodity': commodity,
+            'region': region
         }
         
-        # API-Aufruf
-        api_result = await self._call_perplexity_api(query, model_config)
+        api_result = await provider.search(query, model_name, legacy_options)
         
         if not api_result.get('success'):
             return {
@@ -260,6 +295,44 @@ class MineSearchService(LegacySearchFunctions):
         # Berechne Datenqualität
         quality_metrics = self._calculate_data_quality(structured_data)
         
+        # DATABASE INTEGRATION: Speichere Legacy-Suchergebnis in Database
+        # BUGFIX 20.07.2025: Verwende tatsächlich verwendetes Modell
+        try:
+            logger.info(f"[DB LEGACY] Speichere mit model_used: {legacy_full_model_id} (original request: {model})")
+            search_result = self.db_manager.save_search_result(
+                mine_name=mine_name,
+                model_used=legacy_full_model_id,
+                structured_data=structured_data,
+                sources=[{
+                    'url': s.get('url', ''),
+                    'title': s.get('title', ''),
+                    'type': s.get('type', 'unknown'),
+                    'reliability': s.get('reliability', 0.5)
+                } for s in sources],
+                data_quality=quality_metrics.get('completion_percentage', 0),
+                success=True,
+                country=country,
+                search_type="legacy"
+            )
+            logger.info(f"[DB] Legacy-Suchergebnis für {mine_name} gespeichert (ID: {search_result.id})")
+            
+            # Aktualisiere Source-Statistiken in Database  
+            for source in sources:
+                if source.get('url'):
+                    self.db_manager.add_or_update_source(
+                        url=source.get('url'),
+                        domain=source.get('domain', ''),
+                        country=country,
+                        source_type=source.get('type', 'unknown'),
+                        metadata={
+                            'title': source.get('title', ''),
+                            'reliability': source.get('reliability', 0.5)
+                        }
+                    )
+                    
+        except Exception as e:
+            logger.error(f"[DB] Fehler beim Speichern des Legacy-Suchergebnisses: {e}")
+        
         return {
             "success": True,
             "data": {
@@ -267,7 +340,7 @@ class MineSearchService(LegacySearchFunctions):
                 "structured_data": structured_data,
                 "sources": sources,
                 "quality_metrics": quality_metrics,
-                "model_used": model,
+                "model_used": legacy_full_model_id,
                 "confidence": confidence,
                 "search_type": "legacy"
             }
@@ -314,6 +387,56 @@ class MineSearchService(LegacySearchFunctions):
         # Berechne Qualitäts-Metriken
         quality_metrics = self._calculate_data_quality(structured_data)
         
+        # ÄNDERUNG 15.07.2025: Sources Usage Tracking implementieren
+        await self._track_sources_usage(sources, success=True, model=model)
+        
+        # DATABASE INTEGRATION: Speichere Suchergebnis in Database
+        # BUGFIX 20.07.2025: Verwende tatsächlich verwendetes Modell statt Request-Modell
+        try:
+            search_duration = result.metadata.get("response_time", 0) / 1000.0  # Convert ms to seconds
+            
+            # Bestimme tatsächlich verwendetes Modell aus Result oder verwende übergebenes
+            actual_model_used = result.metadata.get('model_used') or model
+            logger.info(f"[DB] Speichere mit model_used: {actual_model_used} (original request: {model})")
+            
+            search_result = self.db_manager.save_search_result(
+                mine_name=mine_name,
+                model_used=actual_model_used,
+                structured_data=structured_data,
+                sources=[{
+                    'url': s.get('url', ''),
+                    'title': s.get('title', ''),
+                    'type': s.get('type', 'unknown'),
+                    'reliability': s.get('reliability', 0.5)
+                } for s in sources],
+                search_duration=search_duration,
+                data_quality=quality_metrics.get('completion_percentage', 0),
+                success=True,
+                country=country,
+                search_type="provider"
+            )
+            logger.info(f"[DB] Suchergebnis für {mine_name} gespeichert (ID: {search_result.id})")
+            
+            # Aktualisiere Source-Statistiken in Database  
+            for source in sources:
+                if source.get('url'):
+                    self.db_manager.add_or_update_source(
+                        url=source.get('url'),
+                        domain=source.get('domain', ''),
+                        country=country,
+                        source_type=source.get('type', 'unknown'),
+                        metadata={
+                            'title': source.get('title', ''),
+                            'reliability': source.get('reliability', 0.5)
+                        }
+                    )
+                    
+        except Exception as e:
+            logger.error(f"[DB] Fehler beim Speichern des Suchergebnisses: {e}")
+        
+        # BUGFIX 20.07.2025: Verwende tatsächlich verwendetes Modell in Response
+        actual_model_used = result.metadata.get('model_used') or model
+        
         return {
             "success": True,
             "data": {
@@ -321,7 +444,7 @@ class MineSearchService(LegacySearchFunctions):
                 "structured_data": structured_data,
                 "sources": sources,
                 "quality_metrics": quality_metrics,
-                "model_used": model,
+                "model_used": actual_model_used,
                 "confidence": result.metadata.get("confidence", 0.8),
                 "search_type": "provider"
             }
@@ -344,15 +467,17 @@ class MineSearchService(LegacySearchFunctions):
         # Erstelle spezifische Query für diese Quelle
         query = self._build_phase2_query(source, mine_name, country)
         
-        # Modell-Konfiguration für Phase 2
-        model_config = {
-            "model": model,
-            "temperature": 0.1,  # Niedrigere Temperatur für präzise Extraktion
-            "max_tokens": 2000
-        }
+        # ÄNDERUNG 14.07.2025: Generischer Provider-Aufruf für Phase 2
+        provider_name = model.split(':')[0] if ':' in model else 'openrouter'
+        provider = self.registry.get_provider(provider_name)
+        if not provider:
+            logger.warning(f"Provider {provider_name} nicht verfügbar, verwende Default-Provider")
+            provider = self.registry.get_provider("openrouter")
+            if not provider:
+                raise Exception("Kein verfügbarer Provider gefunden")
         
-        # API-Aufruf
-        api_result = await self._call_perplexity_api(query, model_config)
+        model_name = model.split(':')[1] if ':' in model else model
+        api_result = await provider.search(query, model_name)
         
         if api_result.get('success'):
             content = api_result.get('content', '')
@@ -442,23 +567,96 @@ class MineSearchService(LegacySearchFunctions):
         
         return result
     
-    async def _check_cache(self, cache_key: str) -> Optional[Dict]:
-        """Prüft Cache auf vorhandenes Ergebnis"""
+    async def _check_cache(self, mine_name: str, country: str, model: str, **kwargs) -> Optional[Dict]:
+        """
+        Prüft Cache auf vorhandenes Ergebnis
+        BUGFIX 20.07.2025: Verwende korrekte Cache-Parameter statt String-Key
+        """
         try:
             cache_service = get_cache_service()
-            return await cache_service.get(cache_key)
+            return cache_service.get(mine_name, country, model, **kwargs)
         except Exception as e:
             logger.debug(f"[CACHE] Cache-Check fehlgeschlagen: {e}")
             return None
     
-    async def _cache_result(self, cache_key: str, result: Dict):
-        """Speichert Ergebnis im Cache"""
+    async def _cache_result(self, mine_name: str, country: str, model: str, result: Dict, **kwargs):
+        """
+        Speichert Ergebnis im Cache  
+        BUGFIX 20.07.2025: Verwende korrekte Cache-Parameter statt String-Key
+        """
         try:
             cache_service = get_cache_service()
-            await cache_service.set(cache_key, result, ttl=3600)  # 1 Stunde TTL
+            cache_service.set(mine_name, country, model, result, ttl=3600, **kwargs)  # 1 Stunde TTL
         except Exception as e:
             logger.debug(f"[CACHE] Cache-Speicherung fehlgeschlagen: {e}")
+    
+    async def _track_sources_usage(self, sources: List[Dict], success: bool, model: str):
+        """
+        ÄNDERUNG 15.07.2025: Trackt Sources-Verwendung in der Datenbank
+        
+        Args:
+            sources: Liste der verwendeten Quellen
+            success: Ob die Suche erfolgreich war
+            model: Verwendetes Modell
+        """
+        try:
+            from database.models import Source
+            from urllib.parse import urlparse
+            
+            logger.info(f"[SOURCES TRACKING] Tracke {len(sources)} Sources für {model}")
+            
+            with self.db_manager.get_session() as session:
+                for source in sources:
+                    try:
+                        # Extrahiere URL aus verschiedenen Source-Formaten
+                        source_url = None
+                        if isinstance(source, dict):
+                            source_url = source.get('url') or source.get('value') or source.get('link')
+                        elif isinstance(source, str):
+                            source_url = source
+                        
+                        if not source_url or not source_url.startswith('http'):
+                            continue
+                        
+                        # Normalisiere URL (entferne Query-Parameter)
+                        try:
+                            parsed = urlparse(source_url)
+                            base_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip('/')
+                            domain = parsed.netloc
+                        except:
+                            continue
+                        
+                        # Finde oder erstelle Source in DB
+                        db_source = session.query(Source).filter_by(url=base_url).first()
+                        if not db_source:
+                            # Versuche Domain-basierte Suche
+                            db_source = session.query(Source).filter_by(domain=domain).first()
+                        
+                        if db_source:
+                            # Aktualisiere Source-Statistiken
+                            db_source.total_searches += 1
+                            if success:
+                                db_source.successful_searches += 1
+                            db_source.last_attempted_access = datetime.now()
+                            if success:
+                                db_source.last_successful_access = datetime.now()
+                            
+                            logger.debug(f"[SOURCES TRACKING] Updated {domain}: {db_source.successful_searches}/{db_source.total_searches}")
+                        else:
+                            # Source nicht in DB gefunden - logge für Debugging
+                            logger.debug(f"[SOURCES TRACKING] Source nicht in DB gefunden: {domain}")
+                    
+                    except Exception as e:
+                        logger.warning(f"[SOURCES TRACKING] Fehler beim Tracken von Source: {e}")
+                        continue
+                
+                session.commit()
+                logger.info(f"[SOURCES TRACKING] Source-Tracking abgeschlossen für {model}")
+                
+        except Exception as e:
+            logger.error(f"[SOURCES TRACKING] Fehler beim Sources-Tracking: {e}")
 
 
-# Globale Service-Instanz
-search_service = MineSearchService()
+# Service-Instanz für Kompatibilität (DEPRECATED - use services_container)
+from services_container import services
+search_service = services.mine_search_service

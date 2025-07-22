@@ -1,0 +1,117 @@
+{
+  "start_time": "2025-07-19T14:29:11.037518",
+  "tests": {
+    "1_1_database_complete": {
+      "status": "PASS",
+      "source_created": true,
+      "source_type": "government",
+      "search_result_saved": true,
+      "total_sources": 21,
+      "total_results": 22
+    },
+    "1_2_quebec_patterns": {
+      "status": "PASS",
+      "total_tested": 5,
+      "quebec_gov_sources": 3,
+      "canada_sources": 5,
+      "classifications": [
+        {
+          "url": "https://mern.gouv.qc.ca/mines/",
+          "domain": "mern.gouv.qc.ca",
+          "type": "government",
+          "country": "Canada",
+          "is_quebec_gov": true
+        },
+        {
+          "url": "https://gestim.mines.gouv.qc.ca/MinesActives/",
+          "domain": "gestim.mines.gouv.qc.ca",
+          "type": "government",
+          "country": "Canada",
+          "is_quebec_gov": true
+        },
+        {
+          "url": "https://www.bape.gouv.qc.ca/fr/dossiers-en-cours/",
+          "domain": "www.bape.gouv.qc.ca",
+          "type": "government",
+          "country": "Canada",
+          "is_quebec_gov": true
+        },
+        {
+          "url": "https://sedar.com/filings/canadianmalartic",
+          "domain": "sedar.com",
+          "type": "exchange",
+          "country": "Canada",
+          "is_quebec_gov": false
+        },
+        {
+          "url": "https://canadianmalartic.com/sustainability/",
+          "domain": "canadianmalartic.com",
+          "type": "unknown",
+          "country": "Canada",
+          "is_quebec_gov": false
+        }
+      ]
+    },
+    "1_3_advanced_discovery": {
+      "status": "PARTIAL",
+      "total_sources": 3,
+      "url_sources": 3,
+      "document_sources": 0,
+      "organization_sources": 0,
+      "quebec_specific": 3,
+      "sample_quebec_sources": [
+        "https://mern.gouv.qc.ca/mines/lac-bloom/restoratio",
+        "https://gestim.mines.gouv.qc.ca/titres/GM-12345",
+        "https://bape.gouv.qc.ca/sections/mandats/Mine_Lac_"
+      ]
+    },
+    "2_1_bilingual_terms": {
+      "status": "PASS",
+      "total_owner_terms": 7,
+      "french_owner_terms": 1,
+      "english_owner_terms": 3,
+      "total_restoration_terms": 34,
+      "french_restoration_terms": 5,
+      "english_restoration_terms": 6,
+      "sample_french": [
+        "propri\u00e9taire",
+        "co\u00fbts de restauration",
+        "co\u00fbts de fermeture"
+      ],
+      "sample_english": [
+        "owner",
+        "belongs to",
+        "property of",
+        "restoration costs",
+        "closure costs"
+      ]
+    },
+    "2_2_priority_domains": {
+      "status": "PASS",
+      "total_domains": 7,
+      "quebec_domains": 2,
+      "government_domains": 1,
+      "sample_domains": [
+        "mern.gouv.qc.ca",
+        "nrcan.gc.ca",
+        "gestim.quebec",
+        "mining.ca",
+        "sedar.com"
+      ],
+      "quebec_specific": [
+        "mern.gouv.qc.ca",
+        "gestim.quebec"
+      ]
+    }
+  },
+  "summary": {
+    "total_tests": 5,
+    "passed": 4,
+    "partial": 1,
+    "failed": 0,
+    "success_rate": 80.0,
+    "partial_rate": 20.0,
+    "overall_status": "\ud83c\udfaf EXCELLENT"
+  },
+  "end_time": "2025-07-19T14:29:11.178825"
+}

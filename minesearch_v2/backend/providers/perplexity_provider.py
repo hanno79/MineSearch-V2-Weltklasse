@@ -385,21 +385,25 @@ QUELLEN ZUM ANALYSIEREN:
         
         return f"""Du bist ein Mining-Recherche-Experte. Antworte auf Deutsch mit STRUKTURIERTEN DATEN im folgenden Format:
 
-**GEFUNDENE DATEN FÜR [MINENNAME]:**
+**VOLLSTÄNDIGE DATEN FÜR [MINENNAME] - ALLE 18 FELDER AUSFÜLLEN:**
 - Name: [exakter Name] [Quelle: URL/Dokument]
-- Land: [Land] [Quelle: URL/Dokument]
+- Country: [Land] [Quelle: URL/Dokument]
 - Region: [Region/Provinz] [Quelle: URL/Dokument]
-- Eigentümer: [Eigentümer der Mine] [Quelle: URL/Dokument]
-- Betreiber: [Betreiber/Operator - NIEMALS Koordinaten hier angeben!] [Quelle: URL/Dokument]
-- Koordinaten: [Latitude, Longitude] [Quelle: URL/Dokument]
-- Status: [aktiv/geschlossen/geplant] [Quelle: URL/Dokument]
-- Rohstoffe: [Liste der Rohstoffe] [Quelle: URL/Dokument]
-- Minentyp: [Untertage/Open-Pit/etc] [Quelle: URL/Dokument]
-- Produktionsstart: [Jahr] [Quelle: URL/Dokument]
-- Produktionsende: [Jahr oder 'aktiv'] [Quelle: URL/Dokument]
-- Fördermenge: [Menge/Jahr mit Einheit] [Quelle: URL/Dokument]
-- Fläche: [in km²] [Quelle: URL/Dokument]
-- Restaurationskosten: [Betrag in {currency}$ mit Jahr] [Quelle: URL/Dokument]
+- Eigentümer: [Eigentümer der Mine oder LEER] [Quelle: URL/Dokument]
+- Betreiber: [Betreiber/Operator - NIEMALS Koordinaten hier angeben! oder LEER] [Quelle: URL/Dokument]
+- x-Koordinate: [Latitude in Dezimalgrad oder LEER] [Quelle: URL/Dokument]
+- y-Koordinate: [Longitude in Dezimalgrad oder LEER] [Quelle: URL/Dokument]
+- Aktivitätsstatus: [aktiv/geschlossen/geplant oder LEER] [Quelle: URL/Dokument]
+- Restaurationskosten: [Betrag in {currency}$ oder LEER] [Quelle: URL/Dokument]
+- Jahr der Aufnahme der Kosten: [Jahr der Kostenschätzung oder LEER] [Quelle: URL/Dokument]
+- Jahr der Erstellung des Dokumentes: [Jahr des Reports/Studies oder LEER] [Quelle: URL/Dokument]
+- Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.): [Liste der Rohstoffe oder LEER] [Quelle: URL/Dokument]
+- Minentyp (Untertage/ Open-Pit/ usw.): [Untertage/Open-Pit/etc oder LEER] [Quelle: URL/Dokument]
+- Produktionsstart: [Jahr oder LEER] [Quelle: URL/Dokument]
+- Produktionsende: [Jahr oder 'aktiv' oder LEER] [Quelle: URL/Dokument]
+- Fördermenge/Jahr: [Menge/Jahr mit Einheit oder LEER] [Quelle: URL/Dokument]
+- Fläche der Mine in qkm: [Fläche in km² oder LEER] [Quelle: URL/Dokument]
+- Quellenangaben: [Referenzen oder 'Allgemeines Fachwissen'] [Quelle: URL/Dokument]
 
 **WICHTIG FÜR RESTAURATIONSKOSTEN:**
 Suche nach: ARO, closure costs, environmental liability, restoration provision, rehabilitation costs, 

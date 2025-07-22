@@ -90,8 +90,8 @@ OPENROUTER_MODELS = {
     'cypher-alpha-free': {
         'id': 'openrouter/cypher-alpha:free',
         'name': 'Cypher Alpha (Kostenlos)',
-        'timeout': 60,
-        'max_tokens': 3000,
+        'timeout': 120,  # FIXED 15.07.2025: Erhöhtes Timeout für experimentelles Modell
+        'max_tokens': 4000,  # FIXED 15.07.2025: Erhöhte Token-Anzahl für bessere Extraktion
         'description': 'Kostenloses experimentelles Modell für Mining-Datenextraktion',
         'supports_web_search': False,
         'is_free': True
@@ -99,8 +99,8 @@ OPENROUTER_MODELS = {
     'minimax-m1': {
         'id': 'minimax/minimax-m1',
         'name': 'MiniMax M1',
-        'timeout': 90,
-        'max_tokens': 5000,
+        'timeout': 180,  # FIXED 15.07.2025: Erhöhtes Timeout für langsamere Antworten
+        'max_tokens': 6000,  # FIXED 15.07.2025: Erhöhte Token-Anzahl für umfassendere Extraktion
         'description': 'MiniMax M1 - Ausgewogenes Modell für Mining-Analysen',
         'supports_web_search': False,
         'is_free': True
@@ -120,6 +120,15 @@ OPENROUTER_MODELS = {
         'timeout': 120,
         'max_tokens': 8000,
         'description': 'NVIDIA Llama 3.1 Nemotron Ultra - Hochleistungs-LLM mit 253B Parametern',
+        'supports_web_search': False,
+        'is_free': True
+    },
+    'kimi-k2': {
+        'id': 'moonshotai/kimi-k2',
+        'name': 'Kimi K2 (Kostenlos)',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'Moonshot AI Kimi K2 - Kostenloses multilinguale Modell für Mining-Analysen',
         'supports_web_search': False,
         'is_free': True
     }
@@ -303,32 +312,34 @@ BRIGHTDATA_MODELS = {
 # OpenAI Modelle
 OPENAI_MODELS = {
     'o3-deep-research': {
-        'id': 'o3-deep-research',
-        'name': 'O3 Deep Research',
+        # KORRIGIERT 13.07.2025: O3 nicht verfügbar, nutze GPT-4o für Research
+        'id': 'gpt-4o',
+        'name': 'GPT-4o (O3 Deep Research Replacement)',
         'timeout': 300,
         'max_tokens': 16000,
-        'description': 'Maximale Intelligenz für komplexe Research-Aufgaben',
+        'description': 'GPT-4o als Research-Ersatz für nicht verfügbares O3',
         'supports_web_search': False,
         'supports_deep_research': True,
         'is_free': False
     },
     'gpt-4.1': {
-        'id': 'gpt-4.1-2025-04-14',
-        'name': 'GPT-4.1 (April 2025)',
+        # KORRIGIERT 13.07.2025: GPT-4.1 nicht verfügbar, nutze GPT-4o
+        'id': 'gpt-4o',
+        'name': 'GPT-4o (GPT-4.1 Replacement)',
         'timeout': 120,
         'max_tokens': 8000,
-        'description': 'Beste Performance für komplexe Finanzanalysen',
+        'description': 'GPT-4o als Ersatz für nicht verfügbares GPT-4.1',
         'supports_web_search': False,
         'supports_deep_research': False,
         'is_free': False
     },
     'o3': {
-        # ÄNDERUNG 10.07.2025: O3 ist noch nicht veröffentlicht, nutze GPT-4 Turbo als Fallback
-        'id': 'gpt-4-turbo-2024-04-09',
-        'name': 'O3 (GPT-4 Turbo Fallback)',
+        # KORRIGIERT 13.07.2025: O3 nicht verfügbar, nutze korrekte GPT-4 Turbo Model-ID
+        'id': 'gpt-4-turbo',
+        'name': 'GPT-4 Turbo (O3 Replacement)',
         'timeout': 180,
         'max_tokens': 12000,
-        'description': 'O3 noch nicht verfügbar - nutzt GPT-4 Turbo als Fallback',
+        'description': 'GPT-4 Turbo als Ersatz für nicht verfügbares O3',
         'supports_web_search': False,
         'supports_deep_research': False,
         'is_free': False
@@ -340,6 +351,47 @@ OPENAI_MODELS = {
         'max_tokens': 4000,
         'description': 'Kosteneffiziente GPT-4 Variante für schnelle Mining-Analysen',
         'supports_web_search': False,
+        'is_free': False
+    },
+    # MODEL-FIX 15.07.2025: Fehlende OpenAI-Modelle hinzugefügt
+    'gpt-4o': {
+        'id': 'gpt-4o',
+        'name': 'GPT-4o',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'OpenAI GPT-4o - Neueste multimodale Generation',
+        'supports_web_search': False,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'gpt-4-turbo': {
+        'id': 'gpt-4-turbo',
+        'name': 'GPT-4 Turbo',
+        'timeout': 90,
+        'max_tokens': 8000,
+        'description': 'OpenAI GPT-4 Turbo - Optimiert für schnelle Antworten',
+        'supports_web_search': False,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'gpt-3.5-turbo': {
+        'id': 'gpt-3.5-turbo',
+        'name': 'GPT-3.5 Turbo',
+        'timeout': 60,
+        'max_tokens': 4000,
+        'description': 'OpenAI GPT-3.5 Turbo - Kosteneffizient für einfache Aufgaben',
+        'supports_web_search': False,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'gpt-3.5-turbo-16k': {
+        'id': 'gpt-3.5-turbo-16k',
+        'name': 'GPT-3.5 Turbo 16K',
+        'timeout': 60,
+        'max_tokens': 16000,
+        'description': 'OpenAI GPT-3.5 Turbo mit erweiterten Kontext (16K Token)',
+        'supports_web_search': False,
+        'supports_deep_research': False,
         'is_free': False
     }
 }
@@ -374,6 +426,27 @@ ANTHROPIC_MODELS = {
         'supports_web_search': False,
         'supports_deep_research': True,
         'is_free': False
+    },
+    # MODEL-FIX 15.07.2025: Fehlende Anthropic-Modelle hinzugefügt
+    'claude-3-haiku': {
+        'id': 'claude-3-haiku-20240307',
+        'name': 'Claude 3 Haiku',
+        'timeout': 45,
+        'max_tokens': 4000,
+        'description': 'Schnellstes Claude-Modell für einfache Mining-Datenextraktion',
+        'supports_web_search': False,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'claude-3-opus': {
+        'id': 'claude-3-opus-20240229',
+        'name': 'Claude 3 Opus',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'Leistungsstärkstes Claude 3 Modell für komplexe Mining-Analysen',
+        'supports_web_search': False,
+        'supports_deep_research': True,
+        'is_free': False
     }
 }
 
@@ -405,6 +478,37 @@ GEMINI_MODELS = {
         'max_tokens': 5000,
         'description': 'Ultra-schnell für einfache Analysen',
         'supports_web_search': False,
+        'is_free': False
+    },
+    # MODEL-FIX 15.07.2025: Fehlende Gemini-Modelle hinzugefügt
+    'gemini-1.5-pro': {
+        'id': 'gemini-1.5-pro',
+        'name': 'Gemini 1.5 Pro',
+        'timeout': 120,
+        'max_tokens': 12000,
+        'description': 'Google Gemini 1.5 Pro - Bewährtes Modell für komplexe Mining-Analysen',
+        'supports_web_search': False,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'gemini-1.5-flash': {
+        'id': 'gemini-1.5-flash',
+        'name': 'Gemini 1.5 Flash',
+        'timeout': 60,
+        'max_tokens': 8000,
+        'description': 'Google Gemini 1.5 Flash - Schnell und kosteneffizient',
+        'supports_web_search': False,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'gemini-2.0-flash': {
+        'id': 'gemini-2.0-flash-experimental',
+        'name': 'Gemini 2.0 Flash Experimental',
+        'timeout': 60,
+        'max_tokens': 8000,
+        'description': 'Google Gemini 2.0 Flash - Experimentelle Version mit neuen Features',
+        'supports_web_search': False,
+        'supports_deep_research': False,
         'is_free': False
     }
 }
@@ -447,6 +551,46 @@ GROK_MODELS = {
         'max_tokens': 2000,
         'description': 'Ultra-schnelle Suche mit Web-Zugriff',
         'supports_web_search': True,
+        'is_free': False
+    },
+    # MODEL-FIX 15.07.2025: Fehlende Grok-Modelle hinzugefügt
+    'grok-2': {
+        'id': 'grok-2',
+        'name': 'Grok 2',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'xAI Grok 2 - Bewährtes Modell mit Web-Zugriff',
+        'supports_web_search': True,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'grok-2-mini': {
+        'id': 'grok-2-mini',
+        'name': 'Grok 2 Mini',
+        'timeout': 60,
+        'max_tokens': 4000,
+        'description': 'xAI Grok 2 Mini - Kosteneffiziente Version',
+        'supports_web_search': True,
+        'is_free': False
+    },
+    'grok-beta': {
+        'id': 'grok-beta',
+        'name': 'Grok Beta',
+        'timeout': 90,
+        'max_tokens': 6000,
+        'description': 'xAI Grok Beta - Experimentelle Features',
+        'supports_web_search': True,
+        'supports_deep_research': False,
+        'is_free': False
+    },
+    'grok-vision-beta': {
+        'id': 'grok-vision-beta',
+        'name': 'Grok Vision Beta',
+        'timeout': 90,
+        'max_tokens': 6000,
+        'description': 'xAI Grok Vision Beta - Multimodal mit Bildverarbeitung',
+        'supports_web_search': True,
+        'supports_deep_research': False,
         'is_free': False
     }
 }

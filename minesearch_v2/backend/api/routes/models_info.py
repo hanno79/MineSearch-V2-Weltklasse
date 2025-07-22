@@ -26,6 +26,8 @@ async def get_available_models():
                     "timeout": config.timeout,
                     "max_tokens": config.max_tokens,
                     "supports_web_search": config.supports_web_search,
+                    "supports_deep_research": getattr(config, 'supports_deep_research', False),
+                    "is_free": config.is_free,
                     "provider": config.provider
                 }
                 for model_id, config in models.items()
@@ -58,6 +60,8 @@ async def get_model_info(model_id: str):
                 "timeout": model_config.timeout,
                 "max_tokens": model_config.max_tokens,
                 "supports_web_search": model_config.supports_web_search,
+                "supports_deep_research": getattr(model_config, 'supports_deep_research', False),
+                "is_free": model_config.is_free,
                 "provider": model_config.provider
             }
         }

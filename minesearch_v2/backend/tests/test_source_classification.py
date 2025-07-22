@@ -6,6 +6,10 @@ Version: 1.0
 Beschreibung: Test für verbesserte Source Classification
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import logging
 from database import db_manager, Source
 

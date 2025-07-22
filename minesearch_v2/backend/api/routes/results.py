@@ -157,3 +157,88 @@ async def delete_result(result_id: int):
         "success": True,
         "message": f"Ergebnis {result_id} gelöscht"
     }
+
+@router.get("/results/export/csv")
+async def export_results_csv(
+    mine_name: Optional[str] = Query(None),
+    country: Optional[str] = Query(None),
+    session_id: Optional[str] = Query(None),
+    days_back: int = Query(30),
+    sort_by: str = Query("timestamp"),
+    order: str = Query("desc"),
+    exclude_exa: bool = Query(True)
+):
+    """
+    Exportiere Suchergebnisse als CSV mit Pipe-Trennzeichen
+    
+    CSV-EXPORT 19.07.2025: Neue Route für CSV-Download mit | als Separator
+    """
+    from fastapi.responses import StreamingResponse
+    from database import db_manager, SearchResult
+    from sqlalchemy import desc as sql_desc, asc as sql_asc
+    import io
+    from typing import List
+    
+    # CSV Service laden
+    from csv_service import CSVExportService
+    csv_service = CSVExportService()
+    
+    with db_manager.get_session() as session:
+        query = session.query(SearchResult)
+        
+        # Filter anwenden (gleiche Logik wie /results)
+        if exclude_exa:
+            query = query.filter(~SearchResult.model_used.like('exa:%'))
+        
+        if mine_name:
+            query = query.filter(SearchResult.mine_name == mine_name)
+            
+        if country:
+            query = query.filter(SearchResult.country == country)
+            
+        if session_id:
+            query = query.filter(SearchResult.session_id == session_id)
+        
+        # Zeitfilter
+        if days_back > 0:
+            from datetime import datetime, timedelta
+            cutoff = datetime.now() - timedelta(days=days_back)
+            query = query.filter(SearchResult.search_timestamp >= cutoff)
+        
+        # Sortierung
+        sort_columns = {
+            'timestamp': SearchResult.search_timestamp,
+            'mine_name': SearchResult.mine_name,
+            'model_id': SearchResult.model_used,
+            'response_time': SearchResult.search_duration
+        }
+        sort_column = sort_columns.get(sort_by, SearchResult.search_timestamp)
+        
+        if order == 'asc':
+            query = query.order_by(sql_asc(sort_column))
+        else:
+            query = query.order_by(sql_desc(sort_column))
+        
+        # Alle Ergebnisse laden
+        results = query.all()
+        
+        # CSV generieren
+        csv_content = csv_service.generate_csv_export(results)
+        
+        # Dateiname mit Timestamp
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"minesearch_results_{timestamp}.csv"
+        
+        # Stream Response erstellen
+        def iter_csv():
+            yield csv_content.encode('utf-8-sig')  # UTF-8 BOM für Excel
+        
+        return StreamingResponse(
+            iter_csv(),
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Type": "text/csv; charset=utf-8"
+            }
+        )

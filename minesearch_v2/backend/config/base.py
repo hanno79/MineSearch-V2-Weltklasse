@@ -32,7 +32,8 @@ FIELDS_WITHOUT_SOURCES = [
 ]
 
 # Lade Umgebungsvariablen
-env_path = Path(__file__).parent.parent.parent / '.env'
+# ABACUS-FIX 18.07.2025: Korrigiere Pfad zur richtigen .env Datei
+env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(env_path)
 
 class Config(APIKeysConfig):
@@ -50,12 +51,13 @@ class Config(APIKeysConfig):
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     
     # API Einstellungen
-    API_TIMEOUT = 30  # Sekunden
-    MAX_RETRIES = 3
+    API_TIMEOUT = int(os.getenv('API_TIMEOUT', 30))  # Sekunden
+    MAX_RETRIES = int(os.getenv('MAX_RETRIES', 3))
     
     # Default Modell - ENTFERNT: Keine automatische Perplexity-Auswahl mehr
-    DEFAULT_MODEL = None
-    PERPLEXITY_TEMPERATURE = 0.2
+    # ÄNDERUNG 14.07.2025: Kimi K2 als explizites Default-Modell für Kostenkontrolle
+    DEFAULT_MODEL = os.getenv('DEFAULT_MODEL', 'openrouter:kimi-k2')
+    PERPLEXITY_TEMPERATURE = float(os.getenv('PERPLEXITY_TEMPERATURE', 0.2))
     
     # Provider Konfiguration
     PROVIDERS = PROVIDERS_CONFIG
@@ -154,3 +156,6 @@ class Config(APIKeysConfig):
             "database": cls.DATABASE_URL,
             "log_level": cls.LOG_LEVEL
         }
+
+# Erstelle globale Config-Instanz
+config = Config()

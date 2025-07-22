@@ -13,6 +13,54 @@ from utils import get_country_config
 logger = logging.getLogger(__name__)
 
 
+def normalize_field_value(value: str) -> str:
+    """
+    FELDANZEIGE-FIX 14.07.2025: Normalisiert Feldwerte für einheitliche Anzeige
+    
+    Args:
+        value: Rohwert aus Provider
+        
+    Returns:
+        Normalisierter Wert: X für "nicht gefunden", leer für "nicht gesucht"
+    """
+    if not value or value.strip() == '':
+        # Komplett leer = nicht gesucht (bleibt leer)
+        return ''
+    
+    # Verschiedene "nicht gefunden" Werte zu einheitlichem "X"
+    not_found_values = [
+        'LEER', 'Leer', 'leer',
+        'LEER - keine verlässlichen Daten verfügbar',
+        'LEER - Keine verlässlichen Daten verfügbar', 
+        'Leer - status unklar',
+        'LEER - status unklar',
+        'LEER - Typ unbekannt',
+        'LEER - Minentyp unbekannt',
+        'LEER - Minentyp nicht verifiziert',
+        'LEER - Keine verlässlichen Daten verfügbar',
+        'LEER - Typ unklar',
+        'LEER',
+        'Keine spezifischen Quellen gefunden',
+        'Keine Informationen gefunden',
+        'Nicht verfügbar',
+        'Unbekannt',
+        'N/A', 'n/a',
+        '-', '—', '–',
+        'k.A.', 'k.a.', 'K.A.',
+        'keine Daten',
+        'nicht gefunden',
+        'no data',
+        'unknown'
+    ]
+    
+    value_cleaned = value.strip()
+    if value_cleaned in not_found_values:
+        return 'X'
+    
+    # Echte Daten unverändert
+    return value
+
+
 def process_restoration_costs(value: str, full_match: str, currency: str) -> str:
     """
     Verarbeitet und formatiert Restaurationskosten
@@ -261,6 +309,11 @@ def post_process_data(data: Dict[str, str], content: str, country_config: Dict) 
             coord_value = re.sub(r'[°\s]+$', '', coord_value)
             data[coord_field] = coord_value
     
+    # FELDANZEIGE-FIX 14.07.2025: Normalisiere alle Feldwerte für einheitliche Anzeige
+    for field, value in data.items():
+        if isinstance(value, str):
+            data[field] = normalize_field_value(value)
+    
     return data
 
 
@@ -299,5 +352,29 @@ def clean_field_value(value: str, field: str) -> str:
         minerals = [m.strip() for m in value.split(',')]
         minerals = list(dict.fromkeys(minerals))  # Erhält Reihenfolge
         value = ', '.join(minerals)
+    
+    elif field == 'Minentyp (Untertage/ Open-Pit/ usw.)':
+        # DATENKONSISTENZ-FIX 19.07.2025: Entferne störendes Präfix
+        # Entferne "(Untertage/ Open-Pit/ usw.): " oder ähnliche Präfixe
+        prefixes_to_remove = [
+            r'Untertage/ Open-Pit/ usw\.\):\s*',
+            r'\(Untertage/ Open-Pit/ usw\.\):\s*',
+            r'Minentyp \(Untertage/ Open-Pit/ usw\.\):\s*',
+            r'Typ:\s*',
+            r'Mine type:\s*',
+            r'Type:\s*'
+        ]
+        
+        for prefix_pattern in prefixes_to_remove:
+            value = re.sub(prefix_pattern, '', value, flags=re.IGNORECASE)
+        
+        # Bereinige auch häufige redundante Angaben
+        value = re.sub(r'^\(Untertage/ Open-Pit/ usw\.\):?\s*', '', value, flags=re.IGNORECASE)
+        
+        # Entferne führende/nachfolgende Leerzeichen nach Bereinigung
+        value = value.strip()
+    
+    # DATENKONSISTENZ-FIX 19.07.2025: Normalisiere LEER-Werte NACH allen Bereinigungen
+    value = normalize_field_value(value)
     
     return value

@@ -6,6 +6,10 @@ Test für Tavily Provider und Source Tracking
 import asyncio
 import logging
 from datetime import datetime
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from search_service_multi import multi_search_service
 from database import db_manager, Source
 from sqlalchemy.sql import func

@@ -1,0 +1,19 @@
+{
+  "start_time": "2025-07-20T06:03:07.949094",
+  "tests": {
+    "1_1_bilingual_terms": {
+      "status": "FAIL",
+      "error": "cannot import name 'quebec_bilingual_search' from 'bilingual_search_strategy' (/app/minesearch_v2/backend/bilingual_search_strategy.py)"
+    },
+    "1_2_quebec_detection": {
+      "status": "FAIL",
+      "error": "name 'quebec_bilingual_search' is not defined"
+    },
+    "2_1_gestim_connector": {
+      "status": "FAIL",
+      "error": "'GESTIMConnector' object has no attribute 'test_connection'"
+    }
+  },
+  "summary": {},
+  "end_time": "2025-07-20T06:03:08.147025"
+}

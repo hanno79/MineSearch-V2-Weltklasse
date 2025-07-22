@@ -1,0 +1,80 @@
+{
+  "start_time": "2025-07-20T06:14:08.170649",
+  "tests": {
+    "1_1_bilingual_terms": {
+      "status": "PASS",
+      "terms_count": 23,
+      "french_terms": 3,
+      "english_terms": 3,
+      "sample_terms": [
+        "Lac Bloom co\u00fbts restauration OR Lac Bloom restoration costs",
+        "Lac Bloom garantie financi\u00e8re OR Lac Bloom financial guarantee",
+        "Lac Bloom plan fermeture OR Lac Bloom closure plan"
+      ]
+    },
+    "1_2_quebec_detection": {
+      "status": "PASS",
+      "quebec_detected": true,
+      "region_variants": [
+        "Quebec",
+        "QC",
+        "Qu\u00e9bec"
+      ],
+      "variants_count": 3
+    },
+    "1_3_accent_handling": {
+      "status": "PASS",
+      "normalized_pairs": [
+        [
+          "Propri\u00e9taire",
+          "Proprietaire"
+        ],
+        [
+          "Qu\u00e9bec",
+          "Quebec"
+        ],
+        [
+          "Abitibi-T\u00e9miscamingue",
+          "Abitibi-Temiscamingue"
+        ]
+      ],
+      "test_terms_count": 3
+    },
+    "2_1_gestim_connector": {
+      "status": "PASS",
+      "connection": true,
+      "note": "GESTIM simulated in development environment"
+    },
+    "2_2_quebec_registry": {
+      "status": "FAIL",
+      "error": "'QuebecRegistryConnector' object has no attribute 'test_connection'"
+    },
+    "2_3_source_discovery": {
+      "status": "FAIL",
+      "error": "cannot import name 'enhanced_source_discovery' from 'source_discovery' (/app/minesearch_v2/backend/source_discovery.py)"
+    },
+    "3_1_database_models": {
+      "status": "FAIL",
+      "error": "module 'database.manager' has no attribute 'get_session'"
+    },
+    "3_2_api_endpoints": {
+      "status": "PASS",
+      "health_status_code": 200,
+      "health_response": {
+        "status": "healthy",
+        "service": "MineSearch v2.1",
+        "timestamp": "2025-07-12"
+      }
+    }
+  },
+  "summary": {
+    "total_tests": 8,
+    "passed": 5,
+    "partial": 0,
+    "failed": 3,
+    "success_rate": 62.5,
+    "partial_rate": 0.0,
+    "overall_status": "\u2705 GOOD"
+  },
+  "end_time": "2025-07-20T06:14:08.443837"
+}

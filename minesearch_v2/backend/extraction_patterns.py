@@ -39,7 +39,12 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'property\s+of\s+([^\n]+)',
             r'belongs\s+to\s+([^\n]+)',
             r'possession\s+of\s+([^\n]+)',
-            r'Eigentum\s+(?:von|der)\s+([^\n]+)'
+            r'Eigentum\s+(?:von|der)\s+([^\n]+)',
+            # Französische Patterns (Quebec)
+            r'détenteur\s+(?:du\s+)?titre:\s*([^\n]+)',
+            r'société\s+(?:propriétaire|détentrice):\s*([^\n]+)',
+            r'appartient\s+à\s+([^\n]+)',
+            r'propriété\s+de\s+([^\n]+)'
         ],
         'Betreiber': [
             r'Betreiber:\s*([^\n]+)', 
@@ -48,7 +53,12 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'operated\s+by\s+([^\n,]+)',
             r'opérateur:\s*([^\n]+)',
             r'operador:\s*([^\n]+)',
-            r'dioperasikan\s+oleh\s+([^\n]+)'
+            r'dioperasikan\s+oleh\s+([^\n]+)',
+            # Französische Patterns (Quebec)
+            r'exploitant:\s*([^\n]+)',
+            r'exploité\s+par\s+([^\n,]+)',
+            r'société\s+exploitante:\s*([^\n]+)',
+            r'gestion\s+(?:de\s+la\s+mine\s+)?par\s+([^\n,]+)'
         ],
         'x-Koordinate': [
             # Dezimalgrad-Formate
@@ -204,6 +214,13 @@ def get_restoration_cost_patterns() -> List[str]:
         r'(?:Umwelt|Environmental).*?(?:Kosten|costs|liabilities).*?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?|million)?',
         r'\$\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?|million)?\s*(?:für|for)\s+(?:Restauration|Sanierung|restoration|closure)',
         r'(?:Schätzung|estimate).*?(?:Restauration|Sanierung|closure).*?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:Millionen|Mio\.?|million)?',
+        # Französische Patterns (Quebec Mining)
+        r'coûts?\s+(?:de\s+)?(?:restauration|fermeture|réhabilitation):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millions?|mio\.?)?\s*(?:CAD|CDN|\$)?',
+        r'garantie\s+financière:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millions?|mio\.?)?\s*(?:CAD|CDN)?',
+        r'cautionnement:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millions?|mio\.?)?\s*(?:CAD|CDN)?',
+        r'provision\s+(?:pour\s+)?(?:fermeture|restauration):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millions?|mio\.?)?\s*(?:CAD|CDN)?',
+        r'obligations?\s+(?:de\s+)?(?:restauration|réhabilitation):\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millions?|mio\.?)?\s*(?:CAD|CDN)?',
+        r'plan\s+(?:de\s+)?fermeture[\s\S]{0,50}?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millions?|mio\.?)?\s*(?:CAD|CDN)?',
         # Spanische Patterns
         r'costos?\s+de\s+cierre:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millones?)?\s*(?:USD|PEN|CLP)?',
         r'pasivos?\s+ambientales?:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:millones?)?\s*(?:USD|PEN|CLP)?',

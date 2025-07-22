@@ -70,7 +70,7 @@ class ValidationService:
                 is_valid, cleaned = self.validate_operator(str(value))
                 if not is_valid:
                     errors.append(f"Ungültiger Betreiber: {value}")
-                    cleaned_data[field] = ""
+                    cleaned_data[field] = "X"  # Nicht gefunden markieren
                 else:
                     cleaned_data[field] = cleaned
             
@@ -79,7 +79,7 @@ class ValidationService:
                 is_valid, cleaned = self.validate_restoration_cost(str(value))
                 if not is_valid:
                     errors.append(f"Verdächtige Restaurationskosten: {value}")
-                    cleaned_data[field] = ""
+                    cleaned_data[field] = "X"  # Nicht gefunden markieren
                 else:
                     cleaned_data[field] = cleaned
             
@@ -89,7 +89,7 @@ class ValidationService:
                 is_valid = validate_coordinate(str(value), coord_type)
                 if not is_valid:
                     errors.append(f"Ungültige {field}: {value}")
-                    cleaned_data[field] = ""
+                    cleaned_data[field] = "X"  # Nicht gefunden markieren
             
             # Jahr validieren
             elif 'jahr' in field.lower() or 'datum' in field.lower():
@@ -100,7 +100,7 @@ class ValidationService:
             # Platzhalter-Check für alle Felder
             if is_placeholder_value(str(value), field):
                 errors.append(f"Platzhalter-Wert in {field}: {value}")
-                cleaned_data[field] = ""
+                cleaned_data[field] = "X"  # Nicht gefunden markieren
         
         return cleaned_data, errors
     
@@ -190,7 +190,7 @@ class ValidationService:
             if value and not is_placeholder_value(str(value), field):
                 cleaned[field] = value
             else:
-                cleaned[field] = ""
+                cleaned[field] = "X"  # Nicht gefunden markieren
         
         return cleaned
     

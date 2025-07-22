@@ -17,39 +17,61 @@ class ModelTierStrategy:
     """Implementiert kaskadierende Modell-Auswahl basierend auf Performance"""
     
     def __init__(self):
-        # ÄNDERUNG 07.07.2025: Tier-Definitionen basierend auf Test-Ergebnissen
+        # ÄNDERUNG 14.07.2025: Kostenlose Modelle als Tier 1 priorisieren - Kimi K2 als primäres Fallback
         self.tier_definitions = {
-            'tier_1_financial': {
+            'tier_1_free_primary': {
                 'models': [
-                    'perplexity:sonar-pro',
-                    'openai:o3-deep-research',
-                    'grok:grok-3-fast',
-                    'perplexity:sonar-deep-research'
+                    'openrouter:kimi-k2',
+                    'openrouter:deepseek-free',
+                    'openrouter:deepseek-chimera-free',
+                    'openrouter:mistral-small-free',
+                    'openrouter:cypher-alpha-free'
                 ],
-                'focus': 'restoration_costs',
-                'threshold': 0.8  # 80% der kritischen Felder müssen gefüllt sein
+                'focus': 'free_fallback',
+                'threshold': 0.6  # Kimi K2 zeigt 10-13 Felder Performance
             },
-            'tier_1_sources': {
+            'tier_1_free_secondary': {
                 'models': [
-                    'perplexity:sonar',
+                    'openrouter:deepseek-chat',
                     'tavily:search',
-                    'exa:neural-search',
-                    'perplexity:sonar-reasoning'
+                    'anthropic:claude-3.7-sonnet',
+                    'gemini:gemini-2.5-flash-lite'
                 ],
-                'focus': 'source_discovery',
-                'threshold': 10  # Mindestens 10 Quellen
+                'focus': 'free_backup',
+                'threshold': 0.5
             },
-            'tier_1_technical': {
+            'tier_2_scraping': {
                 'models': [
                     'scrapingbee:basic-scrape',
                     'scrapingbee:js-render',
                     'brightdata:web-scraper',
                     'firecrawl:scrape'
                 ],
-                'focus': 'coordinates',
-                'threshold': 0.9
+                'focus': 'technical_scraping',
+                'threshold': 0.7
             },
-            'tier_2_comprehensive': {
+            'tier_3_premium_financial': {
+                'models': [
+                    'perplexity:sonar-pro',
+                    'perplexity:sonar-deep-research',
+                    'openai:o3-deep-research',
+                    'grok:grok-3-fast'
+                ],
+                'focus': 'premium_financial',
+                'threshold': 0.8,
+                'cost_warning': True  # Warnung bei Verwendung
+            },
+            'tier_3_premium_sources': {
+                'models': [
+                    'perplexity:sonar',
+                    'perplexity:sonar-reasoning',
+                    'exa:neural-search'
+                ],
+                'focus': 'premium_sources',
+                'threshold': 0.8,
+                'cost_warning': True  # Warnung bei Verwendung
+            },
+            'tier_3_premium_comprehensive': {
                 'models': [
                     'anthropic:claude-opus-4',
                     'anthropic:claude-sonnet-4',
@@ -57,18 +79,9 @@ class ModelTierStrategy:
                     'gemini:gemini-2.5-flash',
                     'openai:gpt-4.1'
                 ],
-                'focus': 'general',
-                'threshold': 0.7
-            },
-            'tier_3_fallback': {
-                'models': [
-                    'openrouter:deepseek-chat',
-                    'openrouter:deepseek-free',
-                    'anthropic:claude-3.7-sonnet',
-                    'gemini:gemini-2.5-flash-lite'
-                ],
-                'focus': 'fallback',
-                'threshold': 0.5
+                'focus': 'premium_comprehensive',
+                'threshold': 0.8,
+                'cost_warning': True  # Warnung bei Verwendung
             }
         }
         
@@ -126,6 +139,36 @@ class ModelTierStrategy:
         else:
             logger.warning(f"Unbekannte Phase: {phase}")
             return []
+    
+    def is_premium_model(self, model_id: str) -> bool:
+        """
+        Prüft ob ein Modell kostenpflichtig ist
+        
+        Args:
+            model_id: Modell-ID (z.B. 'perplexity:sonar-pro')
+            
+        Returns:
+            True wenn kostenpflichtig, False wenn kostenlos
+        """
+        # ÄNDERUNG 14.07.2025: Kostenkontrolle für Premium-Modelle
+        for tier_name, tier_config in self.tier_definitions.items():
+            if model_id in tier_config['models']:
+                return tier_config.get('cost_warning', False)
+        return False
+    
+    def get_cost_warning_message(self, model_id: str) -> str:
+        """
+        Erstellt Warnung für kostenpflichtige Modelle
+        
+        Args:
+            model_id: Modell-ID
+            
+        Returns:
+            Warnung-String
+        """
+        if self.is_premium_model(model_id):
+            return f"⚠️ KOSTENPFLICHTIG: {model_id} verursacht Kosten! Verwende openrouter:kimi-k2 für kostenlose Alternative."
+        return ""
     
     def should_continue_to_next_tier(self, current_results: Dict[str, Any], 
                                    current_tier: str) -> bool:

@@ -5,8 +5,11 @@ Version: 1.0
 Beschreibung: Test ob API-Keys korrekt geladen werden
 """
 
-from config import Config
+import sys
 import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from config.base import Config
 from pathlib import Path
 
 print("=== API KEY TEST ===")

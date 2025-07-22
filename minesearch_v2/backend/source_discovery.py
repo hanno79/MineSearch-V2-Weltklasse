@@ -149,7 +149,21 @@ class SourceDiscovery:
             r'(Machbarkeitsstudie[^,\n]*)',
             r'(Sustainability\s+Report[^,\n]*)',
             r'(Technical\s+Study[^,\n]*)',
-            r'(Resource\s+Estimate[^,\n]*)'
+            r'(Resource\s+Estimate[^,\n]*)',
+            # QUEBEC-SPEZIFISCHE DOKUMENTE
+            r'((?:Certificat|Certificate)\s+(?:d\'autorisation|of\s+authorization)[^,\n]*)',
+            r'((?:Permis|Permit)\s+(?:d\'exploitation|mining)[^,\n]*)',
+            r'((?:Plan|Programme)\s+(?:de\s+fermeture|closure)[^,\n]*)',
+            r'((?:Plan|Programme)\s+(?:de\s+restauration|restoration)[^,\n]*)',
+            r'((?:Étude|Study)\s+(?:d\'impact|environmental|impact)[^,\n]*)',
+            r'((?:Rapport|Report)\s+(?:annuel|annual)\s+\d{4}[^,\n]*)',
+            r'((?:Garantie|Financial\s+guarantee)\s+(?:financière|bancaire)[^,\n]*)',
+            r'((?:Cautionnement|Surety\s+bond)[^,\n]*)',
+            r'((?:Lettre|Letter)\s+(?:de\s+crédit|of\s+credit)[^,\n]*)',
+            r'((?:Titre|Mining\s+title)\s+(?:minier|claim)[^,\n]*)',
+            r'((?:Bail|Lease)\s+(?:minier|mining)[^,\n]*)',
+            r'((?:GESTIM|Système\s+GESTIM)[^,\n]*)',
+            r'((?:MERN|Ministère)\s+(?:document|rapport)[^,\n]*)'
         ]
         
         for pattern in doc_patterns:
@@ -171,10 +185,22 @@ class SourceDiscovery:
         sources = []
         
         org_patterns = [
-            r'(?:according to|per|from|source:|quelle:|laut)\s+([A-Z][^,\n]{3,50})',
+            r'(?:according to|per|from|source:|quelle:|laut|selon)\s+([A-Z][^,\n]{3,50})',
             r'((?:SEDAR|EDGAR|InfoMine|Mining\.com|S&P Global|Natural Resources Canada|USGS)[^,\n]*)',
             r'((?:MERN|GESTIM|BLM|DMIRS|SERNAGEOMIN|INGEMMET)[^,\n]*)',
-            r'((?:TSX|ASX|JSE|NYSE|NASDAQ)[^,\n]*)'
+            r'((?:TSX|ASX|JSE|NYSE|NASDAQ)[^,\n]*)',
+            # QUEBEC-SPEZIFISCHE ORGANISATIONEN
+            r'((?:Ministère de l\'Énergie et des Ressources naturelles|MERN)[^,\n]*)',
+            r'((?:Gouvernement du Québec|Quebec Government)[^,\n]*)',
+            r'((?:GESTIM|Système de gestion des titres miniers)[^,\n]*)',
+            r'((?:Institut national de santé publique du Québec|INSPQ)[^,\n]*)',
+            r'((?:Commission de protection du territoire agricole|CPTAQ)[^,\n]*)',
+            r'((?:Bureau d\'audiences publiques sur l\'environnement|BAPE)[^,\n]*)',
+            # MINING COMPANIES QUEBEC
+            r'((?:Agnico Eagle|Newmont|Barrick|Kinross|Yamana|Iamgold|Eldorado)[^,\n]*)',
+            r'((?:Corporation Minière|Mines|Resources|Mining)[^,\n]*(?:Québec|Quebec)[^,\n]*)',
+            # FINANCIAL INSTITUTIONS
+            r'((?:Banque Nationale|Caisse Desjardins|Banque Royale|BMO|Banque de Montréal)[^,\n]*)'
         ]
         
         for pattern in org_patterns:

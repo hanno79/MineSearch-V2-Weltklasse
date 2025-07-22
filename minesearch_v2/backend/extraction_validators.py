@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 
 def is_placeholder_value(value: str, field: str = None) -> bool:
     """
-    Prüft ob ein Wert ein verbotener Platzhalter ist
+    FELDMARKIERUNG-FIX 15.07.2025: Prüft ob ein Wert ein verbotener Platzhalter ist
+    
+    WICHTIG: "X" ist KEIN Platzhalter - es markiert korrekt "nicht gefunden"
     
     Args:
         value: Zu prüfender Wert
@@ -26,19 +28,23 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
     if not value:
         return False
         
-    value_lower = str(value).lower().strip()
+    value_stripped = str(value).strip()
+    value_lower = value_stripped.lower()
     
-    # ÄNDERUNG 11.07.2025: REGEL 10 ENFORCEMENT - Alle Platzhalter entfernen
-    # Gemäß Regel 10: Felder LEER lassen wenn keine Daten gefunden
+    # FELDMARKIERUNG-FIX 15.07.2025: "X" ist das korrekte Marker für "nicht gefunden"
+    # "X" darf NICHT als Platzhalter behandelt werden!
+    if value_stripped == 'X':
+        logger.debug(f"[FIELD MARKER] 'X' ist korrektes 'nicht gefunden' Marker - KEIN Platzhalter")
+        return False
+    
+    # Verbotene Platzhalter (aber NICHT "X")
     general_placeholders = [
         'k.a', 'k.a.', 'n/a', 'n.a.', '-', '--', '---',
         'keine angabe', 'keine daten', 'nicht verfügbar',
         'no data', 'not found', 'not available'
     ]
     
-    # ÄNDERUNG 11.07.2025: REGEL 10 ENFORCEMENT - ALLE unklaren Werte sind Platzhalter!
-    # Gemäß Regel 10: "STRIKT VERBOTEN: Dummy-Werte und Fallback-Werte"
-    # Wenn keine Daten gefunden werden: Feld LEER lassen - KEINE Platzhalter!
+    # Dummy-Ausdrücke die entfernt werden sollen
     dummy_expressions = [
         'unbekannt', 'unknown', 'nicht gefunden', 
         'keine spezifischen daten gefunden',
@@ -49,13 +55,13 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
         'information not available'
     ]
     
-    # ALLE unklaren Aussagen sind Platzhalter und müssen entfernt werden
+    # Prüfe auf verbotene Ausdrücke
     if value_lower in dummy_expressions:
-        logger.debug(f"[PLACEHOLDER] '{value}' ist ein DUMMY-Wert - REGEL 10 Verstoß!")
+        logger.debug(f"[PLACEHOLDER] '{value}' ist ein DUMMY-Wert - wird zu X konvertiert")
         return True
     
     if value_lower in general_placeholders:
-        logger.debug(f"[PLACEHOLDER] '{value}' ist ein Platzhalter")
+        logger.debug(f"[PLACEHOLDER] '{value}' ist ein Platzhalter - wird zu X konvertiert")
         return True
     
     # Grok-spezifische Probleme für alle Felder

@@ -8,7 +8,7 @@ Beschreibung: Quellen-Management Routes
 from fastapi import APIRouter, HTTPException, Query, Body
 from typing import Optional, Dict, List, Any
 import logging
-from database import Source
+from database.models import Source
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,8 @@ async def get_grouped_sources(
     ÄNDERUNG 09.07.2025: Neuer Endpoint für gruppierte Quellen-Darstellung
     Gruppiert Quellen nach Domain für bessere Übersichtlichkeit
     """
-    from database import db_manager
+    from database.manager import DatabaseManager
+    db_manager = DatabaseManager()
     
     # Hole alle Quellen mit Filtern
     sources = db_manager.get_sources_for_search(
@@ -123,7 +124,8 @@ async def get_sources(
     offset: int = Query(0)
 ):
     """Hole alle Quellen aus der Datenbank mit Filtern"""
-    from database import db_manager
+    from database.manager import DatabaseManager
+    db_manager = DatabaseManager()
     
     sources = db_manager.get_sources_for_search(
         country=country,
@@ -156,7 +158,8 @@ async def get_sources(
 @router.get("/sources/stats")
 async def get_source_statistics():
     """Hole Statistiken über die Quellen-Datenbank"""
-    from database import db_manager
+    from database.manager import DatabaseManager
+    db_manager = DatabaseManager()
     
     stats = db_manager.get_statistics()
     return {
@@ -167,7 +170,8 @@ async def get_source_statistics():
 @router.get("/sources/{source_id}")
 async def get_source_by_id(source_id: int):
     """Hole einzelne Quelle nach ID"""
-    from database import db_manager
+    from database.manager import DatabaseManager
+    db_manager = DatabaseManager()
     
     with db_manager.get_session() as session:
         source = session.query(Source).filter_by(id=source_id).first()
@@ -186,7 +190,8 @@ async def search_sources_for_mine(
     region: Optional[str] = Body(None)
 ):
     """Suche relevante Quellen für eine spezifische Mine"""
-    from database import db_manager
+    from database.manager import DatabaseManager
+    db_manager = DatabaseManager()
     
     sources = db_manager.get_sources_for_search(
         country=country,
@@ -205,3 +210,44 @@ async def search_sources_for_mine(
             "total": len(sources)
         }
     }
+
+@router.post("/sources/seed")
+async def seed_sources_database(
+    force: bool = Body(False, description="Force seeding even if sources already exist")
+):
+    """
+    ÄNDERUNG 15.07.2025: Neuer Endpoint zum Befüllen der Quellen-Datenbank
+    Befüllt die leere Datenbank mit Standard-Mining-Quellen
+    """
+    try:
+        from seed_sources import seed_database_sources
+        
+        logger.info(f"[SOURCES SEED] Starting database seeding, force={force}")
+        
+        result = seed_database_sources(force=force)
+        
+        if result["success"]:
+            logger.info(f"[SOURCES SEED] Success: {result['statistics']['final_database_count']} sources")
+            return {
+                "success": True,
+                "message": "Sources database seeded successfully",
+                "data": result["statistics"]
+            }
+        else:
+            logger.warning(f"[SOURCES SEED] Skipped: {result['message']}")
+            return {
+                "success": False,
+                "message": result["message"],
+                "data": {
+                    "existing_count": result.get("existing_count", 0),
+                    "action": result.get("action", "skipped")
+                }
+            }
+            
+    except Exception as e:
+        logger.error(f"[SOURCES SEED] Error: {e}")
+        return {
+            "success": False,
+            "message": f"Error seeding sources database: {str(e)}",
+            "error": str(e)
+        }

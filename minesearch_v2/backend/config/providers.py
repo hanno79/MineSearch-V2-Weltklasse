@@ -5,7 +5,28 @@ Version: 1.0
 Beschreibung: Provider-Konfiguration für MineSearch
 """
 
-from .api_keys import APIKeysConfig
+# DEFENSIVE IMPORT 15.07.2025: Verhindere AttributeError bei APIKeysConfig
+try:
+    from .api_keys import APIKeysConfig
+except ImportError as e:
+    print(f"WARNING: Could not import APIKeysConfig: {e}")
+    # Fallback APIKeysConfig
+    import os
+    class APIKeysConfig:
+        PERPLEXITY_API_KEY = os.getenv('PERPLEXITY_API_KEY', '')
+        OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
+        ABACUS_API_KEY = os.getenv('ABACUS_API_KEY', '')
+        TAVILY_API_KEY = os.getenv('TAVILY_API_KEY', '')
+        EXA_API_KEY = os.getenv('EXA_API_KEY', '')
+        SCRAPINGBEE_API_KEY = os.getenv('SCRAPINGBEE_API_KEY', '')
+        FIRECRAWL_API_KEY = os.getenv('FIRECRAWL_API_KEY', '')
+        BRIGHTDATA_API_KEY = os.getenv('BRIGHTDATA_API_KEY', '')
+        OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+        ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+        GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+        GROK_API_KEY = os.getenv('GROK_API_KEY', '')
+        DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
+
 from .models import (
     PERPLEXITY_MODELS,
     OPENROUTER_MODELS,
@@ -43,7 +64,8 @@ PROVIDERS_CONFIG = {
         'retry_delay': 10
     },
     'abacus': {
-        'enabled': False,  # Deaktiviert bis API-Dokumentation verfügbar
+        # PROVIDER-FIX 15.07.2025: Aktiviert für Abacus Deep Agent Testing
+        'enabled': True,
         'api_key': APIKeysConfig.ABACUS_API_KEY,
         'base_url': 'https://api.abacus.ai',
         'models': ABACUS_MODELS
@@ -58,8 +80,8 @@ PROVIDERS_CONFIG = {
         'retry_delay': 5
     },
     'exa': {
-        # ÄNDERUNG 09.07.2025: Deaktiviert wegen Domain-Format-Problemen
-        'enabled': False,
+        # PROVIDER-FIX 15.07.2025: Aktiviert für Exa Neural Search
+        'enabled': True,
         'api_key': APIKeysConfig.EXA_API_KEY,
         'base_url': 'https://api.exa.ai',
         'models': EXA_MODELS
@@ -128,10 +150,10 @@ PROVIDERS_CONFIG = {
         'retry_delay': 20
     },
     'deepseek': {
-        # ÄNDERUNG 09.07.2025: Deaktiviert um Duplikate zu vermeiden - DeepSeek-Modelle sind über OpenRouter verfügbar
-        'enabled': False,
-        'api_key': APIKeysConfig.OPENROUTER_API_KEY,  # DeepSeek nutzt OpenRouter als Proxy
-        'base_url': 'https://openrouter.ai/api/v1',
+        # PROVIDER-FIX 15.07.2025: Aktiviert für direkte DeepSeek API-Nutzung
+        'enabled': True,
+        'api_key': APIKeysConfig.DEEPSEEK_API_KEY,  # Direkte DeepSeek API
+        'base_url': 'https://api.deepseek.com/v1',
         'models': DEEPSEEK_MODELS
     }
 }

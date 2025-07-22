@@ -1,0 +1,88 @@
+{
+  "start_time": "2025-07-19T11:24:31.494123",
+  "tests": {
+    "2_1_gestim_connector": {
+      "status": "FAIL",
+      "error": "'GESTIMConnector' object has no attribute 'test_connection'"
+    },
+    "2_2_quebec_registry": {
+      "status": "FAIL",
+      "error": "'QuebecRegistryConnector' object has no attribute 'test_connection'"
+    },
+    "2_3_source_discovery": {
+      "status": "FAIL",
+      "error": "cannot import name 'enhanced_source_discovery' from 'source_discovery' (/app/minesearch_v2/backend/source_discovery.py)"
+    },
+    "2_4_orchestrator": {
+      "status": "PASS",
+      "methods_available": [
+        "__class__",
+        "__delattr__",
+        "__dict__",
+        "__dir__",
+        "__doc__"
+      ],
+      "ready": true
+    },
+    "3_1_restoration_patterns": {
+      "status": "PASS",
+      "total_patterns": 64,
+      "french_patterns": 3,
+      "english_patterns": 27
+    },
+    "3_2_quebec_prompts": {
+      "status": "FAIL",
+      "error": "No module named 'quebec_prompts'"
+    },
+    "3_3_source_registry": {
+      "status": "PASS",
+      "recommended_sources": 3,
+      "total_sources_tracked": 0,
+      "high_quality_sources": 0
+    },
+    "4_1_database_models": {
+      "status": "PASS",
+      "search_results": 21,
+      "sources_tracked": 20,
+      "models_available": [
+        "SearchResult",
+        "ModelStatistics",
+        "FieldStatistics",
+        "Source"
+      ]
+    },
+    "4_2_service_container": {
+      "status": "PASS",
+      "services_available": [
+        "mine_search_service",
+        "multi_search_service",
+        "benchmark_service"
+      ],
+      "singleton_pattern": true
+    },
+    "5_1_health_endpoint": {
+      "status": "PASS",
+      "status_code": 200,
+      "response_data": {
+        "status": "healthy",
+        "service": "MineSearch v2.1",
+        "timestamp": "2025-07-12"
+      }
+    },
+    "5_2_batch_endpoint": {
+      "status": "PASS",
+      "status_code": 200,
+      "message": "Batch endpoints are working"
+    }
+  },
+  "summary": {
+    "total_tests": 11,
+    "passed": 7,
+    "partial": 0,
+    "failed": 4,
+    "success_rate": 63.6,
+    "partial_rate": 0.0,
+    "overall_status": "\u2705 GOOD"
+  },
+  "end_time": "2025-07-19T11:24:32.075412"
+}

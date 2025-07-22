@@ -9,8 +9,11 @@ import time
 import hashlib
 import json
 import logging
+import threading
+import weakref
 from typing import Any, Optional, Dict
 from datetime import datetime, timedelta
+from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +34,8 @@ class CacheService:
             max_size: Maximale Anzahl von Cache-Einträgen
             default_ttl: Standard TTL in Sekunden (1 Stunde)
         """
-        self.cache: Dict[str, Dict[str, Any]] = {}
+        # PERFORMANCE-FIX: OrderedDict für effiziente LRU-Operationen
+        self.cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
         self.max_size = max_size
         self.default_ttl = default_ttl
         self.stats = {
@@ -40,6 +44,14 @@ class CacheService:
             'sets': 0,
             'evictions': 0
         }
+        
+        # MEMORY-LEAK-FIX: Thread-Lock für Thread-Safety
+        self._lock = threading.RLock()
+        
+        # MEMORY-LEAK-FIX: Automatischer Cleanup-Timer
+        self._cleanup_timer = None
+        self._start_cleanup_timer()
+        
         logger.info(f"[CACHE] Cache-Service initialisiert (max_size={max_size}, ttl={default_ttl}s)")
     
     def _generate_key(self, mine_name: str, country: str, model: str, **kwargs) -> str:
@@ -70,24 +82,26 @@ class CacheService:
         """
         key = self._generate_key(mine_name, country, model, **kwargs)
         
-        if key in self.cache:
-            entry = self.cache[key]
-            
-            # Prüfe ob abgelaufen
-            if time.time() < entry['expires_at']:
-                # Aktualisiere last_accessed für LRU
-                entry['last_accessed'] = time.time()
-                self.stats['hits'] += 1
+        with self._lock:
+            if key in self.cache:
+                entry = self.cache[key]
                 
-                logger.info(f"[CACHE HIT] Mine: {mine_name}, Model: {model}")
-                return entry['value']
-            else:
-                # Abgelaufen - entfernen
-                del self.cache[key]
-                logger.debug(f"[CACHE EXPIRED] Key: {key}")
-        
-        self.stats['misses'] += 1
-        return None
+                # Prüfe ob abgelaufen
+                if time.time() < entry['expires_at']:
+                    # PERFORMANCE-FIX: OrderedDict move_to_end für LRU
+                    self.cache.move_to_end(key)
+                    self.stats['hits'] += 1
+                    
+                    logger.info(f"[CACHE HIT] Mine: {mine_name}, Model: {model}")
+                    return entry['value']
+                else:
+                    # Abgelaufen - entfernen
+                    del self.cache[key]
+                    # PERFORMANCE-FIX: Reduziere Debug-Logging
+                    # logger.debug(f"[CACHE EXPIRED] Key: {key}")
+            
+            self.stats['misses'] += 1
+            return None
     
     def set(self, mine_name: str, country: str, model: str, value: Dict[str, Any], 
             ttl: Optional[int] = None, **kwargs) -> None:
@@ -100,21 +114,28 @@ class CacheService:
         key = self._generate_key(mine_name, country, model, **kwargs)
         ttl = ttl or self.default_ttl
         
-        # Eviction wenn Cache voll
-        if len(self.cache) >= self.max_size and key not in self.cache:
-            self._evict_lru()
-        
-        self.cache[key] = {
-            'value': value,
-            'expires_at': time.time() + ttl,
-            'last_accessed': time.time(),
-            'created_at': time.time(),
-            'mine_name': mine_name,
-            'model': model
-        }
-        
-        self.stats['sets'] += 1
-        logger.info(f"[CACHE SET] Mine: {mine_name}, Model: {model}, TTL: {ttl}s")
+        with self._lock:
+            # PERFORMANCE-FIX: OrderedDict LRU-Eviction
+            if len(self.cache) >= self.max_size and key not in self.cache:
+                # Entferne ältesten Eintrag (FIFO/LRU)
+                oldest_key, oldest_entry = self.cache.popitem(last=False)
+                self.stats['evictions'] += 1
+                # PERFORMANCE-FIX: Reduziere Debug-Logging
+                # logger.debug(f"[CACHE EVICT] Mine: {oldest_entry['mine_name']}, Model: {oldest_entry['model']}")
+            
+            self.cache[key] = {
+                'value': value,
+                'expires_at': time.time() + ttl,
+                'created_at': time.time(),
+                'mine_name': mine_name,
+                'model': model
+            }
+            
+            # PERFORMANCE-FIX: Move to end für LRU
+            self.cache.move_to_end(key)
+            
+            self.stats['sets'] += 1
+            logger.info(f"[CACHE SET] Mine: {mine_name}, Model: {model}, TTL: {ttl}s")
     
     def _evict_lru(self) -> None:
         """Entferne am längsten nicht genutzten Eintrag"""
@@ -129,7 +150,8 @@ class CacheService:
         del self.cache[lru_key]
         self.stats['evictions'] += 1
         
-        logger.debug(f"[CACHE EVICT] Mine: {entry['mine_name']}, Model: {entry['model']}")
+        # PERFORMANCE-FIX: Reduziere Debug-Logging
+        # logger.debug(f"[CACHE EVICT] Mine: {entry['mine_name']}, Model: {entry['model']}")
     
     def invalidate(self, mine_name: Optional[str] = None, model: Optional[str] = None) -> int:
         """
@@ -195,6 +217,39 @@ class CacheService:
             logger.info(f"[CACHE CLEANUP] {len(to_delete)} abgelaufene Einträge entfernt")
         
         return len(to_delete)
+    
+    def _start_cleanup_timer(self) -> None:
+        """MEMORY-LEAK-FIX: Startet automatischen Cleanup-Timer"""
+        self._cleanup_timer = threading.Timer(300.0, self._periodic_cleanup)  # 5 Minuten
+        self._cleanup_timer.daemon = True
+        self._cleanup_timer.start()
+    
+    def _periodic_cleanup(self) -> None:
+        """MEMORY-LEAK-FIX: Periodischer Cleanup abgelaufener Einträge"""
+        try:
+            cleaned = self.cleanup_expired()
+            if cleaned > 0:
+                logger.info(f"[CACHE] Periodic cleanup: {cleaned} expired entries removed")
+        except Exception as e:
+            logger.error(f"[CACHE] Cleanup error: {e}")
+        finally:
+            # Nächsten Timer starten
+            self._start_cleanup_timer()
+    
+    def __del__(self) -> None:
+        """MEMORY-LEAK-FIX: Cleanup beim Löschen der Instanz"""
+        if hasattr(self, '_cleanup_timer') and self._cleanup_timer:
+            self._cleanup_timer.cancel()
+    
+    def shutdown(self) -> None:
+        """MEMORY-LEAK-FIX: Explizites Shutdown für Cleanup"""
+        if hasattr(self, '_cleanup_timer') and self._cleanup_timer:
+            self._cleanup_timer.cancel()
+        
+        with self._lock:
+            self.cache.clear()
+        
+        logger.info("[CACHE] Cache-Service heruntergefahren")
 
 
 # Globale Cache-Instanz
