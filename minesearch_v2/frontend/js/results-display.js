@@ -141,6 +141,10 @@ window.MineSearchResultsDisplay = {
                 } else if (col.key === 'details') {
                     cellContent = `<button class="details-btn" data-mine="${this.sanitizeHTML(result.mine_name)}" 
                                     data-country="${this.sanitizeHTML(result.country || '')}">📋 Details</button>`;
+                } else if (col.key === 'overall_confidence') {
+                    // DEFINITIVE-FIX 01.08.2025: Zuverlässigkeit nur aus overall_confidence, niemals aus best_values
+                    const confidence = result.overall_confidence || 0;
+                    cellContent = `<span style="color: ${confidenceColor}; font-weight: bold;">${confidence}%</span>`;
                 } else {
                     // Alle anderen Felder aus best_values
                     const value = result.best_values?.[col.key] || 'N/A';
@@ -351,7 +355,46 @@ window.MineSearchResultsDisplay = {
                     <p><strong>Verschiedene Modelle:</strong> ${data.data.unique_models}</p>
                     <p><strong>Zeitraum:</strong> ${data.data.date_range.earliest} bis ${data.data.date_range.latest}</p>
                 </div>
-                
+        `;
+        
+        // USER-REQUIREMENTS 31.07.2025: Zeige Zuverlässigkeit und Letzte Aktualisierung aus Mine-Metadaten
+        if (data.data.mine_metadata) {
+            const metadata = data.data.mine_metadata;
+            detailsHTML += `
+                <div class="mine-metadata">
+                    <h4>🎯 Mine-Metadaten</h4>
+                    <div class="metadata-grid">
+            `;
+            
+            // Zuverlässigkeit anzeigen
+            if (metadata.overall_confidence !== undefined) {
+                const confidenceColor = this.getConfidenceColor(metadata.overall_confidence);
+                detailsHTML += `
+                    <div class="metadata-field">
+                        <span class="field-name">🎯 Zuverlässigkeit:</span>
+                        <span class="field-value" style="color: ${confidenceColor}; font-weight: bold;">${metadata.overall_confidence}%</span>
+                    </div>
+                `;
+            }
+            
+            // Letzte Aktualisierung anzeigen
+            if (metadata.last_updated) {
+                const lastUpdated = new Date(metadata.last_updated).toLocaleDateString('de-DE');
+                detailsHTML += `
+                    <div class="metadata-field">
+                        <span class="field-name">📅 Letzte Aktualisierung:</span>
+                        <span class="field-value">${lastUpdated}</span>
+                    </div>
+                `;
+            }
+            
+            detailsHTML += `
+                    </div>
+                </div>
+            `;
+        }
+        
+        detailsHTML += `
                 <div class="model-details">
                     <h4>🤖 Modell-spezifische Ergebnisse</h4>
         `;
@@ -370,8 +413,82 @@ window.MineSearchResultsDisplay = {
                         <span>🔗 ${model.sources_count} Quellen</span>
                         <span>⏱️ ${model.search_duration || 'N/A'}s</span>
                     </div>
-                </div>
             `;
+            
+            // DETAIL-MODAL-ANALYST-FIX 31.07.2025: Zeige strukturierte Daten mit Filterung
+            if (model.structured_data && Object.keys(model.structured_data).length > 0) {
+                detailsHTML += `
+                    <div class="model-data-details">
+                        <h5>📋 Extrahierte Daten:</h5>
+                        <div class="data-grid">
+                `;
+                
+                // FIELD-ORDER-FIX 01.08.2025: Verwende EXAKT die gleiche Reihenfolge wie Backend FIELD_ORDER
+                // Muss 1:1 mit backend/api/routes/consolidated_results.py FIELD_ORDER übereinstimmen
+                const mainTableFieldOrder = [
+                    // Backend FIELD_ORDER vollständig repliziert (ohne Meta-Felder)
+                    'Betreiber', 'Eigentümer', 'Rohstoffe', 'Minentyp', 'Aktivitätsstatus', 
+                    'Produktionsstart', 'Produktionsende', 'Fördermenge/Jahr', 'Minenfläche in qkm',
+                    'x-Koordinate', 'y-Koordinate', 'Restaurationskosten', 'Kostenjahr', 
+                    'Dokumentenjahr', 'Quellenangaben'
+                    // Hinweis: 'Mine', 'Land', 'Region', 'Modelle', 'Letzte Aktualisierung', 'Details' 
+                    // werden als Meta-Felder separat behandelt und nicht in Details-Modal angezeigt
+                ];
+                
+                // Interne Felder die niemals angezeigt werden sollen
+                const excludedDetailFields = [
+                    // Basis-Metadaten (bereits in Kopfzeile)
+                    'Mine', 'mine_name', 'Land', 'country', 'Region', 'region',
+                    // Interne Backend-Felder
+                    '_source_mapping', 'source_mapping', '_internal', '_meta',
+                    // Metadaten die bereits separat angezeigt werden
+                    'Details', 'Modelle', 'Letzte Aktualisierung', 'last_updated', 'Zuverlässigkeit'
+                ];
+                
+                // Sammle alle verfügbaren Felder und ordne sie
+                const availableFields = [];
+                const unorderedFields = [];
+                
+                Object.entries(model.structured_data).forEach(([fieldName, fieldValue]) => {
+                    // Nur nicht-ausgeschlossene Felder mit Werten berücksichtigen
+                    if (!excludedDetailFields.includes(fieldName) && 
+                        fieldValue && 
+                        String(fieldValue).trim() && 
+                        String(fieldValue).trim().toUpperCase() !== 'X') {
+                        
+                        if (mainTableFieldOrder.includes(fieldName)) {
+                            availableFields.push({ name: fieldName, value: fieldValue });
+                        } else {
+                            unorderedFields.push({ name: fieldName, value: fieldValue });
+                        }
+                    }
+                });
+                
+                // Sortiere verfügbare Felder nach Haupttabellen-Reihenfolge
+                availableFields.sort((a, b) => {
+                    return mainTableFieldOrder.indexOf(a.name) - mainTableFieldOrder.indexOf(b.name);
+                });
+                
+                // Sortiere ungeordnete Felder alphabetisch
+                unorderedFields.sort((a, b) => a.name.localeCompare(b.name));
+                
+                // Zeige Felder in der korrekten Reihenfolge an
+                [...availableFields, ...unorderedFields].forEach(field => {
+                    detailsHTML += `
+                        <div class="data-field">
+                            <span class="field-name">${this.sanitizeHTML(field.name)}:</span>
+                            <span class="field-value">${this.sanitizeHTML(field.value)}</span>
+                        </div>
+                    `;
+                });
+                
+                detailsHTML += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            detailsHTML += `</div>`;
         });
         
         detailsHTML += `
