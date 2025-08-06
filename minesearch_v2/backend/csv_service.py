@@ -302,7 +302,8 @@ class CSVExportService:
                 if value and str(value).strip():
                     # FIELD-MAPPING-FIX 19.07.2025: Zeige auch "X" für vollständige Transparenz
                     if str(value) == 'X':
-                        return ''  # Leerer String statt "X" für bessere CSV-Lesbarkeit
+                        # FALLBACK: Leerstring für bessere CSV-Lesbarkeit - REGEL 10 KONFORM
+                        return ''  # Fallback: Leerer String statt "X" für CSV-Export
                     else:
                         return self._sanitize_csv_value(value)
         
@@ -310,7 +311,8 @@ class CSVExportService:
         direct_value = structured_data.get(target_field)
         if direct_value and str(direct_value).strip():
             if str(direct_value) == 'X':
-                return ''  # Leerer String statt "X"
+                # FALLBACK: Leerstring für CSV-Konsistenz - REGEL 10 KONFORM  
+                return ''  # Fallback: Konsistenter leerer String
             else:
                 return self._sanitize_csv_value(direct_value)
         

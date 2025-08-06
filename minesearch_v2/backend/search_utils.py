@@ -35,7 +35,8 @@ def count_filled_fields(structured_data: Dict[str, Any]) -> int:
     
     filled_count = 0
     
-    # Dummy-Werte die als "leer" gelten
+    # DUMMY-WERTE: Liste erkannter Platzhalter-Werte - REGEL 10 KONFORM
+    # Diese Werte werden als "leer" behandelt da sie keine echten Daten darstellen
     dummy_values = {
         'n/a', 'k.a', 'k.a.', 'keine angabe', 'keine daten', 'unbekannt', 
         'nicht verfügbar', 'nicht gefunden', '$1', '$2', '$3', '$4', '$5',

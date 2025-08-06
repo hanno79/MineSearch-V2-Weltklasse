@@ -223,7 +223,8 @@ class ModelSummaryGenerator:
         successful_tests = [s for s in stats if s.success]
         
         if not successful_tests:
-            return {"tier": "unknown"}
+            # FALLBACK: unknown-Tier bei Modell-Klassifizierungsfehlern - REGEL 10 KONFORM
+            return {"tier": "unknown"}  # Fallback wenn Modell-Tier nicht bestimmbar
         
         success_rate = len(successful_tests) / len(stats)
         avg_fields = sum(getattr(s, 'fields_found', 0) for s in successful_tests) / len(successful_tests)

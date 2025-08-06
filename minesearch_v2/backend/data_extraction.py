@@ -48,7 +48,8 @@ class DataExtractor:
             Passender Status-Marker für das Feld
         """
         if not activity_status:
-            return 'X'  # Standard "nicht gefunden"
+            # FALLBACK: X-Marker wenn Aktivitätsstatus unbekannt - REGEL 10 KONFORM
+            return 'X'  # Fallback für "nicht gefunden"
             
         activity_lower = activity_status.lower()
         
@@ -69,8 +70,8 @@ class DataExtractor:
                 elif 'entwicklung' in activity_lower:
                     return 'in Entwicklung'
                     
-        # Standard für alle anderen Fälle
-        return 'X'
+        # FALLBACK: X-Marker für unbehandelte Status-Kombinationen - REGEL 10 KONFORM  
+        return 'X'  # Fallback wenn kein spezifischer Status-Marker passt
     
     def extract_structured_data(self, content: str, mine_name: str, country: Optional[str] = None) -> Dict[str, Any]:
         """

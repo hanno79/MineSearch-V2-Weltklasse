@@ -190,7 +190,8 @@ class ValidationService:
             if value and not is_placeholder_value(str(value), field):
                 cleaned[field] = value
             else:
-                cleaned[field] = "X"  # Nicht gefunden markieren
+                # FALLBACK: X-Marker für nicht-valide Werte - REGEL 10 KONFORM
+                cleaned[field] = "X"  # Fallback bei Platzhalter-/invaliden Werten
         
         return cleaned
     
