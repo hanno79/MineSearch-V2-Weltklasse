@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 def is_placeholder_value(value: str, field: str = None) -> bool:
     """
     FELDMARKIERUNG-FIX 15.07.2025: Prüft ob ein Wert ein verbotener Platzhalter ist
+    TEMPLATE-PATTERN-FIX 06.08.2025: Erweiterte Erkennung für CSV_COLUMNS Template-Strukturen
     
     WICHTIG: "X" ist KEIN Platzhalter - es markiert korrekt "nicht gefunden"
     
@@ -36,6 +37,21 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
     if value_stripped == 'X':
         logger.debug(f"[FIELD MARKER] 'X' ist korrektes 'nicht gefunden' Marker - KEIN Platzhalter")
         return False
+    
+    # TEMPLATE-PATTERN-FIX 06.08.2025: Erkenne CSV_COLUMNS Template-Strukturen
+    template_patterns = [
+        r'/ usw\.\)$',           # Endung "/ usw.)"
+        r'/ etc\.\)$',           # Endung "/ etc.)"
+        r'\(.*/ .* usw\.\)',     # Pattern "(X/ Y/ usw.)"
+        r'Gold/ Kupfer/ Kohle/ usw\.\)', # Spezifische Rohstoff-Template
+        r'Untertage/ Open-Pit/ usw\.\)', # Spezifische Minentyp-Template
+        r'\(.*/ .*/ .*\)$'       # Generisches "(A/ B/ C)" Pattern am Ende
+    ]
+    
+    for pattern in template_patterns:
+        if re.search(pattern, value):
+            logger.debug(f"[TEMPLATE-PLACEHOLDER] '{value}' ist CSV_COLUMNS Template-Struktur - wird zu 'Unbekannt' konvertiert")
+            return True
     
     # Verbotene Platzhalter (aber NICHT "X")
     general_placeholders = [

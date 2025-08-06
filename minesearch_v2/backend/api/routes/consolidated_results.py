@@ -22,6 +22,13 @@ FIELD_CONSOLIDATION_MAP = {
     # Additional consolidation mappings
     'mine_name': 'Mine',  # English field name -> German
     'country': 'Land',   # English field name -> German
+    # CRITICAL FIX 06.08.2025: Rohstoff-Duplikat-Elimination
+    'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': 'Rohstoffe',  # Primary consolidation
+    'Rohstoffabbau (Gold/Kupfer/Kohle/usw.)': 'Rohstoffe',     # Alternative spacing
+    'Rohstoffabbau': 'Rohstoffe',                               # Short form
+    'Commodity': 'Rohstoffe',                                   # English variant
+    'Commodities': 'Rohstoffe',                                 # English plural
+    'Rohstofftyp': 'Rohstoffe',                                # Alternative German
     # BACKEND-FIELD-SPECIALIST-FIX 30.07.2025: Kritische fehlende Mappings
     'restoration_costs': 'Restaurationskosten',  # English -> German
     'cost_year': 'Kostenjahr',  # English -> German  
@@ -164,7 +171,7 @@ def _analyze_field_values(value_details):
     
     return value_groups
 
-def _calculate_best_value(value_analysis):
+def _calculate_best_value(value_analysis, field_name=None):
     """
     Implementiert "Best Value" Algorithmus basierend auf:
     - Häufigkeit (frequency)
@@ -172,12 +179,17 @@ def _calculate_best_value(value_analysis):
     - Modell-Konsens (model_consensus)
     - Datenqualität (avg_data_quality)
     - Zuverlässigkeit der Quellen
+    - TEMPLATE-PATTERN-PENALTY 06.08.2025: Malus für CSV_COLUMNS Template-Strukturen
+    
+    Args:
+        value_analysis: Analyse der verfügbaren Werte
+        field_name: Name des Feldes für template-spezifische Prüfungen
     
     Returns: Dict mit bestem Wert und Konfidenz-Score
     """
     if not value_analysis:
         return {
-            'display_value': 'X',  # BACKEND-FIELD-SPECIALIST-FIX 30.07.2025: Konsistent mit Datenextraktion
+            'display_value': 'Unbekannt',  # FIELD-CONSOLIDATION-FIX 06.08.2025: Bessere UX als X oder N/A
             'confidence_score': 0,
             'reason': 'Keine Daten verfügbar'
         }
@@ -192,8 +204,20 @@ def _calculate_best_value(value_analysis):
         model_consensus_score = analysis['model_consensus'] * 1.0  # Verschiedene AI-Modelle
         quality_score = analysis['avg_data_quality'] * 0.01  # Datenqualität (0-100)
         
-        # Bonus für nicht-X Werte
-        non_x_bonus = 0 if analysis['display_value'].upper() == 'X' else 5.0
+        # ENHANCED BONUS SYSTEM 06.08.2025: Stärkere Präferenz für echte Daten
+        # TEMPLATE-PATTERN-PENALTY 06.08.2025: Starker Malus für Template-Strukturen
+        display_val = analysis['display_value'].strip().upper()
+        
+        # Import is_placeholder_value für Template-Pattern-Erkennung
+        from extraction_validators import is_placeholder_value
+        
+        if display_val in ['X', 'N/A', 'UNBEKANNT', 'KEINE ANGABEN', 'NICHT VERFÜGBAR', '']:
+            non_x_bonus = 0  # Keine Bonus für Platzhalter-Werte
+        elif is_placeholder_value(analysis['display_value'], field_name):
+            # TEMPLATE-PATTERN-PENALTY: Starker Malus für Template-Strukturen
+            non_x_bonus = -50.0  # Starker Malus für Template-Werte wie "Untertage/ Open-Pit/ usw.)"
+        else:
+            non_x_bonus = 10.0  # Erhöhter Bonus für echte Daten (war 5.0)
         
         # Malus für sehr kurze Suchzeiten (könnte auf Timeout hindeuten)
         duration_penalty = -2.0 if analysis['avg_search_duration'] < 1.0 else 0
@@ -208,7 +232,7 @@ def _calculate_best_value(value_analysis):
     
     if not best_value:
         return {
-            'display_value': 'N/A',
+            'display_value': 'Unbekannt',  # FIELD-CONSOLIDATION-FIX 06.08.2025: Konsistente UX
             'confidence_score': 0,
             'reason': 'Keine gültigen Werte gefunden'
         }
@@ -356,14 +380,33 @@ async def get_consolidated_results(
                     if has_real_data:
                         clean_value = str(processed_value).strip()
                         
-                        # IMPROVED FIX: Smarte Duplikat-Vermeidung für Feldkonsolidierung
-                        # Nur überspringe wenn sowohl das Quell- als auch Zielfeld bereits Daten vom gleichen Modell haben
+                        # ENHANCED DUPLICATE PREVENTION 06.08.2025: Vollständige Feldkonsolidierung
+                        # Wenn ein Feld konsolidiert wird, stelle sicher dass das Quellfeld nicht separat erscheint
                         if original_field_name != final_field_name:
+                            # Entferne das ursprüngliche Feld aus der Feldliste falls es bereits existiert
+                            if original_field_name in mine_data['consolidated_fields']:
+                                logger.info(f"Removing original field '{original_field_name}' after consolidation to '{final_field_name}'")
+                                # Merge existing data vom ursprünglichen Feld ins konsolidierte Feld
+                                original_field_data = mine_data['consolidated_fields'][original_field_name]
+                                if final_field_name not in mine_data['consolidated_fields']:
+                                    mine_data['consolidated_fields'][final_field_name] = {
+                                        'raw_values': [],
+                                        'ai_models': [],
+                                        'real_sources': [],
+                                        'value_details': []
+                                    }
+                                # Merge data
+                                mine_data['consolidated_fields'][final_field_name]['raw_values'].extend(original_field_data['raw_values'])
+                                mine_data['consolidated_fields'][final_field_name]['ai_models'].extend(original_field_data['ai_models'])
+                                mine_data['consolidated_fields'][final_field_name]['real_sources'].extend(original_field_data['real_sources'])
+                                mine_data['consolidated_fields'][final_field_name]['value_details'].extend(original_field_data['value_details'])
+                                # Remove original field
+                                del mine_data['consolidated_fields'][original_field_name]
+                            
+                            # Smart duplicate avoidance for same model contributing twice
                             target_field_exists = final_field_name in mine_data['consolidated_fields']
                             if target_field_exists:
                                 existing_models = mine_data['consolidated_fields'][final_field_name]['ai_models']
-                                # Nur überspringe wenn das Modell bereits zu diesem Zielfeld beigetragen hat
-                                # UND wenn der gleiche Wert bereits vorhanden ist
                                 if result.model_used in existing_models:
                                     existing_values = mine_data['consolidated_fields'][final_field_name]['raw_values']
                                     if clean_value in existing_values:
@@ -431,22 +474,25 @@ async def get_consolidated_results(
         # Konvertiere zu Liste und implementiere "Best Value" Algorithmus
         consolidated_results = []
         for mine_name, mine_data in mines_data.items():
-            # BACKEND-FIELD-SPECIALIST-FIX 30.07.2025: Stelle sicher, dass ALLE erwarteten Felder vorhanden sind
-            # auch wenn sie in den Datensätzen nicht extrahiert wurden
+            # FIELD-CONSOLIDATION-FIX 06.08.2025: Erweiterte Field-Initialisierung mit Konsolidierungslogik
             from config.base import CSV_COLUMNS
-            logger.error(f"[FIELD-INIT-DEBUG] Prüfe {len(CSV_COLUMNS)} erwartete Felder für Mine '{mine_name}' - FIX AKTIV!")
+            logger.info(f"[FIELD-INIT] Prüfe {len(CSV_COLUMNS)} erwartete Felder für Mine '{mine_name}' nach Konsolidierung")
             fields_added = 0
             for expected_field in CSV_COLUMNS:
                 if expected_field not in ['Mine', 'Quellenangaben']:  # Skip meta fields
-                    if expected_field not in mine_data['consolidated_fields']:
-                        mine_data['consolidated_fields'][expected_field] = {
+                    # CRITICAL: Apply same consolidation logic to expected fields
+                    final_field_name, _ = _consolidate_and_rename_field(expected_field, "")
+                    
+                    # Only add if the final field name doesn't exist yet
+                    if final_field_name not in mine_data['consolidated_fields']:
+                        mine_data['consolidated_fields'][final_field_name] = {
                             'raw_values': [],
                             'ai_models': [],
                             'real_sources': [],
                             'value_details': []
                         }
                         fields_added += 1
-                        logger.info(f"[FIELD-INIT] Feld '{expected_field}' für Mine '{mine_name}' initialisiert")
+                        logger.info(f"[FIELD-INIT] Feld '{final_field_name}' für Mine '{mine_name}' initialisiert (war: {expected_field})")
             logger.info(f"[FIELD-INIT] {fields_added} Felder zu Mine '{mine_name}' hinzugefügt. Total: {len(mine_data['consolidated_fields'])}")
             
             # Implementiere "Best Value" Algorithmus für jedes Feld
@@ -477,16 +523,18 @@ async def get_consolidated_results(
                 value_analysis = _analyze_field_values(field_info['value_details'])
                 
                 # Bestimme besten Wert basierend auf Algorithmus
-                best_value_info = _calculate_best_value(value_analysis)
+                # TEMPLATE-PATTERN-FIX 06.08.2025: Übergebe field_name für Template-Detection
+                best_value_info = _calculate_best_value(value_analysis, field_name)
                 
                 # Speichere besten Wert für Haupttabelle
-                # CRITICAL FIX 30.07.2025: Verwende 'N/A' statt leerer Werte für bessere UI-Darstellung
+                # FIELD-CONSOLIDATION-FIX 06.08.2025: Bessere UX mit 'Unbekannt' statt N/A
                 # DUPLIKAT-FIX 30.07.2025: Metadaten-Felder NICHT in best_values - kommen bereits als direkte Felder
                 metadaten_felder = ['Mine', 'Land', 'Zuverlässigkeit', 'Modelle', 'Letzte Aktualisierung', 'Details']
                 if field_name not in metadaten_felder:  # Verhindere Duplikate in Frontend
                     display_value = best_value_info['display_value']
-                    if not display_value or display_value.strip() in ['', 'X', 'x']:
-                        display_value = 'N/A'
+                    # ENHANCED VALUE CLEANING 06.08.2025: Mehr Platzhalter-Werte erkennen
+                    if not display_value or display_value.strip().upper() in ['', 'X', 'N/A', 'KEINE ANGABEN', 'NICHT VERFÜGBAR']:
+                        display_value = 'Unbekannt'
                     best_values[field_name] = display_value
                 
                 # Erstelle detaillierte Aufschlüsselung für Modal
