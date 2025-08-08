@@ -21,9 +21,9 @@ from minesearch.database import (
     ModelStatisticsComprehensive,
     ModelFieldConsistency,
 )
-from source_stats_manager import source_stats_manager
-from providers.registry import provider_registry
-from .statistics_utils import StatisticsCalculator, StatisticsAnalyzer
+from minesearch.source_stats_manager import source_stats_manager
+from minesearch.providers.registry import provider_registry
+from minesearch.api.routes.statistics_utils import StatisticsCalculator, StatisticsAnalyzer
 
 logger = logging.getLogger(__name__)
 
