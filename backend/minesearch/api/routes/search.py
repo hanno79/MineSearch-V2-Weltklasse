@@ -15,19 +15,19 @@ from datetime import datetime
 from ..models import MineSearchRequest, MineSearchResponse, MultiSearchRequest, SmartSearchRequest
 
 # Backend Services (package‑relative imports)
-from ...search_service import MineSearchService
-from ...search_service_multi import multi_search_service
-from ...search_service_multi_enhanced import EnhancedMultiProviderSearchService
-from ...providers.registry import provider_registry
-from ...model_benchmark_service import ModelBenchmarkService
-from ...search_utils import count_filled_fields
-from ...config.base import CSV_COLUMNS
+from minesearch.search_service import MineSearchService
+from minesearch.search_service_multi import multi_search_service
+from minesearch.search_service_multi_enhanced import EnhancedMultiProviderSearchService
+from minesearch.providers.registry import provider_registry
+from minesearch.model_benchmark_service import ModelBenchmarkService
+from minesearch.search_utils import count_filled_fields
+from minesearch.config.base import CSV_COLUMNS
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Shared Service Container
-from ...services_container import services
+from minesearch.services_container import services
 
 @router.post("/search", response_model=MineSearchResponse)
 async def search_mine(request: MineSearchRequest):
@@ -84,7 +84,7 @@ async def search_mine(request: MineSearchRequest):
         # ÄNDERUNG 12.07.2025: Erweiterte Datenbank-Speicherung
         if result.get('success') and result.get('data'):
             try:
-                from database import db_manager
+                from minesearch.database import db_manager
                 search_duration = result.get('data', {}).get('search_duration')
                 structured_data = result['data'].get('structured_data', {})
                 
@@ -183,7 +183,7 @@ async def search_two_phase(request: MineSearchRequest):
         # Speichere Ergebnis
         if result.get('success') and result.get('data'):
             try:
-                from database import db_manager
+                from minesearch.database import db_manager
                 db_manager.save_search_result(
                     mine_name=request.mine_name,
                     model_used='two_phase',
@@ -221,7 +221,7 @@ async def search_multiple_models(request: MultiSearchRequest):
         
         # Speichere alle erfolgreichen Ergebnisse
         if result.get('success') and result.get('results'):
-            from database import db_manager
+            from minesearch.database import db_manager
             for model_id, model_result in result['results'].items():
                 if model_result.get('success') and model_result.get('data'):
                     try:
@@ -345,7 +345,7 @@ async def comprehensive_search(request: MineSearchRequest):
         # Speichere Ergebnis
         if result.get('success') and result.get('data'):
             try:
-                from database import db_manager
+                from minesearch.database import db_manager
                 db_manager.save_search_result(
                     mine_name=request.mine_name,
                     model_used='comprehensive_enhanced',
