@@ -22,12 +22,22 @@ _ADAPTER_SUBMODULES = [
     "search_service_multi_enhanced",
     "services_container",
     "utils",
+    "search_utils",
     "source_manager",
+    "source_discovery",
+    "enhanced_source_discovery",
     "data_extraction",
     "extraction_patterns",
     "extraction_processors",
     "extraction_validators",
     "html_utils",
+    "specialized_prompts",
+    "validation_service",
+    "cache_service",
+    "api_fix_wrapper",
+    "model_tier_strategy",
+    "model_id_parser",
+    "service_manager",
 ]
 
 backend_pkg: ModuleType

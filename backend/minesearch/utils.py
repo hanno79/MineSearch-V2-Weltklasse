@@ -8,7 +8,7 @@ Beschreibung: Hilfsfunktionen für MineSearch
 import re
 import logging
 from typing import List, Dict, Any, Optional
-from config import config, COUNTRY_CONFIG
+from minesearch.config import config, COUNTRY_CONFIG
 
 # ÄNDERUNG 30.06.2025: Strukturiertes Logging (Regel 16)
 logger = logging.getLogger(__name__)

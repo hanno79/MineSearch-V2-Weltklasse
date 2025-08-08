@@ -8,7 +8,7 @@ Beschreibung: Cache-Management API Endpoints
 from fastapi import APIRouter, HTTPException
 import logging
 
-from cache_service import get_cache_service
+from minesearch.cache_service import get_cache_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

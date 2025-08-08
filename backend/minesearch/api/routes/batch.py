@@ -14,11 +14,11 @@ import asyncio
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from config import CSV_COLUMNS
-from batch_service import BatchService
-from search_service import MineSearchService
-from search_service_multi import MultiProviderSearchService
-from providers.registry import provider_registry
+from minesearch.config import CSV_COLUMNS
+from minesearch_v2.backend.batch_service import BatchService  # transitional
+from minesearch.search_service import MineSearchService
+from minesearch.search_service_multi import MultiProviderSearchService
+from minesearch.providers.registry import provider_registry
 from minesearch.database import db_manager
 from extraction_validators import is_placeholder_value
 
@@ -116,7 +116,7 @@ async def batch_search(
         from minesearch.services_container import services
         
         # PHASE 2.3: COMPREHENSIVE SEARCH ORCHESTRATOR Integration
-        from comprehensive_search_orchestrator import comprehensive_search_orchestrator
+        from minesearch_v2.backend.comprehensive_search_orchestrator import comprehensive_search_orchestrator
         
         for idx, mine in enumerate(mines_to_search):
             mine_name = mine.get("mine_name", "")

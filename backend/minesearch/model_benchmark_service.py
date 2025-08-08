@@ -14,12 +14,12 @@ from typing import Dict, List, Any, Optional, Tuple
 from collections import defaultdict
 
 from minesearch.database import db_manager
-from database.models import ModelStatistics, FieldStatistics, FieldConsistency, ModelSummary
-from search_service_multi import multi_search_service
-from search_service import search_service
-from search_service_multi_enhanced import enhanced_search_service
-from providers.registry import provider_registry
-from config import CSV_COLUMNS
+from minesearch.database.models import ModelStatistics, FieldStatistics, FieldConsistency, ModelSummary
+from minesearch.search_service_multi import multi_search_service
+from minesearch.search_service import search_service
+from minesearch.search_service_multi_enhanced import enhanced_search_service
+from minesearch.providers.registry import provider_registry
+from minesearch.config import CSV_COLUMNS
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +167,7 @@ class ModelBenchmarkService:
             sources = data.get('sources', []) or []  # KORRIGIERT: Ensure not None
             
             # Zähle gefüllte Felder - KORRIGIERT: Nutze count_filled_fields
-            from search_utils import count_filled_fields
+            from minesearch.search_utils import count_filled_fields
             fields_found = count_filled_fields(structured_data)
             sources_count = len(sources) if sources else 0  # KORRIGIERT: Safe source counting
             

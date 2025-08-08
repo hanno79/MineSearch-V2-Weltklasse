@@ -14,9 +14,9 @@ from datetime import datetime
 import urllib.parse
 import asyncio
 
-from config import config, Config, COUNTRY_CONFIG
-from source_discovery import SourceDiscovery
-from models import SearchSession
+from minesearch.config import config, Config, COUNTRY_CONFIG
+from minesearch.source_discovery import SourceDiscovery
+from minesearch.models import SearchSession
 import uuid
 from datetime import datetime, timedelta
 
@@ -279,7 +279,7 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         sources = []
         
         # Import hier um zirkuläre Imports zu vermeiden
-        from database import db_manager
+        from minesearch.database import db_manager
         
         # Hole relevante Quellen aus DB
         # ÄNDERUNG 08.07.2025: Erweiterte Datenbank-Quellennutzung
@@ -343,7 +343,7 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         self.session.add_searched_source(url, success, found_data)
         
         # ÄNDERUNG 02.07.2025: Verwende direkt die Datenbank
-        from database import db_manager
+        from minesearch.database import db_manager
         
         # Parse Domain
         domain = urllib.parse.urlparse(url).netloc

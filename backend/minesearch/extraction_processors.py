@@ -8,7 +8,7 @@ Beschreibung: Verarbeitungsfunktionen für Mining-Datenextraktion
 import re
 import logging
 from typing import Dict, Optional, List, Any
-from utils import get_country_config
+from minesearch.utils import get_country_config
 
 logger = logging.getLogger(__name__)
 
