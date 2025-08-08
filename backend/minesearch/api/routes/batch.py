@@ -15,7 +15,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from minesearch.config import CSV_COLUMNS
-from minesearch_v2.backend.batch_service import BatchService  # transitional
+from minesearch.batch_service import BatchService  # Adapter
 from minesearch.search_service import MineSearchService
 from minesearch.search_service_multi import MultiProviderSearchService
 from minesearch.providers.registry import provider_registry
@@ -116,7 +116,11 @@ async def batch_search(
         from minesearch.services_container import services
         
         # PHASE 2.3: COMPREHENSIVE SEARCH ORCHESTRATOR Integration
-        from minesearch_v2.backend.comprehensive_search_orchestrator import comprehensive_search_orchestrator
+        # Optional: nur wenn vorhanden (Legacy)
+        try:
+            from minesearch_v2.backend.comprehensive_search_orchestrator import comprehensive_search_orchestrator
+        except Exception:
+            comprehensive_search_orchestrator = None
         
         for idx, mine in enumerate(mines_to_search):
             mine_name = mine.get("mine_name", "")
@@ -131,7 +135,7 @@ async def batch_search(
             
             try:
                 # PHASE 2.3: COMPREHENSIVE SEARCH Option
-                if comprehensive_search == "true":
+                if comprehensive_search == "true" and comprehensive_search_orchestrator is not None:
                     logger.info(f"[COMPREHENSIVE] Starte systematische Vollsuche für {mine_name}")
                     try:
                         comprehensive_result = await comprehensive_search_orchestrator.orchestrate_comprehensive_search(
