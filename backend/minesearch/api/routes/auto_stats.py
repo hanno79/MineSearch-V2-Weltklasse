@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from auto_stats_updater import auto_stats_updater
-from database import db_manager
+from ...database import db_manager
 from database.models import ModelStatistics, ModelSummary
 from sqlalchemy import func, Integer, cast
 

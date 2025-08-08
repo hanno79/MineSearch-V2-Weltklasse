@@ -19,7 +19,7 @@ from batch_service import BatchService
 from search_service import MineSearchService
 from search_service_multi import MultiProviderSearchService
 from providers.registry import provider_registry
-from database import db_manager
+from ...database import db_manager
 from extraction_validators import is_placeholder_value
 
 logger = logging.getLogger(__name__)

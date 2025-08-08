@@ -12,7 +12,15 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from database import db_manager, Source, SearchResult, Mine, ModelSummary, ModelStatisticsComprehensive, ModelFieldConsistency
+from ...database import (
+    db_manager,
+    Source,
+    SearchResult,
+    Mine,
+    ModelSummary,
+    ModelStatisticsComprehensive,
+    ModelFieldConsistency,
+)
 from source_stats_manager import source_stats_manager
 from providers.registry import provider_registry
 from .statistics_utils import StatisticsCalculator, StatisticsAnalyzer

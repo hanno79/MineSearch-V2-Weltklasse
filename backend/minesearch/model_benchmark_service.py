@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
 from collections import defaultdict
 
-from database import db_manager
+from .database import db_manager
 from database.models import ModelStatistics, FieldStatistics, FieldConsistency, ModelSummary
 from search_service_multi import multi_search_service
 from search_service import search_service

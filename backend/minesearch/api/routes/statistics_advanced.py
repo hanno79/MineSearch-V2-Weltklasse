@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 
-from database import db_manager, SearchResult, ModelSummary
+from ...database import db_manager, SearchResult, ModelSummary
 from source_stats_manager import source_stats_manager
 from .statistics_utils import StatisticsCalculator, StatisticsAnalyzer, StatisticsTimeAnalyzer
 

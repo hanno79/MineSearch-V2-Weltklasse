@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timedelta
 from sqlalchemy import func, desc, asc, and_, or_
 
-from database import db_manager
+from ...database import db_manager
 from database.models import ModelStatistics, ModelSummary, FieldStatistics, SearchResult
 
 logger = logging.getLogger(__name__)

@@ -8,7 +8,7 @@ Beschreibung: Konsolidierte Ergebnis-Management Routes für Mine-basierte Ansich
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, Dict, List, Any
 import logging
-from database import SearchResult
+from ...database import SearchResult
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)

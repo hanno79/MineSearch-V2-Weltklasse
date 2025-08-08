@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime
 
 from model_benchmark_service import ModelBenchmarkService
-from database import db_manager
+from ...database import db_manager
 from model_summary_auto_updater import ModelSummaryAutoUpdater
 
 logger = logging.getLogger(__name__)
