@@ -10,13 +10,7 @@ from typing import Dict, List, Optional, Type, Any
 from importlib import import_module
 
 from .base_provider import AbstractProvider, ModelConfig
-try:
-    from minesearch.config.base import config as Config
-except ImportError:
-    import sys
-    import os
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from minesearch.config.base import config as Config
+from minesearch.config.base import config as Config
 
 logger = logging.getLogger(__name__)
 
@@ -144,8 +138,8 @@ class ProviderRegistry:
             return None
         
         try:
-            # Dynamischer Import mit absoluten Pfad
-            module = import_module(f'providers.{provider_name}_provider')
+            # Dynamischer Import mit absolutem Pfad im `minesearch`-Namespace
+            module = import_module(f'minesearch.providers.{provider_name}_provider')
             provider_class = getattr(module, class_name)
             return provider_class
         except Exception as e:

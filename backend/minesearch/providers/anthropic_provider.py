@@ -13,17 +13,16 @@ import json
 
 from .base_provider import AbstractProvider, ModelConfig, SearchResult
 
-# ÄNDERUNG 06.07.2025: Absolute Imports für Provider-Kompatibilität
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from minesearch.config.base import config as Config
-from data_extraction import DataExtractor
-from source_discovery import extract_sources_from_content
-from enhanced_source_discovery import EnhancedSourceDiscovery
-from utils import generate_name_variants, generate_multilingual_search_terms, get_country_config
-from specialized_prompts import SpecializedPrompts
+from minesearch.data_extraction import DataExtractor
+from minesearch.source_discovery import extract_sources_from_content
+from minesearch.enhanced_source_discovery import EnhancedSourceDiscovery
+from minesearch.utils import (
+    generate_name_variants,
+    generate_multilingual_search_terms,
+    get_country_config,
+)
+from minesearch.specialized_prompts import SpecializedPrompts
 
 logger = logging.getLogger(__name__)
 

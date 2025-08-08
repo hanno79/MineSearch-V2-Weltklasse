@@ -12,8 +12,12 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from functools import lru_cache
 
-from config import CSV_COLUMNS
-from utils import generate_name_variants, generate_multilingual_search_terms, get_country_config
+from minesearch.config import CSV_COLUMNS
+from minesearch.utils import (
+    generate_name_variants,
+    generate_multilingual_search_terms,
+    get_country_config,
+)
 
 logger = logging.getLogger(__name__)
 

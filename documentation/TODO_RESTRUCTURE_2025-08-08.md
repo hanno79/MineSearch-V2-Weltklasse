@@ -27,7 +27,7 @@ Ziel: Struktur-Aufräumung ohne Funktionsänderung (API stabil, Port 8000, beste
 - [x] Playwright-UI-Smoketest (Tabs) grün
 
 ## P2 – Imports & Entrypoints konsolidieren
-- [ ] Einheitliche absolute Imports: `from minesearch ...` innerhalb `backend/minesearch`
+- [x] Einheitliche absolute Imports: `from minesearch ...` innerhalb `backend/minesearch` (Kernmodule & Routen migriert)
 - [x] Offizieller Startkommando: `uvicorn minesearch.main:app --port 8000` (SAFE_MODE validiert)
 - [x] Static Mount zeigt auf `frontend/`
 - [x] CI aktualisieren (Install, Test, Artefakte, Pfade): SAFE_MODE‑Start + UI‑Smoketest ergänzt
@@ -44,9 +44,8 @@ Ziel: Struktur-Aufräumung ohne Funktionsänderung (API stabil, Port 8000, beste
 - 2025-08-08: `style.css` nach `frontend/` verschoben (404 behoben)
 - 2025-08-08: Übergangs‑Entrypoint `minesearch.main:app` angelegt (P2)
 - 2025-08-08: `get_api_router()` mit lazy Imports, `main` nutzt `get_api_router()` außerhalb SAFE_MODE
- - 2025-08-08: Teilmigration auf absolute Importe (`minesearch.*`) in Kern‑Services, DB und Providern
+ - 2025-08-08: Teilmigration auf absolute Importe (`minesearch.*`) in Kern‑Services, DB, Providern und Routen (search/statistics/batch)
  - 2025-08-08: CI ergänzt: SAFE_MODE‑Start (8000) + UI‑Smoketest gegen `/static/index.html`
- - 2025-08-08: CI-Workflow ergänzt: SAFE_MODE‑Start (8000) + UI‑Smoketest gegen `/static/index.html`
 
 ## P3 – Cleanup & Dokumentation
 - [ ] Entfernen/Archivieren veralteter V1‑Reste in `legacy/` (nur falls erforderlich)

@@ -13,15 +13,14 @@ from datetime import datetime
 
 from .base_provider import AbstractProvider, ModelConfig, SearchResult
 
-# ÄNDERUNG 06.07.2025: Absolute Imports für Provider-Kompatibilität
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from data_extraction import DataExtractor
-from source_discovery import extract_sources_from_content
-from utils import generate_name_variants, get_country_config, generate_multilingual_search_terms
-from specialized_prompts import SpecializedPrompts
+from minesearch.data_extraction import DataExtractor
+from minesearch.source_discovery import extract_sources_from_content
+from minesearch.utils import (
+    generate_name_variants,
+    get_country_config,
+    generate_multilingual_search_terms,
+)
+from minesearch.specialized_prompts import SpecializedPrompts
 
 logger = logging.getLogger(__name__)
 
