@@ -45,13 +45,14 @@ Ziel: Struktur-Aufräumung ohne Funktionsänderung (API stabil, Port 8000, beste
 - 2025-08-08: Übergangs‑Entrypoint `minesearch.main:app` angelegt (P2)
 - 2025-08-08: `get_api_router()` mit lazy Imports, `main` nutzt `get_api_router()` außerhalb SAFE_MODE
  - 2025-08-08: Teilmigration → vollständige Migration auf absolute Importe (`minesearch.*`) in Kern‑Services, DB, Providern und Routen (inkl. `batch`, `cache`, Discovery, Benchmarks)
- - 2025-08-08: CI ergänzt: SAFE_MODE‑Start (8000) + UI‑Smoketest gegen `/static/index.html`; lokaler Smoke grün
+  - 2025-08-08: CI ergänzt: SAFE_MODE‑Start (8000) + UI‑Smoketest gegen `/static/index.html`; lokaler Smoke grün
+  - 2025-08-08: P3 gestartet: README (Start/SAFE_MODE/Struktur), ARCH_GUIDELINES (Startkommandos), `.gitignore` (data/) aktualisiert
 
 ## P3 – Cleanup & Dokumentation
 - [ ] Entfernen/Archivieren veralteter V1‑Reste in `legacy/` (nur falls erforderlich)
-- [ ] README aktualisieren (Start, Struktur, .env, Port 8000)
-- [ ] ARCHITECTURE_GUIDELINES aktualisieren (neue Pfade/Module)
-- [ ] `.gitignore` prüfen: `node_modules/`, `data/*.db`, `logs/`, `.env` etc.
+- [x] README aktualisieren (Start, Struktur, .env, Port 8000)
+- [x] ARCHITECTURE_GUIDELINES aktualisieren (neue Pfade/Module)
+- [x] `.gitignore` prüfen: `node_modules/`, `data/*.db`, `logs/`, `.env` etc.
 
 ### Akzeptanzkriterien P3
 - [ ] Repository-Root übersichtlich; keine doppelten .env/.db/.example Dateien
