@@ -14,7 +14,9 @@ from .models import (
     ModelStatistics,
     FieldConsistency,
     ModelSummary,
-    FieldStatistics
+    FieldStatistics,
+    ModelStatisticsComprehensive,
+    ModelFieldConsistency
 )
 
 # Import connection functions
@@ -36,6 +38,8 @@ __all__ = [
     'FieldConsistency',
     'ModelSummary',
     'FieldStatistics',
+    'ModelStatisticsComprehensive',
+    'ModelFieldConsistency',
     'init_db',
     'get_db',
     'get_session',

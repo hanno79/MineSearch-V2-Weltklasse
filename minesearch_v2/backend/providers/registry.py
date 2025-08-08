@@ -11,12 +11,12 @@ from importlib import import_module
 
 from .base_provider import AbstractProvider, ModelConfig
 try:
-    from config import Config
+    from config.base import config as Config
 except ImportError:
     import sys
     import os
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from config import Config
+    from config.base import config as Config
 
 logger = logging.getLogger(__name__)
 

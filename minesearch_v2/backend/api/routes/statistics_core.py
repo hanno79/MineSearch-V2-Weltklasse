@@ -12,14 +12,14 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from database import db_manager, Source, SearchResult, Mine, ModelSummary
+from database import db_manager, Source, SearchResult, Mine, ModelSummary, ModelStatisticsComprehensive, ModelFieldConsistency
 from source_stats_manager import source_stats_manager
 from providers.registry import provider_registry
 from .statistics_utils import StatisticsCalculator, StatisticsAnalyzer
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/statistics", tags=["Core Statistics"])
+router = APIRouter(prefix="/statistics", tags=["Core Statistics"])
 
 # STATISTICS-FIELD-ORDER 01.08.2025: Zentrale Feldreihenfolge für modell-fokussierte Statistik-Tabellen
 # Ähnlich FIELD_ORDER in consolidated_results.py, aber für Modelle statt Minen
@@ -262,19 +262,120 @@ async def get_field_coverage_analysis(
         logger.error(f"[STATS-CORE] Fehler bei Field Coverage Analysis: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Field Coverage Analysis Fehler: {str(e)}")
 
-@router.get("/models/{model_id}/details", response_model=Dict[str, Any])
-async def get_model_detailed_stats(model_id: str):
+@router.get("/models/overview", response_model=Dict[str, Any])
+async def get_models_overview_table():
     """
-    Detaillierte Statistiken für ein spezifisches Modell
+    NEUE API: Modell-basierte Statistik-Übersicht für Tabellen-Darstellung
+    Ersetzt die Mine-basierte Ansicht mit einer Modell-fokussierten Übersicht
     """
     try:
         with db_manager.get_session() as session:
-            # Model Summary aus der Datenbank
-            model_summary = session.query(ModelSummary).filter(
-                ModelSummary.model_id == model_id
+            # Alle Search Results gruppiert nach Modellen
+            search_results = session.query(SearchResult).all()
+            
+            if not search_results:
+                return {
+                    'success': True,
+                    'models_overview': [],
+                    'total_models': 0,
+                    'summary': {
+                        'message': 'Keine Suchresultate für Modell-Statistiken gefunden'
+                    }
+                }
+            
+            # Gruppiere nach Modellen
+            models_data = {}
+            for result in search_results:
+                model_id = result.model_used
+                if model_id not in models_data:
+                    models_data[model_id] = []
+                models_data[model_id].append(result)
+            
+            calculator = StatisticsCalculator()
+            models_overview = []
+            
+            # Berechne Statistiken für jedes Modell
+            for model_id, model_results in models_data.items():
+                # Provider aus model_id extrahieren
+                provider = model_id.split(':')[0] if ':' in model_id else model_id
+                
+                # Basis-Metriken
+                total_searches = len(model_results)
+                successful_searches = sum(1 for r in model_results if r.structured_data)
+                success_rate = (successful_searches / total_searches * 100) if total_searches > 0 else 0
+                
+                # Erweiterte Metriken
+                avg_fields_found = calculator.calculate_avg_field_coverage(model_results) * 8  # Approximation: 8 wichtige Felder
+                
+                # NEUE: Konsistenz-Berechnung
+                consistency_data = calculator.calculate_model_consistency(model_results, model_id)
+                overall_consistency = consistency_data['overall_consistency']
+                
+                # NEUE: Meist gefundene Felder
+                most_found_fields = calculator.identify_most_found_fields(model_results)
+                top_3_fields = [field['field'] for field in most_found_fields['top_fields'][:3]]
+                
+                # Performance-Kategorie basierend auf Success Rate und Konsistenz
+                performance_category = calculator._determine_performance_category(success_rate, overall_consistency)
+                
+                # Data Quality Score
+                quality_score = calculator.calculate_data_quality_score(model_results)
+                
+                model_overview = {
+                    'model_id': model_id,
+                    'model_name': model_id.replace(':', ' - ').title(),  # Formatierte Anzeige
+                    'provider': provider.title(),
+                    'total_searches': total_searches,
+                    'success_rate': round(success_rate, 1),
+                    'avg_fields_found': round(avg_fields_found, 1),
+                    'overall_consistency': round(overall_consistency, 1),
+                    'consistency_grade': consistency_data['consistency_grade'],
+                    'most_found_fields': top_3_fields,
+                    'performance_category': performance_category,
+                    'quality_score': round(quality_score, 1),
+                    'last_used': max([r.search_timestamp for r in model_results if r.search_timestamp]).isoformat() if any(r.search_timestamp for r in model_results) else None
+                }
+                
+                models_overview.append(model_overview)
+            
+            # Sortiere nach Performance (Success Rate * Konsistenz)
+            models_overview.sort(key=lambda x: (x['success_rate'] * x['overall_consistency']), reverse=True)
+            
+            # Summary-Statistiken
+            summary = {
+                'total_models_analyzed': len(models_overview),
+                'avg_success_rate': round(sum([m['success_rate'] for m in models_overview]) / len(models_overview), 1),
+                'avg_consistency': round(sum([m['overall_consistency'] for m in models_overview]) / len(models_overview), 1),
+                'best_performing_model': models_overview[0]['model_id'] if models_overview else None,
+                'total_searches_analyzed': sum([m['total_searches'] for m in models_overview])
+            }
+            
+            logger.info(f"[STATS-CORE] Models Overview Tabelle generiert - {len(models_overview)} Modelle analysiert")
+            return {
+                'success': True,
+                'models_overview': models_overview,
+                'total_models': len(models_overview),
+                'summary': summary
+            }
+            
+    except Exception as e:
+        logger.error(f"[STATS-CORE] Fehler bei Models Overview: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Models Overview Fehler: {str(e)}")
+
+@router.get("/models/{model_id}/details", response_model=Dict[str, Any])
+async def get_model_detailed_stats(model_id: str):
+    """
+    ERWEITERTE MODELL-DETAILS: Detaillierte Statistiken für ein spezifisches Modell
+    Jetzt mit Konsistenz-Analysen und Feld-spezifischen Metriken
+    """
+    try:
+        with db_manager.get_session() as session:
+            # Model Statistics aus der Datenbank (FIXED: Use ModelStatisticsComprehensive instead of ModelSummary)
+            model_stats = session.query(ModelStatisticsComprehensive).filter(
+                ModelStatisticsComprehensive.model_id == model_id
             ).first()
             
-            if not model_summary:
+            if not model_stats:
                 raise HTTPException(status_code=404, detail=f"Modell {model_id} nicht gefunden")
             
             # Search Results für dieses Modell
@@ -284,36 +385,86 @@ async def get_model_detailed_stats(model_id: str):
             
             # Detaillierte Berechnungen
             calculator = StatisticsCalculator()
-            
-            # Performance-Metriken
+
+            # Standardberechnung aus echten Suchergebnissen
             success_rate = calculator.calculate_success_rate(search_results)
             avg_response_time = calculator.calculate_avg_response_time(search_results)
             field_coverage = calculator.calculate_avg_field_coverage(search_results)
-            
-            # Zuverlässigkeits-Trend (letzte 30 Tage)
-            reliability_trend = calculator.calculate_reliability_trend(search_results[-30:] if len(search_results) > 30 else search_results)
-            
-            # Field Coverage Breakdown
+            consistency_analysis = calculator.calculate_model_consistency(search_results, model_id)
+            most_found_fields = calculator.identify_most_found_fields(search_results)
+            reliability_trend = calculator.calculate_reliability_trend(
+                search_results[-30:] if len(search_results) > 30 else search_results
+            )
             field_breakdown = calculator.calculate_field_breakdown(search_results)
-            
-            # Unique Sources
-            unique_sources = len(set(sr.sources_json for sr in search_results if sr.sources_json))
-            
-            # Datenqualitäts-Score
+            unique_sources = len(set(str(sr.sources) for sr in search_results if sr.sources))
             data_quality_score = calculator.calculate_data_quality_score(search_results)
-            
-            # Cost per Query (wenn verfügbar)
             cost_per_query = calculator.calculate_cost_per_query(model_id, len(search_results))
+
+            # Fallback-LOGIK: Wenn keine (oder offensichtlich leere) SearchResults verfügbar sind,
+            # verwende die voraggregierten Werte aus ModelStatisticsComprehensive, damit die
+            # Detailansicht realistische Zahlen anzeigt und nicht nur Nullen.
+            if not search_results:
+                # Mapping von Comprehensive -> Detailwerte
+                total_searches_fallback = model_stats.total_searches or 0
+                successful_searches_fallback = model_stats.successful_searches or 0
+                success_rate = (model_stats.success_rate_percent or 0.0) / 100.0
+                avg_response_time = (
+                    model_stats.avg_response_time_ms
+                    or model_stats.avg_search_duration_ms
+                    or 0.0
+                )
+                field_coverage = (model_stats.completeness_score or 0.0) / 100.0
+                unique_sources = model_stats.unique_sources_total or 0
+                # Durchschnittliche Quellen pro Suche als Näherung für Ergebnisse/Suche
+                avg_results_per_query_fallback = model_stats.avg_sources_per_search or 0.0
+
+                # Datenqualität konservativ aus vorhandenen Scores mitteln
+                data_quality_score = float(
+                    (
+                        (model_stats.completeness_score or 0.0)
+                        + (model_stats.consistency_score or 0.0)
+                        + (model_stats.source_diversity_score or 0.0)
+                    )
+                    / 3.0
+                )
+                # Konsistenzanalyse leer, wenn keine Rohdaten
+                consistency_analysis = consistency_analysis or {
+                    'overall_consistency': model_stats.consistency_score or 0.0,
+                    'field_consistency': {},
+                    'consistency_grade': model_stats.consistency_grade or 'Unbekannt',
+                    'total_mine_comparisons': 0,
+                    'total_field_comparisons': 0,
+                }
+                most_found_fields = most_found_fields or {'top_fields': [], 'field_success_rates': {}}
+                reliability_trend = []
+                field_breakdown = {}
+
+            else:
+                # Wenn es SearchResults gibt, verbleibt die Standardlogik oben. Für
+                # die Berechnung "avg_results_per_query" nutzen wir die spezielle Utility-Funktion
+                avg_results_per_query_fallback = None  # Nicht genutzt im Standardpfad
+            
+            # BUGFIX 07.08.2025: Provider aus model_id extrahieren da provider_name nicht existiert
+            provider = model_id.split(':')[0] if ':' in model_id else "unknown"
             
             detailed_stats = ModelPerformanceStats(
                 model_id=model_id,
-                provider=model_summary.provider_name if model_summary else "unknown",
-                total_queries=len(search_results),
-                successful_queries=sum(1 for sr in search_results if sr.structured_data),
-                failed_queries=sum(1 for sr in search_results if not sr.structured_data),
+                provider=provider,
+                total_queries=(len(search_results) if search_results else total_searches_fallback),
+                successful_queries=(
+                    sum(1 for sr in search_results if sr.structured_data)
+                    if search_results else successful_searches_fallback
+                ),
+                failed_queries=(
+                    sum(1 for sr in search_results if not sr.structured_data)
+                    if search_results else max(0, (total_searches_fallback - successful_searches_fallback))
+                ),
                 success_rate=success_rate,
                 avg_response_time=avg_response_time,
-                avg_results_per_query=calculator.calculate_avg_results_per_query(search_results),
+                avg_results_per_query=(
+                    calculator.calculate_avg_results_per_query(search_results)
+                    if search_results else avg_results_per_query_fallback
+                ),
                 avg_field_coverage=field_coverage,
                 unique_sources_found=unique_sources,
                 data_quality_score=data_quality_score,
@@ -322,18 +473,28 @@ async def get_model_detailed_stats(model_id: str):
                 field_coverage_breakdown=field_breakdown
             )
             
-            # Zusätzliche Kontext-Informationen
+            # ERWEITERTE Kontext-Informationen
             context = {
                 'model_stats': detailed_stats.dict(),
+                'consistency_analysis': consistency_analysis,  # NEU
+                'most_found_fields_analysis': most_found_fields,  # NEU
                 'recent_performance': {
                     'last_7_days': calculator.calculate_recent_performance(search_results, 7),
                     'last_30_days': calculator.calculate_recent_performance(search_results, 30)
                 },
                 'specialization_analysis': calculator.analyze_model_specialization(search_results),
-                'comparison_to_average': calculator.compare_to_system_average(detailed_stats)
+                'comparison_to_average': calculator.compare_to_system_average(detailed_stats),
+                'field_specific_performance': {  # NEU
+                    field: {
+                        'success_rate': data['success_rate'],
+                        'avg_quality': data['avg_quality'],
+                        'consistency': consistency_analysis['field_consistency'].get(field, {}).get('consistency_percent', 0)
+                    }
+                    for field, data in most_found_fields['field_success_rates'].items()
+                }
             }
             
-            logger.info(f"[STATS-CORE] Detaillierte Modell-Statistiken für {model_id} generiert")
+            logger.info(f"[STATS-CORE] Erweiterte Modell-Statistiken für {model_id} generiert")
             return context
             
     except HTTPException:
@@ -341,6 +502,358 @@ async def get_model_detailed_stats(model_id: str):
     except Exception as e:
         logger.error(f"[STATS-CORE] Fehler bei detaillierten Modell-Statistiken: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Modell-Statistik-Fehler: {str(e)}")
+
+@router.get("/models/comprehensive", response_model=Dict[str, Any])
+async def get_models_comprehensive_statistics(
+    sort_by: str = "overall_score",
+    order: str = "desc", 
+    min_searches: int = 0,
+    provider_filter: Optional[str] = None
+):
+    """
+    NEUE HAUPTTABELLE: Umfassende Modell-Statistiken mit normiertem Gesamtscore
+    Eine Zeile pro AI-Modell mit allen wichtigen Performance-Kennzahlen
+    """
+    try:
+        with db_manager.get_session() as session:
+            # Hole alle Modell-Statistiken
+            query = session.query(ModelStatisticsComprehensive)
+            
+            # Filter anwenden
+            if min_searches > 0:
+                query = query.filter(ModelStatisticsComprehensive.total_searches >= min_searches)
+            
+            if provider_filter:
+                # Provider aus model_id extrahieren
+                query = query.filter(ModelStatisticsComprehensive.model_id.like(f"{provider_filter}:%"))
+            
+            # Sortierung anwenden
+            reverse_order = (order == "desc")
+            
+            if sort_by == "overall_score":
+                if reverse_order:
+                    query = query.order_by(ModelStatisticsComprehensive.overall_score.desc())
+                else:
+                    query = query.order_by(ModelStatisticsComprehensive.overall_score.asc())
+            elif sort_by == "consistency_score":
+                if reverse_order:
+                    query = query.order_by(ModelStatisticsComprehensive.consistency_score.desc())
+                else:
+                    query = query.order_by(ModelStatisticsComprehensive.consistency_score.asc())
+            elif sort_by == "completeness_score":
+                if reverse_order:
+                    query = query.order_by(ModelStatisticsComprehensive.completeness_score.desc())
+                else:
+                    query = query.order_by(ModelStatisticsComprehensive.completeness_score.asc())
+            else:  # model_id
+                if reverse_order:
+                    query = query.order_by(ModelStatisticsComprehensive.model_id.desc())
+                else:
+                    query = query.order_by(ModelStatisticsComprehensive.model_id.asc())
+            
+            model_stats = query.all()
+            
+            # Falls keine Daten vorhanden, aus SearchResults generieren
+            if not model_stats:
+                logger.info("[STATS-CORE] Keine comprehensive statistics vorhanden, generiere aus SearchResults...")
+                await update_comprehensive_statistics()
+                model_stats = query.all()
+            
+            # Konvertiere zu API-Response
+            models_data = [model.to_dict() for model in model_stats]
+            
+            # Summary-Statistiken
+            if models_data:
+                summary_stats = {
+                    'total_models': len(models_data),
+                    'avg_overall_score': round(sum([m['overall_score'] for m in models_data]) / len(models_data), 1),
+                    'avg_completeness': round(sum([m['completeness_score'] for m in models_data]) / len(models_data), 1),
+                    'avg_consistency': round(sum([m['consistency_score'] for m in models_data]) / len(models_data), 1),
+                    'best_model': max(models_data, key=lambda x: x['overall_score']),
+                    'score_distribution': {
+                        'exzellent': len([m for m in models_data if m['score_category'] == 'Exzellent']),
+                        'sehr_gut': len([m for m in models_data if m['score_category'] == 'Sehr Gut']),
+                        'gut': len([m for m in models_data if m['score_category'] == 'Gut']),
+                        'limitiert': len([m for m in models_data if m['score_category'] == 'Limitiert']),
+                        'ungeeignet': len([m for m in models_data if m['score_category'] == 'Ungeeignet'])
+                    }
+                }
+            else:
+                summary_stats = {
+                    'total_models': 0,
+                    'message': 'Keine Modell-Statistiken verfügbar'
+                }
+            
+            logger.info(f"[STATS-CORE] Comprehensive model statistics generiert - {len(models_data)} Modelle")
+            return {
+                'success': True,
+                'data': {
+                    'models': models_data,
+                    'summary': summary_stats,
+                    'sort_by': sort_by,
+                    'order': order,
+                    'filters_applied': {
+                        'min_searches': min_searches,
+                        'provider_filter': provider_filter
+                    }
+                }
+            }
+            
+    except Exception as e:
+        logger.error(f"[STATS-CORE] Fehler bei comprehensive model statistics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Comprehensive statistics Fehler: {str(e)}")
+
+@router.get("/models/{model_id}/field-consistency", response_model=Dict[str, Any])
+async def get_model_field_consistency(model_id: str):
+    """
+    NEUE DETAILANSICHT: Feld-spezifische Konsistenz-Analysen für ein Modell
+    Zeigt wie konsistent das Modell bei jedem einzelnen Feld ist
+    """
+    try:
+        with db_manager.get_session() as session:
+            # Hole Feld-Konsistenz-Daten für dieses Modell
+            field_consistencies = session.query(ModelFieldConsistency).filter(
+                ModelFieldConsistency.model_id == model_id
+            ).all()
+            
+            if not field_consistencies:
+                # Generiere Konsistenz-Daten aus SearchResults
+                logger.info(f"[STATS-CORE] Generiere Feld-Konsistenz für Modell {model_id}...")
+                await update_field_consistency_for_model(model_id)
+                field_consistencies = session.query(ModelFieldConsistency).filter(
+                    ModelFieldConsistency.model_id == model_id
+                ).all()
+            
+            if not field_consistencies:
+                raise HTTPException(status_code=404, detail=f"Keine Feld-Konsistenz-Daten für Modell {model_id} gefunden")
+            
+            # Gruppiere nach Feld-Kategorien
+            field_categories = {
+                'Grunddaten': ['Mine', 'Land', 'Region', 'Rohstoffe', 'Aktivitätsstatus'],
+                'Koordinaten': ['x-Koordinate', 'y-Koordinate', 'Minenfläche in qkm'],
+                'Betriebsdaten': ['Betreiber', 'Eigentümer', 'Minentyp', 'Produktionsstart', 'Produktionsende'],
+                'Produktionsdaten': ['Fördermenge/Jahr', 'Rohstoffe'],
+                'Finanzdaten': ['Restaurationskosten', 'Kostenjahr', 'Dokumentenjahr']
+            }
+            
+            # Konvertiere zu API-Response und gruppiere
+            categorized_fields = {}
+            uncategorized_fields = []
+            
+            for field_consistency in field_consistencies:
+                field_data = field_consistency.to_dict()
+                
+                # Finde passende Kategorie
+                found_category = None
+                for category, field_names in field_categories.items():
+                    if field_consistency.field_name in field_names:
+                        found_category = category
+                        break
+                
+                if found_category:
+                    if found_category not in categorized_fields:
+                        categorized_fields[found_category] = []
+                    categorized_fields[found_category].append(field_data)
+                else:
+                    uncategorized_fields.append(field_data)
+            
+            # Berechne Kategorie-Scores
+            category_scores = {}
+            for category, fields in categorized_fields.items():
+                if fields:
+                    avg_score = sum([f['field_consistency_score'] for f in fields]) / len(fields)
+                    category_scores[category] = {
+                        'avg_consistency': round(avg_score, 1),
+                        'field_count': len(fields),
+                        'best_field': max(fields, key=lambda x: x['field_consistency_score'])['field_name'],
+                        'worst_field': min(fields, key=lambda x: x['field_consistency_score'])['field_name']
+                    }
+            
+            # Overall Model Field Performance
+            all_fields = field_consistencies
+            overall_consistency = sum([f.field_consistency_score for f in all_fields]) / len(all_fields) if all_fields else 0
+            
+            response = {
+                'success': True,
+                'model_id': model_id,
+                'data': {
+                    'overall_field_consistency': round(overall_consistency, 1),
+                    'total_fields_analyzed': len(all_fields),
+                    'categorized_fields': categorized_fields,
+                    'uncategorized_fields': uncategorized_fields,
+                    'category_performance': category_scores,
+                    'consistency_insights': {
+                        'most_consistent_field': max(all_fields, key=lambda x: x.field_consistency_score).field_name if all_fields else None,
+                        'least_consistent_field': min(all_fields, key=lambda x: x.field_consistency_score).field_name if all_fields else None,
+                        'fields_with_high_consistency': len([f for f in all_fields if f.field_consistency_score >= 80]),
+                        'fields_needing_improvement': len([f for f in all_fields if f.field_consistency_score < 50])
+                    }
+                }
+            }
+            
+            logger.info(f"[STATS-CORE] Feld-Konsistenz für Modell {model_id} generiert - {len(all_fields)} Felder")
+            return response
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[STATS-CORE] Fehler bei Feld-Konsistenz für {model_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Feld-Konsistenz-Fehler: {str(e)}")
+
+@router.post("/models/update-comprehensive")
+async def update_comprehensive_statistics():
+    """
+    UTILITY ENDPOINT: Aktualisiere umfassende Modell-Statistiken aus SearchResults
+    Berechnet alle Scores und Metriken neu
+    """
+    try:
+        with db_manager.get_session() as session:
+            # Hole alle SearchResults gruppiert nach Modellen
+            search_results = session.query(SearchResult).all()
+            
+            if not search_results:
+                return {
+                    'success': True,
+                    'message': 'Keine SearchResults zum Verarbeiten gefunden',
+                    'updated_models': 0
+                }
+            
+            # Gruppiere nach Modellen
+            models_data = {}
+            for result in search_results:
+                model_id = result.model_used
+                if model_id not in models_data:
+                    models_data[model_id] = []
+                models_data[model_id].append(result)
+            
+            updated_count = 0
+            
+            # Erstelle oder aktualisiere ModelStatisticsComprehensive für jedes Modell
+            for model_id, model_results in models_data.items():
+                # Suche existierende Statistik oder erstelle neue
+                model_stats = session.query(ModelStatisticsComprehensive).filter(
+                    ModelStatisticsComprehensive.model_id == model_id
+                ).first()
+                
+                if not model_stats:
+                    model_stats = ModelStatisticsComprehensive(model_id=model_id)
+                    session.add(model_stats)
+                
+                # Aktualisiere alle Statistiken
+                model_stats.update_from_search_results(model_results)
+                
+                # Konsistenz-Score separat berechnen (komplexere Logik)
+                consistency_score = await calculate_model_consistency_score(model_results, model_id)
+                model_stats.consistency_score = consistency_score
+                
+                # Konsistenz-Grade zuweisen
+                if consistency_score >= 90:
+                    model_stats.consistency_grade = 'A'
+                elif consistency_score >= 80:
+                    model_stats.consistency_grade = 'B'
+                elif consistency_score >= 70:
+                    model_stats.consistency_grade = 'C'
+                elif consistency_score >= 60:
+                    model_stats.consistency_grade = 'D'
+                else:
+                    model_stats.consistency_grade = 'F'
+                
+                updated_count += 1
+            
+            # Speichere alle Änderungen
+            session.commit()
+            
+            logger.info(f"[STATS-CORE] Comprehensive statistics updated - {updated_count} Modelle")
+            return {
+                'success': True,
+                'message': f'Comprehensive statistics für {updated_count} Modelle aktualisiert',
+                'updated_models': updated_count,
+                'total_search_results_processed': len(search_results)
+            }
+            
+    except Exception as e:
+        logger.error(f"[STATS-CORE] Fehler beim Update der comprehensive statistics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Update-Fehler: {str(e)}")
+
+async def calculate_model_consistency_score(search_results: List[SearchResult], model_id: str) -> float:
+    """
+    Hilfsfunktion: Berechne Konsistenz-Score für ein Modell über alle Felder
+    """
+    field_values = {}  # field_name -> [value1, value2, ...]
+    
+    # Sammle alle Feldwerte
+    for result in search_results:
+        if result.structured_data:
+            for field_name, field_value in result.structured_data.items():
+                if field_value and str(field_value).strip() and str(field_value).strip().upper() != 'X':
+                    if field_name not in field_values:
+                        field_values[field_name] = []
+                    field_values[field_name].append(str(field_value).strip())
+    
+    # Berechne Konsistenz pro Feld
+    field_consistencies = []
+    for field_name, values in field_values.items():
+        if len(values) > 1:  # Nur Felder mit mehreren Werten
+            unique_values = len(set(values))
+            # BUGFIX 07.08.2025: NULL-Wert-Behandlung für leere Listen
+            value_counts = [values.count(val) for val in set(values)]
+            if value_counts:  # Prüfe ob Liste nicht leer ist
+                most_common_count = max(value_counts)
+                consistency = (most_common_count / len(values)) * 100
+                field_consistencies.append(consistency)
+    
+    # Overall Konsistenz-Score
+    if field_consistencies:
+        return sum(field_consistencies) / len(field_consistencies)
+    else:
+        return 0.0
+
+async def update_field_consistency_for_model(model_id: str):
+    """
+    Hilfsfunktion: Aktualisiere Feld-Konsistenz-Daten für ein spezifisches Modell
+    """
+    with db_manager.get_session() as session:
+        # Hole SearchResults für dieses Modell
+        search_results = session.query(SearchResult).filter(
+            SearchResult.model_used == model_id
+        ).all()
+        
+        if not search_results:
+            return
+        
+        # Sammle Feldwerte
+        field_values = {}
+        for result in search_results:
+            if result.structured_data:
+                for field_name, field_value in result.structured_data.items():
+                    if field_name not in field_values:
+                        field_values[field_name] = []
+                    if field_value and str(field_value).strip():
+                        field_values[field_name].append(str(field_value).strip())
+        
+        # Erstelle oder aktualisiere ModelFieldConsistency für jedes Feld
+        for field_name, values in field_values.items():
+            if not values:
+                continue
+            
+            # Suche existierende oder erstelle neue
+            field_consistency = session.query(ModelFieldConsistency).filter(
+                ModelFieldConsistency.model_id == model_id,
+                ModelFieldConsistency.field_name == field_name
+            ).first()
+            
+            if not field_consistency:
+                field_consistency = ModelFieldConsistency(
+                    model_id=model_id,
+                    field_name=field_name
+                )
+                session.add(field_consistency)
+            
+            # Aktualisiere mit neuen Daten
+            field_consistency.update_from_field_data(values)
+            field_consistency.total_searches = len(search_results)
+        
+        session.commit()
 
 # Globale Router-Instanz
 statistics_core_router = router

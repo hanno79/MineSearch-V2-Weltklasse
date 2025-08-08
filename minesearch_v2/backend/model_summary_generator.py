@@ -13,7 +13,7 @@ from collections import defaultdict
 import statistics
 
 from database import db_manager
-from database.models import ModelStatistics, ModelSummary
+from database import ModelStatistics, ModelSummary
 
 logger = logging.getLogger(__name__)
 

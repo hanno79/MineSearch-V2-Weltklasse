@@ -278,6 +278,8 @@ TEST-STRUKTUR:
 - Test-Dateien: *_test.py / *_test.js
 - Test-Ordner: /tests/ unterhalb der jeweiligen Module
 - Test-Coverage: Mindestens 70% anstreben
+- immer backend, frontend und API testen
+- immer mit Hilfe vom Playwrigth MCP Server alle Funktionalitäten direkt in der Browser Oberfläche prüfen und testen. Nicht nur Funktionalität sondern auch Plausibilität der Werte prüfen.
 
 ASSERT-NACHRICHTEN:
 - Immer deutsche Fehlermeldungen bei fehlgeschlagenen Tests

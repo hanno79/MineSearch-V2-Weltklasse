@@ -39,8 +39,8 @@ from .models import (
     OPENAI_MODELS,
     ANTHROPIC_MODELS,
     GEMINI_MODELS,
-    GROK_MODELS,
-    DEEPSEEK_MODELS
+    GROK_MODELS
+    # DEEPSEEK_MODELS  # ENTFERNT 06.08.2025: Duplikate eliminiert
 )
 
 # Provider Konfiguration
@@ -149,11 +149,11 @@ PROVIDERS_CONFIG = {
         'retry_attempts': 2,
         'retry_delay': 20
     },
-    'deepseek': {
-        # PROVIDER-FIX 15.07.2025: Aktiviert für direkte DeepSeek API-Nutzung
-        'enabled': True,
-        'api_key': APIKeysConfig.DEEPSEEK_API_KEY,  # Direkte DeepSeek API
-        'base_url': 'https://api.deepseek.com/v1',
-        'models': DEEPSEEK_MODELS
-    }
+    # 'deepseek': {
+    #     # ENTFERNT 06.08.2025: Duplikate eliminiert - DeepSeek nur noch über OpenRouter
+    #     'enabled': False,
+    #     'api_key': APIKeysConfig.DEEPSEEK_API_KEY,
+    #     'base_url': 'https://api.deepseek.com/v1',
+    #     'models': DEEPSEEK_MODELS
+    # }
 }

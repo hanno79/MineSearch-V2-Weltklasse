@@ -32,9 +32,19 @@ FIELDS_WITHOUT_SOURCES = [
 ]
 
 # Lade Umgebungsvariablen
-# ABACUS-FIX 18.07.2025: Korrigiere Pfad zur richtigen .env Datei
-env_path = Path(__file__).parent.parent / '.env'
-load_dotenv(env_path)
+# Bevorzuge Root-.env, fallback auf package-lokale .env; schließlich Systemumgebung
+from dotenv import find_dotenv
+root_env = Path(__file__).resolve().parents[3] / '.env'
+local_env = Path(__file__).parent.parent / '.env'
+if root_env.exists():
+    load_dotenv(root_env)
+elif local_env.exists():
+    load_dotenv(local_env)
+else:
+    # Letzter Versuch: automatische Suche im Projekt
+    auto_env = find_dotenv(usecwd=True)
+    if auto_env:
+        load_dotenv(auto_env)
 
 class Config(APIKeysConfig):
     """Zentrale Konfigurationsklasse - KISS Prinzip"""
@@ -44,8 +54,16 @@ class Config(APIKeysConfig):
     PORT = int(os.getenv('PORT', 8000))
     DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
     
-    # Datenbank
-    DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./mines.db')
+    # Datenbank: URL bevorzugt; falls nicht vorhanden, aus DATABASE_PATH ableiten
+    _ROOT = Path(__file__).resolve().parents[3]
+    _db_url_env = os.getenv('DATABASE_URL')
+    if _db_url_env and _db_url_env.strip():
+        DATABASE_URL = _db_url_env
+    else:
+        _db_path = os.getenv('DATABASE_PATH', 'data/minesearch.db')
+        # Absoluten Pfad bilden, dann als sqlite URL
+        _db_path_abs = (_ROOT / _db_path).resolve()
+        DATABASE_URL = f"sqlite:///{_db_path_abs}"
     
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
@@ -68,7 +86,7 @@ class Config(APIKeysConfig):
     GEMINI_MODELS = MODELS_CONFIG['gemini']
     GROK_MODELS = MODELS_CONFIG['grok']
     OPENAI_MODELS = MODELS_CONFIG['openai']
-    DEEPSEEK_MODELS = MODELS_CONFIG['deepseek']
+    # DEEPSEEK_MODELS = MODELS_CONFIG['deepseek']  # ENTFERNT 06.08.2025: DeepSeek nur über OpenRouter
     OPENROUTER_MODELS = MODELS_CONFIG['openrouter']
     EXA_MODELS = MODELS_CONFIG['exa']
     TAVILY_MODELS = MODELS_CONFIG['tavily']

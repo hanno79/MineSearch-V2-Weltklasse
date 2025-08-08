@@ -563,8 +563,8 @@ class FieldStatistics(Base):
     
     # Indizes für Performance
     __table_args__ = (
-        Index('idx_model_field', 'model_id', 'field_name'),
-        Index('idx_field_success', 'field_name', 'success_rate'),
+        Index('idx_model_statistics_model_field', 'model_id', 'field_name'),
+        Index('idx_model_statistics_success', 'field_name', 'success_rate'),
     )
     
     def to_dict(self) -> Dict[str, Any]:
@@ -582,5 +582,333 @@ class FieldStatistics(Base):
             'excluded_count': getattr(self, 'excluded_count', 0),
             'conditional_logic_applied': getattr(self, 'conditional_logic_applied', False),
             'effective_searches': self.total_searches,  # Für Rückwärtskompatibilität
+            'last_updated': self.last_updated.isoformat() if self.last_updated else None
+        }
+
+
+class ModelStatisticsComprehensive(Base):
+    """
+    Datenbank-Tabelle für umfassende Modell-Statistiken
+    Eine Zeile pro AI-Modell mit allen wichtigen Performance-Kennzahlen
+    """
+    __tablename__ = 'model_statistics_comprehensive'
+    
+    model_id = Column(String(100), primary_key=True)
+    
+    # Basis-Performance Metriken
+    total_searches = Column(Integer, nullable=False, default=0)
+    successful_searches = Column(Integer, nullable=False, default=0)
+    success_rate_percent = Column(Float, nullable=False, default=0.0)  # 0.0 bis 100.0
+    
+    # VOLLSTÄNDIGKEITSSCORE: Gefundene Felder / Erwartete Felder * 100
+    total_expected_fields = Column(Integer, nullable=False, default=20)  # Anzahl erwarteter Felder
+    avg_fields_found = Column(Float, nullable=False, default=0.0)  # Durchschnittlich gefundene Felder pro Suche
+    completeness_score = Column(Float, nullable=False, default=0.0)  # 0.0 bis 100.0
+    
+    # KONSISTENZSCORE: Wie oft werden gleiche Werte bei mehrfachen Suchen gefunden
+    consistency_score = Column(Float, nullable=False, default=0.0)  # 0.0 bis 100.0
+    consistency_grade = Column(String(20), nullable=False, default='Unbekannt')  # A, B, C, D, F
+    
+    # QUELLENVIELFALT: Anzahl verschiedener Quellen pro Modell
+    avg_sources_per_search = Column(Float, nullable=False, default=0.0)
+    unique_sources_total = Column(Integer, nullable=False, default=0)
+    source_diversity_score = Column(Float, nullable=False, default=0.0)  # 0.0 bis 100.0
+    
+    # PERFORMANCE METRIKEN
+    avg_response_time_ms = Column(Float, nullable=False, default=0.0)
+    avg_search_duration_ms = Column(Float, nullable=False, default=0.0)
+    performance_category = Column(String(20), nullable=False, default='Standard')  # Schnell, Standard, Langsam
+    
+    # GESAMTSCORE: Normierter Score (0-100) für Modell-Bewertung
+    overall_score = Column(Float, nullable=False, default=0.0)  # 0.0 bis 100.0
+    score_category = Column(String(20), nullable=False, default='Ungetestet')  # Exzellent, Sehr Gut, Gut, Limitiert, Ungeeignet
+    
+    # SPEZIALISIERUNG: In welchen Bereichen ist das Modell besonders gut
+    best_field_categories = Column(JSON, nullable=True)  # ["Grunddaten", "Finanzdaten", "Koordinaten"]
+    specialization_score = Column(JSON, nullable=True)  # {"Grunddaten": 85, "Finanzdaten": 60, ...}
+    
+    # KOSTEN-EFFIZIENZ
+    estimated_cost_per_search = Column(Float, nullable=True)
+    cost_efficiency_score = Column(Float, nullable=False, default=50.0)  # 0.0 bis 100.0
+    
+    # TIMESTAMPS
+    first_search_at = Column(DateTime, nullable=True)
+    last_search_at = Column(DateTime, nullable=True)
+    last_updated = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    
+    # Indizes für Performance
+    __table_args__ = (
+        Index('idx_model_overall_score', 'overall_score'),
+        Index('idx_model_consistency', 'consistency_score'),
+        Index('idx_model_completeness', 'completeness_score'),
+    )
+    
+    def calculate_overall_score(self) -> float:
+        """
+        Berechne den normierten Gesamtscore (0-100) basierend auf gewichteten Faktoren:
+        - Vollständigkeit: 40% (wichtigster Faktor)
+        - Konsistenz: 30% (Zuverlässigkeit)
+        - Quellenvielfalt: 20% (Robustheit)
+        - Performance: 10% (Effizienz)
+        """
+        # Basis-Score aus den Komponenten
+        # BUGFIX 07.08.2025: NULL-Wert-Behandlung für NoneType-Vergleiche
+        completeness = self.completeness_score or 0.0
+        consistency = self.consistency_score or 0.0
+        source_diversity = self.source_diversity_score or 0.0
+        response_time = self.avg_response_time_ms or 0.0
+        
+        weighted_score = (
+            completeness * 0.40 +
+            consistency * 0.30 +
+            source_diversity * 0.20 +
+            min(100, (100 - (response_time / 1000 * 10))) * 0.10  # Performance-Penalty für langsame Modelle
+        )
+        
+        # Qualitätsmodifikatoren
+        quality_modifier = 1.0
+        
+        # BUGFIX 07.08.2025: NULL-Wert-Behandlung für NoneType-Vergleiche
+        successful_searches = self.successful_searches or 0
+        success_rate = self.success_rate_percent or 0.0
+        
+        # Bonus für viele erfolgreiche Suchen (Vertrauenswürdigkeit)
+        if successful_searches >= 50:
+            quality_modifier += 0.05
+        elif successful_searches >= 20:
+            quality_modifier += 0.03
+        elif successful_searches >= 10:
+            quality_modifier += 0.01
+        
+        # Malus für sehr niedrige Erfolgsrate
+        if success_rate < 50:
+            quality_modifier -= 0.10
+        elif success_rate < 70:
+            quality_modifier -= 0.05
+        
+        # Finaler Score
+        final_score = min(100.0, max(0.0, weighted_score * quality_modifier))
+        
+        # Score-Kategorie bestimmen
+        if final_score >= 86:
+            self.score_category = 'Exzellent'
+        elif final_score >= 71:
+            self.score_category = 'Sehr Gut'
+        elif final_score >= 51:
+            self.score_category = 'Gut'
+        elif final_score >= 31:
+            self.score_category = 'Limitiert'
+        else:
+            self.score_category = 'Ungeeignet'
+        
+        return final_score
+    
+    def update_from_search_results(self, search_results: List[Any]):
+        """
+        Aktualisiere Statistiken basierend auf SearchResult-Objekten
+        """
+        if not search_results:
+            return
+        
+        # Basis-Statistiken
+        self.total_searches = len(search_results)
+        self.successful_searches = sum(1 for sr in search_results if sr.structured_data and len(sr.structured_data) > 0)
+        self.success_rate_percent = (self.successful_searches / self.total_searches * 100) if self.total_searches > 0 else 0
+        
+        # Vollständigkeits-Analyse
+        field_counts = [len([k for k, v in (sr.structured_data or {}).items() if v and str(v).strip() and str(v).strip().upper() != 'X']) 
+                       for sr in search_results]
+        self.avg_fields_found = sum(field_counts) / len(field_counts) if field_counts else 0
+        # BUGFIX 07.08.2025: NULL-Wert-Behandlung für total_expected_fields
+        total_expected = self.total_expected_fields or 18  # Fallback zu Standard-Feldanzahl
+        self.completeness_score = (self.avg_fields_found / total_expected * 100) if total_expected > 0 else 0
+        
+        # Performance-Metriken
+        # search_duration wird in Sekunden gespeichert. Die aggregierte Kennzahl in diesem Modell
+        # ist jedoch in Millisekunden benannt (…_ms). Daher hier die korrekte Umrechnung.
+        durations_sec = [sr.search_duration for sr in search_results if sr.search_duration]
+        avg_duration_sec = (sum(durations_sec) / len(durations_sec)) if durations_sec else 0.0
+        self.avg_search_duration_ms = avg_duration_sec * 1000.0
+        # Halte avg_response_time_ms konsistent (falls an anderer Stelle gelesen wird)
+        self.avg_response_time_ms = self.avg_search_duration_ms
+        
+        # Performance-Kategorie - BUGFIX 07.08.2025: NULL-Wert-Behandlung
+        duration_ms = self.avg_search_duration_ms or 0
+        if duration_ms < 5000:  # < 5 Sekunden
+            self.performance_category = 'Schnell'
+        elif duration_ms < 15000:  # < 15 Sekunden
+            self.performance_category = 'Standard'
+        else:
+            self.performance_category = 'Langsam'
+        
+        # Quellenvielfalt
+        all_sources = []
+        for sr in search_results:
+            if sr.sources:
+                all_sources.extend(sr.sources)
+        unique_sources = len(set(str(source) for source in all_sources))
+        self.unique_sources_total = unique_sources
+        self.avg_sources_per_search = len(all_sources) / self.total_searches if self.total_searches > 0 else 0
+        self.source_diversity_score = min(100, unique_sources * 5)  # 20 verschiedene Quellen = 100 Punkte
+        
+        # Timestamps
+        timestamps = [sr.search_timestamp for sr in search_results if sr.search_timestamp]
+        if timestamps:
+            self.first_search_at = min(timestamps)
+            self.last_search_at = max(timestamps)
+        
+        # Gesamtscore berechnen
+        self.overall_score = self.calculate_overall_score()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Konvertiere zu Dictionary für API-Responses"""
+        return {
+            'model_id': self.model_id,
+            'model_name': self.model_id.replace(':', ' - ').title(),
+            'provider': self.model_id.split(':')[0] if ':' in self.model_id else self.model_id,
+            'total_searches': self.total_searches,
+            'successful_searches': self.successful_searches,
+            'success_rate_percent': round(self.success_rate_percent, 1),
+            'completeness_score': round(self.completeness_score, 1),
+            'consistency_score': round(self.consistency_score, 1),
+            'consistency_grade': self.consistency_grade,
+            'source_diversity_score': round(self.source_diversity_score, 1),
+            'avg_fields_found': round(self.avg_fields_found, 1),
+            'avg_sources_per_search': round(self.avg_sources_per_search, 1),
+            'unique_sources_total': self.unique_sources_total,
+            'performance_category': self.performance_category,
+            'avg_search_duration_ms': round(self.avg_search_duration_ms, 1),
+            'overall_score': round(self.overall_score, 1),
+            'score_category': self.score_category,
+            'best_field_categories': self.best_field_categories or [],
+            'specialization_score': self.specialization_score or {},
+            'cost_efficiency_score': round(self.cost_efficiency_score, 1),
+            'estimated_cost_per_search': self.estimated_cost_per_search,
+            'first_search_at': self.first_search_at.isoformat() if self.first_search_at else None,
+            'last_search_at': self.last_search_at.isoformat() if self.last_search_at else None,
+            'last_updated': self.last_updated.isoformat() if self.last_updated else None
+        }
+
+
+class ModelFieldConsistency(Base):
+    """
+    Datenbank-Tabelle für Feld-spezifische Konsistenz-Analysen
+    Tracks wie konsistent jedes Modell bei spezifischen Feldern ist
+    """
+    __tablename__ = 'model_field_consistency'
+    
+    id = Column(Integer, primary_key=True)
+    model_id = Column(String(100), nullable=False, index=True)
+    field_name = Column(String(100), nullable=False)
+    
+    # Konsistenz-Metriken
+    total_searches = Column(Integer, nullable=False, default=0)
+    times_found = Column(Integer, nullable=False, default=0)
+    unique_values_found = Column(Integer, nullable=False, default=0)
+    most_common_value = Column(Text, nullable=True)
+    most_common_frequency = Column(Integer, nullable=False, default=0)
+    
+    # Konsistenz-Score für dieses spezifische Feld
+    field_consistency_score = Column(Float, nullable=False, default=0.0)  # 0.0 bis 100.0
+    
+    # Alle gefundenen Werte mit Häufigkeit (für detaillierte Analyse)
+    value_distribution = Column(JSON, nullable=True)  # {"Wert1": 5, "Wert2": 3, "Wert3": 1}
+    
+    # Qualitäts-Indikatoren
+    avg_confidence = Column(Float, nullable=True)
+    has_high_quality_sources = Column(Boolean, nullable=False, default=False)
+    
+    # Timestamps
+    first_found_at = Column(DateTime, nullable=True)
+    last_found_at = Column(DateTime, nullable=True)
+    last_updated = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    
+    # Indizes für Performance
+    __table_args__ = (
+        Index('idx_field_consistency_model_field', 'model_id', 'field_name'),
+        Index('idx_field_consistency_score', 'field_name', 'field_consistency_score'),
+    )
+    
+    def calculate_consistency_score(self) -> float:
+        """
+        Berechne Konsistenz-Score für dieses spezifische Feld:
+        - Hohe Konsistenz: Immer der gleiche Wert gefunden
+        - Niedrige Konsistenz: Viele verschiedene Werte
+        """
+        if self.times_found == 0:
+            return 0.0
+        
+        # Basis-Score: Wie oft wurde der häufigste Wert gefunden
+        consistency_rate = (self.most_common_frequency / self.times_found) if self.times_found > 0 else 0
+        
+        # Gewichtung basierend auf Anzahl Fundstellen
+        reliability_weight = 1.0
+        if self.times_found >= 10:
+            reliability_weight = 1.0  # Volle Gewichtung bei vielen Fundstellen
+        elif self.times_found >= 5:
+            reliability_weight = 0.8  # Reduzierte Gewichtung
+        elif self.times_found >= 3:
+            reliability_weight = 0.6  # Weitere Reduktion
+        else:
+            reliability_weight = 0.4  # Minimale Gewichtung bei wenigen Fundstellen
+        
+        # Bonus für wenige verschiedene Werte (hohe Konsistenz)
+        variety_penalty = 0
+        if self.unique_values_found > 3:
+            variety_penalty = (self.unique_values_found - 3) * 5  # Penalty für viele verschiedene Werte
+        
+        # Finaler Score
+        final_score = min(100.0, max(0.0, (consistency_rate * 100 * reliability_weight) - variety_penalty))
+        
+        return final_score
+    
+    def update_from_field_data(self, field_values: List[str]):
+        """
+        Aktualisiere Konsistenz-Daten basierend auf gefundenen Feldwerten
+        """
+        if not field_values:
+            return
+        
+        # Bereinige und zähle Werte
+        cleaned_values = [str(val).strip() for val in field_values if val and str(val).strip() and str(val).strip().upper() != 'X']
+        
+        if not cleaned_values:
+            return
+        
+        # Basis-Statistiken
+        self.times_found = len(cleaned_values)
+        unique_values = list(set(cleaned_values))
+        self.unique_values_found = len(unique_values)
+        
+        # Häufigkeitsverteilung
+        from collections import Counter
+        value_counts = Counter(cleaned_values)
+        self.value_distribution = dict(value_counts)
+        
+        # Häufigster Wert
+        most_common = value_counts.most_common(1)[0]
+        self.most_common_value = most_common[0]
+        self.most_common_frequency = most_common[1]
+        
+        # Konsistenz-Score berechnen
+        self.field_consistency_score = self.calculate_consistency_score()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Konvertiere zu Dictionary für API-Responses"""
+        return {
+            'id': self.id,
+            'model_id': self.model_id,
+            'field_name': self.field_name,
+            'total_searches': self.total_searches,
+            'times_found': self.times_found,
+            'unique_values_found': self.unique_values_found,
+            'most_common_value': self.most_common_value,
+            'most_common_frequency': self.most_common_frequency,
+            'field_consistency_score': round(self.field_consistency_score, 1),
+            'value_distribution': self.value_distribution or {},
+            'avg_confidence': self.avg_confidence,
+            'has_high_quality_sources': self.has_high_quality_sources,
+            'first_found_at': self.first_found_at.isoformat() if self.first_found_at else None,
+            'last_found_at': self.last_found_at.isoformat() if self.last_found_at else None,
             'last_updated': self.last_updated.isoformat() if self.last_updated else None
         }

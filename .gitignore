@@ -19,6 +19,11 @@ data/output/
 data/temp/
 *.csv
 *.xlsx
+# DB files
+mines.db
+*.db
+/data/*.db
+/minesearch_v2/backend/mines.db
 
 # IDE
 .vscode/
@@ -37,3 +42,9 @@ htmlcov/
 
 # Cleanup
 to_delete/
+
+# Node
+node_modules/
+**/node_modules/
+/playwright-mcp/node_modules/
+/minesearch_v2/**/node_modules/

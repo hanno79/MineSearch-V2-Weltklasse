@@ -143,10 +143,10 @@ async def get_result_by_id(result_id: int):
 @router.delete("/results/{result_id}")
 async def delete_result(result_id: int):
     """Lösche einzelnes Suchergebnis"""
-    from database import db_manager
+    from database import db_manager, SearchResult
     
     with db_manager.get_session() as session:
-        result = session.query(db_manager.SearchResult).filter_by(id=result_id).first()
+        result = session.query(SearchResult).filter_by(id=result_id).first()
         if not result:
             raise HTTPException(status_code=404, detail="Ergebnis nicht gefunden")
         

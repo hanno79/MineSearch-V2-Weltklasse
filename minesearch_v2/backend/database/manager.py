@@ -9,7 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Optional, Dict, List, Any
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
 from config.base import config
@@ -177,7 +177,7 @@ class DatabaseManager:
     def cleanup_old_results(self, days: int = 30):
         """Lösche alte Suchergebnisse"""
         from sqlalchemy import func
-        cutoff_date = datetime.now() - datetime.timedelta(days=days)
+        cutoff_date = datetime.now() - timedelta(days=days)
         
         with self.get_session() as session:
             deleted = session.query(SearchResult).filter(

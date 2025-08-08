@@ -87,12 +87,12 @@ OPENROUTER_MODELS = {
         'supports_web_search': False,
         'is_free': True
     },
-    'cypher-alpha-free': {
-        'id': 'openrouter/cypher-alpha:free',
-        'name': 'Cypher Alpha (Kostenlos)',
-        'timeout': 120,  # FIXED 15.07.2025: Erhöhtes Timeout für experimentelles Modell
-        'max_tokens': 4000,  # FIXED 15.07.2025: Erhöhte Token-Anzahl für bessere Extraktion
-        'description': 'Kostenloses experimentelles Modell für Mining-Datenextraktion',
+    'horizon-beta': {
+        'id': 'openrouter/horizon-beta',
+        'name': 'Horizon Beta (Experimentell)',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'Experimentelles Horizon Beta Modell - Neueste Generation für Mining-Datenextraktion',
         'supports_web_search': False,
         'is_free': True
     },
@@ -131,6 +131,44 @@ OPENROUTER_MODELS = {
         'description': 'Moonshot AI Kimi K2 - Kostenloses multilinguale Modell für Mining-Analysen',
         'supports_web_search': False,
         'is_free': True
+    },
+    # NEUE GLM-MODELLE 06.08.2025: Z-AI GLM-Serie hinzugefügt
+    'glm-4.5': {
+        'id': 'z-ai/glm-4.5',
+        'name': 'GLM 4.5 (Z-AI)',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'Z-AI GLM 4.5 - Hochleistungs-LLM für technische Mining-Analysen',
+        'supports_web_search': False,
+        'is_free': False
+    },
+    'glm-4.5-air-free': {
+        'id': 'z-ai/glm-4.5-air:free',
+        'name': 'GLM 4.5 Air (Kostenlos)',
+        'timeout': 90,
+        'max_tokens': 6000,
+        'description': 'Z-AI GLM 4.5 Air - Kostenlose Version für schnelle Mining-Datenextraktion',
+        'supports_web_search': False,
+        'is_free': True
+    },
+    # NEUE OPENAI-MODELLE 06.08.2025: OpenAI OSS-Serie via OpenRouter
+    'gpt-oss-20b': {
+        'id': 'openai/gpt-oss-20b',
+        'name': 'GPT OSS 20B',
+        'timeout': 90,
+        'max_tokens': 8000,
+        'description': 'OpenAI GPT OSS 20B - Open Source Modell für Mining-Analysen',
+        'supports_web_search': False,
+        'is_free': False
+    },
+    'gpt-oss-120b': {
+        'id': 'openai/gpt-oss-120b',
+        'name': 'GPT OSS 120B',
+        'timeout': 150,
+        'max_tokens': 12000,
+        'description': 'OpenAI GPT OSS 120B - Größtes Open Source Modell für komplexe Mining-Dokumente',
+        'supports_web_search': False,
+        'is_free': False
     }
 }
 
@@ -418,7 +456,7 @@ ANTHROPIC_MODELS = {
         'is_free': False
     },
     'claude-opus-4': {
-        'id': 'claude-opus-4-20250514',
+        'id': 'claude-opus-4-1-20250805',
         'name': 'Claude Opus 4',
         'timeout': 180,
         'max_tokens': 12000,
@@ -595,33 +633,11 @@ GROK_MODELS = {
     }
 }
 
-# ÄNDERUNG 06.07.2025: DeepSeek Modelle hinzugefügt
-# DeepSeek Modelle (via OpenRouter)
-DEEPSEEK_MODELS = {
-    'deepseek-chat': {
-        'id': 'deepseek/deepseek-chat',
-        'name': 'DeepSeek Chat',
-        'timeout': 120,
-        'max_tokens': 8000,
-        'description': 'Fortgeschrittenes Chat-Modell mit gutem Reasoning',
-        'supports_web_search': False,
-        'supports_deep_research': False,
-        'is_free': False
-    },
-    'deepseek-reasoner': {
-        # ÄNDERUNG 09.07.2025: Korrigierte Model-ID für DeepSeek R1
-        'id': 'deepseek/deepseek-r1-0528',
-        'name': 'DeepSeek R1 (Reasoner) [BETA]',
-        'timeout': 180,
-        'max_tokens': 12000,
-        'description': 'DeepSeek R1 - Experimentell: Niedriger Feldabdeckung, optimiert für Reasoning statt Datenextraktion',
-        'supports_web_search': False,
-        'supports_deep_research': True,
-        'is_free': False
-    }
-}
+# ENTFERNT 06.08.2025: DeepSeek-Duplikate eliminiert
+# DeepSeek-Modelle werden nur noch über OpenRouter bereitgestellt
 
 # Zusammenführung aller Modelle für einfachen Zugriff
+# BEREINIGT 06.08.2025: DeepSeek-Duplikate entfernt
 MODELS_CONFIG = {
     'perplexity': PERPLEXITY_MODELS,
     'openrouter': OPENROUTER_MODELS,
@@ -634,6 +650,6 @@ MODELS_CONFIG = {
     'openai': OPENAI_MODELS,
     'anthropic': ANTHROPIC_MODELS,
     'gemini': GEMINI_MODELS,
-    'grok': GROK_MODELS,
-    'deepseek': DEEPSEEK_MODELS
+    'grok': GROK_MODELS
+    # 'deepseek': DEEPSEEK_MODELS  # ENTFERNT: Duplikate eliminiert, DeepSeek nur über OpenRouter
 }

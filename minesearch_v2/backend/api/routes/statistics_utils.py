@@ -206,9 +206,10 @@ class StatisticsCalculator:
         
         result_counts = []
         for result in search_results:
-            if result.sources_json:
+            if result.sources:
                 try:
-                    sources = json.loads(result.sources_json) if isinstance(result.sources_json, str) else result.sources_json
+                    # BUGFIX 07.08.2025: Attribute heißt 'sources', nicht 'sources_json'
+                    sources = result.sources if isinstance(result.sources, list) else []
                     if isinstance(sources, list):
                         result_counts.append(len(sources))
                 except (json.JSONDecodeError, TypeError):
@@ -216,6 +217,173 @@ class StatisticsCalculator:
         
         return statistics.mean(result_counts) if result_counts else 0.0
     
+    def calculate_model_consistency(self, search_results: List, model_id: str) -> Dict[str, Any]:
+        """
+        NEUE METHODE: Berechnet Modell-Konsistenz für mehrfache Suchen
+        Analysiert wie oft ein Modell bei derselben Mine dieselben Werte zurückgibt
+        """
+        if not search_results:
+            return {'overall_consistency': 0.0, 'field_consistency': {}, 'consistency_grade': 'Keine Daten'}
+        
+        # Gruppiere Ergebnisse nach Mine
+        mine_results = {}
+        for result in search_results:
+            mine_name = result.mine_name if hasattr(result, 'mine_name') else 'unknown'
+            if mine_name not in mine_results:
+                mine_results[mine_name] = []
+            mine_results[mine_name].append(result)
+        
+        # Berechne Konsistenz für Minen mit mehrfachen Suchen
+        field_consistency_data = {}
+        total_comparisons = 0
+        total_matches = 0
+        
+        for mine_name, results in mine_results.items():
+            if len(results) < 2:  # Brauchen mindestens 2 Ergebnisse für Vergleich
+                continue
+            
+            # Vergleiche alle Paare von Ergebnissen für diese Mine
+            for i in range(len(results)):
+                for j in range(i + 1, len(results)):
+                    result1, result2 = results[i], results[j]
+                    
+                    if result1.structured_data and result2.structured_data:
+                        try:
+                            data1 = json.loads(result1.structured_data) if isinstance(result1.structured_data, str) else result1.structured_data
+                            data2 = json.loads(result2.structured_data) if isinstance(result2.structured_data, str) else result2.structured_data
+                            
+                            if isinstance(data1, dict) and isinstance(data2, dict):
+                                # Vergleiche jedes Feld
+                                common_fields = set(data1.keys()) & set(data2.keys())
+                                for field in common_fields:
+                                    if field not in field_consistency_data:
+                                        field_consistency_data[field] = {'matches': 0, 'total': 0}
+                                    
+                                    field_consistency_data[field]['total'] += 1
+                                    total_comparisons += 1
+                                    
+                                    # Normalisiere Werte für Vergleich (Groß-/Kleinschreibung, Whitespace)
+                                    val1 = str(data1[field]).strip().lower() if data1[field] else ''
+                                    val2 = str(data2[field]).strip().lower() if data2[field] else ''
+                                    
+                                    if val1 and val2 and val1 == val2:
+                                        field_consistency_data[field]['matches'] += 1
+                                        total_matches += 1
+                                        
+                        except (json.JSONDecodeError, TypeError):
+                            continue
+        
+        # Berechne Konsistenz-Prozentsätze
+        field_consistency = {}
+        for field, data in field_consistency_data.items():
+            if data['total'] > 0:
+                consistency_pct = (data['matches'] / data['total']) * 100
+                field_consistency[field] = {
+                    'consistency_percent': consistency_pct,
+                    'matches': data['matches'],
+                    'total_comparisons': data['total'],
+                    'grade': self._get_consistency_grade(consistency_pct)
+                }
+        
+        # Gesamtkonsistenz
+        overall_consistency = (total_matches / total_comparisons * 100) if total_comparisons > 0 else 0.0
+        
+        return {
+            'overall_consistency': overall_consistency,
+            'field_consistency': field_consistency,
+            'consistency_grade': self._get_consistency_grade(overall_consistency),
+            'total_mine_comparisons': len([m for m in mine_results.values() if len(m) >= 2]),
+            'total_field_comparisons': total_comparisons
+        }
+    
+    def identify_most_found_fields(self, search_results: List) -> Dict[str, Any]:
+        """
+        NEUE METHODE: Identifiziert welche Felder ein Modell am häufigsten/besten findet
+        """
+        if not search_results:
+            return {'top_fields': [], 'field_success_rates': {}}
+        
+        field_stats = {}
+        
+        for result in search_results:
+            if result.structured_data:
+                try:
+                    data = json.loads(result.structured_data) if isinstance(result.structured_data, str) else result.structured_data
+                    if isinstance(data, dict):
+                        for field, value in data.items():
+                            if field not in field_stats:
+                                field_stats[field] = {'found': 0, 'total': 0, 'quality_sum': 0}
+                            
+                            field_stats[field]['total'] += 1
+                            
+                            # Bewerte Qualität des gefundenen Wertes
+                            if value and str(value).strip() and value not in ['X', '-', 'N/A', 'unknown']:
+                                field_stats[field]['found'] += 1
+                                
+                                # Qualitäts-Score basierend auf Länge und Plausibilität
+                                quality_score = min(len(str(value)) / 10, 1.0)  # Längere Antworten = höhere Qualität
+                                field_stats[field]['quality_sum'] += quality_score
+                                
+                except (json.JSONDecodeError, TypeError):
+                    continue
+        
+        # Berechne Success Rates und sortiere
+        field_success_rates = {}
+        for field, stats in field_stats.items():
+            if stats['total'] > 0:
+                success_rate = (stats['found'] / stats['total']) * 100
+                avg_quality = (stats['quality_sum'] / stats['found']) if stats['found'] > 0 else 0
+                field_success_rates[field] = {
+                    'success_rate': success_rate,
+                    'found_count': stats['found'],
+                    'total_attempts': stats['total'],
+                    'avg_quality': avg_quality,
+                    'combined_score': success_rate * (1 + avg_quality)  # Kombinierter Score
+                }
+        
+        # Sortiere nach combined_score
+        top_fields = sorted(field_success_rates.items(), 
+                          key=lambda x: x[1]['combined_score'], 
+                          reverse=True)[:10]  # Top 10
+        
+        return {
+            'top_fields': [{'field': field, **data} for field, data in top_fields],
+            'field_success_rates': field_success_rates
+        }
+    
+    def _get_consistency_grade(self, consistency_percent: float) -> str:
+        """Bestimmt Konsistenz-Bewertung basierend auf Prozentsatz"""
+        if consistency_percent >= 90:
+            return 'Excellent'
+        elif consistency_percent >= 80:
+            return 'Good'
+        elif consistency_percent >= 70:
+            return 'Fair'
+        elif consistency_percent >= 50:
+            return 'Poor'
+        else:
+            return 'Very Poor'
+    
+    def _determine_performance_category(self, success_rate: float, consistency: float) -> str:
+        """
+        NEUE METHODE: Bestimmt Performance-Kategorie basierend auf Success Rate und Konsistenz
+        """
+        # Kombinierter Score aus Success Rate und Konsistenz
+        combined_score = (success_rate + consistency) / 2
+        
+        if combined_score >= 85:
+            return 'Excellent'
+        elif combined_score >= 75:
+            return 'Very Good'
+        elif combined_score >= 65:
+            return 'Good'
+        elif combined_score >= 55:
+            return 'Fair'
+        elif combined_score >= 40:
+            return 'Poor'
+        else:
+            return 'Very Poor'
+
     def analyze_model_specialization(self, search_results: List) -> Dict[str, Any]:
         """Analysiert Modell-Spezialisierung"""
         if not search_results:

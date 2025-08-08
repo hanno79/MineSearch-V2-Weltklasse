@@ -17,18 +17,18 @@ from enhanced_source_discovery import EnhancedSourceDiscovery
 from providers.registry import provider_registry
 from providers.base_provider import SearchResult
 from cache_service import get_cache_service, cached_search
-from search_service_legacy import LegacySearchFunctions
+# BEREINIGUNG 06.08.2025: Legacy import entfernt - Datei wurde nach to_delete/ verschoben
+# from search_service_legacy import LegacySearchFunctions
 from cost_monitor import cost_monitor
 from database.manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
 
-class MineSearchService(LegacySearchFunctions):
+class MineSearchService:
     """Hauptklasse für Mining-Suchen mit Provider-Unterstützung"""
     
     def __init__(self):
-        super().__init__()
         # Provider-basierte Architektur
         provider_registry.initialize(config.PROVIDERS)
         self.registry = provider_registry
@@ -393,8 +393,21 @@ class MineSearchService(LegacySearchFunctions):
         # DATABASE INTEGRATION: Speichere Suchergebnis in Database
         # BUGFIX 20.07.2025: Verwende tatsächlich verwendetes Modell statt Request-Modell
         try:
-            search_duration = result.metadata.get("response_time", 0) / 1000.0  # Convert ms to seconds
-            
+            # Robuste Ermittlung der Laufzeit (Sekunden):
+            # 1) Provider liefert sie direkt als result.search_duration (sek.)
+            # 2) Alternativ in result.metadata als response_time_ms / response_time (ms)
+            # 3) Fallback: None (nicht 0 eintragen, um falsche Durchschnitte zu vermeiden)
+            search_duration = None
+            if hasattr(result, 'search_duration') and result.search_duration:
+                search_duration = float(result.search_duration)
+            else:
+                # Unterschiedliche Keys unterstützen
+                meta = result.metadata or {}
+                if 'response_time_ms' in meta and meta['response_time_ms']:
+                    search_duration = float(meta['response_time_ms']) / 1000.0
+                elif 'response_time' in meta and meta['response_time']:
+                    search_duration = float(meta['response_time']) / 1000.0
+
             # Bestimme tatsächlich verwendetes Modell aus Result oder verwende übergebenes
             actual_model_used = result.metadata.get('model_used') or model
             logger.info(f"[DB] Speichere mit model_used: {actual_model_used} (original request: {model})")
@@ -409,7 +422,8 @@ class MineSearchService(LegacySearchFunctions):
                     'type': s.get('type', 'unknown'),
                     'reliability': s.get('reliability', 0.5)
                 } for s in sources],
-                search_duration=search_duration,
+                # Speichere nur, wenn messbar (> 0). None bleibt NULL in DB
+                search_duration=search_duration if (search_duration is not None and search_duration > 0) else None,
                 data_quality=quality_metrics.get('completion_percentage', 0),
                 success=True,
                 country=country,
@@ -600,7 +614,7 @@ class MineSearchService(LegacySearchFunctions):
             model: Verwendetes Modell
         """
         try:
-            from database.models import Source
+            from database import Source
             from urllib.parse import urlparse
             
             logger.info(f"[SOURCES TRACKING] Tracke {len(sources)} Sources für {model}")
