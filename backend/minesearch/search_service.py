@@ -10,21 +10,21 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 
 from minesearch.config.base import config, Config, CSV_COLUMNS, FIELDS_WITHOUT_SOURCES
-from .utils import (
+from minesearch.utils import (
     normalize_accents,
     generate_name_variants,
     generate_multilingual_search_terms,
     get_country_config,
 )
-from .data_extraction import DataExtractor, assign_sources_to_data
-from .source_discovery import extract_sources_from_content
-from .enhanced_source_discovery import EnhancedSourceDiscovery
-from .providers.registry import provider_registry
-from .providers.base_provider import SearchResult
-from .cache_service import get_cache_service, cached_search
+from minesearch.data_extraction import DataExtractor, assign_sources_to_data
+from minesearch.source_discovery import extract_sources_from_content
+from minesearch.enhanced_source_discovery import EnhancedSourceDiscovery
+from minesearch.providers.registry import provider_registry
+from minesearch.providers.base_provider import SearchResult
+from minesearch.cache_service import get_cache_service, cached_search
 # BEREINIGUNG 06.08.2025: Legacy import entfernt - Datei wurde nach to_delete/ verschoben
 # from search_service_legacy import LegacySearchFunctions
-from .cost_monitor import cost_monitor
+from minesearch.cost_monitor import cost_monitor
 from minesearch.database.manager import DatabaseManager
 
 logger = logging.getLogger(__name__)

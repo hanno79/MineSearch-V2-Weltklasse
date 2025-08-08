@@ -40,7 +40,7 @@ class ServiceContainer:
     def mine_search_service(self):
         """Lazy loading MineSearchService"""
         if self._mine_search_service is None:
-            from .search_service import MineSearchService
+            from minesearch.search_service import MineSearchService
             self._mine_search_service = MineSearchService()
             logger.info("[SERVICE-CONTAINER] MineSearchService created")
         return self._mine_search_service
@@ -49,7 +49,7 @@ class ServiceContainer:
     def enhanced_search_service(self):
         """Lazy loading EnhancedMultiProviderSearchService"""
         if self._enhanced_search_service is None:
-            from .search_service_multi_enhanced import EnhancedMultiProviderSearchService
+            from minesearch.search_service_multi_enhanced import EnhancedMultiProviderSearchService
             self._enhanced_search_service = EnhancedMultiProviderSearchService()
             logger.info("[SERVICE-CONTAINER] EnhancedMultiProviderSearchService created")
         return self._enhanced_search_service
@@ -58,7 +58,7 @@ class ServiceContainer:
     def multi_search_service(self):
         """Lazy loading MultiProviderSearchService"""
         if self._multi_search_service is None:
-            from .search_service_multi import MultiProviderSearchService
+            from minesearch.search_service_multi import MultiProviderSearchService
             self._multi_search_service = MultiProviderSearchService()
             logger.info("[SERVICE-CONTAINER] MultiProviderSearchService created")
         return self._multi_search_service
@@ -67,7 +67,7 @@ class ServiceContainer:
     def benchmark_service(self):
         """Lazy loading ModelBenchmarkService"""
         if self._benchmark_service is None:
-            from .model_benchmark_service import ModelBenchmarkService
+            from minesearch.model_benchmark_service import ModelBenchmarkService
             self._benchmark_service = ModelBenchmarkService()
             logger.info("[SERVICE-CONTAINER] ModelBenchmarkService created")
         return self._benchmark_service
@@ -76,7 +76,7 @@ class ServiceContainer:
     def web_fetch_service(self):
         """Lazy loading WebFetchService"""
         if self._web_fetch_service is None:
-            from .web_fetch_service import WebFetchService
+            from minesearch.web_fetch_service import WebFetchService
             self._web_fetch_service = WebFetchService()
             logger.info("[SERVICE-CONTAINER] WebFetchService created")
         return self._web_fetch_service
@@ -85,7 +85,7 @@ class ServiceContainer:
     def validation_service(self):
         """Lazy loading ValidationService"""
         if self._validation_service is None:
-            from .validation_service import ValidationService
+            from minesearch.validation_service import ValidationService
             self._validation_service = ValidationService()
             logger.info("[SERVICE-CONTAINER] ValidationService created")
         return self._validation_service
