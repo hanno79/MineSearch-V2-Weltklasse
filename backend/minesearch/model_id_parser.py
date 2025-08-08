@@ -9,7 +9,7 @@ Beschreibung: Model-ID Parser für Batch → Individual Models
 
 import logging
 from typing import List, Dict, Any
-from .database import db_manager, ModelStatisticsComprehensive
+from minesearch.database import db_manager, ModelStatisticsComprehensive
 
 logger = logging.getLogger(__name__)
 

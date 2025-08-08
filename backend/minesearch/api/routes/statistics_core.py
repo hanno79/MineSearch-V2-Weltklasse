@@ -12,7 +12,7 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from ...database import (
+from minesearch.database import (
     db_manager,
     Source,
     SearchResult,

@@ -33,11 +33,28 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r minesearch_v2/requirements.txt
+        pip install uvicorn==0.32.0 fastapi==0.115.0 python-dotenv==1.0.1
     
     - name: Install Playwright browsers
       run: |
         pip install playwright
         playwright install chromium
+    - name: Start backend in SAFE_MODE (port 8000)
+      env:
+        SAFE_MODE: "1"
+      run: |
+        nohup python -m uvicorn minesearch.main:app --host 0.0.0.0 --port 8000 >/dev/null 2>&1 &
+        # Warten, bis Port 8000 bereit ist
+        for i in {1..20}; do curl -sSf http://127.0.0.1:8000/static/index.html >/dev/null && break || sleep 1; done
+        curl -sSf http://127.0.0.1:8000/static/index.html >/dev/null
+
+    - name: UI smoke test (tabs)
+      run: |
+        node -v || (sudo apt-get update && sudo apt-get install -y nodejs npm)
+        npm init -y >/dev/null 2>&1 || true
+        npm i -D --silent playwright@1.47.2 >/dev/null 2>&1
+        npx playwright install --with-deps chromium >/dev/null 2>&1 || true
+        UI_BASE_URL='http://127.0.0.1:8000/static/index.html' node scripts/ui_smoke_test.js
     
     - name: Lint with ruff (disabled)
       if: false
