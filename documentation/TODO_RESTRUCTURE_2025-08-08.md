@@ -30,7 +30,7 @@ Ziel: Struktur-Aufräumung ohne Funktionsänderung (API stabil, Port 8000, beste
 - [ ] Einheitliche absolute Imports: `from minesearch ...` innerhalb `backend/minesearch`
 - [x] Offizieller Startkommando: `uvicorn minesearch.main:app --port 8000` (SAFE_MODE validiert)
 - [x] Static Mount zeigt auf `frontend/`
-- [ ] CI aktualisieren (Install, Test, Artefakte, Pfade):
+- [x] CI aktualisieren (Install, Test, Artefakte, Pfade): SAFE_MODE‑Start + UI‑Smoketest ergänzt
   - [ ] Dependencies aus `minesearch_v2/requirements.txt` → ggf. `requirements.txt` vereinheitlichen (später)
   - [ ] Test-Run: `python minesearch_v2/run_tests.py` → Übergang/Adapter oder neues Script (ohne Logik-Änderungen)
   - [ ] Playwright-Smoketest gegen `http://localhost:8000/static/index.html`
@@ -44,6 +44,8 @@ Ziel: Struktur-Aufräumung ohne Funktionsänderung (API stabil, Port 8000, beste
 - 2025-08-08: `style.css` nach `frontend/` verschoben (404 behoben)
 - 2025-08-08: Übergangs‑Entrypoint `minesearch.main:app` angelegt (P2)
 - 2025-08-08: `get_api_router()` mit lazy Imports, `main` nutzt `get_api_router()` außerhalb SAFE_MODE
+ - 2025-08-08: Teilmigration auf absolute Importe (`minesearch.*`) in Kern‑Services, DB und Providern
+ - 2025-08-08: CI ergänzt: SAFE_MODE‑Start (8000) + UI‑Smoketest gegen `/static/index.html`
  - 2025-08-08: CI-Workflow ergänzt: SAFE_MODE‑Start (8000) + UI‑Smoketest gegen `/static/index.html`
 
 ## P3 – Cleanup & Dokumentation
