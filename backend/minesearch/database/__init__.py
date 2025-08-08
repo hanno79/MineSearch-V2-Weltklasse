@@ -6,7 +6,7 @@ Beschreibung: Datenbank-Modul f√ºr MineSearch v2 - Aufgeteilt aus database.py f√
 """
 
 # Import all models
-from .models import (
+from minesearch.database.models import (
     Base,
     Source,
     Mine,
@@ -20,10 +20,10 @@ from .models import (
 )
 
 # Import connection functions
-from .connection import init_db, get_db, get_session
+from minesearch.database.connection import init_db, get_db, get_session
 
 # Import database manager
-from .manager import DatabaseManager
+from minesearch.database.manager import DatabaseManager
 
 # Create global database manager instance
 db_manager = DatabaseManager()

@@ -7,7 +7,7 @@ Beschreibung: Provider-Konfiguration für MineSearch
 
 # DEFENSIVE IMPORT 15.07.2025: Verhindere AttributeError bei APIKeysConfig
 try:
-    from .api_keys import APIKeysConfig
+    from minesearch.config.api_keys import APIKeysConfig
 except ImportError as e:
     print(f"WARNING: Could not import APIKeysConfig: {e}")
     # Fallback APIKeysConfig
@@ -27,7 +27,7 @@ except ImportError as e:
         GROK_API_KEY = os.getenv('GROK_API_KEY', '')
         DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
 
-from .models import (
+from minesearch.config.models import (
     PERPLEXITY_MODELS,
     OPENROUTER_MODELS,
     ABACUS_MODELS,

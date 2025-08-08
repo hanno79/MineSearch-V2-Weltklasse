@@ -7,7 +7,7 @@ Beschreibung: Kostenüberwachung für Premium-Modelle
 
 import logging
 from typing import Dict, Set, List
-from .model_tier_strategy import ModelTierStrategy
+from minesearch.model_tier_strategy import ModelTierStrategy
 
 logger = logging.getLogger(__name__)
 

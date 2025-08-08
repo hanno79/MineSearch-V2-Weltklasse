@@ -8,22 +8,22 @@ Beschreibung: Refactorierte Datenextraktion für MineSearch - Hauptmodul
 import re
 import logging
 from typing import Dict, List, Any, Optional
-from config import config, CSV_COLUMNS, FIELDS_WITHOUT_SOURCES
-from .utils import clean_extracted_value, get_country_config
-from .source_discovery import extract_sources_from_content
+from minesearch.config import config, CSV_COLUMNS, FIELDS_WITHOUT_SOURCES
+from minesearch.utils import clean_extracted_value, get_country_config
+from minesearch.source_discovery import extract_sources_from_content
 
 # Importiere neue Module
-from .extraction_patterns import get_extraction_patterns, get_enhanced_coordinate_patterns
-from .extraction_validators import (
+from minesearch.extraction_patterns import get_extraction_patterns, get_enhanced_coordinate_patterns
+from minesearch.extraction_validators import (
     is_placeholder_value, validate_coordinate, 
     validate_restoration_cost, validate_year, validate_area
 )
-from .extraction_processors import (
+from minesearch.extraction_processors import (
     process_restoration_costs, process_activity_status,
     split_country_region, find_region_from_content,
     process_sources, post_process_data, clean_field_value
 )
-from .source_manager import SourceManager
+from minesearch.source_manager import SourceManager
 
 logger = logging.getLogger(__name__)
 

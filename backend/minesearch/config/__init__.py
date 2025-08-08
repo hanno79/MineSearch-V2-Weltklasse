@@ -9,12 +9,12 @@ Beschreibung: Config Package für MineSearch
 from dotenv import load_dotenv
 load_dotenv()
 
-from .base import Config, CSV_COLUMNS, FIELDS_WITHOUT_SOURCES
-from .api_keys import APIKeysConfig
-from .providers import PROVIDERS_CONFIG
-from .models import MODELS_CONFIG
-from .country_config import COUNTRY_CONFIG
-from .source_sharing import SOURCE_SHARING_CONFIG, CACHE_CONFIG
+from minesearch.config.base import Config, CSV_COLUMNS, FIELDS_WITHOUT_SOURCES
+from minesearch.config.api_keys import APIKeysConfig
+from minesearch.config.providers import PROVIDERS_CONFIG
+from minesearch.config.models import MODELS_CONFIG
+from minesearch.config.country_config import COUNTRY_CONFIG
+from minesearch.config.source_sharing import SOURCE_SHARING_CONFIG, CACHE_CONFIG
 
 # Zentrale Config-Instanz
 config = Config()

@@ -10,9 +10,9 @@ import logging
 from fastapi import APIRouter
 
 # Refactored Module imports
-from .statistics_core import statistics_core_router, STATISTICS_FIELD_ORDER
-from .statistics_advanced import statistics_advanced_router
-from .statistics_utils import statistics_calculator, statistics_analyzer, statistics_time_analyzer
+from minesearch.api.routes.statistics_core import statistics_core_router, STATISTICS_FIELD_ORDER
+from minesearch.api.routes.statistics_advanced import statistics_advanced_router
+from minesearch.api.routes.statistics_utils import statistics_calculator, statistics_analyzer, statistics_time_analyzer
 
 logger = logging.getLogger(__name__)
 

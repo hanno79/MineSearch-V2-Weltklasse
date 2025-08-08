@@ -11,7 +11,7 @@ import logging
 from typing import Generator
 
 from minesearch.config.base import config as Config
-from .models import Base
+from minesearch.database.models import Base
 
 logger = logging.getLogger(__name__)
 

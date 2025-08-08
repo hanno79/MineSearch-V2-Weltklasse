@@ -8,9 +8,9 @@ Beschreibung: Basis-Konfiguration für MineSearch
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from .api_keys import APIKeysConfig
-from .providers import PROVIDERS_CONFIG
-from .models import MODELS_CONFIG
+from minesearch.config.api_keys import APIKeysConfig
+from minesearch.config.providers import PROVIDERS_CONFIG
+from minesearch.config.models import MODELS_CONFIG
 
 # CSV-Spalten Definition
 # ÄNDERUNG 13.07.2025: ID-Feld entfernt - wird systemseitig generiert, nicht aus Quellen extrahiert
