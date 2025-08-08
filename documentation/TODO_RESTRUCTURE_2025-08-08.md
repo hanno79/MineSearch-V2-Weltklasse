@@ -33,10 +33,10 @@ Ziel: Struktur-Aufräumung ohne Funktionsänderung (API stabil, Port 8000, beste
 - [x] CI aktualisieren (Install, Test, Artefakte, Pfade): SAFE_MODE‑Start + UI‑Smoketest ergänzt
   - [ ] Dependencies aus `minesearch_v2/requirements.txt` → ggf. `requirements.txt` vereinheitlichen (später)
   - [ ] Test-Run: `python minesearch_v2/run_tests.py` → Übergang/Adapter oder neues Script (ohne Logik-Änderungen)
-  - [ ] Playwright-Smoketest gegen `http://localhost:8000/static/index.html`
+  - [x] Playwright-Smoketest gegen `http://localhost:8000/static/index.html`
 
 ### Akzeptanzkriterien P2
-- [ ] Alle Imports funktionieren ohne `sys.path`-Hacks
+- [x] Alle Imports funktionieren ohne `sys.path`-Hacks
 - [ ] CI‑Job grün (Build + UI‑Smoke)
 
 ## Fortschritt/Log
@@ -44,8 +44,8 @@ Ziel: Struktur-Aufräumung ohne Funktionsänderung (API stabil, Port 8000, beste
 - 2025-08-08: `style.css` nach `frontend/` verschoben (404 behoben)
 - 2025-08-08: Übergangs‑Entrypoint `minesearch.main:app` angelegt (P2)
 - 2025-08-08: `get_api_router()` mit lazy Imports, `main` nutzt `get_api_router()` außerhalb SAFE_MODE
- - 2025-08-08: Teilmigration auf absolute Importe (`minesearch.*`) in Kern‑Services, DB, Providern und Routen (search/statistics/batch)
- - 2025-08-08: CI ergänzt: SAFE_MODE‑Start (8000) + UI‑Smoketest gegen `/static/index.html`
+ - 2025-08-08: Teilmigration → vollständige Migration auf absolute Importe (`minesearch.*`) in Kern‑Services, DB, Providern und Routen (inkl. `batch`, `cache`, Discovery, Benchmarks)
+ - 2025-08-08: CI ergänzt: SAFE_MODE‑Start (8000) + UI‑Smoketest gegen `/static/index.html`; lokaler Smoke grün
 
 ## P3 – Cleanup & Dokumentation
 - [ ] Entfernen/Archivieren veralteter V1‑Reste in `legacy/` (nur falls erforderlich)

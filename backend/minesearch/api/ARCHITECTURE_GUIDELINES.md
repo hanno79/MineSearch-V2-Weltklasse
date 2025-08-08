@@ -312,6 +312,18 @@ API_STANDARDS = {
 
 ## 🚀 DEPLOYMENT-GUIDELINES
 
+### Startkommandos (FastAPI)
+
+```bash
+# SAFE_MODE: nur Static/Health, schnelle Diagnose
+SAFE_MODE=1 uvicorn minesearch.main:app --host 0.0.0.0 --port 8000
+
+# Vollbetrieb: Provider/DB‑Initialisierung aktiv
+uvicorn minesearch.main:app --host 0.0.0.0 --port 8000
+```
+
+Statische Dateien werden unter `/static` aus `/app/frontend` ausgeliefert. Die Root‑Route `/` leitet in SAFE_MODE auf `/static/index.html` um.
+
 ### Health-Checks
 ```python
 @app.get("/health")

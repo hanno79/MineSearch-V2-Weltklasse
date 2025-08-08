@@ -1,5 +1,40 @@
 # MineSearch - Multi-Agent Mining Research System
 
+## Schnellstart (Backend v2 – FastAPI)
+
+- Entwicklung (SAFE_MODE – nur Static & Health, keine Provider/DB):
+
+```bash
+SAFE_MODE=1 uvicorn minesearch.main:app --host 0.0.0.0 --port 8000
+# UI: http://localhost:8000/static/index.html
+```
+
+- Vollbetrieb (Provider/DB werden initialisiert):
+
+```bash
+uvicorn minesearch.main:app --host 0.0.0.0 --port 8000
+```
+
+- UI‑Smoketest (Playwright):
+
+```bash
+UI_BASE_URL=http://127.0.0.1:8000/static/index.html node scripts/ui_smoke_test.js
+```
+
+### Projektstruktur (v2)
+
+```
+backend/minesearch/        # FastAPI Backend (Python‑Paket `minesearch`)
+frontend/                  # Statisches Frontend, über /static ausgeliefert
+minesearch/                # Adapter‑Paket, mapped auf backend.minesearch (Entrypoint)
+documentation/             # Reorg/TODO & Architektur‑Dokumente
+```
+
+Wichtige Invarianten:
+- Port 8000 exklusiv für MineSearch (UI unter `/static/index.html`)
+- `.env` im Projekt‑Root (nicht committen), DB unter `/app/data/minesearch.db`
+
+
 Ein hochperformantes, KI-gestütztes System zur automatisierten Recherche von Bergbauinformationen weltweit. Entwickelt mit modernster Multi-Agent-Architektur für umfassende Datenerfassung aus diversen Quellen.
 
 ## 🚀 Features
