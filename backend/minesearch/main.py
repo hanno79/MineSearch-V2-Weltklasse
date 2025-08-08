@@ -26,8 +26,8 @@ from .api.handlers import setup_exception_handlers
 SAFE_MODE = os.getenv('SAFE_MODE', '0') == '1'
 
 if not SAFE_MODE:
-    from .providers.registry import provider_registry
-    from .config.api_keys import APIKeysConfig
+    from minesearch.providers.registry import provider_registry
+    from minesearch.config.api_keys import APIKeysConfig
 
 # Logging auf Deutsch
 logging.basicConfig(

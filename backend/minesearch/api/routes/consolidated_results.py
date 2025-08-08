@@ -475,7 +475,7 @@ async def get_consolidated_results(
         consolidated_results = []
         for mine_name, mine_data in mines_data.items():
             # FIELD-CONSOLIDATION-FIX 06.08.2025: Erweiterte Field-Initialisierung mit Konsolidierungslogik
-            from config.base import CSV_COLUMNS
+            from minesearch.config.base import CSV_COLUMNS
             logger.info(f"[FIELD-INIT] Prüfe {len(CSV_COLUMNS)} erwartete Felder für Mine '{mine_name}' nach Konsolidierung")
             fields_added = 0
             for expected_field in CSV_COLUMNS:

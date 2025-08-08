@@ -18,7 +18,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.base import config as Config
+from minesearch.config.base import config as Config
 from data_extraction import DataExtractor
 from source_discovery import extract_sources_from_content
 from enhanced_source_discovery import EnhancedSourceDiscovery

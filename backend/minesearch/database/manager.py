@@ -337,7 +337,7 @@ class DatabaseManager:
             
             # Model-Performance aus aggregierten ModelStatistics + alle konfigurierten Modelle
             from sqlalchemy import cast, Float
-            from config.providers import PROVIDERS_CONFIG
+            from minesearch.config.providers import PROVIDERS_CONFIG
             
             # Hole alle konfigurierten Modelle
             all_configured_models = []
