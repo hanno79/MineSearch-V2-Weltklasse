@@ -5,7 +5,7 @@ Version: 2.0
 Beschreibung: Refactored Multi-Provider Search Service für MineSearch (CLAUDE.md konform)
 """
 
-from search_service_advanced import SearchServiceAdvanced
+from minesearch.search_service_advanced import SearchServiceAdvanced
 
 # Hauptklasse für Multi-Provider Search Service
 class MultiProviderSearchService(SearchServiceAdvanced):
@@ -23,5 +23,5 @@ class MultiProviderSearchService(SearchServiceAdvanced):
         super().__init__()
 
 # Service-Instanz für Kompatibilität (DEPRECATED - use services_container)
-from services_container import services
+from minesearch.services_container import services
 multi_search_service = services.multi_search_service

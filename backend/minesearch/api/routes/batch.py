@@ -113,7 +113,7 @@ async def batch_search(
         results = []
         
         # Shared Service Container
-        from services_container import services
+        from minesearch.services_container import services
         
         # PHASE 2.3: COMPREHENSIVE SEARCH ORCHESTRATOR Integration
         from comprehensive_search_orchestrator import comprehensive_search_orchestrator
@@ -267,7 +267,7 @@ async def batch_search(
                 logger.info(f"[BATCH-DEBUG] Data Keys: {list(first_result['data'].keys())}")
         
         # Erstelle HTML-Antwort
-        from html_utils import create_batch_results_table
+        from minesearch.html_utils import create_batch_results_table
         html_content = create_batch_results_table(results)
         
         # Speichere Ergebnisse im Cache für Download
@@ -304,7 +304,7 @@ async def get_batch_results(cache_key: str):
     if cache_key not in batch_results_cache:
         raise HTTPException(status_code=404, detail="Keine Ergebnisse gefunden")
     
-    from html_utils import create_batch_results_table
+    from minesearch.html_utils import create_batch_results_table
     
     results = batch_results_cache[cache_key]
     html = create_batch_results_table(results)

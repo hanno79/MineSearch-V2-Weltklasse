@@ -677,5 +677,5 @@ class MineSearchService:
 
 
 # Service-Instanz für Kompatibilität (DEPRECATED - use services_container)
-from services_container import services
+from minesearch.services_container import services
 search_service = services.mine_search_service

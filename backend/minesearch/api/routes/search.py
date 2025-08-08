@@ -45,7 +45,7 @@ async def search_mine(request: MineSearchRequest):
         # DEFENSIVE-FIX 19.07.2025: Verwende robusten Wrapper
         # BUGFIX 20.07.2025: Async Wrapper Call
         try:
-            from api_fix_wrapper import defensive_search
+            from minesearch.api_fix_wrapper import defensive_search
             logger.info(f"[SEARCH API] Verwende defensiven Wrapper für {model}")
             result = await defensive_search.safe_search(
                 mine_name=request.mine_name,
@@ -373,7 +373,7 @@ async def comprehensive_search(request: MineSearchRequest):
 async def search_mine_html(request: MineSearchRequest, model: str):
     """Sucht nach Mining-Informationen und gibt HTML zurück"""
     try:
-        from html_utils import create_result_card, create_error_card
+        from minesearch.html_utils import create_result_card, create_error_card
         
         result = await services.mine_search_service.search_mine(
             mine_name=request.mine_name,
