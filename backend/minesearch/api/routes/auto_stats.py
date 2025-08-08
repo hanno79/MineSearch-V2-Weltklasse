@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from auto_stats_updater import auto_stats_updater
 from minesearch.database import db_manager
-from database.models import ModelStatistics, ModelSummary
+from minesearch.database.models import ModelStatistics, ModelSummary
 from sqlalchemy import func, Integer, cast
 
 logger = logging.getLogger(__name__)

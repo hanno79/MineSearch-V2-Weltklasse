@@ -8,7 +8,7 @@ Beschreibung: Quellen-Management Routes
 from fastapi import APIRouter, HTTPException, Query, Body
 from typing import Optional, Dict, List, Any
 import logging
-from database.models import Source
+from minesearch.database.models import Source
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
@@ -27,8 +27,7 @@ async def get_grouped_sources(
     ÄNDERUNG 09.07.2025: Neuer Endpoint für gruppierte Quellen-Darstellung
     Gruppiert Quellen nach Domain für bessere Übersichtlichkeit
     """
-    from database.manager import DatabaseManager
-    db_manager = DatabaseManager()
+    from minesearch.database import db_manager
     
     # Hole alle Quellen mit Filtern
     sources = db_manager.get_sources_for_search(
@@ -124,8 +123,7 @@ async def get_sources(
     offset: int = Query(0)
 ):
     """Hole alle Quellen aus der Datenbank mit Filtern"""
-    from database.manager import DatabaseManager
-    db_manager = DatabaseManager()
+    from minesearch.database import db_manager
     
     sources = db_manager.get_sources_for_search(
         country=country,
@@ -158,8 +156,7 @@ async def get_sources(
 @router.get("/sources/stats")
 async def get_source_statistics():
     """Hole Statistiken über die Quellen-Datenbank"""
-    from database.manager import DatabaseManager
-    db_manager = DatabaseManager()
+    from minesearch.database import db_manager
     
     stats = db_manager.get_statistics()
     return {
@@ -170,8 +167,7 @@ async def get_source_statistics():
 @router.get("/sources/{source_id}")
 async def get_source_by_id(source_id: int):
     """Hole einzelne Quelle nach ID"""
-    from database.manager import DatabaseManager
-    db_manager = DatabaseManager()
+    from minesearch.database import db_manager
     
     with db_manager.get_session() as session:
         source = session.query(Source).filter_by(id=source_id).first()

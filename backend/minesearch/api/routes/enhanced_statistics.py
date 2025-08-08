@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import func, desc, asc, and_, or_
 
 from minesearch.database import db_manager
-from database.models import ModelStatistics, ModelSummary, FieldStatistics, SearchResult
+from minesearch.database.models import ModelStatistics, ModelSummary, FieldStatistics, SearchResult
 
 logger = logging.getLogger(__name__)
 
