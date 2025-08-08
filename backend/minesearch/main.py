@@ -19,7 +19,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from .config.base import config
+from minesearch.config.base import config
 from .api.middleware import setup_middleware
 from .api.handlers import setup_exception_handlers
 

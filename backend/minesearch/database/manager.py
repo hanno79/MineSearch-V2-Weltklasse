@@ -12,7 +12,7 @@ import logging
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
-from config.base import config
+from minesearch.config.base import config
 from .models import Base, Source, SearchResult, ModelStatistics, FieldConsistency, ModelSummary, FieldStatistics
 
 logger = logging.getLogger(__name__)
