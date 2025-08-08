@@ -21,7 +21,7 @@ class DefensiveSearchWrapper:
     def _initialize_service(self):
         """Initialisiere Search Service mit Fallback"""
         try:
-            from search_service import MineSearchService
+            from minesearch.search_service import MineSearchService
             self.service = MineSearchService()
             logger.info("✅ MineSearchService erfolgreich initialisiert")
         except Exception as e:
