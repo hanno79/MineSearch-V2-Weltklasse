@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Undefined Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .test-result { margin: 5px 0; padding: 8px; border-radius: 3px; }
+        .pass { background: #d4edda; color: #155724; }
+        .fail { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+        td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        button { padding: 10px 15px; margin: 5px; border: none; border-radius: 3px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .debug-hint { margin: 10px 0; padding: 10px; background: #f8f9fa; border-left: 4px solid #007bff; }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Comprehensive Undefined Fix Test</h1>
+    
+    <div class="debug-hint">
+        <strong>Debug-Konsole:</strong> Drücke <kbd>Strg+Shift+D</kbd> um die Debug-Konsole zu öffnen.<br>
+        Diese Seite testet alle Aspekte des undefined-Schutzsystems.
+    </div>
+    
+    <div class="test-section">
+        <h2>🔧 Test Area - Initial Undefined Values</h2>
+        <p>Diese Werte sollten automatisch zu "N/A" konvertiert werden:</p>
+        <div id="test-area">
+            <p id="test1">undefined</p>
+            <p id="test2">null</p>
+            <p id="test3">Test mit undefined Wert</p>
+            <table>
+                <tr>
+                    <th>Element</th>
+                    <th>Ursprünglicher Wert</th>
+                    <th>Aktueller Wert</th>
+                </tr>
+                <tr>
+                    <td>Paragraph 1</td>
+                    <td>undefined</td>
+                    <td id="td1">undefined</td>
+                </tr>
+                <tr>
+                    <td>Paragraph 2</td>
+                    <td>null</td>
+                    <td id="td2">null</td>
+                </tr>
+                <tr>
+                    <td>Paragraph 3</td>
+                    <td>Gültiger Wert</td>
+                    <td id="td3">Gültiger Wert</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>🧪 Function Tests</h2>
+        <button class="btn-primary" onclick="testSafeDisplayValue()">Test safeDisplayValue Function</button>
+        <button class="btn-success" onclick="testDOMFix()">Test DOM Auto-Fix</button>
+        <button class="btn-warning" onclick="testDynamicContent()">Test Dynamic Content</button>
+        <div id="function-test-output"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>📊 System Status</h2>
+        <button class="btn-primary" onclick="checkSystemStatus()">Check System Status</button>
+        <div id="system-status-output"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>⚡ Performance Test</h2>
+        <button class="btn-success" onclick="runPerformanceTest()">Run Performance Test</button>
+        <div id="performance-output"></div>
+    </div>
+    
+    <div id="all-test-results"></div>
+    
+    <script src="js/undefined-fix.js"></script>
+    <script src="js/undefined-detection.js"></script>
+    <script src="js/debug-console.js"></script>
+    
+    <script>
+        // Test safeDisplayValue function
+        function testSafeDisplayValue() {
+            console.log('🧪 Testing safeDisplayValue function...');
+            
+            const output = document.getElementById('function-test-output');
+            let results = '<h4>safeDisplayValue Function Tests:</h4>';
+            
+            const testCases = [
+                { input: undefined, expected: 'N/A', description: 'undefined value' },
+                { input: null, expected: 'N/A', description: 'null value' },
+                { input: 'undefined', expected: 'N/A', description: 'string "undefined"' },
+                { input: 'null', expected: 'N/A', description: 'string "null"' },
+                { input: '', expected: 'N/A', description: 'empty string' },
+                { input: '   ', expected: 'N/A', description: 'whitespace string' },
+                { input: 'Gültiger Wert', expected: 'Gültiger Wert', description: 'valid string' },
+                { input: 123, expected: 123, description: 'valid number' },
+                { input: 0, expected: 0, description: 'zero number' },
+                { input: NaN, expected: 'N/A', description: 'NaN value' },
+                { input: false, expected: false, description: 'boolean false' },
+                { input: true, expected: true, description: 'boolean true' }
+            ];
+            
+            let passCount = 0;
+            
+            testCases.forEach((testCase, index) => {
+                const result = window.safeDisplayValue ? window.safeDisplayValue(testCase.input) : 'FUNCTION_NOT_FOUND';
+                const passed = result === testCase.expected;
+                if (passed) passCount++;
+                
+                results += `<div class="test-result ${passed ? 'pass' : 'fail'}">
+                    Test ${index + 1} (${testCase.description}): 
+                    ${JSON.stringify(testCase.input)} → ${JSON.stringify(result)} 
+                    ${passed ? '✅ PASS' : '❌ FAIL (expected: ' + JSON.stringify(testCase.expected) + ')'}
+                </div>`;
+            });
+            
+            results += `<div class="test-result info">
+                <strong>Summary:</strong> ${passCount}/${testCases.length} tests passed (${((passCount/testCases.length)*100).toFixed(1)}%)
+            </div>`;
+            
+            output.innerHTML = results;
+        }
+        
+        // Test DOM auto-fix functionality
+        function testDOMFix() {
+            console.log('🧪 Testing DOM auto-fix...');
+            
+            const output = document.getElementById('function-test-output');
+            let results = '<h4>DOM Auto-Fix Tests:</h4>';
+            
+            // Create test elements with undefined values
+            const testValues = ['undefined', 'null', '[object Object]', 'NaN'];
+            const testElements = [];
+            
+            testValues.forEach((value, index) => {
+                const element = document.createElement('div');
+                element.textContent = value;
+                element.id = `dom-test-${index}`;
+                document.body.appendChild(element);
+                testElements.push(element);
+            });
+            
+            // Wait for DOM observer to fix values
+            setTimeout(() => {
+                let fixedCount = 0;
+                
+                testElements.forEach((element, index) => {
+                    const originalValue = testValues[index];
+                    const currentValue = element.textContent;
+                    const wasFixed = currentValue !== originalValue && currentValue === 'N/A';
+                    
+                    if (wasFixed) fixedCount++;
+                    
+                    results += `<div class="test-result ${wasFixed ? 'pass' : 'fail'}">
+                        DOM Test ${index + 1}: "${originalValue}" → "${currentValue}" 
+                        ${wasFixed ? '✅ FIXED' : '❌ NOT FIXED'}
+                    </div>`;
+                    
+                    // Clean up
+                    document.body.removeChild(element);
+                });
+                
+                results += `<div class="test-result info">
+                    <strong>DOM Fix Summary:</strong> ${fixedCount}/${testElements.length} elements fixed
+                </div>`;
+                
+                output.innerHTML = results;
+            }, 500);
+        }
+        
+        // Test dynamic content addition
+        function testDynamicContent() {
+            console.log('🧪 Testing dynamic content handling...');
+            
+            const output = document.getElementById('function-test-output');
+            let results = '<h4>Dynamic Content Tests:</h4>';
+            
+            const container = document.createElement('div');
+            container.id = 'dynamic-test-container';
+            document.body.appendChild(container);
+            
+            // Simulate adding dynamic content with undefined values
+            const dynamicContent = `
+                <p>Dynamic content with undefined</p>
+                <table>
+                    <tr><td>undefined</td><td>null</td><td>Valid Value</td></tr>
+                </table>
+            `;
+            
+            container.innerHTML = dynamicContent;
+            
+            // Check if values were automatically fixed
+            setTimeout(() => {
+                const undefinedElements = container.querySelectorAll('*');
+                let problematicCount = 0;
+                let fixedCount = 0;
+                
+                undefinedElements.forEach(el => {
+                    if (el.textContent) {
+                        const content = el.textContent.trim();
+                        if (content === 'undefined' || content === 'null') {
+                            problematicCount++;
+                        } else if (content === 'N/A') {
+                            fixedCount++;
+                        }
+                    }
+                });
+                
+                results += `<div class="test-result ${problematicCount === 0 ? 'pass' : 'fail'}">
+                    Dynamic Content: ${problematicCount} problematic values, ${fixedCount} fixed values
+                    ${problematicCount === 0 ? '✅ ALL FIXED' : '❌ SOME UNFIXED'}
+                </div>`;
+                
+                // Clean up
+                document.body.removeChild(container);
+                output.innerHTML = results;
+            }, 300);
+        }
+        
+        // Check system status
+        function checkSystemStatus() {
+            console.log('📊 Checking system status...');
+            
+            const output = document.getElementById('system-status-output');
+            let status = '<h4>System Status:</h4>';
+            
+            // Check if core functions are available
+            const checks = [
+                { name: 'window.safeDisplayValue', available: typeof window.safeDisplayValue === 'function' },
+                { name: 'window.UndefinedDetection', available: typeof window.UndefinedDetection === 'object' },
+                { name: 'window.DebugConsole', available: typeof window.DebugConsole === 'object' },
+                { name: 'window.checkUndefinedValues', available: typeof window.checkUndefinedValues === 'function' },
+                { name: 'window.getUndefinedStats', available: typeof window.getUndefinedStats === 'function' }
+            ];
+            
+            checks.forEach(check => {
+                status += `<div class="test-result ${check.available ? 'pass' : 'fail'}">
+                    ${check.name}: ${check.available ? '✅ Available' : '❌ Not Available'}
+                </div>`;
+            });
+            
+            // Get statistics if available
+            if (window.getUndefinedStats) {
+                try {
+                    const stats = window.getUndefinedStats();
+                    status += `<div class="test-result info">
+                        <strong>Statistics:</strong><br>
+                        - Detection initialized: ${stats.initialized ? '✅' : '❌'}<br>
+                        - Total detected: ${stats.detectionCount}<br>
+                        - Total fixed: ${stats.fixedCount}<br>
+                        - Has global safe function: ${stats.hasGlobalSafeFunction ? '✅' : '❌'}
+                    </div>`;
+                } catch (error) {
+                    status += `<div class="test-result fail">Stats Error: ${error.message}</div>`;
+                }
+            }
+            
+            // Count current undefined elements
+            const currentUndefined = Array.from(document.querySelectorAll('*')).filter(el => 
+                el.textContent && el.textContent.includes('undefined')
+            ).length;
+            
+            status += `<div class="test-result ${currentUndefined === 0 ? 'pass' : 'fail'}">
+                Current undefined elements in DOM: ${currentUndefined} ${currentUndefined === 0 ? '✅' : '❌'}
+            </div>`;
+            
+            output.innerHTML = status;
+        }
+        
+        // Run performance test
+        function runPerformanceTest() {
+            console.log('⚡ Running performance test...');
+            
+            const output = document.getElementById('performance-output');
+            output.innerHTML = '<div class="info">Running performance test...</div>';
+            
+            const iterations = 1000;
+            const testValue = 'undefined';
+            
+            // Test safeDisplayValue performance
+            const start = performance.now();
+            
+            for (let i = 0; i < iterations; i++) {
+                if (window.safeDisplayValue) {
+                    window.safeDisplayValue(testValue);
+                }
+            }
+            
+            const end = performance.now();
+            const duration = end - start;
+            const avgTime = duration / iterations;
+            
+            let results = `<h4>Performance Test Results:</h4>`;
+            results += `<div class="test-result info">
+                <strong>safeDisplayValue Performance:</strong><br>
+                - ${iterations} iterations<br>
+                - Total time: ${duration.toFixed(2)}ms<br>
+                - Average time per call: ${avgTime.toFixed(4)}ms<br>
+                - Calls per second: ${(1000/avgTime).toFixed(0)}
+            </div>`;
+            
+            // Test DOM scan performance if available
+            if (window.checkUndefinedValues) {
+                const scanStart = performance.now();
+                const scanResult = window.checkUndefinedValues();
+                const scanEnd = performance.now();
+                const scanDuration = scanEnd - scanStart;
+                
+                results += `<div class="test-result info">
+                    <strong>DOM Scan Performance:</strong><br>
+                    - Scan duration: ${scanDuration.toFixed(2)}ms<br>
+                    - Elements scanned: ${document.querySelectorAll('*').length}<br>
+                    - Scan result: ${JSON.stringify(scanResult)}
+                </div>`;
+            }
+            
+            output.innerHTML = results;
+        }
+        
+        // Auto-run initial tests
+        window.addEventListener('load', function() {
+            console.log('🚀 Page loaded, running initial checks...');
+            
+            setTimeout(() => {
+                console.log('📝 Checking initial DOM state...');
+                document.querySelectorAll('#test-area p, #test-area td').forEach(el => {
+                    console.log(`Element: ${el.id || el.tagName}, Content: "${el.textContent}"`);
+                });
+                
+                checkSystemStatus();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

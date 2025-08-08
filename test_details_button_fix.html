@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Details Button Fix Test</title>
+</head>
+<body>
+    <h1>JavaScript Details Button Fix Test</h1>
+    
+    <div id="test-buttons"></div>
+    <div id="test-output"></div>
+
+    <script>
+        // CRITICAL_FIX 01.08.2025: Sichere Escaping-Funktion für onclick-Handler
+        function safeEscapeForOnClick(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/\\/g, '\\\\')    
+                .replace(/'/g, "\\'")      
+                .replace(/"/g, '\\"')      
+                .replace(/\n/g, '\\n')     
+                .replace(/\r/g, '\\r')     
+                .replace(/\t/g, '\\t');    
+        }
+
+        // Test-Funktion für showModelDetails
+        function showModelDetails(modelId) {
+            const output = document.getElementById('test-output');
+            output.innerHTML = `
+                <div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin-top: 20px;">
+                    <h3>✅ Details Button funktioniert!</h3>
+                    <p><strong>Model ID:</strong> ${modelId}</p>
+                    <p><strong>Typ:</strong> ${typeof modelId}</p>
+                    <p><strong>Länge:</strong> ${modelId ? modelId.length : 'undefined'}</p>
+                </div>
+            `;
+        }
+
+        // Test verschiedene problematische Model IDs
+        const testModelIds = [
+            'claude-3-5-sonnet-20241022',
+            'gpt-4o-mini',
+            'claude-3-haiku-20240307',
+            'test/model/with/slashes',
+            'model"with"quotes',
+            "model'with'singles",
+            'model\nwith\nnewlines',
+            'model\twith\ttabs'
+        ];
+
+        // Generiere Test-Buttons
+        let buttonsHTML = '<h2>Test Buttons (neue Methode):</h2>';
+        testModelIds.forEach((modelId, index) => {
+            const escapedModelId = safeEscapeForOnClick(modelId);
+            buttonsHTML += `
+                <button onclick="showModelDetails('${escapedModelId}')" 
+                        style="background: #007bff; color: white; border: none; padding: 10px 15px; margin: 5px; border-radius: 4px; cursor: pointer;">
+                    Test Model ${index + 1}: ${modelId.substring(0, 20)}...
+                </button><br>
+            `;
+        });
+
+        document.getElementById('test-buttons').innerHTML = buttonsHTML;
+
+        // Automatischer Test
+        setTimeout(() => {
+            console.log('🔍 [AUTO-TEST] Teste ersten Button automatisch...');
+            const firstButton = document.querySelector('button');
+            if (firstButton) {
+                firstButton.click();
+                console.log('✅ [AUTO-TEST] Erster Button-Klick erfolgreich - kein Syntax-Fehler!');
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

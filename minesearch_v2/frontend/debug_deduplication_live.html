@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Deduplication Debug Test</title>
+    <script src="js/deduplication-engine.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-good { color: #4CAF50; font-weight: bold; }
+        .status-bad { color: #f44336; font-weight: bold; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f0f0f0; }
+        .console-output {
+            background: #1e1e1e;
+            color: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #45a049; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Live Deduplication Engine Debugging</h1>
+    
+    <div class="test-container">
+        <h2>1️⃣ Engine Availability Check</h2>
+        <div id="engine-status"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>2️⃣ Basic Deduplication Test</h2>
+        <button onclick="runBasicTest()">Run Basic Test</button>
+        <div id="basic-test-results"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>3️⃣ Field Type Detection Test</h2>
+        <button onclick="runFieldTypeTest()">Run Field Type Test</button>
+        <div id="field-type-results"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>4️⃣ Integration Simulation Test</h2>
+        <button onclick="runIntegrationTest()">Run Integration Test</button>
+        <div id="integration-results"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>5️⃣ Browser Console Output</h2>
+        <button onclick="toggleDebugMode()">Toggle Debug Mode</button>
+        <button onclick="clearConsoleOutput()">Clear Console</button>
+        <div id="console-output" class="console-output"></div>
+    </div>
+
+    <script>
+        // Copy detectFieldType function from index.html (line 1038)
+        function detectFieldType(fieldName) {
+            const typeMapping = {
+                'country': 'country',
+                'land': 'country', 
+                'country_name': 'country',
+                'region': 'region',
+                'province': 'region',
+                'state': 'region',
+                'quebec': 'region',
+                'status': 'status',
+                'mine_status': 'status',
+                'operation_status': 'status',
+                'mineral': 'mineral',
+                'commodity': 'mineral',
+                'primary_mineral': 'mineral',
+                'secondary_mineral': 'mineral'
+            };
+            
+            return typeMapping[fieldName.toLowerCase()] || 'general';
+        }
+
+        // Console capture for debugging
+        let consoleOutput = [];
+        const originalConsoleLog = console.log;
+        console.log = function(...args) {
+            consoleOutput.push(args.join(' '));
+            updateConsoleDisplay();
+            originalConsoleLog.apply(console, arguments);
+        };
+
+        function updateConsoleDisplay() {
+            const container = document.getElementById('console-output');
+            container.innerHTML = consoleOutput.slice(-20).join('<br>');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearConsoleOutput() {
+            consoleOutput = [];
+            updateConsoleDisplay();
+        }
+
+        // 1. Engine Availability Check
+        function checkEngineAvailability() {
+            const statusDiv = document.getElementById('engine-status');
+            let status = '';
+            
+            // Check window.deduplicationEngine
+            if (typeof window.deduplicationEngine !== 'undefined') {
+                status += '<div class="status-good">✅ window.deduplicationEngine exists</div>';
+                
+                // Check if it has the deduplicateValues method
+                if (typeof window.deduplicationEngine.deduplicateValues === 'function') {
+                    status += '<div class="status-good">✅ deduplicateValues method exists</div>';
+                } else {
+                    status += '<div class="status-bad">❌ deduplicateValues method missing</div>';
+                }
+                
+                // Check for synonym maps
+                if (window.deduplicationEngine.synonymMaps) {
+                    status += '<div class="status-good">✅ Synonym maps loaded</div>';
+                    status += '<div>Available synonym types: ' + Object.keys(window.deduplicationEngine.synonymMaps).join(', ') + '</div>';
+                } else {
+                    status += '<div class="status-bad">❌ Synonym maps missing</div>';
+                }
+                
+                // Test basic instantiation
+                try {
+                    const testResult = window.deduplicationEngine.deduplicateValues('test / test / test', 'general');
+                    status += '<div class="status-good">✅ Basic method call successful: "' + testResult + '"</div>';
+                } catch (error) {
+                    status += '<div class="status-bad">❌ Basic method call failed: ' + error.message + '</div>';
+                }
+                
+            } else {
+                status += '<div class="status-bad">❌ window.deduplicationEngine not found</div>';
+            }
+            
+            // Check if MineSearchDeduplication exists
+            if (typeof window.MineSearchDeduplication !== 'undefined') {
+                status += '<div class="status-good">✅ window.MineSearchDeduplication exists</div>';
+            } else {
+                status += '<div class="status-bad">❌ window.MineSearchDeduplication not found</div>';
+            }
+            
+            statusDiv.innerHTML = status;
+        }
+
+        // 2. Basic Deduplication Test
+        function runBasicTest() {
+            const resultsDiv = document.getElementById('basic-test-results');
+            
+            if (!window.deduplicationEngine) {
+                resultsDiv.innerHTML = '<div class="status-bad">❌ Engine not available</div>';
+                return;
+            }
+
+            const testCases = [
+                {
+                    input: 'Aktiv / Aktiv / Geplant / Aktiv',
+                    fieldType: 'status',
+                    description: 'Status deduplication'
+                },
+                {
+                    input: 'Canada / Kanada / Canada / Kanada',
+                    fieldType: 'country',
+                    description: 'Country synonym detection'
+                },
+                {
+                    input: 'Gold / AU / Gold / Aurum',
+                    fieldType: 'mineral',
+                    description: 'Mineral synonym detection'
+                },
+                {
+                    input: 'Quebec / Québec / QC / Quebec',
+                    fieldType: 'region',
+                    description: 'Region synonym detection'
+                },
+                {
+                    input: 'Test / Test / Test',
+                    fieldType: 'general',
+                    description: 'Simple deduplication'
+                }
+            ];
+
+            let html = '<table><tr><th>Description</th><th>Input</th><th>Output</th><th>Changed</th></tr>';
+            
+            testCases.forEach(test => {
+                const result = window.deduplicationEngine.deduplicateValues(test.input, test.fieldType);
+                const changed = result !== test.input;
+                const statusClass = changed ? 'status-good' : 'status-bad';
+                
+                html += `<tr>
+                    <td>${test.description} (${test.fieldType})</td>
+                    <td style="font-size: 12px;">${test.input}</td>
+                    <td style="font-size: 12px; font-weight: bold;">${result}</td>
+                    <td class="${statusClass}">${changed ? '✅ YES' : '❌ NO'}</td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            resultsDiv.innerHTML = html;
+        }
+
+        // 3. Field Type Detection Test
+        function runFieldTypeTest() {
+            const resultsDiv = document.getElementById('field-type-results');
+            
+            const testFields = [
+                { field: 'country', expected: 'country' },
+                { field: 'land', expected: 'country' },
+                { field: 'region', expected: 'region' },
+                { field: 'province', expected: 'region' },
+                { field: 'status', expected: 'status' },
+                { field: 'mine_status', expected: 'status' },
+                { field: 'mineral', expected: 'mineral' },
+                { field: 'commodity', expected: 'mineral' },
+                { field: 'some_unknown_field', expected: 'general' }
+            ];
+
+            let html = '<table><tr><th>Field Name</th><th>Expected Type</th><th>Actual Type</th><th>Correct</th></tr>';
+            
+            testFields.forEach(test => {
+                const actualType = detectFieldType(test.field);
+                const correct = actualType === test.expected;
+                const statusClass = correct ? 'status-good' : 'status-bad';
+                
+                html += `<tr>
+                    <td>${test.field}</td>
+                    <td>${test.expected}</td>
+                    <td>${actualType}</td>
+                    <td class="${statusClass}">${correct ? '✅ YES' : '❌ NO'}</td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            resultsDiv.innerHTML = html;
+        }
+
+        // 4. Integration Simulation Test (mimics displayConsolidatedResults logic)
+        function runIntegrationTest() {
+            const resultsDiv = document.getElementById('integration-results');
+            
+            if (!window.deduplicationEngine) {
+                resultsDiv.innerHTML = '<div class="status-bad">❌ Engine not available</div>';
+                return;
+            }
+
+            // Simulate data that would come from displayConsolidatedResults with NEW FORMAT
+            const mockResults = [
+                {
+                    mine_name: 'Test Mine 1',
+                    country: 'Canada',
+                    // New format: separated raw_fields and consolidated_fields
+                    raw_fields: {
+                        'country': 'Canada / Kanada / Canada / Canada',
+                        'status': 'Aktiv / Active / Aktiv / Operating',
+                        'mineral': 'Gold / AU / Gold / Aurum',
+                        'region': 'Quebec / Québec / QC / Quebec',
+                        'province': 'Ontario / ON / Ontario'
+                    },
+                    consolidated_fields: {
+                        'country': 'Canada / Kanada / Canada / Canada [gpt-4, claude-3]',
+                        'status': 'Aktiv / Active / Aktiv / Operating [gpt-4, gemini]',
+                        'mineral': 'Gold / AU / Gold / Aurum [claude-3, gpt-4]',
+                        'region': 'Quebec / Québec / QC / Quebec [gpt-4]',
+                        'province': 'Ontario / ON / Ontario [claude-3, gemini]'
+                    }
+                }
+            ];
+
+            let html = '<h3>Simulating displayConsolidatedResults Integration</h3>';
+            html += '<table><tr><th>Field</th><th>Original Value</th><th>Deduplicated Value</th><th>Changed</th></tr>';
+            
+            const result = mockResults[0];
+            
+            Object.keys(result.raw_fields).forEach(field => {
+                // NEW LOGIC: Use raw_fields for deduplication, like the updated frontend
+                let rawFieldValue = (result.raw_fields && result.raw_fields[field]) || '';
+                let fieldValue = result.consolidated_fields[field] || '';
+                let deduplicatedValue = fieldValue;
+                let wasProcessed = false;
+                
+                // This matches the UPDATED logic from displayConsolidatedResults (lines 6571-6603)
+                if (rawFieldValue.includes(' / ') && window.deduplicationEngine) {
+                    const fieldType = detectFieldType(field);
+                    const originalValue = rawFieldValue;
+                    deduplicatedValue = window.deduplicationEngine.deduplicateValues(rawFieldValue, fieldType);
+                    
+                    // Add source information back if available
+                    if (fieldValue !== rawFieldValue && fieldValue.includes('[')) {
+                        const sourcesMatch = fieldValue.match(/\[([^\]]+)\]$/);
+                        if (sourcesMatch) {
+                            deduplicatedValue += ' ' + sourcesMatch[0];
+                        }
+                    }
+                    
+                    wasProcessed = originalValue !== deduplicatedValue.replace(/\s*\[([^\]]+)\]$/, '');
+                    
+                    // Debug output like in the original code
+                    if (window.deduplicationEngine.debugMode && wasProcessed) {
+                        console.log(`Deduplication applied to ${field}:`, {
+                            raw: originalValue,
+                            deduplicated: deduplicatedValue,
+                            fieldType: fieldType
+                        });
+                    }
+                } else {
+                    // No deduplication needed, use original value with sources
+                    deduplicatedValue = fieldValue;
+                }
+                
+                const statusClass = wasProcessed ? 'status-good' : 'status-bad';
+                
+                html += `<tr>
+                    <td><strong>${field}</strong><br><small>(${detectFieldType(field)})</small></td>
+                    <td style="font-size: 12px; max-width: 200px;">${rawFieldValue}</td>
+                    <td style="font-size: 12px; max-width: 200px; font-weight: bold;">${deduplicatedValue}</td>
+                    <td class="${statusClass}">${wasProcessed ? '✅ YES' : '❌ NO'}</td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            resultsDiv.innerHTML = html;
+        }
+
+        // Toggle debug mode
+        function toggleDebugMode() {
+            if (window.deduplicationEngine) {
+                if (window.deduplicationEngine.debugMode) {
+                    window.deduplicationEngine.disableDebug();
+                    console.log('Debug mode disabled');
+                } else {
+                    window.deduplicationEngine.enableDebug();
+                    console.log('Debug mode enabled');
+                }
+            } else {
+                console.log('Deduplication engine not available');
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== Deduplication Debug Test Started ===');
+            checkEngineAvailability();
+        });
+    </script>
+</body>
+</html>

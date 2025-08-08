@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Final Deduplication Test with Real Data Structure</title>
+    <script src="minesearch_v2/frontend/js/deduplication-engine.js"></script>
+</head>
+<body>
+    <h1>Final Deduplication Test</h1>
+    <button onclick="testDeduplication()">Test Deduplication</button>
+    <button onclick="simulateConsolidatedResults()">Simulate Full Process</button>
+    <div id="results"></div>
+    
+    <script>
+        // Simulate the exact data from our database analysis
+        const simulatedAPIResponse = {
+            results: [
+                {
+                    mine_name: "Aubelle",
+                    country: "Canada",
+                    raw_fields: {
+                        "Country": "Canada / Canada / Canada / Kanada / Canada / Canada",
+                        "Region": "Quebec / Quebec / Quebec / Quebec / Quebec / Quebec", 
+                        "Aktivitätsstatus": "Aktiv / X / Geplant / Aktiv / Geplant / Geschlossen"
+                    },
+                    consolidated_fields: {
+                        "Country": "Canada / Canada / Canada / Kanada / Canada / Canada [gpt-4, claude-3, gemini, kimi, deepseek, mistral]",
+                        "Region": "Quebec / Quebec / Quebec / Quebec / Quebec / Quebec [gpt-4, claude-3, gemini, kimi, deepseek, mistral]",
+                        "Aktivitätsstatus": "Aktiv / X / Geplant / Aktiv / Geplant / Geschlossen [gpt-4, claude-3, gemini, kimi, deepseek, mistral]"
+                    }
+                }
+            ]
+        };
+        
+        // Copy detectFieldType function
+        function detectFieldType(fieldName) {
+            const typeMapping = {
+                'country': 'country',
+                'land': 'country', 
+                'Country': 'country',
+                'region': 'region',
+                'Region': 'region',
+                'province': 'region',
+                'status': 'status',
+                'Aktivitätsstatus': 'status',
+                'mine_status': 'status',
+                'operation_status': 'status',
+                'mineral': 'mineral',
+                'commodity': 'mineral'
+            };
+            
+            const fieldLower = fieldName.toLowerCase();
+            
+            // Exakte Übereinstimmung
+            if (typeMapping[fieldLower] || typeMapping[fieldName]) {
+                return typeMapping[fieldLower] || typeMapping[fieldName];
+            }
+            
+            // Teilstring-Suche
+            for (const [key, type] of Object.entries(typeMapping)) {
+                if (fieldLower.includes(key.toLowerCase())) {
+                    return type;
+                }
+            }
+            
+            return 'general';
+        }
+        
+        function testDeduplication() {
+            const resultsDiv = document.getElementById('results');
+            let html = '<h2>Deduplication Engine Test</h2>';
+            
+            if (!window.deduplicationEngine) {
+                html += '<p style="color: red;">❌ Deduplication engine not loaded!</p>';
+                resultsDiv.innerHTML = html;
+                return;
+            }
+            
+            html += '<p style="color: green;">✅ Deduplication engine loaded</p>';
+            
+            // Test each field
+            const testData = simulatedAPIResponse.results[0];
+            
+            for (const [fieldName, rawValue] of Object.entries(testData.raw_fields)) {
+                html += `<h3>Field: ${fieldName}</h3>`;
+                html += `<p><strong>Original:</strong> ${rawValue}</p>`;
+                
+                const fieldType = detectFieldType(fieldName);
+                html += `<p><strong>Field Type:</strong> ${fieldType}</p>`;
+                
+                const deduplicated = window.deduplicationEngine.deduplicateValues(rawValue, fieldType);
+                html += `<p><strong>Deduplicated:</strong> <span style="background: #e8f5e8; padding: 2px 4px;">${deduplicated}</span></p>`;
+                
+                // Check if it meets user requirements
+                if (fieldName === 'Country') {
+                    const hasCanadaCount = deduplicated.includes('Canada (5)');
+                    const hasKanadaCount = deduplicated.includes('Kanada (1)') || deduplicated.includes('Kanada');
+                    if (hasCanadaCount && hasKanadaCount) {
+                        html += '<p style="color: green;">✅ Canada/Kanada requirement MET!</p>';
+                    } else {
+                        html += '<p style="color: red;">❌ Canada/Kanada requirement NOT met</p>';
+                    }
+                }
+                
+                if (fieldName === 'Aktivitätsstatus') {
+                    const hasAktivCount = deduplicated.includes('Aktiv (2)');
+                    const hasGeplantCount = deduplicated.includes('Geplant (2)');
+                    if (hasAktivCount && hasGeplantCount) {
+                        html += '<p style="color: green;">✅ Status deduplication requirement MET!</p>';
+                    } else {
+                        html += '<p style="color: red;">❌ Status deduplication requirement NOT met</p>';
+                    }
+                }
+                
+                html += '<hr>';
+            }
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        function simulateConsolidatedResults() {
+            const resultsDiv = document.getElementById('results');
+            let html = '<h2>Simulate displayConsolidatedResults Function</h2>';
+            
+            // This simulates the exact logic from the frontend
+            const result = simulatedAPIResponse.results[0];
+            const sortedFields = Object.keys(result.raw_fields || {});
+            
+            html += '<table border="1" style="border-collapse: collapse; width: 100%;">';
+            html += '<tr><th>Field</th><th>Raw Value</th><th>Processed Value</th><th>Status</th></tr>';
+            
+            sortedFields.forEach(field => {
+                // This is the exact logic from displayConsolidatedResults
+                let rawFieldValue = (result.raw_fields && result.raw_fields[field]) || '';
+                let fieldValue = result.consolidated_fields[field] || '';
+                let deduplicatedValue = fieldValue;
+                
+                let status = '❌ No processing';
+                
+                // Intelligente Deduplizierung mit Synonym-Erkennung anwenden
+                if (rawFieldValue.includes(' / ') && window.deduplicationEngine) {
+                    const fieldType = detectFieldType(field);
+                    const originalValue = rawFieldValue;
+                    deduplicatedValue = window.deduplicationEngine.deduplicateValues(rawFieldValue, fieldType);
+                    
+                    // Füge Quellen-Information hinzu wenn verfügbar
+                    if (fieldValue !== rawFieldValue && fieldValue.includes('[')) {
+                        const sourcesMatch = fieldValue.match(/\\[([^\\]]+)\\]$/);
+                        if (sourcesMatch) {
+                            deduplicatedValue += ' ' + sourcesMatch[0];
+                        }
+                    }
+                    
+                    status = '✅ Deduplicated';
+                } else {
+                    // Keine Deduplizierung nötig, verwende originalen Wert mit Quellen
+                    deduplicatedValue = fieldValue;
+                    status = 'ℹ️ No duplicates';
+                }
+                
+                // Finaler Wert für Anzeige
+                fieldValue = deduplicatedValue;
+                
+                html += `<tr>
+                    <td><strong>${field}</strong></td>
+                    <td style="font-size: 11px; max-width: 200px; word-wrap: break-word;">${rawFieldValue}</td>
+                    <td style="font-size: 11px; max-width: 250px; word-wrap: break-word; background: #f0f8ff;">${fieldValue}</td>
+                    <td>${status}</td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            
+            html += '<h3>Final Result Check</h3>';
+            html += '<p>The processed values above should show:</p>';
+            html += '<ul>';
+            html += '<li>Country: "Canada (5) / Kanada (1) [sources]"</li>';
+            html += '<li>Aktivitätsstatus: "Aktiv (2) / Geplant (2) / X (1) / Geschlossen (1) [sources]"</li>';
+            html += '</ul>';
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        // Auto-run when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                if (window.deduplicationEngine) {
+                    console.log('✅ Deduplication engine ready');
+                    // Enable debug mode
+                    window.deduplicationEngine.enableDebug();
+                } else {
+                    console.log('❌ Deduplication engine not loaded');
+                }
+            }, 500);
+        });
+    </script>
+</body>
+</html>

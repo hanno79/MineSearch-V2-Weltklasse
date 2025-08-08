@@ -1,0 +1,49 @@
+{
+  "timestamp": "2025-08-07T08:53:34.472332",
+  "tests": [
+    {
+      "test": "main_page",
+      "status": "SUCCESS",
+      "status_code": 200
+    },
+    {
+      "test": "statistics_api__api_statistics",
+      "status": "FAILED",
+      "status_code": 404,
+      "content_length": 22
+    },
+    {
+      "test": "statistics_api__api_statistics_",
+      "status": "FAILED",
+      "status_code": 404,
+      "content_length": 22
+    },
+    {
+      "test": "statistics_api__statistics",
+      "status": "FAILED",
+      "status_code": 404,
+      "content_length": 22
+    },
+    {
+      "test": "statistics_api__api_routes_statistics",
+      "status": "FAILED",
+      "status_code": 404,
+      "content_length": 22
+    },
+    {
+      "test": "statistics_api__consolidated-results",
+      "status": "FAILED",
+      "status_code": 404,
+      "content_length": 22
+    },
+    {
+      "test": "server_running",
+      "status": "WARNING",
+      "processes": 0
+    }
+  ],
+  "success": false,
+  "success_rate": 0.14285714285714285,
+  "successful_tests": 1,
+  "total_tests": 7
+}

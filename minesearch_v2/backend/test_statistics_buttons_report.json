@@ -1,0 +1,52 @@
+{
+  "timestamp": "2025-08-07T09:16:17.538155",
+  "buttons_found": [
+    {
+      "index": 1,
+      "text": "🔍 Filter anwenden",
+      "onclick": "loadModelStatistics()",
+      "visible": true
+    },
+    {
+      "index": 2,
+      "text": "📊 CSV Export",
+      "onclick": "exportModelStatistics()",
+      "visible": true
+    },
+    {
+      "index": 3,
+      "text": "🔍 Statistiken laden",
+      "onclick": "loadModelStatistics()",
+      "visible": true
+    },
+    {
+      "index": 4,
+      "text": "📊 Modell-Performance (CSV)",
+      "onclick": "exportModelStatistics()",
+      "visible": true
+    },
+    {
+      "index": 5,
+      "text": "📈 Feld-Performance (CSV)",
+      "onclick": "exportFieldPerformance()",
+      "visible": true
+    },
+    {
+      "index": 6,
+      "text": "📄 Performance-Report (PDF)",
+      "onclick": "generatePerformanceReport()",
+      "visible": true
+    }
+  ],
+  "api_calls": [],
+  "console_logs": {
+    "total": 44,
+    "errors": 3,
+    "warnings": 1
+  },
+  "screenshots": [
+    "test_stats_01_interface.png",
+    "test_stats_02_after_load.png",
+    "test_stats_03_after_filter.png"
+  ]
+}

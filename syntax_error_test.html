@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JavaScript Syntax Error Test</title>
+</head>
+<body>
+    <h1>JavaScript Syntax Error Demonstration</h1>
+    
+    <h2>Problematische onclick-Handler (wie aktuell)</h2>
+    
+    <h3>Test 1: grok:grok-3-mini (FEHLERHAFT)</h3>
+    <button onclick="showModelDetails('grok:grok-3-mini')" style="background: red; color: white; padding: 10px; margin: 5px;">
+        ❌ Fehlerhafter Button (Syntax Error)
+    </button>
+    <p>Fehler: Doppelpunkt in 'grok:grok-3-mini' macht JavaScript ungültig</p>
+    
+    <h3>Test 2: openai:gpt-3.5-turbo (FEHLERHAFT)</h3>
+    <button onclick="showModelDetails('openai:gpt-3.5-turbo')" style="background: red; color: white; padding: 10px; margin: 5px;">
+        ❌ Fehlerhafter Button (Syntax Error)
+    </button>
+    <p>Fehler: Doppelpunkt in 'openai:gpt-3.5-turbo' macht JavaScript ungültig</p>
+    
+    <h2>Korrigierte onclick-Handler (Lösung)</h2>
+    
+    <h3>Test 3: Escaped Version (FUNKTIONIERT)</h3>
+    <button onclick="showModelDetails('grok:grok-3-mini'.replace(':', '\\:'))" style="background: green; color: white; padding: 10px; margin: 5px;">
+        ✅ Korriger Button (Escape-Workaround)
+    </button>
+    
+    <h3>Test 4: Base64 Version (FUNKTIONIERT)</h3>
+    <button onclick="showModelDetails(atob('Z3Jvazpncm9rLTMtbWluaQ=='))" style="background: green; color: white; padding: 10px; margin: 5px;">
+        ✅ Korriger Button (Base64)
+    </button>
+    
+    <h3>Test 5: Data Attribute Version (BESTE LÖSUNG)</h3>
+    <button data-model-id="grok:grok-3-mini" onclick="showModelDetails(this.dataset.modelId)" style="background: blue; color: white; padding: 10px; margin: 5px;">
+        ✅ Korriger Button (Data Attribute)
+    </button>
+    
+    <script>
+        function showModelDetails(modelId) {
+            alert(`Model Details für: ${modelId}`);
+            console.log(`Model ID received: ${modelId}`);
+        }
+        
+        // Test der problematischen Syntax
+        console.log('=== SYNTAX ERROR DEMONSTRATION ===');
+        
+        try {
+            // Das hier würde einen Syntax-Fehler verursachen:
+            // eval("showModelDetails('grok:grok-3-mini')");
+            console.log('❌ Syntax Error würde hier auftreten bei direkter Evaluation');
+        } catch(e) {
+            console.error('Syntax Error:', e.message);
+        }
+        
+        console.log('✅ Korrekte Aufrufe funktionieren:');
+        console.log('showModelDetails("grok:grok-3-mini") - direkt aufgerufen');
+        
+        // Demonstration des Problems
+        const problemmaticCode = "onclick=\"showModelDetails('grok:grok-3-mini')\"";
+        console.log('❌ Problematischer onclick-Code:', problemmaticCode);
+        
+        const correctedCode = "onclick=\"showModelDetails('grok\\:grok-3-mini')\"";
+        console.log('✅ Korrigierter onclick-Code:', correctedCode);
+    </script>
+</body>
+</html>

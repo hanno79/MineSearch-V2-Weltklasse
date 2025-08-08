@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JavaScript Functions Test</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .pass { background: #d4edda; border: 1px solid #c3e6cb; }
+        .fail { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>🔍 JavaScript Functions Direct Test</h1>
+    <div id="test-results"></div>
+    
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        
+        function logResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            document.getElementById('test-results').appendChild(div);
+            console.log(message);
+        }
+        
+        function sanitizeHTML(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+        
+        function showNotification(message, type) {
+            logResult(`📢 Notification: ${message} (${type})`, 'info');
+        }
+        
+        // Mock Modal für Tests
+        function createMockModal() {
+            const modal = document.createElement('div');
+            modal.id = 'field-performance-modal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="field-performance-modal-title">Test Modal</h2>
+                        <span class="close" onclick="this.parentElement.parentElement.parentElement.style.display='none'">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <div id="field-performance-content"></div>
+                    </div>
+                </div>
+            `;
+            modal.style.display = 'none';
+            document.body.appendChild(modal);
+            return modal;
+        }
+
+        // Statistics Table Mock
+        function createMockStatisticsTable() {
+            const container = document.createElement('div');
+            container.id = 'enhanced-statistics-table-container';
+            container.innerHTML = `
+                <table>
+                    <tbody>
+                        <tr data-model-id="openrouter:deepseek-chimera-free">
+                            <td>Test Model</td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+            document.body.appendChild(container);
+        }
+        
+        // JavaScript Funktionen aus der Hauptdatei kopieren
+        async function showModelDetails(modelId) {
+            logResult(`🔍 Testing showModelDetails(${modelId})`, 'info');
+            
+            try {
+                // Simuliere API Call
+                const response = await fetch(`${API_BASE_URL}/api/statistics/model/${encodeURIComponent(modelId)}/details?days_back=30`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    logResult(`✅ showModelDetails API erfolgreich: Model ${data.data.summary.model_id}`, 'pass');
+                    return true;
+                } else {
+                    logResult(`❌ showModelDetails API Fehler: ${data.error || 'Unknown error'}`, 'fail');
+                    return false;
+                }
+                
+            } catch (error) {
+                logResult(`❌ showModelDetails Fehler: ${error.message}`, 'fail');
+                return false;
+            }
+        }
+        
+        async function showFieldPerformance(modelId) {
+            logResult(`📈 Testing showFieldPerformance(${modelId})`, 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/statistics/fields/performance?model_id=${encodeURIComponent(modelId)}&days_back=30`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const fieldData = result.data.field_statistics || [];
+                    logResult(`✅ showFieldPerformance API erfolgreich: ${fieldData.length} Felder gefunden`, 'pass');
+                    return true;
+                } else {
+                    logResult(`❌ showFieldPerformance API Fehler: ${result.error || 'Unknown error'}`, 'fail');
+                    return false;
+                }
+                
+            } catch (error) {
+                logResult(`❌ showFieldPerformance Fehler: ${error.message}`, 'fail');
+                return false;
+            }
+        }
+        
+        // Test Runner
+        async function runTests() {
+            logResult('🚀 Starting JavaScript Functions Tests...', 'info');
+            
+            // Setup Mock Elements
+            createMockModal();
+            createMockStatisticsTable();
+            
+            let passedTests = 0;
+            let totalTests = 0;
+            
+            // Test 1: showModelDetails Function
+            totalTests++;
+            logResult('Test 1: showModelDetails Function', 'info');
+            const test1Result = await showModelDetails('openrouter:deepseek-chimera-free');
+            if (test1Result) passedTests++;
+            
+            // Test 2: showFieldPerformance Function 
+            totalTests++;
+            logResult('Test 2: showFieldPerformance Function', 'info');
+            const test2Result = await showFieldPerformance('openrouter:deepseek-chimera-free');
+            if (test2Result) passedTests++;
+            
+            // Test 3: showFieldPerformance ohne Model ID
+            totalTests++;
+            logResult('Test 3: showFieldPerformance (ohne Model ID)', 'info');
+            const test3Result = await showFieldPerformance('');
+            if (test3Result) passedTests++;
+            
+            // Ergebnisse
+            logResult(`📊 TEST ZUSAMMENFASSUNG: ${passedTests}/${totalTests} Tests bestanden`, 
+                     passedTests === totalTests ? 'pass' : 'fail');
+                     
+            if (passedTests === totalTests) {
+                logResult('🎉 ALLE JAVASCRIPT-FUNKTIONEN TESTS BESTANDEN!', 'pass');
+            } else {
+                logResult('⚠️ EINIGE JAVASCRIPT-FUNKTIONEN TESTS FEHLGESCHLAGEN!', 'fail');
+            }
+        }
+        
+        // Starte Tests nach Seitenladung
+        window.onload = () => {
+            setTimeout(runTests, 1000);
+        };
+    </script>
+</body>
+</html>

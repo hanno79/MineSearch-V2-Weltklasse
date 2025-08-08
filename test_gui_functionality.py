@@ -270,7 +270,7 @@ def test_html_source_verification():
     
     try:
         # Read the HTML file
-        with open("/app/minesearch_v2/frontend/index.html", "r") as f:
+        with open("/app/frontend/index.html", "r") as f:
             content = f.read()
         
         # Check for key JavaScript functions

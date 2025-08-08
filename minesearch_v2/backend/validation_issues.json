@@ -1,0 +1,142 @@
+[
+  {
+    "mine_name": "Aubelle",
+    "issue_type": "INKONSISTENTER_STATUS",
+    "description": "Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'",
+    "fields_involved": [
+      "Aktivitätsstatus",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  },
+  {
+    "mine_name": "Aubelle",
+    "issue_type": "NOCH_AKTIV_ABER_GESCHLOSSEN",
+    "description": "Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'",
+    "fields_involved": [
+      "Produktionsende",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  },
+  {
+    "mine_name": "Barry-1",
+    "issue_type": "INKONSISTENTER_STATUS",
+    "description": "Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'",
+    "fields_involved": [
+      "Aktivitätsstatus",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  },
+  {
+    "mine_name": "Barry-1",
+    "issue_type": "NOCH_AKTIV_ABER_GESCHLOSSEN",
+    "description": "Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'",
+    "fields_involved": [
+      "Produktionsende",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  },
+  {
+    "mine_name": "Bell-Allard",
+    "issue_type": "INKONSISTENTER_STATUS",
+    "description": "Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'",
+    "fields_involved": [
+      "Aktivitätsstatus",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  },
+  {
+    "mine_name": "Bell-Allard",
+    "issue_type": "NOCH_AKTIV_ABER_GESCHLOSSEN",
+    "description": "Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'",
+    "fields_involved": [
+      "Produktionsende",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  },
+  {
+    "mine_name": "Courville",
+    "issue_type": "INKONSISTENTER_STATUS",
+    "description": "Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'",
+    "fields_involved": [
+      "Aktivitätsstatus",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  },
+  {
+    "mine_name": "Courville",
+    "issue_type": "NOCH_AKTIV_ABER_GESCHLOSSEN",
+    "description": "Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'",
+    "fields_involved": [
+      "Produktionsende",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  },
+  {
+    "mine_name": "Lac Pelletier",
+    "issue_type": "INKONSISTENTER_STATUS",
+    "description": "Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'",
+    "fields_involved": [
+      "Aktivitätsstatus",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  },
+  {
+    "mine_name": "Lac Pelletier",
+    "issue_type": "NOCH_AKTIV_ABER_GESCHLOSSEN",
+    "description": "Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'",
+    "fields_involved": [
+      "Produktionsende",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  },
+  {
+    "mine_name": "Malartic Midway",
+    "issue_type": "INKONSISTENTER_STATUS",
+    "description": "Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'",
+    "fields_involved": [
+      "Aktivitätsstatus",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  },
+  {
+    "mine_name": "Malartic Midway",
+    "issue_type": "NOCH_AKTIV_ABER_GESCHLOSSEN",
+    "description": "Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'",
+    "fields_involved": [
+      "Produktionsende",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  },
+  {
+    "mine_name": "St-Charles Bourget",
+    "issue_type": "INKONSISTENTER_STATUS",
+    "description": "Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'",
+    "fields_involved": [
+      "Aktivitätsstatus",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  },
+  {
+    "mine_name": "St-Charles Bourget",
+    "issue_type": "NOCH_AKTIV_ABER_GESCHLOSSEN",
+    "description": "Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'",
+    "fields_involved": [
+      "Produktionsende",
+      "Fördermenge/Jahr"
+    ],
+    "severity": "CRITICAL"
+  }
+]

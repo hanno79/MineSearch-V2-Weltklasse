@@ -1,0 +1,31 @@
+{
+  "timestamp": "2025-08-07T08:21:06.835910",
+  "duration_seconds": 0.033303,
+  "test_summary": {
+    "total_tests": 7,
+    "passed_tests": 3,
+    "failed_tests": 4,
+    "success_rate": 0.42857142857142855,
+    "overall_status": "FAIL"
+  },
+  "detailed_results": {
+    "server_start": true,
+    "api_health": true,
+    "csv_upload": false,
+    "model_selection": true,
+    "batch_search": false,
+    "search_completion": false,
+    "results_validation": false,
+    "performance_metrics": {},
+    "errors": [
+      "CSV upload failed: Expecting value: line 2 column 9 (char 9)"
+    ]
+  },
+  "recommendations": [
+    "Check CSV upload functionality and file permissions",
+    "Verify model selection and search initialization",
+    "Investigate search timeout issues and provider availability",
+    "Check result processing and data formatting",
+    "Low success rate - check provider configurations and API keys"
+  ]
+}

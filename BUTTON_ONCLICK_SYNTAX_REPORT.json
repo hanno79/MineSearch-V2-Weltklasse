@@ -1,0 +1,1120 @@
+{
+  "file": "/app/minesearch_v2/frontend/index.html",
+  "file_size": 324223,
+  "onclick_analysis": {
+    "tested_handlers": [
+      {
+        "index": 1,
+        "code": "startSingleSearch()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 2,
+        "code": "loadSources()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 3,
+        "code": "loadSources()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 4,
+        "code": "loadResults()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 5,
+        "code": "loadStatistics()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 6,
+        "code": "exportEnhancedStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 7,
+        "code": "exportEnhancedStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 8,
+        "code": "printStatisticsReport()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 9,
+        "code": "closeBenchmarkModal()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 10,
+        "code": "cancelSearch()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 11,
+        "code": "loadConsolidatedResults()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 12,
+        "code": "exportConsolidatedCSV()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 13,
+        "code": "(${retryCallback.toString()})()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 14,
+        "code": "seedSourcesDatabase()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 15,
+        "code": "document.getElementById(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 16,
+        "code": "loadSourcesWithSort(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 17,
+        "code": "loadSourcesWithSort(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 18,
+        "code": "loadSourcesWithSort(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 19,
+        "code": "loadSourcesWithSort(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 20,
+        "code": "loadSourcesWithSort(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 21,
+        "code": "toggleSourceDetails(${escapedDomain})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 22,
+        "code": "loadStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 23,
+        "code": "loadStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 24,
+        "code": "loadStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 25,
+        "code": "loadStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 26,
+        "code": "loadStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 27,
+        "code": "loadStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 28,
+        "code": "showModelDetails(${escapedModelId})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 29,
+        "code": "document.getElementById(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 30,
+        "code": "showFieldDetails(${safeJSONStringify(modelId)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 31,
+        "code": "closeModelDetails()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 32,
+        "code": "showFieldPerformance(${safeJSONStringify(modelId)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 33,
+        "code": "exportModelData(${safeJSONStringify(modelId)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 34,
+        "code": "closeModelDetails()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 35,
+        "code": "closeFieldPerformance()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 36,
+        "code": "exportFieldData(${safeJSONStringify(modelId)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 37,
+        "code": "closeFieldPerformance()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 38,
+        "code": "document.getElementById(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 39,
+        "code": "exportResultsAsCSV()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 40,
+        "code": "loadResults(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 41,
+        "code": "loadResults(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 42,
+        "code": "loadResults(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 43,
+        "code": "loadResults(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 44,
+        "code": "loadResults(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 45,
+        "code": "viewResultDetail(${index}, \\",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 46,
+        "code": "this.remove()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 47,
+        "code": "event.stopPropagation()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 48,
+        "code": "this.closest(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 49,
+        "code": "refreshDomainDetails(${safeJSONStringify(domain)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 50,
+        "code": "refreshDomainDetails(${safeJSONStringify(domain)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 51,
+        "code": "refreshDomainDetails(${safeJSONStringify(domain)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 52,
+        "code": "refreshDomainDetails(${safeJSONStringify(domain)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 53,
+        "code": "refreshDomainDetails(${safeJSONStringify(domain)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 54,
+        "code": "exportDomainSources(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 55,
+        "code": "refreshDomainDetails(${safeJSONStringify(domain)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 56,
+        "code": "toggleAnalyticsView(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 57,
+        "code": "toggleAnalyticsView(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 58,
+        "code": "toggleAnalyticsView(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 59,
+        "code": "toggleSourceView(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 60,
+        "code": "toggleSourceView(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 61,
+        "code": "sortTable(this, 0, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 62,
+        "code": "sortTable(this, 1, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 63,
+        "code": "sortTable(this, 2, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 64,
+        "code": "sortTable(this, 3, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 65,
+        "code": "showConsolidatedDetails(${escapedMineName}, ${escapedCountry})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 66,
+        "code": "closeConsolidatedDetails()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 67,
+        "code": "closeConsolidatedDetails()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 68,
+        "code": "closeConsolidatedDetails()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 69,
+        "code": "sortTable(this, 0, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 70,
+        "code": "sortTable(this, 1, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 71,
+        "code": "sortTable(this, 2, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 72,
+        "code": "sortTable(this, 3, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 73,
+        "code": "sortTable(this, 4, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 74,
+        "code": "sortTable(this, 5, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 75,
+        "code": "sortTable(this, 6, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 76,
+        "code": "toggleModelFields(${index})",
+        "valid": true,
+        "issues": []
+      }
+    ],
+    "syntax_errors": [
+      {
+        "index": 6,
+        "code": "exportEnhancedStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 7,
+        "code": "exportEnhancedStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 15,
+        "code": "document.getElementById(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 16,
+        "code": "loadSourcesWithSort(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 17,
+        "code": "loadSourcesWithSort(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 18,
+        "code": "loadSourcesWithSort(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 19,
+        "code": "loadSourcesWithSort(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 20,
+        "code": "loadSourcesWithSort(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 22,
+        "code": "loadStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 23,
+        "code": "loadStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 24,
+        "code": "loadStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 25,
+        "code": "loadStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 26,
+        "code": "loadStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 27,
+        "code": "loadStatistics(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 29,
+        "code": "document.getElementById(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 38,
+        "code": "document.getElementById(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 40,
+        "code": "loadResults(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 41,
+        "code": "loadResults(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 42,
+        "code": "loadResults(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 43,
+        "code": "loadResults(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 44,
+        "code": "loadResults(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 45,
+        "code": "viewResultDetail(${index}, \\",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 48,
+        "code": "this.closest(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 54,
+        "code": "exportDomainSources(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 56,
+        "code": "toggleAnalyticsView(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 57,
+        "code": "toggleAnalyticsView(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 58,
+        "code": "toggleAnalyticsView(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 59,
+        "code": "toggleSourceView(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 60,
+        "code": "toggleSourceView(",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 61,
+        "code": "sortTable(this, 0, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 62,
+        "code": "sortTable(this, 1, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 63,
+        "code": "sortTable(this, 2, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 64,
+        "code": "sortTable(this, 3, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 69,
+        "code": "sortTable(this, 0, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 70,
+        "code": "sortTable(this, 1, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 71,
+        "code": "sortTable(this, 2, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 72,
+        "code": "sortTable(this, 3, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 73,
+        "code": "sortTable(this, 4, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 74,
+        "code": "sortTable(this, 5, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      },
+      {
+        "index": 75,
+        "code": "sortTable(this, 6, ",
+        "valid": false,
+        "issues": [
+          "Unmatched parentheses: 1 open, 0 close"
+        ]
+      }
+    ],
+    "warnings": [],
+    "valid_handlers": [
+      {
+        "index": 1,
+        "code": "startSingleSearch()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 2,
+        "code": "loadSources()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 3,
+        "code": "loadSources()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 4,
+        "code": "loadResults()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 5,
+        "code": "loadStatistics()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 8,
+        "code": "printStatisticsReport()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 9,
+        "code": "closeBenchmarkModal()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 10,
+        "code": "cancelSearch()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 11,
+        "code": "loadConsolidatedResults()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 12,
+        "code": "exportConsolidatedCSV()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 13,
+        "code": "(${retryCallback.toString()})()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 14,
+        "code": "seedSourcesDatabase()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 21,
+        "code": "toggleSourceDetails(${escapedDomain})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 28,
+        "code": "showModelDetails(${escapedModelId})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 30,
+        "code": "showFieldDetails(${safeJSONStringify(modelId)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 31,
+        "code": "closeModelDetails()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 32,
+        "code": "showFieldPerformance(${safeJSONStringify(modelId)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 33,
+        "code": "exportModelData(${safeJSONStringify(modelId)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 34,
+        "code": "closeModelDetails()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 35,
+        "code": "closeFieldPerformance()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 36,
+        "code": "exportFieldData(${safeJSONStringify(modelId)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 37,
+        "code": "closeFieldPerformance()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 39,
+        "code": "exportResultsAsCSV()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 46,
+        "code": "this.remove()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 47,
+        "code": "event.stopPropagation()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 49,
+        "code": "refreshDomainDetails(${safeJSONStringify(domain)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 50,
+        "code": "refreshDomainDetails(${safeJSONStringify(domain)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 51,
+        "code": "refreshDomainDetails(${safeJSONStringify(domain)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 52,
+        "code": "refreshDomainDetails(${safeJSONStringify(domain)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 53,
+        "code": "refreshDomainDetails(${safeJSONStringify(domain)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 55,
+        "code": "refreshDomainDetails(${safeJSONStringify(domain)})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 65,
+        "code": "showConsolidatedDetails(${escapedMineName}, ${escapedCountry})",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 66,
+        "code": "closeConsolidatedDetails()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 67,
+        "code": "closeConsolidatedDetails()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 68,
+        "code": "closeConsolidatedDetails()",
+        "valid": true,
+        "issues": []
+      },
+      {
+        "index": 76,
+        "code": "toggleModelFields(${index})",
+        "valid": true,
+        "issues": []
+      }
+    ]
+  },
+  "button_analysis": {
+    "total_model_buttons": 3,
+    "buttons_with_issues": [],
+    "buttons_valid": [
+      {
+        "html": "<button onclick=\"showModelDetails(${escapedModelId})\"\n                                data-model-id=\"${sanitizeHTML(stat.model_id)}\"\n                                style=\"background: #3b82f6; color: ...",
+        "has_onclick": true,
+        "has_data_model_id": true,
+        "has_showmodeldetails": true,
+        "onclick_code": "showModelDetails(${escapedModelId})"
+      },
+      {
+        "html": "<button onclick=\"showModelDetails(${escapedModelId})\"\n                                data-model-id=\"${sanitizeHTML(stat.model_id)}\"\n                                style=\"background: #3b82f6; color: ...",
+        "has_onclick": true,
+        "has_data_model_id": true,
+        "has_showmodeldetails": true,
+        "onclick_code": "showModelDetails(${escapedModelId})"
+      },
+      {
+        "html": "<!DOCTYPE html>\n<html lang=\"de\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <meta http-equiv=\"Cache-Control\" content=\"no-cache, no...",
+        "has_onclick": true,
+        "has_data_model_id": true,
+        "has_showmodeldetails": true,
+        "onclick_code": "startSingleSearch()"
+      }
+    ]
+  },
+  "summary": {
+    "total_onclick_handlers": 76,
+    "syntax_errors": 40,
+    "warnings": 0,
+    "valid_handlers": 36,
+    "model_buttons_found": 3,
+    "model_buttons_with_issues": 0
+  }
+}

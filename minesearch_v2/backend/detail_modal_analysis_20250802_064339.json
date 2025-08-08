@@ -1,0 +1,218 @@
+{
+  "timestamp": "20250802_064339",
+  "analysis_type": "Detail Modal Simulation",
+  "summary": {
+    "analyzed_modals": 3,
+    "critical_findings": [
+      "Erfolgsrate ist 0.0%",
+      "Ø Felder gefunden ist 0.0",
+      "Ø Quellen ist 0.0",
+      "Konsistenz ist 0.0%",
+      "Erfolgsrate ist 0.0%",
+      "Ø Felder gefunden ist 0.0",
+      "Ø Quellen ist 0.0",
+      "Konsistenz ist 0.0%",
+      "Erfolgsrate ist 0.0%",
+      "Ø Felder gefunden ist 0.0",
+      "Ø Quellen ist 0.0",
+      "Konsistenz ist 0.0%"
+    ],
+    "data_quality_issues": [
+      "openrouter:deepseek-chimera-free: Keine erfolgreichen Tests",
+      "openrouter:deepseek-chimera-free: Keine Konsistenz-Daten",
+      "openrouter:deepseek-free: Keine erfolgreichen Tests",
+      "openrouter:deepseek-free: Keine Konsistenz-Daten",
+      "openrouter:glm-4.5-air-free: Keine erfolgreichen Tests",
+      "openrouter:glm-4.5-air-free: Keine Konsistenz-Daten"
+    ]
+  },
+  "modal_analyses": [
+    {
+      "model_id": "openrouter:deepseek-chimera-free",
+      "modal_content": "Model Details: openrouter:deepseek-chimera-free\n\nPerformance-Übersicht:\nErfolgsrate: 0.0%\nGesamt Tests: 30\nGetestete Minen: 15\nØ Felder gefunden: 0.0\nØ Quellen: 0.0\nKonsistenz: 0.0%\nØ Antwortzeit: 0 ms\n\nTop Felder (Erfolgsrate):\n• Mine: 0.0% (0/30)\n• Land: 0.0% (0/30)\n• Region: 0.0% (0/30)\n• Zuverlässigkeit: 0.0% (0/15)\n• Modelle: 0.0% (0/30)",
+      "performance_metrics": {
+        "erfolgsrate": 0.0,
+        "gesamt_tests": 30,
+        "getestete_minen": 15,
+        "avg_felder": 0,
+        "avg_quellen": 0,
+        "konsistenz": 0.0,
+        "avg_response_time": 0
+      },
+      "validation": {
+        "status": "PROBLEME",
+        "issues": [
+          "Erfolgsrate ist 0.0%",
+          "Ø Felder gefunden ist 0.0",
+          "Ø Quellen ist 0.0",
+          "Konsistenz ist 0.0%"
+        ],
+        "success_rate": 0.0,
+        "plausible_values": {
+          "tests_reasonable": true,
+          "mines_reasonable": true,
+          "fields_reasonable": false,
+          "sources_reasonable": false,
+          "consistency_reasonable": false
+        }
+      },
+      "field_performance": [
+        {
+          "field_name": "Mine",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 30
+        },
+        {
+          "field_name": "Land",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 30
+        },
+        {
+          "field_name": "Region",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 30
+        },
+        {
+          "field_name": "Zuverlässigkeit",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 15
+        },
+        {
+          "field_name": "Modelle",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 30
+        }
+      ]
+    },
+    {
+      "model_id": "openrouter:deepseek-free",
+      "modal_content": "Model Details: openrouter:deepseek-free\n\nPerformance-Übersicht:\nErfolgsrate: 0.0%\nGesamt Tests: 30\nGetestete Minen: 15\nØ Felder gefunden: 0.0\nØ Quellen: 0.0\nKonsistenz: 0.0%\nØ Antwortzeit: 0 ms\n\nTop Felder (Erfolgsrate):\n• Mine: 0.0% (0/30)\n• Land: 0.0% (0/30)\n• Region: 0.0% (0/30)\n• Zuverlässigkeit: 0.0% (0/15)\n• Modelle: 0.0% (0/30)",
+      "performance_metrics": {
+        "erfolgsrate": 0.0,
+        "gesamt_tests": 30,
+        "getestete_minen": 15,
+        "avg_felder": 0,
+        "avg_quellen": 0,
+        "konsistenz": 0.0,
+        "avg_response_time": 0
+      },
+      "validation": {
+        "status": "PROBLEME",
+        "issues": [
+          "Erfolgsrate ist 0.0%",
+          "Ø Felder gefunden ist 0.0",
+          "Ø Quellen ist 0.0",
+          "Konsistenz ist 0.0%"
+        ],
+        "success_rate": 0.0,
+        "plausible_values": {
+          "tests_reasonable": true,
+          "mines_reasonable": true,
+          "fields_reasonable": false,
+          "sources_reasonable": false,
+          "consistency_reasonable": false
+        }
+      },
+      "field_performance": [
+        {
+          "field_name": "Mine",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 30
+        },
+        {
+          "field_name": "Land",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 30
+        },
+        {
+          "field_name": "Region",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 30
+        },
+        {
+          "field_name": "Zuverlässigkeit",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 15
+        },
+        {
+          "field_name": "Modelle",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 30
+        }
+      ]
+    },
+    {
+      "model_id": "openrouter:glm-4.5-air-free",
+      "modal_content": "Model Details: openrouter:glm-4.5-air-free\n\nPerformance-Übersicht:\nErfolgsrate: 0.0%\nGesamt Tests: 30\nGetestete Minen: 15\nØ Felder gefunden: 0.0\nØ Quellen: 0.0\nKonsistenz: 0.0%\nØ Antwortzeit: 0 ms\n\nTop Felder (Erfolgsrate):\n• Mine: 0.0% (0/30)\n• Land: 0.0% (0/30)\n• Region: 0.0% (0/30)\n• Zuverlässigkeit: 0.0% (0/15)\n• Modelle: 0.0% (0/30)",
+      "performance_metrics": {
+        "erfolgsrate": 0.0,
+        "gesamt_tests": 30,
+        "getestete_minen": 15,
+        "avg_felder": 0,
+        "avg_quellen": 0,
+        "konsistenz": 0.0,
+        "avg_response_time": 0
+      },
+      "validation": {
+        "status": "PROBLEME",
+        "issues": [
+          "Erfolgsrate ist 0.0%",
+          "Ø Felder gefunden ist 0.0",
+          "Ø Quellen ist 0.0",
+          "Konsistenz ist 0.0%"
+        ],
+        "success_rate": 0.0,
+        "plausible_values": {
+          "tests_reasonable": true,
+          "mines_reasonable": true,
+          "fields_reasonable": false,
+          "sources_reasonable": false,
+          "consistency_reasonable": false
+        }
+      },
+      "field_performance": [
+        {
+          "field_name": "Mine",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 30
+        },
+        {
+          "field_name": "Land",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 30
+        },
+        {
+          "field_name": "Region",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 30
+        },
+        {
+          "field_name": "Zuverlässigkeit",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 15
+        },
+        {
+          "field_name": "Modelle",
+          "success_rate": 0.0,
+          "times_found": 0,
+          "total_searches": 30
+        }
+      ]
+    }
+  ],
+  "overall_assessment": "GESAMTBEWERTUNG DER DETAIL-MODAL-DATEN:\n\n✅ Erfolgreiche Modelle: 0/3\n❌ Problematische Modelle: 3/3\n\n📊 Durchschnittliche Erfolgsrate: 0.0%\n🧪 Durchschnittliche Tests pro Modell: 30\n\nHAUPTPROBLEME:\n• ModelSummary-Tabelle ist nicht synchronisiert (zeigt 0 Tests für alle Modelle)\n• Einige Modelle haben 0% Erfolgsrate trotz vorhandener Testdaten\n• Konsistenz-Berechnungen fehlen für einige Modelle\n\nEMPFEHLUNGEN:\n1. ModelSummary-Tabelle mit aktuellen ModelStatistics synchronisieren\n2. Detail-Modal-Logik überprüfen und korrekte Datenquelle verwenden\n3. Frontend-Tests mit echten Daten durchführen"
+}

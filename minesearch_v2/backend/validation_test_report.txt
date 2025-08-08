@@ -1,0 +1,90 @@
+================================================================================
+CROSS-FIELD-VALIDATION TESTBERICHT
+================================================================================
+Datum: 30.07.2025
+Autor: Data Validation Tester
+
+📊 ZUSAMMENFASSUNG:
+   Gesamt Probleme: 14
+   ❌ CRITICAL: 14
+   🔥 HIGH: 0
+   ⚠️  MEDIUM: 0
+   💡 LOW: 0
+
+
+CRITICAL PROBLEME (14):
+--------------------------------------------------
+🏭 Mine: Aubelle
+   Typ: INKONSISTENTER_STATUS
+   Beschreibung: Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'
+   Betroffene Felder: Aktivitätsstatus, Fördermenge/Jahr
+
+🏭 Mine: Aubelle
+   Typ: NOCH_AKTIV_ABER_GESCHLOSSEN
+   Beschreibung: Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'
+   Betroffene Felder: Produktionsende, Fördermenge/Jahr
+
+🏭 Mine: Barry-1
+   Typ: INKONSISTENTER_STATUS
+   Beschreibung: Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'
+   Betroffene Felder: Aktivitätsstatus, Fördermenge/Jahr
+
+🏭 Mine: Barry-1
+   Typ: NOCH_AKTIV_ABER_GESCHLOSSEN
+   Beschreibung: Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'
+   Betroffene Felder: Produktionsende, Fördermenge/Jahr
+
+🏭 Mine: Bell-Allard
+   Typ: INKONSISTENTER_STATUS
+   Beschreibung: Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'
+   Betroffene Felder: Aktivitätsstatus, Fördermenge/Jahr
+
+🏭 Mine: Bell-Allard
+   Typ: NOCH_AKTIV_ABER_GESCHLOSSEN
+   Beschreibung: Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'
+   Betroffene Felder: Produktionsende, Fördermenge/Jahr
+
+🏭 Mine: Courville
+   Typ: INKONSISTENTER_STATUS
+   Beschreibung: Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'
+   Betroffene Felder: Aktivitätsstatus, Fördermenge/Jahr
+
+🏭 Mine: Courville
+   Typ: NOCH_AKTIV_ABER_GESCHLOSSEN
+   Beschreibung: Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'
+   Betroffene Felder: Produktionsende, Fördermenge/Jahr
+
+🏭 Mine: Lac Pelletier
+   Typ: INKONSISTENTER_STATUS
+   Beschreibung: Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'
+   Betroffene Felder: Aktivitätsstatus, Fördermenge/Jahr
+
+🏭 Mine: Lac Pelletier
+   Typ: NOCH_AKTIV_ABER_GESCHLOSSEN
+   Beschreibung: Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'
+   Betroffene Felder: Produktionsende, Fördermenge/Jahr
+
+🏭 Mine: Malartic Midway
+   Typ: INKONSISTENTER_STATUS
+   Beschreibung: Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'
+   Betroffene Felder: Aktivitätsstatus, Fördermenge/Jahr
+
+🏭 Mine: Malartic Midway
+   Typ: NOCH_AKTIV_ABER_GESCHLOSSEN
+   Beschreibung: Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'
+   Betroffene Felder: Produktionsende, Fördermenge/Jahr
+
+🏭 Mine: St-Charles Bourget
+   Typ: INKONSISTENTER_STATUS
+   Beschreibung: Mine ist 'aktiv' aber Fördermenge zeigt 'mine geschlossen'
+   Betroffene Felder: Aktivitätsstatus, Fördermenge/Jahr
+
+🏭 Mine: St-Charles Bourget
+   Typ: NOCH_AKTIV_ABER_GESCHLOSSEN
+   Beschreibung: Produktionsende 'noch aktiv' aber Fördermenge 'mine geschlossen'
+   Betroffene Felder: Produktionsende, Fördermenge/Jahr
+
+🔧 EMPFEHLUNGEN:
+   ❌ SOFORTIGER HANDLUNGSBEDARF - Cross-Field-Validation ist fehlerhaft!
+   - Status Logic Implementer muss die Validierungsregeln überarbeiten
+   - Inkonsistente Daten müssen korrigiert werden

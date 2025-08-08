@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Deduplication Functionality</title>
+    <script src="minesearch_v2/frontend/js/deduplication-engine.js"></script>
+</head>
+<body>
+    <h1>Deduplication Test</h1>
+    <div id="test-results"></div>
+    
+    <script>
+        function runDeduplicationTest() {
+            const resultsDiv = document.getElementById('test-results');
+            let html = '<h2>Deduplication Engine Test Results</h2>';
+            
+            // Test 1: Check if engine is loaded
+            if (typeof window.deduplicationEngine !== 'undefined') {
+                html += '<p style="color: green;">✅ Deduplication engine loaded successfully</p>';
+                
+                // Test 2: Test Canada/Kanada deduplication
+                const testValue = "Canada / Kanada / Canada / Canada / Kanada";
+                const result = window.deduplicationEngine.deduplicateValues(testValue, 'country');
+                html += `<p><strong>Test Input:</strong> ${testValue}</p>`;
+                html += `<p><strong>Deduplicated Result:</strong> ${result}</p>`;
+                
+                if (result.includes('Canada (3)') && result.includes('Kanada (2)')) {
+                    html += '<p style="color: green;">✅ Canada/Kanada deduplication working correctly!</p>';
+                } else {
+                    html += '<p style="color: red;">❌ Canada/Kanada deduplication not working as expected</p>';
+                }
+                
+                // Test 3: Test field type detection
+                window.detectFieldType = function(fieldName) {
+                    const typeMapping = {
+                        'country': 'country',
+                        'land': 'country', 
+                        'country_name': 'country',
+                        'region': 'region',
+                        'province': 'region',
+                        'state': 'region',
+                        'quebec': 'region',
+                        'status': 'status',
+                        'mine_status': 'status',
+                        'operation_status': 'status',
+                        'mineral': 'mineral',
+                        'commodity': 'mineral',
+                        'primary_mineral': 'mineral',
+                        'primary_commodity': 'mineral'
+                    };
+                    
+                    const fieldLower = fieldName.toLowerCase();
+                    
+                    // Exakte Übereinstimmung
+                    if (typeMapping[fieldLower]) {
+                        return typeMapping[fieldLower];
+                    }
+                    
+                    // Teilstring-Suche für zusammengesetzte Feldnamen
+                    for (const [key, type] of Object.entries(typeMapping)) {
+                        if (fieldLower.includes(key)) {
+                            return type;
+                        }
+                    }
+                    
+                    return 'general';
+                };
+                
+                const fieldType = detectFieldType('country');
+                html += `<p><strong>Field Type Detection:</strong> "country" → "${fieldType}"</p>`;
+                
+                if (fieldType === 'country') {
+                    html += '<p style="color: green;">✅ Field type detection working</p>';
+                } else {
+                    html += '<p style="color: red;">❌ Field type detection not working</p>';
+                }
+                
+                // Test 4: Test with source references
+                const testWithSources = "Canada [gpt-4] / Kanada [claude-3] / Canada [gemini]";
+                const cleanedTest = testWithSources.replace(/\\s*\\[[^\\]]+\\]/g, '');
+                const sourceResult = window.deduplicationEngine.deduplicateValues(cleanedTest, 'country');
+                html += `<p><strong>With Sources (cleaned):</strong> ${sourceResult}</p>`;
+                
+            } else {
+                html += '<p style="color: red;">❌ Deduplication engine NOT loaded!</p>';
+                html += '<p>Check if js/deduplication-engine.js file exists and loads correctly</p>';
+            }
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        // Run test when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(runDeduplicationTest, 100);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Progress Tracking Integration Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+        }
+        .test-section { 
+            margin: 20px 0; 
+            padding: 15px; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+        }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .info { background: #d1ecf1; border-color: #bee5eb; }
+        button { 
+            padding: 10px 20px; 
+            margin: 5px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            background: #007bff; 
+            color: white; 
+        }
+        button:hover { background: #0056b3; }
+        .log { 
+            background: #f8f9fa; 
+            border: 1px solid #dee2e6; 
+            border-radius: 5px; 
+            padding: 10px; 
+            height: 200px; 
+            overflow-y: auto; 
+            font-family: monospace; 
+            font-size: 12px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Progress Tracking Integration Test</h1>
+        
+        <div class="test-section info">
+            <h3>Test 1: Backend API Connection</h3>
+            <button onclick="testBackendAPI()">Test Backend API</button>
+            <div id="api-result"></div>
+        </div>
+
+        <div class="test-section info">
+            <h3>Test 2: WebSocket Connection</h3>
+            <button onclick="testWebSocketConnection()">Test WebSocket</button>
+            <div id="websocket-result"></div>
+        </div>
+
+        <div class="test-section info">
+            <h3>Test 3: Enhanced Loading Component</h3>
+            <button onclick="testEnhancedLoading()">Test Enhanced Loading</button>
+            <div id="loading-test-container"></div>
+        </div>
+
+        <div class="test-section info">
+            <h3>Test 4: Mathematical Progress Calculation</h3>
+            <button onclick="testProgressMath()">Test Progress Math</button>
+            <div id="math-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Log</h3>
+            <div id="test-log" class="log"></div>
+        </div>
+    </div>
+
+    <script src="minesearch_v2/frontend/js/progress-tracking.js"></script>
+    <script>
+        let currentSessionId = null;
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('test-log');
+            const color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'blue';
+            logDiv.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        async function testBackendAPI() {
+            try {
+                log('Testing backend API connection...', 'info');
+                
+                // Test health endpoint
+                const healthResponse = await fetch('http://localhost:8000/health');
+                const healthData = await healthResponse.json();
+                log(`✅ Health check: ${healthData.status}`, 'success');
+                
+                // Test progress session creation
+                const sessionResponse = await fetch('http://localhost:8000/api/progress/create-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mines: ['Test Mine 1', 'Test Mine 2'],
+                        models: ['test-model-1', 'test-model-2']
+                    })
+                });
+                
+                const sessionData = await sessionResponse.json();
+                if (sessionData.success) {
+                    currentSessionId = sessionData.session_id;
+                    log(`✅ Session created: ${currentSessionId}`, 'success');
+                    log(`✅ Total operations: ${sessionData.session_info.total_operations}`, 'success');
+                    
+                    document.getElementById('api-result').innerHTML = `
+                        <div class="success">
+                            <strong>✅ API Test Successful</strong><br>
+                            Session ID: ${currentSessionId}<br>
+                            Total Operations: ${sessionData.session_info.total_operations}
+                        </div>
+                    `;
+                } else {
+                    throw new Error(sessionData.detail || 'Session creation failed');
+                }
+                
+            } catch (error) {
+                log(`❌ API test failed: ${error.message}`, 'error');
+                document.getElementById('api-result').innerHTML = `
+                    <div class="error"><strong>❌ API Test Failed:</strong> ${error.message}</div>
+                `;
+            }
+        }
+
+        async function testWebSocketConnection() {
+            if (!currentSessionId) {
+                log('❌ Please run Backend API test first', 'error');
+                return;
+            }
+
+            try {
+                log('Testing WebSocket connection...', 'info');
+                
+                const wsUrl = `ws://localhost:8000/ws/search-progress/${currentSessionId}`;
+                const websocket = new WebSocket(wsUrl);
+                
+                websocket.onopen = (event) => {
+                    log('✅ WebSocket connected', 'success');
+                    websocket.send(JSON.stringify({type: 'ping'}));
+                    
+                    document.getElementById('websocket-result').innerHTML = `
+                        <div class="success">
+                            <strong>✅ WebSocket Connected</strong><br>
+                            URL: ${wsUrl}
+                        </div>
+                    `;
+                };
+
+                websocket.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    log(`📨 WebSocket message: ${JSON.stringify(data)}`, 'success');
+                };
+
+                websocket.onerror = (error) => {
+                    log(`❌ WebSocket error: ${error}`, 'error');
+                    document.getElementById('websocket-result').innerHTML = `
+                        <div class="error"><strong>❌ WebSocket Error</strong></div>
+                    `;
+                };
+
+                // Close after 5 seconds
+                setTimeout(() => {
+                    websocket.close();
+                    log('🔄 WebSocket test completed', 'info');
+                }, 5000);
+
+            } catch (error) {
+                log(`❌ WebSocket test failed: ${error.message}`, 'error');
+                document.getElementById('websocket-result').innerHTML = `
+                    <div class="error"><strong>❌ WebSocket Test Failed:</strong> ${error.message}</div>
+                `;
+            }
+        }
+
+        function testEnhancedLoading() {
+            try {
+                log('Testing Enhanced Loading Component...', 'info');
+                
+                const container = document.getElementById('loading-test-container');
+                const mines = ['Test Mine A', 'Test Mine B'];
+                const models = ['Model 1', 'Model 2'];
+                
+                if (window.progressTracker) {
+                    showEnhancedLoadingMessage(
+                        container, 
+                        '🔄 Test Progress Tracking',
+                        'This is a test of the enhanced loading component with progress tracking.',
+                        mines,
+                        models
+                    );
+                    log('✅ Enhanced loading component created', 'success');
+                } else {
+                    log('❌ Progress tracker not available', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Enhanced loading test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testProgressMath() {
+            try {
+                log('Testing progress calculation mathematics...', 'info');
+                
+                const testCases = [
+                    {mines: 1, models: 1, expected: 1},    // 1 operation = 100% when complete
+                    {mines: 2, models: 2, expected: 4},    // 2×2 = 4 operations
+                    {mines: 10, models: 10, expected: 100}, // 10×10 = 100 operations
+                    {mines: 3, models: 5, expected: 15}     // 3×5 = 15 operations
+                ];
+                
+                let allTestsPassed = true;
+                const results = [];
+                
+                for (const testCase of testCases) {
+                    const response = await fetch('http://localhost:8000/api/progress/create-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            mines: Array.from({length: testCase.mines}, (_, i) => `Mine ${i + 1}`),
+                            models: Array.from({length: testCase.models}, (_, i) => `Model ${i + 1}`)
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    const actualOperations = data.session_info.total_operations;
+                    const passed = actualOperations === testCase.expected;
+                    
+                    if (!passed) allTestsPassed = false;
+                    
+                    results.push({
+                        mines: testCase.mines,
+                        models: testCase.models,
+                        expected: testCase.expected,
+                        actual: actualOperations,
+                        passed: passed
+                    });
+                    
+                    log(`${passed ? '✅' : '❌'} ${testCase.mines}×${testCase.models}: Expected ${testCase.expected}, Got ${actualOperations}`, passed ? 'success' : 'error');
+                }
+                
+                document.getElementById('math-result').innerHTML = `
+                    <div class="${allTestsPassed ? 'success' : 'error'}">
+                        <strong>${allTestsPassed ? '✅' : '❌'} Progress Math Test ${allTestsPassed ? 'Passed' : 'Failed'}</strong><br>
+                        ${results.map(r => `${r.mines}×${r.models} = ${r.actual} operations ${r.passed ? '✅' : '❌'}`).join('<br>')}
+                    </div>
+                `;
+                
+            } catch (error) {
+                log(`❌ Math test failed: ${error.message}`, 'error');
+                document.getElementById('math-result').innerHTML = `
+                    <div class="error"><strong>❌ Math Test Failed:</strong> ${error.message}</div>
+                `;
+            }
+        }
+
+        // Auto-run basic tests on load
+        window.addEventListener('load', () => {
+            log('🚀 Progress Tracking Integration Test loaded', 'success');
+            log('Click buttons above to run individual tests', 'info');
+        });
+    </script>
+</body>
+</html>

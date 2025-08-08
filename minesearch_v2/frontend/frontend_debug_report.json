@@ -1,0 +1,65 @@
+{
+  "timestamp": "2025-08-02T16:10:23.747Z",
+  "apiTest": {
+    "success": true,
+    "status": 200,
+    "modelCount": 43,
+    "sampleModel": {
+      "model_id": "anthropic:claude-3-haiku",
+      "success_rate": 100,
+      "overall_consistency": 54.2,
+      "avg_fields_found": 0
+    },
+    "hasUndefined": true
+  },
+  "buttonInfo": [
+    {
+      "index": 0,
+      "text": "CSV hochladen und weiter",
+      "visible": true,
+      "enabled": true
+    },
+    {
+      "index": 3,
+      "text": "🔍 Quellen laden",
+      "visible": false,
+      "enabled": true
+    },
+    {
+      "index": 6,
+      "text": "📊 Modell-Statistiken (CSV)",
+      "visible": false,
+      "enabled": true
+    }
+  ],
+  "buttonClicked": true,
+  "domAnalysis": {
+    "tables": 0,
+    "undefinedTexts": 0,
+    "identicalValues": [
+      {
+        "type": "hundred_percent",
+        "count": 33
+      },
+      {
+        "type": "zero_values",
+        "count": 84
+      }
+    ],
+    "statisticsVisible": true,
+    "modelRows": 0
+  },
+  "cacheTest": {
+    "cacheCleared": true
+  },
+  "screenshots": [
+    "frontend_debug_after_click.png"
+  ],
+  "problems": {
+    "apiUndefined": true,
+    "domUndefined": false,
+    "noStatistics": false,
+    "noButtons": false,
+    "tooManyIdentical": true
+  }
+}

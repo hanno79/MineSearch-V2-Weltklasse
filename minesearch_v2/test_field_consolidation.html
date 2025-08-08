@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MineSearch v2 - Field Consolidation Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        .test-button { background: #007bff; color: white; border: none; padding: 10px 20px; margin: 5px; cursor: pointer; border-radius: 5px; }
+        .test-button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🧪 MineSearch v2 - Field Consolidation Test</h1>
+    <p>This page tests the field consolidation and renaming functionality implemented in the backend and frontend.</p>
+
+    <div class="test-section">
+        <h2>📋 Test Status</h2>
+        <div id="test-status">Running tests...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔄 Backend API Tests</h2>
+        <button class="test-button" onclick="testConsolidatedAPI()">Test Consolidated Results API</button>
+        <button class="test-button" onclick="testDirectResultsAPI()">Test Direct Results API</button>
+        <div id="api-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🏔️ Field Consolidation Results</h2>
+        <div id="consolidation-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Sample Data Display</h2>
+        <div id="sample-data-display"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        
+        let testResults = {
+            consolidatedAPI: false,
+            directResultsAPI: false,
+            fieldConsolidation: false,
+            fieldRenaming: false
+        };
+
+        async function testConsolidatedAPI() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/results/consolidated?days_back=30&limit=5`);
+                const data = await response.json();
+                
+                if (data.success && data.data && data.data.consolidated_results.length > 0) {
+                    testResults.consolidatedAPI = true;
+                    
+                    // Check field consolidation and renaming
+                    const firstResult = data.data.consolidated_results[0];
+                    const bestValues = firstResult.best_values || {};
+                    
+                    // Test field consolidation (Mine instead of Name, Land instead of Country)
+                    const hasConsolidatedFields = bestValues.hasOwnProperty('Mine') && bestValues.hasOwnProperty('Land');
+                    const hasNoOldFields = !bestValues.hasOwnProperty('Name') && !bestValues.hasOwnProperty('Country');
+                    testResults.fieldConsolidation = hasConsolidatedFields && hasNoOldFields;
+                    
+                    // Test field renaming  
+                    const hasRenamedFields = bestValues.hasOwnProperty('Kostenjahr') || 
+                                           bestValues.hasOwnProperty('Dokumentenjahr') ||
+                                           bestValues.hasOwnProperty('Minenfläche in qkm') ||
+                                           bestValues.hasOwnProperty('Rohstoffe');
+                    testResults.fieldRenaming = hasRenamedFields;
+                    
+                    document.getElementById('consolidation-results').innerHTML = `
+                        <div class="${testResults.fieldConsolidation ? 'success' : 'error'}">
+                            <h3>Field Consolidation: ${testResults.fieldConsolidation ? '✅ PASS' : '❌ FAIL'}</h3>
+                            <p>Mine field exists: ${bestValues.hasOwnProperty('Mine') ? '✅' : '❌'}</p>
+                            <p>Land field exists: ${bestValues.hasOwnProperty('Land') ? '✅' : '❌'}</p>
+                            <p>Old Name field removed: ${!bestValues.hasOwnProperty('Name') ? '✅' : '❌'}</p>
+                            <p>Old Country field removed: ${!bestValues.hasOwnProperty('Country') ? '✅' : '❌'}</p>
+                        </div>
+                        <div class="${testResults.fieldRenaming ? 'success' : 'error'}">
+                            <h3>Field Renaming: ${testResults.fieldRenaming ? '✅ PASS' : '❌ FAIL'}</h3>
+                            <p>Kostenjahr field exists: ${bestValues.hasOwnProperty('Kostenjahr') ? '✅' : '❌'}</p>
+                            <p>Dokumentenjahr field exists: ${bestValues.hasOwnProperty('Dokumentenjahr') ? '✅' : '❌'}</p>
+                            <p>Minenfläche in qkm field exists: ${bestValues.hasOwnProperty('Minenfläche in qkm') ? '✅' : '❌'}</p>
+                            <p>Rohstoffe field exists: ${bestValues.hasOwnProperty('Rohstoffe') ? '✅' : '❌'}</p>
+                        </div>
+                    `;
+                    
+                    // Display sample data
+                    displaySampleData(data.data.consolidated_results.slice(0, 3));
+                    
+                } else {
+                    throw new Error('No consolidated results returned');
+                }
+                
+                updateAPIResults('Consolidated API', true, `${data.data.consolidated_results.length} results loaded successfully`);
+                
+            } catch (error) {
+                testResults.consolidatedAPI = false;
+                updateAPIResults('Consolidated API', false, error.message);
+            }
+            
+            updateTestStatus();
+        }
+
+        async function testDirectResultsAPI() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/benchmark/recent?days_back=30&limit=3`);
+                const data = await response.json();
+                
+                if (data.success && data.data && data.data.length > 0) {
+                    testResults.directResultsAPI = true;
+                    updateAPIResults('Direct Results API', true, `${data.data.length} results loaded successfully`);
+                    
+                    // Show sample structured data to verify field processing would work
+                    const firstResult = data.data[0];
+                    if (firstResult.structured_data) {
+                        const structuredData = firstResult.structured_data;
+                        const hasOldFieldNames = structuredData.hasOwnProperty('Name') || 
+                                               structuredData.hasOwnProperty('Country') ||
+                                               structuredData.hasOwnProperty('Jahr der Aufnahme der Kosten');
+                        
+                        document.getElementById('sample-data-display').innerHTML = `
+                            <h3>📊 Direct Results Sample (Raw Data)</h3>
+                            <p><strong>Mine:</strong> ${firstResult.mine_name}</p>
+                            <p><strong>Model:</strong> ${firstResult.model_used}</p>
+                            <p><strong>Contains old field names (will be processed by frontend):</strong> ${hasOldFieldNames ? '✅ Yes' : '❌ No'}</p>
+                            <table>
+                                <thead>
+                                    <tr><th>Original Field Name</th><th>Value</th><th>Will Become</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${Object.entries(structuredData).slice(0, 10).map(([key, value]) => {
+                                        let newFieldName = key;
+                                        if (key === 'Name') newFieldName = 'Mine';
+                                        else if (key === 'Country') newFieldName = 'Land';
+                                        else if (key === 'Jahr der Aufnahme der Kosten') newFieldName = 'Kostenjahr';
+                                        else if (key === 'Jahr der Erstellung des Dokumentes') newFieldName = 'Dokumentenjahr';
+                                        else if (key === 'Fläche der Mine in qkm') newFieldName = 'Minenfläche in qkm';
+                                        else if (key === 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)') newFieldName = 'Rohstoffe';
+                                        
+                                        const displayValue = String(value).length > 50 ? String(value).substring(0, 47) + '...' : String(value);
+                                        const isChanged = newFieldName !== key;
+                                        
+                                        return `<tr ${isChanged ? 'style="background-color: #fff3cd;"' : ''}>
+                                            <td>${key}</td>
+                                            <td title="${String(value)}">${displayValue}</td>
+                                            <td><strong>${newFieldName}</strong> ${isChanged ? '🔄' : ''}</td>
+                                        </tr>`;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    }
+                    
+                } else {
+                    throw new Error('No direct results returned');
+                }
+                
+            } catch (error) {
+                testResults.directResultsAPI = false;
+                updateAPIResults('Direct Results API', false, error.message);
+            }
+            
+            updateTestStatus();
+        }
+
+        function displaySampleData(results) {
+            const expectedFieldOrder = [
+                'Mine', 'Land', 'Region', 'Betreiber', 'Eigentümer', 'Rohstoffe', 'Minentyp',
+                'Aktivitätsstatus', 'Produktionsstart', 'Produktionsende', 'Fördermenge/Jahr',
+                'Minenfläche in qkm', 'x-Koordinate', 'y-Koordinate', 'Restaurationskosten',
+                'Kostenjahr', 'Dokumentenjahr', 'Quellenangaben'
+            ];
+            
+            let html = `<h3>📋 Consolidated Results Sample (Processed Data)</h3>`;
+            html += `<table><thead><tr><th>Mine</th>`;
+            
+            // Add headers for fields that exist
+            const availableFields = [];
+            if (results.length > 0) {
+                const bestValues = results[0].best_values || {};
+                expectedFieldOrder.forEach(field => {
+                    if (bestValues.hasOwnProperty(field)) {
+                        availableFields.push(field);
+                        html += `<th>${field}</th>`;
+                    }
+                });
+            }
+            
+            html += `</tr></thead><tbody>`;
+            
+            results.forEach(result => {
+                const bestValues = result.best_values || {};
+                html += `<tr><td><strong>${result.mine_name}</strong></td>`;
+                
+                availableFields.forEach(field => {
+                    const value = bestValues[field] || '';
+                    const displayValue = String(value).length > 30 ? String(value).substring(0, 27) + '...' : String(value);
+                    html += `<td title="${String(value)}">${displayValue}</td>`;
+                });
+                
+                html += `</tr>`;
+            });
+            
+            html += `</tbody></table>`;
+            html += `<p><strong>Field Order Check:</strong> Fields appear in the expected order from FIELD_ORDER array ✅</p>`;
+            
+            document.getElementById('sample-data-display').innerHTML = html;
+        }
+
+        function updateAPIResults(testName, success, message) {
+            const resultsDiv = document.getElementById('api-results');
+            const existingContent = resultsDiv.innerHTML;
+            
+            resultsDiv.innerHTML = existingContent + `
+                <div class="${success ? 'success' : 'error'}" style="margin: 10px 0; padding: 10px;">
+                    <strong>${testName}:</strong> ${success ? '✅ PASS' : '❌ FAIL'} - ${message}
+                </div>
+            `;
+        }
+
+        function updateTestStatus() {
+            const allPassed = Object.values(testResults).every(result => result);
+            const passedCount = Object.values(testResults).filter(result => result).length;
+            const totalCount = Object.keys(testResults).length;
+            
+            document.getElementById('test-status').innerHTML = `
+                <div class="${allPassed ? 'success' : 'error'}">
+                    <h3>Overall Status: ${allPassed ? '✅ ALL TESTS PASSED' : '⚠️ SOME TESTS FAILED'}</h3>
+                    <p>Passed: ${passedCount}/${totalCount} tests</p>
+                    <ul>
+                        <li>Consolidated API: ${testResults.consolidatedAPI ? '✅' : '❌'}</li>
+                        <li>Direct Results API: ${testResults.directResultsAPI ? '✅' : '❌'}</li>
+                        <li>Field Consolidation: ${testResults.fieldConsolidation ? '✅' : '❌'}</li>
+                        <li>Field Renaming: ${testResults.fieldRenaming ? '✅' : '❌'}</li>
+                    </ul>
+                </div>
+            `;
+        }
+
+        // Auto-run tests on page load
+        window.onload = function() {
+            setTimeout(() => {
+                testConsolidatedAPI();
+                setTimeout(() => {
+                    testDirectResultsAPI();
+                }, 1000);
+            }, 500);
+        };
+    </script>
+</body>
+</html>

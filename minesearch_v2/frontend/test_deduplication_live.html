@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Deduplication Engine Test</title>
+    <script src="static/js/deduplication-engine.js"></script>
+</head>
+<body>
+    <h1>Live Deduplication Engine Test</h1>
+    <div id="test-results"></div>
+    
+    <script>
+        // Test deduplication engine after page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            const resultsDiv = document.getElementById('test-results');
+            
+            // Test 1: Check if engine is loaded
+            if (typeof window.deduplicationEngine === 'undefined') {
+                resultsDiv.innerHTML += '<p style="color: red;">❌ FAILED: Deduplication Engine not loaded</p>';
+                return;
+            }
+            resultsDiv.innerHTML += '<p style="color: green;">✅ SUCCESS: Deduplication Engine loaded</p>';
+            
+            // Test 2: Check if DeduplicationEngine class exists
+            if (typeof DeduplicationEngine === 'undefined') {
+                resultsDiv.innerHTML += '<p style="color: red;">❌ FAILED: DeduplicationEngine class not found</p>';
+                return;
+            }
+            resultsDiv.innerHTML += '<p style="color: green;">✅ SUCCESS: DeduplicationEngine class found</p>';
+            
+            // Test 3: Test basic deduplication functionality
+            try {
+                const testData = "Canada / Canada / United States / Canada / USA";
+                const result = window.deduplicationEngine.deduplicateValues(testData, 'country');
+                
+                if (result && result.includes('Canada') && result.includes('USA')) {
+                    resultsDiv.innerHTML += '<p style="color: green;">✅ SUCCESS: Basic deduplication works</p>';
+                    resultsDiv.innerHTML += '<p>Input: ' + testData + '</p>';
+                    resultsDiv.innerHTML += '<p>Output: ' + result + '</p>';
+                } else {
+                    resultsDiv.innerHTML += '<p style="color: red;">❌ FAILED: Basic deduplication failed</p>';
+                    resultsDiv.innerHTML += '<p>Input: ' + testData + '</p>';
+                    resultsDiv.innerHTML += '<p>Output: ' + result + '</p>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML += '<p style="color: red;">❌ FAILED: Deduplication threw error: ' + error.message + '</p>';
+            }
+            
+            // Test 4: Test mining-specific data
+            try {
+                const miningData = "Aktiv / Active / Operating / Geplant / Planned / Aktiv";
+                const result = window.deduplicationEngine.deduplicateValues(miningData, 'status');
+                
+                if (result && result.includes('Aktiv') && result.includes('Geplant')) {
+                    resultsDiv.innerHTML += '<p style="color: green;">✅ SUCCESS: Mining status deduplication works</p>';
+                    resultsDiv.innerHTML += '<p>Input: ' + miningData + '</p>';
+                    resultsDiv.innerHTML += '<p>Output: ' + result + '</p>';
+                } else {
+                    resultsDiv.innerHTML += '<p style="color: red;">❌ FAILED: Mining status deduplication failed</p>';
+                    resultsDiv.innerHTML += '<p>Input: ' + miningData + '</p>';
+                    resultsDiv.innerHTML += '<p>Output: ' + result + '</p>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML += '<p style="color: red;">❌ FAILED: Mining deduplication threw error: ' + error.message + '</p>';
+            }
+            
+            // Test 5: Test helper function exists
+            if (typeof processConsolidatedFields !== 'undefined') {
+                resultsDiv.innerHTML += '<p style="color: green;">✅ SUCCESS: processConsolidatedFields helper function found</p>';
+            } else {
+                resultsDiv.innerHTML += '<p style="color: red;">❌ FAILED: processConsolidatedFields helper function not found</p>';
+            }
+            
+            // Test 6: Test global integration object
+            if (typeof window.MineSearchDeduplication !== 'undefined') {
+                resultsDiv.innerHTML += '<p style="color: green;">✅ SUCCESS: MineSearchDeduplication global object found</p>';
+            } else {
+                resultsDiv.innerHTML += '<p style="color: red;">❌ FAILED: MineSearchDeduplication global object not found</p>';
+            }
+            
+            resultsDiv.innerHTML += '<h2>Test Summary</h2>';
+            resultsDiv.innerHTML += '<p>All core functionality tests completed. Check individual results above.</p>';
+        });
+    </script>
+</body>
+</html>

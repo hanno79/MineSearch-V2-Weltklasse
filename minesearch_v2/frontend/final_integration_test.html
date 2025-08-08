@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Final Integration Test - Deduplication System</title>
+    <script src="js/deduplication-engine.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; border: 1px solid #ddd; padding: 15px; }
+        .success { background: #e8f5e8; border-color: #4CAF50; }
+        .warning { background: #fff8e1; border-color: #FF9800; }
+        .error { background: #ffebee; border-color: #f44336; }
+        table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f0f0f0; }
+        pre { background: #f5f5f5; padding: 10px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔬 Final Integration Test - Deduplication System</h1>
+    
+    <div id="test-results"></div>
+    
+    <script>
+        // Test results container
+        const resultsDiv = document.getElementById('test-results');
+        
+        // Test suite
+        class IntegrationTestSuite {
+            constructor() {
+                this.tests = [];
+                this.results = [];
+            }
+            
+            addTest(name, testFn) {
+                this.tests.push({ name, testFn });
+            }
+            
+            async runAllTests() {
+                resultsDiv.innerHTML = '<h2>🚀 Running Integration Tests...</h2>';
+                
+                for (const test of this.tests) {
+                    try {
+                        const result = await test.testFn();
+                        this.results.push({
+                            name: test.name,
+                            status: 'success',
+                            result: result
+                        });
+                    } catch (error) {
+                        this.results.push({
+                            name: test.name,
+                            status: 'error',
+                            error: error.message
+                        });
+                    }
+                }
+                
+                this.displayResults();
+            }
+            
+            displayResults() {
+                let html = '<h2>📊 Test Results</h2>';
+                
+                const passed = this.results.filter(r => r.status === 'success').length;
+                const failed = this.results.filter(r => r.status === 'error').length;
+                
+                html += `<div class="test-section ${failed === 0 ? 'success' : 'warning'}">
+                    <h3>Summary: ${passed} passed, ${failed} failed</h3>
+                </div>`;
+                
+                this.results.forEach(result => {
+                    const sectionClass = result.status === 'success' ? 'success' : 'error';
+                    html += `<div class="test-section ${sectionClass}">
+                        <h4>${result.status === 'success' ? '✅' : '❌'} ${result.name}</h4>`;
+                    
+                    if (result.result) {
+                        html += `<pre>${JSON.stringify(result.result, null, 2)}</pre>`;
+                    }
+                    
+                    if (result.error) {
+                        html += `<p><strong>Error:</strong> ${result.error}</p>`;
+                    }
+                    
+                    html += '</div>';
+                });
+                
+                resultsDiv.innerHTML = html;
+            }
+        }
+        
+        // Initialize test suite
+        const testSuite = new IntegrationTestSuite();
+        
+        // Test 1: Engine availability
+        testSuite.addTest('Deduplication Engine Availability', () => {
+            if (!window.deduplicationEngine) {
+                throw new Error('Deduplication engine not available on window object');
+            }
+            
+            return {
+                engineAvailable: true,
+                engineType: typeof window.deduplicationEngine,
+                methods: Object.getOwnPropertyNames(Object.getPrototypeOf(window.deduplicationEngine))
+            };
+        });
+        
+        // Test 2: Core deduplication functionality
+        testSuite.addTest('Core Deduplication Functionality', () => {
+            const testInput = 'Canada / Kanada / Canada / Canada';
+            const result = window.deduplicationEngine.deduplicateValues(testInput, 'country');
+            
+            if (result === testInput) {
+                throw new Error('No deduplication occurred');
+            }
+            
+            return {
+                input: testInput,
+                output: result,
+                processed: true
+            };
+        });
+        
+        // Test 3: detectFieldType function
+        testSuite.addTest('Field Type Detection', () => {
+            // Copy the detectFieldType function from the HTML
+            function detectFieldType(fieldName) {
+                const typeMapping = {
+                    'country': 'country',
+                    'land': 'country', 
+                    'country_name': 'country',
+                    'region': 'region',
+                    'province': 'region',
+                    'state': 'region',
+                    'quebec': 'region',
+                    'status': 'status',
+                    'mine_status': 'status',
+                    'operation_status': 'status',
+                    'mineral': 'mineral',
+                    'commodity': 'mineral',
+                    'primary_mineral': 'mineral',
+                    'primary_commodity': 'mineral'
+                };
+                
+                const fieldLower = fieldName.toLowerCase();
+                
+                if (typeMapping[fieldLower]) {
+                    return typeMapping[fieldLower];
+                }
+                
+                for (const [key, type] of Object.entries(typeMapping)) {
+                    if (fieldLower.includes(key)) {
+                        return type;
+                    }
+                }
+                
+                return 'general';
+            }
+            
+            const testCases = [
+                { field: 'country', expected: 'country' },
+                { field: 'mine_status', expected: 'status' },
+                { field: 'primary_mineral', expected: 'mineral' },
+                { field: 'unknown_field', expected: 'general' }
+            ];
+            
+            const results = testCases.map(test => ({
+                field: test.field,
+                expected: test.expected,
+                actual: detectFieldType(test.field),
+                correct: detectFieldType(test.field) === test.expected
+            }));
+            
+            const allCorrect = results.every(r => r.correct);
+            if (!allCorrect) {
+                throw new Error('Field type detection failed for some cases');
+            }
+            
+            return { testCases: results, allCorrect };
+        });
+        
+        // Test 4: Synonym recognition
+        testSuite.addTest('Synonym Recognition', () => {
+            const synonymTests = [
+                {
+                    field: 'country',
+                    input: 'Canada / Kanada / USA / United States',
+                    description: 'Country synonyms'
+                },
+                {
+                    field: 'status',
+                    input: 'Active / Aktiv / Planned / Geplant',
+                    description: 'Status synonyms'
+                },
+                {
+                    field: 'mineral',
+                    input: 'Gold / Au / Silver / Ag',
+                    description: 'Mineral synonyms'
+                }
+            ];
+            
+            const results = synonymTests.map(test => {
+                const output = window.deduplicationEngine.deduplicateValues(test.input, test.field);
+                return {
+                    description: test.description,
+                    input: test.input,
+                    output: output,
+                    changed: output !== test.input
+                };
+            });
+            
+            const processedCount = results.filter(r => r.changed).length;
+            if (processedCount === 0) {
+                throw new Error('No synonym recognition occurred');
+            }
+            
+            return { results, processedCount };
+        });
+        
+        // Test 5: Integration with consolidated results
+        testSuite.addTest('Consolidated Results Integration', () => {
+            // Simulate the integration logic from displayConsolidatedResults
+            const mockResult = {
+                mine_name: 'Test Mine',
+                country: 'Canada',
+                consolidated_fields: {
+                    'country': 'Canada / Kanada / Canada / Canada',
+                    'region': 'Quebec / Québec / Quebec',
+                    'status': 'Aktiv / Active / Geplant / Aktiv',
+                    'mineral': 'Gold / Au / Silver / Gold'
+                }
+            };
+            
+            // Apply deduplication logic
+            const processedFields = {};
+            Object.keys(mockResult.consolidated_fields).forEach(field => {
+                let fieldValue = mockResult.consolidated_fields[field];
+                if (fieldValue.includes(' / ') && window.deduplicationEngine) {
+                    // Use the same field type detection as in the HTML
+                    const fieldType = field.toLowerCase() === 'country' ? 'country' :
+                                    field.toLowerCase() === 'region' ? 'region' :
+                                    field.toLowerCase() === 'status' ? 'status' :
+                                    field.toLowerCase() === 'mineral' ? 'mineral' : 'general';
+                    processedFields[field] = window.deduplicationEngine.deduplicateValues(fieldValue, fieldType);
+                } else {
+                    processedFields[field] = fieldValue;
+                }
+            });
+            
+            const changedFields = Object.keys(processedFields).filter(
+                field => processedFields[field] !== mockResult.consolidated_fields[field]
+            );
+            
+            if (changedFields.length === 0) {
+                throw new Error('No fields were processed in integration test');
+            }
+            
+            return {
+                originalFields: mockResult.consolidated_fields,
+                processedFields: processedFields,
+                changedFields: changedFields
+            };
+        });
+        
+        // Test 6: Performance and caching
+        testSuite.addTest('Performance and Caching', () => {
+            // Clear cache first
+            window.deduplicationEngine.clearCache();
+            
+            const testInput = 'Canada / Kanada / Canada / Canada';
+            
+            // First call - cache miss
+            const start1 = performance.now();
+            const result1 = window.deduplicationEngine.deduplicateValues(testInput, 'country');
+            const time1 = performance.now() - start1;
+            
+            // Second call - should hit cache
+            const start2 = performance.now();
+            const result2 = window.deduplicationEngine.deduplicateValues(testInput, 'country');
+            const time2 = performance.now() - start2;
+            
+            const cacheStats = window.deduplicationEngine.getCacheStats();
+            
+            return {
+                firstCall: { result: result1, time: time1 },
+                secondCall: { result: result2, time: time2 },
+                resultsMatch: result1 === result2,
+                cacheSize: cacheStats.size,
+                cacheWorking: cacheStats.size > 0
+            };
+        });
+        
+        // Run all tests when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                testSuite.runAllTests();
+            }, 100);
+        });
+    </script>
+</body>
+</html>

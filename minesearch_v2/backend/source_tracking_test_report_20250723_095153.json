@@ -1,0 +1,113 @@
+{
+  "timestamp": "2025-07-23T09:51:53.174060",
+  "summary": {
+    "total_tests": 17,
+    "passed_tests": 14,
+    "failed_tests": 3,
+    "success_rate": 82.35294117647058
+  },
+  "detailed_results": [
+    {
+      "test_name": "URL Match - Exact URL Match",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.083817",
+      "details": "Expected: True, Got: True"
+    },
+    {
+      "test_name": "URL Match - Path Extension Match",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.083837",
+      "details": "Expected: True, Got: True"
+    },
+    {
+      "test_name": "URL Match - Domain Match Fallback",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.083848",
+      "details": "Expected: True, Got: True"
+    },
+    {
+      "test_name": "URL Match - No Match Different Domain",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.083860",
+      "details": "Expected: False, Got: False"
+    },
+    {
+      "test_name": "_track_sources_usage",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.105586",
+      "details": "Basic tracking completed"
+    },
+    {
+      "test_name": "_track_provider_call_sources",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.111241",
+      "details": "Provider call tracking completed"
+    },
+    {
+      "test_name": "Bulk Mode Tracking",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.113586",
+      "details": "Returned 2 updates"
+    },
+    {
+      "test_name": "Statistics Calculation",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.116255",
+      "details": "Success Rate: 76.9%, Reliability: 85.8"
+    },
+    {
+      "test_name": "Performance Impact",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.138764",
+      "details": "Normal: 0.02s, Bulk: 0.00s"
+    },
+    {
+      "test_name": "Database Integrity",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.142070",
+      "details": "No issues found"
+    },
+    {
+      "test_name": "Edge Case - not-a-url...",
+      "success": false,
+      "timestamp": "2025-07-23T09:51:53.142150",
+      "details": "Expected tracked: False"
+    },
+    {
+      "test_name": "Edge Case - http://...",
+      "success": false,
+      "timestamp": "2025-07-23T09:51:53.150079",
+      "details": "Expected tracked: False"
+    },
+    {
+      "test_name": "Edge Case - ...",
+      "success": false,
+      "timestamp": "2025-07-23T09:51:53.150166",
+      "details": "Expected tracked: False"
+    },
+    {
+      "test_name": "Edge Case - https://domain.com/path with s...",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.158084",
+      "details": "Expected tracked: True"
+    },
+    {
+      "test_name": "Edge Case - https://domain.com/path?query=...",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.164835",
+      "details": "Expected tracked: True"
+    },
+    {
+      "test_name": "Edge Case - https://domain.com/path/...",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.169854",
+      "details": "Expected tracked: True"
+    },
+    {
+      "test_name": "Edge Case - https://domain.com/path...",
+      "success": true,
+      "timestamp": "2025-07-23T09:51:53.173893",
+      "details": "Expected tracked: True"
+    }
+  ]
+}

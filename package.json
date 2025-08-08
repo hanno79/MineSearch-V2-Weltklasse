@@ -1,0 +1,18 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "description": "Ein hochperformantes, KI-gestütztes System zur automatisierten Recherche von Bergbauinformationen weltweit. Entwickelt mit modernster Multi-Agent-Architektur für umfassende Datenerfassung aus diversen Quellen.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "playwright": "^1.47.2"
+  }
+}

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Models Test</title>
+</head>
+<body>
+    <h1>Simple Models Loading Test</h1>
+    
+    <div id="status"></div>
+    <div id="model-selection" style="border: 1px solid #ccc; padding: 20px; min-height: 100px;">
+        Not loaded yet...
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML += `<p>${message}</p>`;
+            console.log(message);
+        }
+
+        async function testModelsAPI() {
+            try {
+                updateStatus('Testing direct API call...');
+                const response = await fetch(`${API_BASE_URL}/api/models`);
+                updateStatus(`Response status: ${response.status}`);
+                
+                const data = await response.json();
+                updateStatus(`Success: ${data.success}`);
+                updateStatus(`Models count: ${data.models ? Object.keys(data.models).length : 0}`);
+                
+                if (data.success && data.models) {
+                    const modelSelection = document.getElementById('model-selection');
+                    const modelCount = Object.keys(data.models).length;
+                    
+                    modelSelection.innerHTML = `
+                        <h3>✅ Successfully loaded ${modelCount} models!</h3>
+                        <ul>
+                            ${Object.entries(data.models).slice(0, 5).map(([id, model]) => 
+                                `<li><strong>${model.name}</strong> (${model.provider})</li>`
+                            ).join('')}
+                            ${modelCount > 5 ? `<li>... and ${modelCount - 5} more models</li>` : ''}
+                        </ul>
+                    `;
+                    updateStatus('✅ Models displayed successfully!');
+                } else {
+                    updateStatus('❌ Invalid response structure');
+                }
+            } catch (error) {
+                updateStatus(`❌ Error: ${error.message}`);
+                document.getElementById('model-selection').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Test immediately when DOM loads
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStatus('DOM loaded, starting test...');
+            testModelsAPI();
+        });
+    </script>
+</body>
+</html>

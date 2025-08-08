@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Deduplication Integration Test</title>
+    <script src="js/deduplication-engine.js"></script>
+</head>
+<body>
+    <h1>Deduplication Integration Test</h1>
+    
+    <div id="test-output"></div>
+    
+    <script>
+        // Test data matching the exact patterns found in the real system
+        const testData = [
+            {
+                field: 'country',
+                originalValue: 'Canada / Kanada / Canada / Canada / Kanada / Canada',
+                expectedResult: 'Canada (4) / Kanada (2)'
+            },
+            {
+                field: 'region',
+                originalValue: 'Quebec / Québec / Quebec / Quebec',
+                expectedResult: 'Quebec (3) / Québec (1)'
+            },
+            {
+                field: 'status',
+                originalValue: 'Aktiv / Active / Geplant / Aktiv / Planned / Aktiv',
+                expectedResult: 'Aktiv (3) / Geplant (2) / Active (1)'
+            },
+            {
+                field: 'mineral',
+                originalValue: 'Gold / Au / Gold / Silver / Ag / Gold',
+                expectedResult: 'Gold (3) / Silver (1) / Au (1) / Ag (1)'
+            },
+            {
+                field: 'general',
+                originalValue: 'Value1 / Value2 / Value1 / Value3 / Value1',
+                expectedResult: 'Value1 (3) / Value2 (1) / Value3 (1)'
+            }
+        ];
+
+        function detectFieldType(fieldName) {
+            const typeMapping = {
+                'country': 'country',
+                'land': 'country', 
+                'country_name': 'country',
+                'region': 'region',
+                'province': 'region',
+                'state': 'region',
+                'quebec': 'region',
+                'status': 'status',
+                'mine_status': 'status',
+                'operation_status': 'status',
+                'mineral': 'mineral',
+                'commodity': 'mineral',
+                'primary_mineral': 'mineral',
+                'primary_commodity': 'mineral'
+            };
+            
+            const fieldLower = fieldName.toLowerCase();
+            
+            // Exakte Übereinstimmung
+            if (typeMapping[fieldLower]) {
+                return typeMapping[fieldLower];
+            }
+            
+            // Teilstring-Suche für zusammengesetzte Feldnamen
+            for (const [key, type] of Object.entries(typeMapping)) {
+                if (fieldLower.includes(key)) {
+                    return type;
+                }
+            }
+            
+            return 'general';
+        }
+
+        function runTests() {
+            const outputDiv = document.getElementById('test-output');
+            let html = '<h2>Deduplication Test Results</h2>';
+            
+            // Check if deduplication engine is available
+            if (!window.deduplicationEngine) {
+                html += '<p style="color: red;">❌ ERROR: Deduplication engine not loaded!</p>';
+                outputDiv.innerHTML = html;
+                return;
+            }
+            
+            html += '<p style="color: green;">✅ Deduplication engine loaded successfully</p>';
+            
+            // Enable debug mode for detailed output
+            window.deduplicationEngine.enableDebug();
+            
+            html += '<table border="1" style="border-collapse: collapse; width: 100%;">';
+            html += '<tr style="background: #f0f0f0;"><th>Field</th><th>Original Value</th><th>Deduplicated Result</th><th>Status</th></tr>';
+            
+            testData.forEach((test, index) => {
+                const fieldType = detectFieldType(test.field);
+                const result = window.deduplicationEngine.deduplicateValues(test.originalValue, fieldType);
+                
+                const isSuccess = result !== test.originalValue; // Any change is progress
+                const statusIcon = isSuccess ? '✅' : '⚠️';
+                const statusText = isSuccess ? 'PROCESSED' : 'NO CHANGE';
+                
+                html += `<tr>
+                    <td><strong>${test.field}</strong><br><small>(${fieldType})</small></td>
+                    <td style="font-size: 12px; max-width: 300px; word-wrap: break-word;">${test.originalValue}</td>
+                    <td style="font-size: 12px; max-width: 300px; word-wrap: break-word; background: ${isSuccess ? '#e8f5e8' : '#fff8e1'};">${result}</td>
+                    <td style="text-align: center;">${statusIcon}<br><small>${statusText}</small></td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            
+            // Cache statistics
+            const cacheStats = window.deduplicationEngine.getCacheStats();
+            html += `<h3>Performance Statistics</h3>
+                     <p>Cache Size: ${cacheStats.size} entries</p>
+                     <p>Cache Hit Rate: ${(cacheStats.hitRate * 100).toFixed(1)}%</p>`;
+            
+            // Real-world integration test
+            html += '<h3>Integration Test</h3>';
+            const testResult = {
+                consolidated_fields: {
+                    'country': 'Canada / Kanada / Canada / Canada',
+                    'region': 'Quebec / Québec / Quebec',
+                    'status': 'Aktiv / Active / Geplant / Aktiv',
+                    'mineral': 'Gold / Au / Silver / Gold'
+                }
+            };
+            
+            // Simulate the integration logic from displayConsolidatedResults
+            const processedFields = {};
+            Object.keys(testResult.consolidated_fields).forEach(field => {
+                let fieldValue = testResult.consolidated_fields[field];
+                if (fieldValue.includes(' / ') && window.deduplicationEngine) {
+                    const fieldType = detectFieldType(field);
+                    processedFields[field] = window.deduplicationEngine.deduplicateValues(fieldValue, fieldType);
+                } else {
+                    processedFields[field] = fieldValue;
+                }
+            });
+            
+            html += '<table border="1" style="border-collapse: collapse; margin-top: 10px;">';
+            html += '<tr style="background: #f0f0f0;"><th>Field</th><th>Before Integration</th><th>After Integration</th></tr>';
+            
+            Object.keys(testResult.consolidated_fields).forEach(field => {
+                const before = testResult.consolidated_fields[field];
+                const after = processedFields[field];
+                
+                html += `<tr>
+                    <td><strong>${field}</strong></td>
+                    <td style="font-size: 11px;">${before}</td>
+                    <td style="font-size: 11px; background: #e8f5e8;">${after}</td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            
+            outputDiv.innerHTML = html;
+        }
+
+        // Run tests when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(runTests, 100); // Small delay to ensure deduplication engine is initialized
+        });
+    </script>
+</body>
+</html>

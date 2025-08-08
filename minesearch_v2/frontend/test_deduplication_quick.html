@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quick Deduplication Test</title>
+    <script src="js/deduplication-engine.js"></script>
+</head>
+<body>
+    <h1>Quick Deduplication Test</h1>
+    <div id="test-results"></div>
+    
+    <script>
+        // Wait for DOM to load
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                runQuickTest();
+            }, 100);
+        });
+        
+        function detectFieldType(fieldName) {
+            const typeMapping = {
+                'country': 'country',
+                'land': 'country', 
+                'country_name': 'country',
+                'region': 'region',
+                'province': 'region',
+                'state': 'region',
+                'quebec': 'region',
+                'status': 'status',
+                'mine_status': 'status',
+                'operation_status': 'status',
+                'mineral': 'mineral',
+                'commodity': 'mineral',
+                'primary_mineral': 'mineral',
+                'primary_commodity': 'mineral'
+            };
+            
+            const fieldLower = fieldName.toLowerCase();
+            return typeMapping[fieldLower] || 'general';
+        }
+        
+        function runQuickTest() {
+            const output = document.getElementById('test-results');
+            let html = '<h2>Test Results</h2>';
+            
+            // Check if deduplication engine exists
+            if (!window.deduplicationEngine) {
+                html += '<p style="color: red;">❌ ERROR: window.deduplicationEngine is not defined!</p>';
+                output.innerHTML = html;
+                return;
+            }
+            
+            html += '<p style="color: green;">✅ Deduplication engine is available</p>';
+            
+            // Enable debug mode
+            window.deduplicationEngine.enableDebug();
+            
+            // Test cases
+            const tests = [
+                {
+                    name: 'Country Test (Canada/Kanada)',
+                    field: 'country',
+                    input: 'Canada / Kanada / Canada / Canada / Kanada / Canada',
+                    expected: 'Canada (4) / Kanada (2)'
+                },
+                {
+                    name: 'Status Test (Active/Aktiv)',
+                    field: 'status', 
+                    input: 'Aktiv / Active / Geplant / Aktiv / Planned / Aktiv',
+                    expected: 'Aktiv (3) / Geplant (2) / Active (1)'
+                },
+                {
+                    name: 'Simple Duplication Test',
+                    field: 'general',
+                    input: 'Value1 / Value2 / Value1 / Value3 / Value1',
+                    expected: 'Value1 (3) / Value2 (1) / Value3 (1)'
+                }
+            ];
+            
+            html += '<table border="1" style="border-collapse: collapse; width: 100%; margin-top: 20px;">';
+            html += '<tr style="background: #f0f0f0;"><th>Test</th><th>Input</th><th>Output</th><th>Status</th></tr>';
+            
+            tests.forEach(test => {
+                try {
+                    const fieldType = detectFieldType(test.field);
+                    const result = window.deduplicationEngine.deduplicateValues(test.input, fieldType);
+                    
+                    const status = result !== test.input ? '✅ Changed' : '❌ No Change';
+                    const color = result !== test.input ? 'green' : 'red';
+                    
+                    html += `<tr>
+                        <td>${test.name}</td>
+                        <td style="font-size: 12px;">${test.input}</td>
+                        <td style="font-size: 12px; color: ${color};">${result}</td>
+                        <td style="color: ${color};">${status}</td>
+                    </tr>`;
+                } catch (error) {
+                    html += `<tr>
+                        <td>${test.name}</td>
+                        <td style="font-size: 12px;">${test.input}</td>
+                        <td style="color: red;">ERROR: ${error.message}</td>
+                        <td style="color: red;">❌ Failed</td>
+                    </tr>`;
+                }
+            });
+            
+            html += '</table>';
+            
+            // Test console
+            html += '<h3>Console Output</h3>';
+            html += '<div id="console-output" style="background: #f5f5f5; padding: 10px; font-family: monospace; white-space: pre-wrap;"></div>';
+            
+            output.innerHTML = html;
+        }
+        
+        // Capture console.log for display
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const consoleDiv = document.getElementById('console-output');
+            if (consoleDiv) {
+                consoleDiv.textContent += args.join(' ') + '\n';
+            }
+        };
+    </script>
+</body>
+</html>

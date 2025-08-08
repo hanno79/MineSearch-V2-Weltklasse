@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-08-02T21:14:40.691080",
+  "original_path": "/app/minesearch_v2/backend/mines.db",
+  "backup_name": "current_before_restore_20250802_211440",
+  "counts_before_backup": {
+    "search_results": 0,
+    "model_statistics": 0,
+    "model_summary": 0,
+    "field_statistics": 0,
+    "field_consistency": 0,
+    "statistics_total": 0,
+    "sources": 19,
+    "mines": 0,
+    "grand_total": 19
+  }
+}

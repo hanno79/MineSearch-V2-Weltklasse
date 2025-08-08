@@ -1,0 +1,91 @@
+{
+  "test_summary": {
+    "timestamp": "2025-08-07T08:30:38.152420",
+    "navigation_success": true,
+    "statistics_tab_accessible": false,
+    "total_screenshots": 9,
+    "data_validations_passed": 0,
+    "interactive_elements_working": 2,
+    "visual_problems_count": 1,
+    "missing_data_count": 4
+  },
+  "detailed_results": {
+    "test_timestamp": "2025-08-07T08:30:38.152420",
+    "navigation_success": true,
+    "statistics_tab_accessible": false,
+    "screenshots_taken": [
+      "/app/minesearch_v2/backend/screenshots/01_initial_page_load.png",
+      "/app/minesearch_v2/backend/screenshots/interactive_buttons_before_0.png",
+      "/app/minesearch_v2/backend/screenshots/interactive_buttons_after_0.png",
+      "/app/minesearch_v2/backend/screenshots/interactive_checkboxes_before_0.png",
+      "/app/minesearch_v2/backend/screenshots/interactive_checkboxes_before_1.png",
+      "/app/minesearch_v2/backend/screenshots/interactive_checkboxes_before_2.png",
+      "/app/minesearch_v2/backend/screenshots/interactive_checkboxes_before_3.png",
+      "/app/minesearch_v2/backend/screenshots/interactive_checkboxes_before_4.png",
+      "/app/minesearch_v2/backend/screenshots/99_final_statistics_overview.png"
+    ],
+    "data_validation": {
+      "Total Searches": {
+        "expected": "13",
+        "actual": null,
+        "found": false,
+        "status": "FAIL"
+      },
+      "Success Rate": {
+        "expected": "100%",
+        "actual": null,
+        "found": false,
+        "status": "FAIL"
+      },
+      "Model Statistics Entries": {
+        "expected": "76",
+        "actual": null,
+        "found": false,
+        "status": "FAIL"
+      },
+      "Field Coverage": {
+        "expected": "75%",
+        "actual": null,
+        "found": false,
+        "status": "FAIL"
+      }
+    },
+    "interactive_elements": {
+      "Buttons": {
+        "total_found": 14,
+        "clickable": 1,
+        "status": "PASS"
+      },
+      "Dropdowns": {
+        "total_found": 13,
+        "clickable": 0,
+        "status": "NOT_CLICKABLE"
+      },
+      "Filter inputs": {
+        "total_found": 5,
+        "clickable": 0,
+        "status": "NOT_CLICKABLE"
+      },
+      "Checkboxes": {
+        "total_found": 75,
+        "clickable": 5,
+        "status": "PASS"
+      },
+      "Radio buttons": {
+        "total_found": 6,
+        "clickable": 0,
+        "status": "NOT_CLICKABLE"
+      }
+    },
+    "visual_problems": [
+      "Statistics tab not visible"
+    ],
+    "missing_data": [
+      "System Health Dashboard section not found",
+      "Search Performance Metrics section not found",
+      "Model Statistics Tables section not found",
+      "Data Quality Scores section not found"
+    ],
+    "success_metrics": {}
+  }
+}

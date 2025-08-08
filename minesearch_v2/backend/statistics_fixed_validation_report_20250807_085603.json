@@ -1,0 +1,151 @@
+{
+  "timestamp": "2025-08-07T08:54:47.388124",
+  "test_steps": [
+    {
+      "category": "API",
+      "step": "Test /api/statistics/overview",
+      "status": "SUCCESS",
+      "timestamp": "2025-08-07T08:54:47.410835",
+      "details": "Status: 200, Daten: Nein"
+    },
+    {
+      "category": "API",
+      "step": "Test /api/statistics/performance/system",
+      "status": "FAILED",
+      "timestamp": "2025-08-07T08:54:47.416103",
+      "details": "Status: 500"
+    },
+    {
+      "category": "API",
+      "step": "Test /api/statistics/models/overview",
+      "status": "SUCCESS",
+      "timestamp": "2025-08-07T08:54:47.418990",
+      "details": "Status: 200, Daten: Ja"
+    },
+    {
+      "category": "API",
+      "step": "Test /api/statistics/models/comprehensive",
+      "status": "SUCCESS",
+      "timestamp": "2025-08-07T08:54:47.422200",
+      "details": "Status: 200, Daten: Ja"
+    },
+    {
+      "category": "BROWSER",
+      "step": "Navigation",
+      "status": "START",
+      "timestamp": "2025-08-07T08:54:48.252680",
+      "details": "Lade http://localhost:8000"
+    },
+    {
+      "category": "BROWSER",
+      "step": "Navigation",
+      "status": "SUCCESS",
+      "timestamp": "2025-08-07T08:54:49.339374",
+      "details": "Hauptseite geladen"
+    },
+    {
+      "category": "BROWSER",
+      "step": "Tab-Suche",
+      "status": "START",
+      "timestamp": "2025-08-07T08:54:49.339388",
+      "details": "Suche Statistik-Tab"
+    },
+    {
+      "category": "BROWSER",
+      "step": "Tab-Suche",
+      "status": "WARNING",
+      "timestamp": "2025-08-07T08:55:50.452683",
+      "details": "Statistik-Tab nicht gefunden"
+    },
+    {
+      "category": "BROWSER",
+      "step": "Filter-Button",
+      "status": "START",
+      "timestamp": "2025-08-07T08:55:52.570686",
+      "details": "Suche Filter-Button"
+    },
+    {
+      "category": "BROWSER",
+      "step": "Filter-Button",
+      "status": "SUCCESS",
+      "timestamp": "2025-08-07T08:55:53.131249",
+      "details": "Button geklickt: button:has-text(\"Laden\")"
+    },
+    {
+      "category": "BROWSER",
+      "step": "Daten-Analyse",
+      "status": "START",
+      "timestamp": "2025-08-07T08:55:56.230801",
+      "details": "Analysiere geladene Daten"
+    },
+    {
+      "category": "BROWSER",
+      "step": "Daten-Analyse",
+      "status": "SUCCESS",
+      "timestamp": "2025-08-07T08:56:01.390364",
+      "details": "Erfolgskriterien: 3/4"
+    },
+    {
+      "category": "BROWSER",
+      "step": "Filter-Test",
+      "status": "START",
+      "timestamp": "2025-08-07T08:56:01.390380",
+      "details": "Teste verfügbare Filter"
+    },
+    {
+      "category": "BROWSER",
+      "step": "Filter-Test",
+      "status": "SUCCESS",
+      "timestamp": "2025-08-07T08:56:02.943024",
+      "details": "Filter getestet: 1"
+    }
+  ],
+  "screenshots": [
+    "/app/minesearch_v2/backend/screenshots/01_main_page_085449.png",
+    "/app/minesearch_v2/backend/screenshots/02_statistics_tab_085552.png",
+    "/app/minesearch_v2/backend/screenshots/03_after_filter_085556.png",
+    "/app/minesearch_v2/backend/screenshots/04_final_analysis_085601.png",
+    "/app/minesearch_v2/backend/screenshots/05_filter_test_085602.png"
+  ],
+  "api_tests": [
+    {
+      "endpoint": "/api/statistics/overview",
+      "status_code": 200,
+      "success": true,
+      "has_data": false,
+      "response_size": 1199
+    },
+    {
+      "endpoint": "/api/statistics/models/overview",
+      "status_code": 200,
+      "success": true,
+      "has_data": true,
+      "response_size": 2943
+    },
+    {
+      "endpoint": "/api/statistics/models/comprehensive",
+      "status_code": 200,
+      "success": true,
+      "has_data": true,
+      "response_size": 4470
+    }
+  ],
+  "browser_tests": [
+    {
+      "indicators_found": {
+        "tables": 0,
+        "model_mentions": 40,
+        "success_rate": 0,
+        "provider_mentions": 12,
+        "numeric_data": true,
+        "no_errors": true
+      },
+      "success_criteria_met": 3,
+      "success_rate": 0.75,
+      "tab_found": false,
+      "filter_clicked": true
+    }
+  ],
+  "success": true,
+  "errors": []
+}

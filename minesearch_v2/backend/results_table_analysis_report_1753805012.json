@@ -1,0 +1,155 @@
+{
+  "analysis_session": {
+    "start_time": "2025-07-29 16:03:32",
+    "total_findings": 20
+  },
+  "findings": [
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "Verbindung",
+      "title": "Server erreichbar",
+      "details": "Status: 200",
+      "status": "SUCCESS"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "Seitenstruktur",
+      "title": "Keine Results-Tab gefunden",
+      "details": "Möglicherweise dynamisch geladen",
+      "status": "WARNING"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "Seitenstruktur",
+      "title": "Keine statischen Tabellen",
+      "details": "Tabellen möglicherweise dynamisch geladen",
+      "status": "WARNING"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "API",
+      "title": "Endpoint verfügbar: /api/results",
+      "details": "Status: 200",
+      "status": "SUCCESS"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "API",
+      "title": "Datenstruktur für /api/results",
+      "details": "Keys: ['success', 'data']",
+      "status": "INFO"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "API",
+      "title": "Endpoint nicht gefunden: /api/mines",
+      "details": "Status: 404",
+      "status": "WARNING"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "API",
+      "title": "Endpoint nicht gefunden: /api/consolidated-results",
+      "details": "Status: 404",
+      "status": "WARNING"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "API",
+      "title": "Endpoint nicht gefunden: /api/export/csv",
+      "details": "Status: 404",
+      "status": "WARNING"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "API",
+      "title": "Endpoint nicht gefunden: /api/batch/results",
+      "details": "Status: 404",
+      "status": "WARNING"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "Datenbank",
+      "title": "Tabellen gefunden: 7",
+      "details": "Tabellen: ['sources', 'mines', 'search_results', 'model_statistics', 'field_consistency', 'model_summary', 'field_statistics']",
+      "status": "INFO"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "Datenbank",
+      "title": "Spalten in mines: 11",
+      "details": "Spalten: ['id', 'name', 'country', 'region', 'latitude', 'longitude', 'commodity', 'status', 'mine_metadata', 'created_at', 'updated_at']",
+      "status": "INFO"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "Datenbank",
+      "title": "Einträge in mines: 0",
+      "details": "Aktuelle Datenmenge",
+      "status": "INFO"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "Datenbank",
+      "title": "Spalten in search_results: 21",
+      "details": "Spalten: ['id', 'session_id', 'mine_name', 'country', 'region', 'commodity', 'search_timestamp', 'model_used', 'search_type', 'search_duration', 'structured_data', 'structured_data_with_sources', 'sources', 'source_index', 'data_quality', 'success', 'error_message', 'source_discovery_session', 'created_at', 'updated_at', 'source_mapping']",
+      "status": "INFO"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "Datenbank",
+      "title": "Einträge in search_results: 255",
+      "details": "Aktuelle Datenmenge",
+      "status": "INFO"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "CSV-Export",
+      "title": "Export-Fehler für /api/results/export",
+      "details": "Status: 422",
+      "status": "ERROR"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "Frontend",
+      "title": "Analyse: index.html",
+      "details": "Keywords: results(172), consolidated(64), table(210), csv(73), export(71), felder(42)",
+      "status": "INFO"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "Frontend",
+      "title": "HTML-Struktur: index.html",
+      "details": "Tabellen: 0, Buttons: 14",
+      "status": "INFO"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "Frontend",
+      "title": "Analyse: app.js",
+      "details": "Keywords: ",
+      "status": "INFO"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "Frontend",
+      "title": "Analyse: results-display.js",
+      "details": "Keywords: results(6), table(1), export(1)",
+      "status": "INFO"
+    },
+    {
+      "timestamp": "2025-07-29 16:03:32",
+      "category": "Frontend",
+      "title": "Analyse: style.css",
+      "details": "Keywords: results(17), table(24), csv(3)",
+      "status": "INFO"
+    }
+  ],
+  "summary": {
+    "total_findings": 20,
+    "success": 2,
+    "warnings": 6,
+    "errors": 1,
+    "analysis_status": "COMPLETE"
+  }
+}

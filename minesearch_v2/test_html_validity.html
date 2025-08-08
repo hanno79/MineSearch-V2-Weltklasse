@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HTML Validity Test</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body>
+    <div id="test-container">
+        <!-- Copy of the problematic HTML from batch_service.py -->
+        <div style="background: #e8f5e8; border-left: 4px solid #4CAF50; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+            <h3 style="margin: 0 0 10px 0; color: #2e7d32;">🚀 Schritt 2: Batch-Suche starten</h3>
+            <p style="margin: 0; color: #424242;">CSV-Datei erfolgreich verarbeitet! Sie können jetzt die Batch-Suche starten.</p>
+        </div>
+        <div class="csv-info-card">
+            <h3>✓ CSV erfolgreich geladen</h3>
+            <p><strong>10</strong> Minen gefunden</p>
+            
+            <form id="batch-form" 
+                  data-session-id="test-session-id"
+                  hx-post="http://localhost:8000/api/batch-search" 
+                  hx-target="#results"
+                  hx-indicator="#batch-loading"
+                  hx-on::before-request="
+                    // PRIMARY: Try to find session_id in this form
+                    var sessionInput = this.querySelector('input[name=session_id]');
+                    var sessionId = sessionInput ? sessionInput.value : null;
+                    
+                    // FALLBACK: Try to find session_id in parent containers
+                    if (!sessionId) {
+                        var parentSessionInput = document.querySelector('#csv-info input[name=session_id]') || 
+                                               document.querySelector('input[name=session_id]');
+                        sessionId = parentSessionInput ? parentSessionInput.value : null;
+                    }
+                    
+                    // FINAL FALLBACK: Extract from data attribute if set
+                    if (!sessionId) {
+                        sessionId = this.getAttribute('data-session-id') || 'test-session-id';
+                    }
+                    
+                    if (!sessionId || sessionId === '' || sessionId === 'undefined') {
+                        alert('Fehler: Keine CSV-Daten gefunden. Bitte laden Sie zuerst eine CSV-Datei hoch.');
+                        console.error('Session ID Debug - Input found:', !!sessionInput, 'Value:', sessionId);
+                        return false;
+                    }
+                    
+                    // Ensure session_id is submitted
+                    if (sessionInput) {
+                        sessionInput.value = sessionId;
+                    } else {
+                        // Create hidden input if it doesn't exist
+                        var hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = 'session_id';
+                        hiddenInput.value = sessionId;
+                        this.appendChild(hiddenInput);
+                    }
+                    
+                    console.log('Session ID Test:', sessionId);
+                  "
+                
+                <input type="hidden" name="session_id" value="test-session-id">
+                <input type="hidden" name="selected_models" id="batch_selected_models" value="">
+                
+                <button type="submit">Test Button</button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        console.log('Testing HTML validity...');
+        const sessionInputs = document.querySelectorAll('input[name="session_id"]');
+        console.log('Session inputs found:', sessionInputs.length);
+        sessionInputs.forEach((input, i) => {
+            console.log(`Input ${i+1}:`, input.value);
+        });
+    </script>
+</body>
+</html>

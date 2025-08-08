@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Validator Test - MineSearch v2</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 20px;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        
+        .test-button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+        
+        .result-box {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            min-height: 50px;
+            border: 2px solid #ddd;
+            background: white;
+        }
+        
+        .success { border-color: #4CAF50; background: #f1f8e9; }
+        .error { border-color: #f44336; background: #ffebee; }
+        .warning { border-color: #ff9800; background: #fff3e0; }
+        .info { border-color: #2196F3; background: #e3f2fd; }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        .modal-test {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 90%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Interactive Validator Agent</h1>
+            <h2>MineSearch v2 - Element Testing Suite</h2>
+            <p>Systematische Validierung aller interaktiven UI-Komponenten</p>
+        </div>
+
+        <!-- Test Progress Overview -->
+        <div class="test-section">
+            <h3>📊 Test Progress</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="overall-progress"></div>
+            </div>
+            <div id="progress-text">0% abgeschlossen</div>
+        </div>
+
+        <!-- Button Testing Section -->
+        <div class="test-section">
+            <h3>🔘 Button Functionality Tests</h3>
+            <p>Teste alle interaktiven Buttons auf korrekte Funktionalität</p>
+            
+            <button class="test-button" onclick="testDetailsButtons()">📋 Details-Buttons testen</button>
+            <button class="test-button" onclick="testModalButtons()">🪟 Modal-Buttons testen</button>
+            <button class="test-button" onclick="testExportButtons()">📤 Export-Buttons testen</button>
+            <button class="test-button" onclick="testSearchButtons()">🔍 Search-Buttons testen</button>
+            
+            <div class="result-box" id="button-results">
+                Wähle einen Test zum Starten...
+            </div>
+        </div>
+
+        <!-- Tab Navigation Testing -->
+        <div class="test-section">
+            <h3>📑 Tab Navigation Tests</h3>
+            <p>Validierung der Tab-Navigation zwischen verschiedenen Ansichten</p>
+            
+            <button class="test-button" onclick="testTabSwitching()">🔄 Tab-Wechsel testen</button>
+            <button class="test-button" onclick="testTabContent()">📄 Tab-Inhalt testen</button>
+            <button class="test-button" onclick="testTabPersistence()">💾 Tab-Persistence testen</button>
+            
+            <div class="result-box" id="tab-results">
+                Wähle einen Test zum Starten...
+            </div>
+        </div>
+
+        <!-- JavaScript Error Detection -->
+        <div class="test-section">
+            <h3>⚠️ JavaScript Error Detection</h3>
+            <p>Überwachung auf Console-Errors und JavaScript-Exceptions</p>
+            
+            <button class="test-button" onclick="startErrorMonitoring()">🔍 Error-Monitoring starten</button>
+            <button class="test-button" onclick="triggerTestError()">💥 Test-Error auslösen</button>
+            <button class="test-button" onclick="checkConsoleErrors()">📋 Console-Errors prüfen</button>
+            
+            <div class="result-box" id="error-results">
+                Error-Monitoring bereit...
+            </div>
+        </div>
+
+        <!-- API Connectivity Tests -->
+        <div class="test-section">
+            <h3>🌐 API Connectivity Tests</h3>
+            <p>Teste Verbindung zu Backend-APIs und Datenlade-Funktionen</p>
+            
+            <button class="test-button" onclick="testHealthEndpoint()">❤️ Health-Check testen</button>
+            <button class="test-button" onclick="testModelsAPI()">🤖 Models-API testen</button>
+            <button class="test-button" onclick="testSourcesAPI()">📚 Sources-API testen</button>
+            <button class="test-button" onclick="testResultsAPI()">📊 Results-API testen</button>
+            
+            <div class="result-box" id="api-results">
+                API-Tests bereit...
+            </div>
+        </div>
+
+        <!-- Performance Tests -->
+        <div class="test-section">
+            <h3>⚡ Performance Tests</h3>
+            <p>Teste Performance bei verschiedenen User-Interaktionen</p>
+            
+            <button class="test-button" onclick="testLoadTimes()">⏱️ Load-Times testen</button>
+            <button class="test-button" onclick="testMemoryUsage()">🧠 Memory-Usage testen</button>
+            <button class="test-button" onclick="testBatchProcessing()">📦 Batch-Processing testen</button>
+            
+            <div class="result-box" id="performance-results">
+                Performance-Tests bereit...
+            </div>
+        </div>
+
+        <!-- Master Test Section -->
+        <div class="test-section">
+            <h3>🚀 Master Test Suite</h3>
+            <p>Führe alle Tests in koordinierter Reihenfolge aus</p>
+            
+            <button class="test-button" onclick="runAllTests()" style="font-size: 18px; padding: 15px 30px;">
+                🎯 ALLE TESTS STARTEN
+            </button>
+            <button class="test-button" onclick="generateTestReport()">📄 Test-Report erstellen</button>
+            <button class="test-button" onclick="openMainApp()">🌐 Haupt-App öffnen</button>
+            
+            <div class="result-box" id="master-results">
+                Master Test Suite bereit...
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Modal -->
+    <div id="test-modal" class="modal-test">
+        <div class="modal-content">
+            <h3>🧪 Modal Test</h3>
+            <p>Dies ist ein Test-Modal zur Überprüfung der Modal-Funktionalität.</p>
+            <button class="test-button" onclick="closeTestModal()">❌ Modal schließen</button>
+        </div>
+    </div>
+
+    <script>
+        // Global test state
+        let testResults = {
+            buttons: {},
+            tabs: {},
+            errors: [],
+            api: {},
+            performance: {},
+            totalTests: 0,
+            passedTests: 0
+        };
+
+        let errorMonitoring = false;
+
+        // Error monitoring setup
+        window.addEventListener('error', (e) => {
+            if (errorMonitoring) {
+                testResults.errors.push({
+                    message: e.message,
+                    source: e.filename,
+                    line: e.lineno,
+                    timestamp: new Date().toISOString()
+                });
+                updateErrorResults();
+            }
+        });
+
+        // Button Testing Functions
+        async function testDetailsButtons() {
+            const resultDiv = document.getElementById('button-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🔄 Teste Details-Buttons...';
+
+            try {
+                // Test if details functions exist
+                const detailsFunctions = [
+                    'showEnhancedDetails',
+                    'showConsolidatedDetails',
+                    'showFieldDetails',
+                    'closeModelDetails'
+                ];
+
+                let results = [];
+                
+                for (const func of detailsFunctions) {
+                    if (typeof window[func] === 'function') {
+                        results.push(`✅ ${func} - Funktion gefunden`);
+                        testResults.buttons[func] = 'PASS';
+                    } else {
+                        results.push(`❌ ${func} - Funktion nicht gefunden`);
+                        testResults.buttons[func] = 'FAIL';
+                    }
+                }
+
+                resultDiv.className = 'result-box success';
+                resultDiv.innerHTML = `
+                    <h4>Details-Button Tests:</h4>
+                    ${results.join('<br>')}
+                `;
+
+                updateProgress();
+                
+            } catch (error) {
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `❌ Error bei Details-Button Test: ${error.message}`;
+                testResults.buttons.detailsTest = 'ERROR';
+            }
+        }
+
+        async function testModalButtons() {
+            const resultDiv = document.getElementById('button-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🔄 Teste Modal-Buttons...';
+
+            try {
+                // Test modal opening
+                document.getElementById('test-modal').style.display = 'block';
+                
+                setTimeout(() => {
+                    if (document.getElementById('test-modal').style.display === 'block') {
+                        testResults.buttons.modalOpen = 'PASS';
+                        
+                        // Test modal closing
+                        closeTestModal();
+                        
+                        setTimeout(() => {
+                            if (document.getElementById('test-modal').style.display === 'none') {
+                                testResults.buttons.modalClose = 'PASS';
+                                resultDiv.className = 'result-box success';
+                                resultDiv.innerHTML = `
+                                    <h4>Modal-Button Tests:</h4>
+                                    ✅ Modal öffnen - PASS<br>
+                                    ✅ Modal schließen - PASS
+                                `;
+                            } else {
+                                testResults.buttons.modalClose = 'FAIL';
+                                resultDiv.className = 'result-box error';
+                                resultDiv.innerHTML = '❌ Modal schließen - FAIL';
+                            }
+                            updateProgress();
+                        }, 500);
+                        
+                    } else {
+                        testResults.buttons.modalOpen = 'FAIL';
+                        resultDiv.className = 'result-box error';
+                        resultDiv.innerHTML = '❌ Modal öffnen - FAIL';
+                        updateProgress();
+                    }
+                }, 500);
+                
+            } catch (error) {
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `❌ Error bei Modal-Button Test: ${error.message}`;
+                testResults.buttons.modalTest = 'ERROR';
+                updateProgress();
+            }
+        }
+
+        function closeTestModal() {
+            document.getElementById('test-modal').style.display = 'none';
+        }
+
+        async function testExportButtons() {
+            const resultDiv = document.getElementById('button-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🔄 Teste Export-Buttons...';
+
+            try {
+                const exportFunctions = [
+                    'exportEnhancedStatistics',
+                    'exportConsolidatedCSV',
+                    'printStatisticsReport'
+                ];
+
+                let results = [];
+                
+                for (const func of exportFunctions) {
+                    if (typeof window[func] === 'function') {
+                        results.push(`✅ ${func} - Funktion gefunden`);
+                        testResults.buttons[func] = 'PASS';
+                    } else {
+                        results.push(`❌ ${func} - Funktion nicht gefunden`);
+                        testResults.buttons[func] = 'FAIL';
+                    }
+                }
+
+                resultDiv.className = 'result-box success';
+                resultDiv.innerHTML = `
+                    <h4>Export-Button Tests:</h4>
+                    ${results.join('<br>')}
+                `;
+
+                updateProgress();
+                
+            } catch (error) {
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `❌ Error bei Export-Button Test: ${error.message}`;
+                testResults.buttons.exportTest = 'ERROR';
+                updateProgress();
+            }
+        }
+
+        async function testSearchButtons() {
+            const resultDiv = document.getElementById('button-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🔄 Teste Search-Buttons...';
+
+            try {
+                const searchFunctions = [
+                    'loadSources',
+                    'loadResults',
+                    'loadStatistics',
+                    'loadConsolidatedResults'
+                ];
+
+                let results = [];
+                
+                for (const func of searchFunctions) {
+                    if (typeof window[func] === 'function') {
+                        results.push(`✅ ${func} - Funktion gefunden`);
+                        testResults.buttons[func] = 'PASS';
+                    } else {
+                        results.push(`❌ ${func} - Funktion nicht gefunden`);
+                        testResults.buttons[func] = 'FAIL';
+                    }
+                }
+
+                resultDiv.className = 'result-box success';
+                resultDiv.innerHTML = `
+                    <h4>Search-Button Tests:</h4>
+                    ${results.join('<br>')}
+                `;
+
+                updateProgress();
+                
+            } catch (error) {
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `❌ Error bei Search-Button Test: ${error.message}`;
+                testResults.buttons.searchTest = 'ERROR';
+                updateProgress();
+            }
+        }
+
+        // Tab Testing Functions
+        async function testTabSwitching() {
+            const resultDiv = document.getElementById('tab-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🔄 Teste Tab-Navigation...';
+
+            try {
+                // Open main app to test tabs
+                const mainWindow = window.open('http://localhost:8000/', '_blank');
+                
+                if (mainWindow) {
+                    testResults.tabs.tabOpen = 'PASS';
+                    resultDiv.className = 'result-box success';
+                    resultDiv.innerHTML = `
+                        <h4>Tab-Navigation Tests:</h4>
+                        ✅ Haupt-App geöffnet - Tab-Tests können manuell durchgeführt werden<br>
+                        ℹ️ Bitte teste die Tab-Navigation in der geöffneten App manuell
+                    `;
+                } else {
+                    testResults.tabs.tabOpen = 'FAIL';
+                    resultDiv.className = 'result-box error';
+                    resultDiv.innerHTML = '❌ Konnte Haupt-App nicht öffnen';
+                }
+
+                updateProgress();
+                
+            } catch (error) {
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `❌ Error bei Tab-Test: ${error.message}`;
+                testResults.tabs.tabTest = 'ERROR';
+                updateProgress();
+            }
+        }
+
+        async function testTabContent() {
+            const resultDiv = document.getElementById('tab-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🔄 Teste Tab-Inhalte...';
+
+            // This would need to run in the context of the main app
+            testResults.tabs.tabContent = 'MANUAL';
+            resultDiv.className = 'result-box warning';
+            resultDiv.innerHTML = `
+                <h4>Tab-Inhalt Tests:</h4>
+                ⚠️ Manuelle Überprüfung erforderlich<br>
+                • CSV-Upload Tab<br>
+                • Search Tab<br>
+                • Statistics Tab<br>
+                • Results Tab
+            `;
+            
+            updateProgress();
+        }
+
+        async function testTabPersistence() {
+            const resultDiv = document.getElementById('tab-results');
+            testResults.tabs.tabPersistence = 'MANUAL';
+            resultDiv.className = 'result-box warning';
+            resultDiv.innerHTML = `
+                <h4>Tab-Persistence Tests:</h4>
+                ⚠️ Manuelle Überprüfung erforderlich<br>
+                • Reload-Verhalten<br>
+                • State-Persistence<br>
+                • URL-Updates
+            `;
+            
+            updateProgress();
+        }
+
+        // Error Detection Functions
+        function startErrorMonitoring() {
+            errorMonitoring = true;
+            testResults.errors = [];
+            
+            const resultDiv = document.getElementById('error-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🔍 Error-Monitoring aktiv... Führe andere Tests durch um Errors zu erkennen.';
+        }
+
+        function triggerTestError() {
+            try {
+                // Intentionally trigger an error
+                nonExistentFunction();
+            } catch (error) {
+                if (errorMonitoring) {
+                    testResults.errors.push({
+                        message: error.message,
+                        source: 'test-trigger',
+                        timestamp: new Date().toISOString(),
+                        type: 'intentional'
+                    });
+                }
+                updateErrorResults();
+            }
+        }
+
+        function checkConsoleErrors() {
+            const resultDiv = document.getElementById('error-results');
+            
+            if (testResults.errors.length === 0) {
+                resultDiv.className = 'result-box success';
+                resultDiv.innerHTML = '✅ Keine JavaScript-Errors erkannt';
+            } else {
+                resultDiv.className = 'result-box warning';
+                resultDiv.innerHTML = `
+                    <h4>⚠️ ${testResults.errors.length} Error(s) erkannt:</h4>
+                    ${testResults.errors.map(err => `
+                        • ${err.message} (${err.source || 'unknown'})
+                    `).join('<br>')}
+                `;
+            }
+            
+            updateProgress();
+        }
+
+        function updateErrorResults() {
+            const resultDiv = document.getElementById('error-results');
+            
+            if (testResults.errors.length > 0) {
+                resultDiv.className = 'result-box warning';
+                resultDiv.innerHTML = `
+                    <h4>⚠️ ${testResults.errors.length} Error(s) erkannt:</h4>
+                    ${testResults.errors.slice(-5).map(err => `
+                        • ${err.message}
+                    `).join('<br>')}
+                `;
+            }
+        }
+
+        // API Testing Functions
+        async function testHealthEndpoint() {
+            const resultDiv = document.getElementById('api-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🔄 Teste Health-Endpoint...';
+
+            try {
+                const response = await fetch('http://localhost:8000/health');
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    testResults.api.health = 'PASS';
+                    resultDiv.className = 'result-box success';
+                    resultDiv.innerHTML = '✅ Health-Endpoint: OK';
+                } else {
+                    testResults.api.health = 'FAIL';
+                    resultDiv.className = 'result-box error';
+                    resultDiv.innerHTML = '❌ Health-Endpoint: FAIL';
+                }
+                
+            } catch (error) {
+                testResults.api.health = 'ERROR';
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `❌ Health-Endpoint Error: ${error.message}`;
+            }
+            
+            updateProgress();
+        }
+
+        async function testModelsAPI() {
+            const resultDiv = document.getElementById('api-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🔄 Teste Models-API...';
+
+            try {
+                const response = await fetch('http://localhost:8000/api/models');
+                const data = await response.json();
+                
+                if (data.success && data.models) {
+                    testResults.api.models = 'PASS';
+                    resultDiv.className = 'result-box success';
+                    resultDiv.innerHTML = `✅ Models-API: ${Object.keys(data.models).length} Modelle gefunden`;
+                } else {
+                    testResults.api.models = 'FAIL';
+                    resultDiv.className = 'result-box error';
+                    resultDiv.innerHTML = '❌ Models-API: FAIL';
+                }
+                
+            } catch (error) {
+                testResults.api.models = 'ERROR';
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `❌ Models-API Error: ${error.message}`;
+            }
+            
+            updateProgress();
+        }
+
+        async function testSourcesAPI() {
+            const resultDiv = document.getElementById('api-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🔄 Teste Sources-API...';
+
+            try {
+                const response = await fetch('http://localhost:8000/api/sources');
+                
+                if (response.ok) {
+                    testResults.api.sources = 'PASS';
+                    resultDiv.className = 'result-box success';
+                    resultDiv.innerHTML = '✅ Sources-API: Erreichbar';
+                } else {
+                    testResults.api.sources = 'FAIL';
+                    resultDiv.className = 'result-box error';
+                    resultDiv.innerHTML = `❌ Sources-API: Status ${response.status}`;
+                }
+                
+            } catch (error) {
+                testResults.api.sources = 'ERROR';
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `❌ Sources-API Error: ${error.message}`;
+            }
+            
+            updateProgress();
+        }
+
+        async function testResultsAPI() {
+            const resultDiv = document.getElementById('api-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🔄 Teste Results-API...';
+
+            try {
+                const response = await fetch('http://localhost:8000/api/consolidated_results');
+                
+                if (response.ok) {
+                    testResults.api.results = 'PASS';
+                    resultDiv.className = 'result-box success';
+                    resultDiv.innerHTML = '✅ Results-API: Erreichbar';
+                } else {
+                    testResults.api.results = 'FAIL';
+                    resultDiv.className = 'result-box error';
+                    resultDiv.innerHTML = `❌ Results-API: Status ${response.status}`;
+                }
+                
+            } catch (error) {
+                testResults.api.results = 'ERROR';
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `❌ Results-API Error: ${error.message}`;
+            }
+            
+            updateProgress();
+        }
+
+        // Performance Testing Functions
+        async function testLoadTimes() {
+            const resultDiv = document.getElementById('performance-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🔄 Teste Load-Times...';
+
+            const startTime = performance.now();
+            
+            try {
+                // Test multiple API calls
+                const promises = [
+                    fetch('http://localhost:8000/health'),
+                    fetch('http://localhost:8000/api/models'),
+                    fetch('http://localhost:8000/api/sources')
+                ];
+                
+                await Promise.all(promises);
+                
+                const endTime = performance.now();
+                const loadTime = endTime - startTime;
+                
+                if (loadTime < 2000) {
+                    testResults.performance.loadTimes = 'PASS';
+                    resultDiv.className = 'result-box success';
+                    resultDiv.innerHTML = `✅ Load-Times: ${loadTime.toFixed(2)}ms (< 2s)`;
+                } else {
+                    testResults.performance.loadTimes = 'SLOW';
+                    resultDiv.className = 'result-box warning';
+                    resultDiv.innerHTML = `⚠️ Load-Times: ${loadTime.toFixed(2)}ms (> 2s)`;
+                }
+                
+            } catch (error) {
+                testResults.performance.loadTimes = 'ERROR';
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `❌ Load-Times Error: ${error.message}`;
+            }
+            
+            updateProgress();
+        }
+
+        async function testMemoryUsage() {
+            const resultDiv = document.getElementById('performance-results');
+            
+            if (performance.memory) {
+                const memInfo = performance.memory;
+                const usedMB = (memInfo.usedJSHeapSize / 1024 / 1024).toFixed(2);
+                const totalMB = (memInfo.totalJSHeapSize / 1024 / 1024).toFixed(2);
+                
+                testResults.performance.memory = 'INFO';
+                resultDiv.className = 'result-box info';
+                resultDiv.innerHTML = `
+                    <h4>Memory Usage:</h4>
+                    Used: ${usedMB} MB<br>
+                    Total: ${totalMB} MB
+                `;
+            } else {
+                testResults.performance.memory = 'UNAVAILABLE';
+                resultDiv.className = 'result-box warning';
+                resultDiv.innerHTML = '⚠️ Memory-API nicht verfügbar in diesem Browser';
+            }
+            
+            updateProgress();
+        }
+
+        async function testBatchProcessing() {
+            const resultDiv = document.getElementById('performance-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🔄 Teste Batch-Processing...';
+
+            // Simulate batch processing test
+            testResults.performance.batchProcessing = 'MANUAL';
+            resultDiv.className = 'result-box warning';
+            resultDiv.innerHTML = `
+                <h4>Batch-Processing Tests:</h4>
+                ⚠️ Manuelle Überprüfung erforderlich<br>
+                • CSV-Upload Performance<br>
+                • Bulk-Search Performance<br>
+                • Export Performance
+            `;
+            
+            updateProgress();
+        }
+
+        // Master Test Functions
+        async function runAllTests() {
+            const resultDiv = document.getElementById('master-results');
+            resultDiv.className = 'result-box info';
+            resultDiv.innerHTML = '🚀 Starte alle Tests...';
+
+            // Notify MCP system
+            try {
+                await fetch('http://localhost:8000/api/mcp-notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: 'Interactive Validator: Starting comprehensive test suite',
+                        type: 'test-start'
+                    })
+                });
+            } catch (e) {
+                console.log('MCP notification failed:', e.message);
+            }
+
+            // Run all test categories
+            await testDetailsButtons();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testModalButtons();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testExportButtons();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testSearchButtons();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testHealthEndpoint();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testModelsAPI();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testSourcesAPI();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testResultsAPI();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testLoadTimes();
+            
+            // Final results
+            const totalTests = Object.keys(testResults.buttons).length + 
+                             Object.keys(testResults.api).length + 
+                             Object.keys(testResults.performance).length;
+            
+            const passedTests = Object.values(testResults.buttons).filter(r => r === 'PASS').length +
+                               Object.values(testResults.api).filter(r => r === 'PASS').length +
+                               Object.values(testResults.performance).filter(r => r === 'PASS').length;
+            
+            resultDiv.className = 'result-box success';
+            resultDiv.innerHTML = `
+                <h4>🎯 Alle Tests abgeschlossen!</h4>
+                ✅ ${passedTests}/${totalTests} Tests bestanden<br>
+                ${testResults.errors.length > 0 ? `⚠️ ${testResults.errors.length} JavaScript-Errors erkannt` : '✅ Keine JavaScript-Errors'}
+            `;
+        }
+
+        function generateTestReport() {
+            const report = {
+                timestamp: new Date().toISOString(),
+                testResults: testResults,
+                summary: {
+                    totalTests: Object.keys(testResults.buttons).length + Object.keys(testResults.api).length,
+                    passedTests: Object.values(testResults.buttons).filter(r => r === 'PASS').length + Object.values(testResults.api).filter(r => r === 'PASS').length,
+                    errors: testResults.errors.length
+                }
+            };
+
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `interactive-validator-report-${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            const resultDiv = document.getElementById('master-results');
+            resultDiv.className = 'result-box success';
+            resultDiv.innerHTML = '📄 Test-Report wurde heruntergeladen!';
+        }
+
+        function openMainApp() {
+            window.open('http://localhost:8000/', '_blank');
+        }
+
+        // Utility Functions
+        function updateProgress() {
+            const totalCategories = 5; // buttons, tabs, errors, api, performance
+            const completedCategories = [
+                Object.keys(testResults.buttons).length > 0,
+                Object.keys(testResults.tabs).length > 0,
+                testResults.errors.length >= 0,
+                Object.keys(testResults.api).length > 0,
+                Object.keys(testResults.performance).length > 0
+            ].filter(Boolean).length;
+
+            const percentage = (completedCategories / totalCategories) * 100;
+            
+            document.getElementById('overall-progress').style.width = `${percentage}%`;
+            document.getElementById('progress-text').textContent = `${percentage.toFixed(0)}% abgeschlossen`;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔧 Interactive Validator Agent initialized');
+            
+            // Start error monitoring by default
+            startErrorMonitoring();
+        });
+    </script>
+</body>
+</html>

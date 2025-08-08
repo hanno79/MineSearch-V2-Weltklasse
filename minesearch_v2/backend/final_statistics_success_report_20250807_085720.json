@@ -1,0 +1,78 @@
+{
+  "timestamp": "2025-08-07T08:57:15.079553",
+  "test_name": "Final Statistics Repair Validation",
+  "overall_success": true,
+  "api_success": true,
+  "frontend_success": true,
+  "detailed_results": {
+    "api_tests": [
+      {
+        "endpoint": "Models Overview",
+        "url": "/api/statistics/models/overview",
+        "status_code": 200,
+        "structure_valid": true,
+        "has_model_data": true,
+        "success": true,
+        "models_count": 3
+      },
+      {
+        "endpoint": "Comprehensive Models",
+        "url": "/api/statistics/models/comprehensive",
+        "status_code": 200,
+        "structure_valid": true,
+        "has_model_data": true,
+        "success": true,
+        "models_count": 3
+      }
+    ],
+    "frontend_tests": [
+      {
+        "tab_found": false,
+        "buttons_found": 14,
+        "filter_button_clicked": false,
+        "statistics_indicators": {
+          "model_names": true,
+          "success_rate": false,
+          "numeric_data": true,
+          "provider_names": true,
+          "no_errors": true
+        },
+        "frontend_score": 4,
+        "success": true
+      }
+    ],
+    "screenshots": [
+      "/app/minesearch_v2/backend/screenshots/final_test_main_085717.png",
+      "/app/minesearch_v2/backend/screenshots/final_test_after_tab_085720.png",
+      "/app/minesearch_v2/backend/screenshots/final_test_complete_085720.png"
+    ],
+    "data_validation": {
+      "total_models": 3,
+      "quality_checks": {
+        "has_models": true,
+        "models_have_data": true,
+        "success_rates_valid": true,
+        "providers_present": true,
+        "timestamps_present": true
+      },
+      "sample_model": {
+        "model_id": "openrouter:deepseek-free_openrouter:deepseek-chat_openrouter:deepseek-reasoner_openrouter:deepseek-chimera-free_openrouter:mistral-small-free_openrouter:horizon-beta_openrouter:minimax-m1_openrouter:llama-3.3-nemotron-super_openrouter:llama-3.1-nemotron-ultra_openrouter:kimi-k2_openrouter:glm-4.5_openrouter:glm-4.5-air-free_openrouter:gpt-oss-20b_openrouter:gpt-oss-120b",
+        "model_name": "Openrouter - Deepseek-Free_Openrouter - Deepseek-Chat_Openrouter - Deepseek-Reasoner_Openrouter - Deepseek-Chimera-Free_Openrouter - Mistral-Small-Free_Openrouter - Horizon-Beta_Openrouter - Minimax-M1_Openrouter - Llama-3.3-Nemotron-Super_Openrouter - Llama-3.1-Nemotron-Ultra_Openrouter - Kimi-K2_Openrouter - Glm-4.5_Openrouter - Glm-4.5-Air-Free_Openrouter - Gpt-Oss-20B_Openrouter - Gpt-Oss-120B",
+        "provider": "Openrouter",
+        "total_searches": 5,
+        "success_rate": 100.0,
+        "avg_fields_found": 0.0,
+        "overall_consistency": 0.0,
+        "consistency_grade": "Very Poor",
+        "most_found_fields": [
+          "Quellenangaben",
+          "_source_mapping",
+          "Name"
+        ],
+        "performance_category": "Poor",
+        "quality_score": 100.0,
+        "last_used": "2025-08-07T06:52:13"
+      }
+    }
+  }
+}

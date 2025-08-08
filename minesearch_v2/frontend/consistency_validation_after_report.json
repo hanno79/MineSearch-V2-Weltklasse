@@ -1,0 +1,160 @@
+{
+  "timestamp": "2025-08-02T16:12:35.873Z",
+  "phase": "AFTER_FIX",
+  "apiValidation": {
+    "success": true,
+    "modelCount": 43,
+    "validationResults": {
+      "realisticValues": true,
+      "noExtremeValues": true,
+      "variousConsistency": true,
+      "noUndefined": false
+    },
+    "sampleModels": [
+      {
+        "model_id": "anthropic:claude-3-haiku",
+        "success_rate": 100,
+        "overall_consistency": 54.2,
+        "avg_fields_found": 0
+      },
+      {
+        "model_id": "anthropic:claude-3.7-sonnet",
+        "success_rate": 100,
+        "overall_consistency": 50.9,
+        "avg_fields_found": 0
+      },
+      {
+        "model_id": "anthropic:claude-opus-4",
+        "success_rate": 100,
+        "overall_consistency": 58.8,
+        "avg_fields_found": 0
+      },
+      {
+        "model_id": "anthropic:claude-sonnet-4",
+        "success_rate": 100,
+        "overall_consistency": 47.3,
+        "avg_fields_found": 0
+      },
+      {
+        "model_id": "exa:neural-search",
+        "success_rate": 100,
+        "overall_consistency": 24.6,
+        "avg_fields_found": 0
+      }
+    ],
+    "consistencyRange": {
+      "min": 24.6,
+      "max": 58.8
+    },
+    "successRateRange": {
+      "min": 100,
+      "max": 100
+    }
+  },
+  "domAnalysis": {
+    "tablesFound": 1,
+    "statisticsVisible": true,
+    "modelRowsFound": 40,
+    "consistencyValuesFound": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+    ],
+    "successRateValuesFound": [],
+    "problemsDetected": {
+      "undefinedValues": 160,
+      "extremeValues": 0,
+      "identicalValues": 40
+    }
+  },
+  "screenshots": [
+    "consistency_after_main.png"
+  ],
+  "overallValidation": {
+    "apiWorking": true,
+    "realisticValues": true,
+    "noExtremeValues": true,
+    "variousConsistency": true,
+    "noUndefined": false,
+    "statisticsVisible": true,
+    "noProblems": false
+  },
+  "successScore": 71.42857142857143
+}

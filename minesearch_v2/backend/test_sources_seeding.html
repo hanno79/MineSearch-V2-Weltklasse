@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sources Seeding Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { padding: 10px 20px; margin: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Sources Seeding Test</h1>
+    
+    <div id="test-area">
+        <h3>🔍 Keine Quellen in der Datenbank</h3>
+        <p>Die Quellen-Datenbank ist leer. Dies kann passieren nach einem Database Reset.</p>
+        <button onclick="seedSourcesDatabase()" class="unified-search-button" style="margin-top: 10px;">
+            🌱 Standard-Quellen laden
+        </button>
+        <p><small>Lädt 19 weltweite Mining-Datenbanken und Regierungsquellen</small></p>
+    </div>
+    
+    <div id="result-area" style="margin-top: 20px;"></div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        
+        // Copy the function from the main frontend
+        window.seedSourcesDatabase = async function() {
+            console.log('🌱 Seeding sources database...');
+            
+            // Show loading state
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '⏳ Laden...';
+            button.disabled = true;
+            
+            try {
+                // Call the API endpoint
+                const response = await fetch(`${API_BASE_URL}/api/sources/seed?force=true`, {
+                    method: 'POST',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log('✅ Sources seeded successfully:', data.data);
+                    
+                    // Show success message
+                    showSuccess(`Standard-Quellen erfolgreich geladen! ${data.data.final_database_count} Quellen in der Datenbank.`);
+                    
+                } else {
+                    console.error('❌ Seeding failed:', data.message);
+                    showError(data.message || 'Fehler beim Laden der Standard-Quellen');
+                }
+                
+            } catch (error) {
+                console.error('❌ Network error during seeding:', error);
+                showError(`Netzwerkfehler beim Laden der Standard-Quellen: ${error.message}`);
+            } finally {
+                // Restore button state
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        };
+        
+        function showSuccess(message) {
+            document.getElementById('result-area').innerHTML = `
+                <div style="padding: 20px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; border-left: 4px solid #28a745;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">✅</div>
+                    <h3 style="color: #155724; margin: 0 0 10px 0;">Erfolg</h3>
+                    <p style="color: #155724; margin: 0;">${message}</p>
+                </div>
+            `;
+        }
+        
+        function showError(message) {
+            document.getElementById('result-area').innerHTML = `
+                <div style="padding: 20px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; border-left: 4px solid #dc3545;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">❌</div>
+                    <h3 style="color: #721c24; margin: 0 0 10px 0;">Fehler</h3>
+                    <p style="color: #721c24; margin: 0;">${message}</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

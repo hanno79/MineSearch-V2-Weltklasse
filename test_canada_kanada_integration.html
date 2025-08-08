@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Canada/Kanada Deduplication Integration Test</title>
+    <script src="minesearch_v2/frontend/js/deduplication-engine.js"></script>
+</head>
+<body>
+    <h1>Canada/Kanada Deduplication Integration Test</h1>
+    <div id="test-results"></div>
+    
+    <script>
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', function() {
+            const resultsDiv = document.getElementById('test-results');
+            let testResults = [];
+            
+            try {
+                // Test setup
+                testResults.push('=== CANADA/KANADA DEDUPLICATION TEST ===\n');
+                
+                // Check if deduplication engine exists
+                if (!window.deduplicationEngine) {
+                    testResults.push('❌ ERROR: Deduplication engine not loaded!');
+                    resultsDiv.innerHTML = `<pre>${testResults.join('\n')}</pre>`;
+                    return;
+                }
+                
+                // Enable debug mode
+                window.deduplicationEngine.enableDebug();
+                testResults.push('✅ Deduplication engine loaded and debug mode enabled');
+                
+                // Test 1: Basic Canada/Kanada deduplication
+                const test1 = "Canada / Kanada / Canada / Kanada / Kanada";
+                const result1 = window.deduplicationEngine.deduplicateValues(test1, 'country');
+                testResults.push(`\nTest 1 - Basic Canada/Kanada:`);
+                testResults.push(`Input:  "${test1}"`);
+                testResults.push(`Output: "${result1}"`);
+                testResults.push(`Expected: "Canada (2) / Kanada (3)" or similar`);
+                testResults.push(`✅ Result: ${result1.includes('Canada') && result1.includes('Kanada') && result1.includes('(') ? 'PASS' : 'FAIL'}`);
+                
+                // Test 2: Mixed case variations
+                const test2 = "CANADA / kanada / Canada / Kanada";
+                const result2 = window.deduplicationEngine.deduplicateValues(test2, 'country');
+                testResults.push(`\nTest 2 - Mixed case variations:`);
+                testResults.push(`Input:  "${test2}"`);
+                testResults.push(`Output: "${result2}"`);
+                testResults.push(`✅ Result: ${result2.includes('(') ? 'PASS' : 'FAIL'}`);
+                
+                // Test 3: With source references (simulating backend data)
+                const test3 = "Canada [gpt-4] / Kanada [claude-3] / Canada [gemini]";
+                // First clean the value (simulate frontend cleaning)
+                const cleaned3 = test3.replace(/\s*\[([^\]]+)\]/g, '');
+                const result3 = window.deduplicationEngine.deduplicateValues(cleaned3, 'country');
+                testResults.push(`\nTest 3 - With source references (cleaned):`);
+                testResults.push(`Original: "${test3}"`);
+                testResults.push(`Cleaned:  "${cleaned3}"`);
+                testResults.push(`Output:   "${result3}"`);
+                testResults.push(`✅ Result: ${result3.includes('(') ? 'PASS' : 'FAIL'}`);
+                
+                // Test 4: Simulated full integration test
+                const mockResult = {
+                    raw_fields: {
+                        'country': 'Canada / Kanada / Canada'
+                    },
+                    consolidated_fields: {
+                        'country': 'Canada / Kanada / Canada [gpt-4, claude-3, gemini]'
+                    }
+                };
+                
+                // Simulate the frontend processing logic
+                const field = 'country';
+                let rawFieldValue = mockResult.raw_fields[field] || '';
+                let fieldValue = mockResult.consolidated_fields[field] || '';
+                let deduplicatedValue = fieldValue;
+                
+                function detectFieldType(fieldName) {
+                    const typeMapping = {
+                        'country': 'country',
+                        'land': 'country',
+                        'status': 'status',
+                        'mineral': 'mineral'
+                    };
+                    return typeMapping[fieldName.toLowerCase()] || 'general';
+                }
+                
+                if (rawFieldValue.includes(' / ') && window.deduplicationEngine) {
+                    const fieldType = detectFieldType(field);
+                    deduplicatedValue = window.deduplicationEngine.deduplicateValues(rawFieldValue, fieldType);
+                    
+                    // Add source references back
+                    if (fieldValue !== rawFieldValue && fieldValue.includes('[')) {
+                        const sourcesMatch = fieldValue.match(/\[([^\]]+)\]$/);
+                        if (sourcesMatch) {
+                            deduplicatedValue += ' ' + sourcesMatch[0];
+                        }
+                    }
+                }
+                
+                testResults.push(`\nTest 4 - Full integration simulation:`);
+                testResults.push(`Raw field:     "${rawFieldValue}"`);
+                testResults.push(`Consolidated:  "${fieldValue}"`);
+                testResults.push(`Final result:  "${deduplicatedValue}"`);
+                testResults.push(`✅ Result: ${deduplicatedValue.includes('(') && deduplicatedValue.includes('[') ? 'PASS' : 'FAIL'}`);
+                
+                // Test 5: Verify synonym mapping
+                const synonyms = window.deduplicationEngine.synonymMaps.countries;
+                testResults.push(`\nTest 5 - Synonym mapping verification:`);
+                testResults.push(`Canada synonyms: ${JSON.stringify(synonyms.canada || 'NOT FOUND')}`);
+                testResults.push(`✅ Result: ${synonyms.canada && synonyms.canada.includes('kanada') ? 'PASS' : 'FAIL'}`);
+                
+                // Cache stats
+                const cacheStats = window.deduplicationEngine.getCacheStats();
+                testResults.push(`\nCache statistics:`);
+                testResults.push(`Size: ${cacheStats.size}, Hit rate: ${cacheStats.hitRate}`);
+                
+                testResults.push(`\n=== TEST SUMMARY ===`);
+                const passCount = testResults.filter(line => line.includes('✅ Result: PASS')).length;
+                const totalTests = testResults.filter(line => line.includes('✅ Result:')).length;
+                testResults.push(`${passCount}/${totalTests} tests passed`);
+                
+                if (passCount === totalTests) {
+                    testResults.push(`🎉 ALL TESTS PASSED! Deduplication system is working correctly.`);
+                } else {
+                    testResults.push(`⚠️ Some tests failed. Review the output above.`);
+                }
+                
+            } catch (error) {
+                testResults.push(`❌ CRITICAL ERROR: ${error.message}`);
+                testResults.push(`Stack trace: ${error.stack}`);
+            }
+            
+            // Display results
+            resultsDiv.innerHTML = `<pre style="background: #f5f5f5; padding: 20px; border-radius: 5px; font-family: monospace; line-height: 1.4; max-height: 600px; overflow-y: auto;">${testResults.join('\n')}</pre>`;
+        });
+    </script>
+</body>
+</html>

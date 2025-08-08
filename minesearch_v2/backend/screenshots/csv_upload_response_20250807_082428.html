@@ -1,0 +1,54 @@
+<!-- CSV Upload Response - 20250807_082428 -->
+
+        <div class="csv-info-card">
+            <h3>✓ CSV erfolgreich geladen</h3>
+            <p><strong>3</strong> Minen gefunden</p>
+            
+            <form id="batch-form" 
+                  hx-post="/api/batch-search" 
+                  hx-target="#results"
+                  hx-indicator="#batch-loading">
+                
+                <input type="hidden" name="session_id" value="7468c0fe-968d-4f61-b26a-3e00c400843f">
+                <input type="hidden" name="selected_models" id="batch_selected_models" value="">
+                
+                <div class="model-info" style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-radius: 5px;">
+                    <p style="margin: 0;"><strong>Hinweis:</strong> Die Batch-Suche verwendet die oben ausgewählten Modelle.</p>
+                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #666;">
+                        ⚠️ Bei Abacus AI: Rechne mit bis zu 5 Minuten pro Mine!
+                    </p>
+                </div>
+                
+                <div class="form-group">
+                    <label>Anzahl zu suchender Minen:</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="number" 
+                               name="count" 
+                               min="1" 
+                               max="3"
+                               value="3"
+                               style="width: 100px;">
+                        <span>von 3 Minen</span>
+                        <button type="submit" name="search_all" value="false" class="batch-search-button">
+                            Suche starten
+                        </button>
+                        <button type="submit" name="search_all" value="true" class="batch-search-button">
+                            Alle suchen
+                        </button>
+                    </div>
+                </div>
+            </form>
+            
+            <div id="batch-loading" class="htmx-indicator">
+                <div class="spinner"></div>
+                <p>Batch-Suche läuft...</p>
+            </div>
+            
+            <details style="margin-top: 20px;">
+                <summary>Erste 5 Minen anzeigen</summary>
+                <ul>
+                    <li>Eleonore Mine (Canada) - Kein Rohstoff</li><li>Canadian Malartic (Canada) - Kein Rohstoff</li><li>Hemlo Gold Mine (Canada) - Kein Rohstoff</li>
+                </ul>
+            </details>
+        </div>
+        

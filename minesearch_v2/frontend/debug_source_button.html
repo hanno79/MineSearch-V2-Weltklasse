@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Source Button</title>
+</head>
+<body>
+    <h1>Debug Source Button Syntax</h1>
+    
+    <div id="test-output"></div>
+    
+    <script>
+        // Kopie der safeJSONStringify Funktion
+        function safeJSONStringify(str) {
+            if (!str) return "''";
+            return JSON.stringify(str);
+        }
+        
+        // Test-Funktion
+        function toggleSourceDetails(domain) {
+            console.log('toggleSourceDetails called with:', domain);
+            alert('toggleSourceDetails called with: ' + domain);
+        }
+        
+        // Test verschiedene Domain-Namen inklusive reale Daten
+        const testDomains = [
+            'gestim.quebec',
+            'ga.gov.au', 
+            'test.com',
+            'example-with-dash.org',
+            'test_with_underscore.net',
+            'test with spaces.com', // Problematisch?
+            'test\'quote.com',      // Problematisch?
+            'test"doublequote.com'  // Problematisch?
+        ];
+        
+        // Test das Template-String-Problem direkt
+        console.log('=== Template String Syntax Test ===');
+        testDomains.forEach(domain => {
+            try {
+                // ALTE (defekte) Syntax: Template-String mit safeJSONStringify darin
+                const oldBrokenSyntax = \`onclick="toggleSourceDetails(\${safeJSONStringify(domain)})"\`;
+                console.log(\`❌ OLD (broken): \${oldBrokenSyntax}\`);
+                
+                // NEUE (korrekte) Syntax: Escape außerhalb Template-String
+                const escapedDomain = safeJSONStringify(domain);
+                const newCorrectSyntax = \`onclick="toggleSourceDetails(\${escapedDomain})"\`;
+                console.log(\`✅ NEW (fixed): \${newCorrectSyntax}\`);
+                
+            } catch (error) {
+                console.error(\`Template test error for \${domain}:\`, error.message);
+            }
+        });
+        
+        let output = '<h2>Testing safeJSONStringify Output:</h2>';
+        
+        testDomains.forEach(domain => {
+            try {
+                const safeDomain = safeJSONStringify(domain);
+                output += `<p><strong>${domain}</strong> -> ${safeDomain}</p>`;
+                
+                // Test button generation
+                const buttonHTML = `<button onclick="toggleSourceDetails(${safeDomain})">Test ${domain}</button>`;
+                output += `<p>Button HTML: <code>${buttonHTML.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></p>`;
+                output += `<div>${buttonHTML}</div>`;
+                output += '<hr>';
+            } catch (error) {
+                output += `<p><strong>ERROR with ${domain}</strong>: ${error.message}</p>`;
+            }
+        });
+        
+        document.getElementById('test-output').innerHTML = output;
+    </script>
+</body>
+</html>
