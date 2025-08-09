@@ -854,14 +854,40 @@
                 </div>
             </div>
 
-            <!-- Einheitlicher Ladeindikator -->
-            <div id="loading" class="htmx-indicator">
-                <div class="spinner"></div>
-                <p id="loading-text" style="margin: 10px 0 5px 0; font-size: 16px;">Suche läuft...</p>
-                <p id="loading-timer" style="font-weight: bold; color: #2563eb; font-size: 20px; margin: 5px 0; display: block;">00:00</p>
-                <button onclick="cancelSearch()" style="background: #dc2626; color: white; border: none; padding: 8px 20px; border-radius: 5px; cursor: pointer; margin-top: 10px;">
-                    ❌ Suche abbrechen
+            <!-- Verbesserter Ladeindikator mit schönerer Animation -->
+            <div id="loading" class="htmx-indicator loading-enhanced" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; text-align: center; padding: 30px; background: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 100%); border-radius: 16px; box-shadow: 0 12px 40px rgba(59, 130, 246, 0.2); border: 2px solid #3b82f6;">
+                <!-- Animierter Spinner -->
+                <div class="spinner" style="width: 50px; height: 50px; border: 4px solid #e5e7eb; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                
+                <!-- Ladetext -->
+                <p id="loading-text" style="margin: 0 0 10px 0; font-size: 18px; font-weight: 600; color: #1f2937;">
+                    🔍 Batch-Suche läuft...
+                </p>
+                
+                <!-- Timer mit größerer Schrift und besserem Styling -->
+                <div style="background: rgba(59, 130, 246, 0.1); border-radius: 8px; padding: 15px; margin: 15px 0;">
+                    <p style="margin: 0 0 5px 0; font-size: 14px; color: #6b7280; font-weight: 500;">Verstrichene Zeit:</p>
+                    <p id="loading-timer" style="font-weight: bold; color: #2563eb; font-size: 28px; margin: 0; font-family: 'Courier New', monospace; text-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);">
+                        00:00
+                    </p>
+                </div>
+                
+                <!-- Progress-Indikator (optional) -->
+                <div style="background: #e5e7eb; border-radius: 10px; height: 6px; margin: 20px 0; overflow: hidden;">
+                    <div class="progress-bar" style="height: 100%; background: linear-gradient(90deg, #3b82f6, #1d4ed8); border-radius: 10px; animation: progress-pulse 2s ease-in-out infinite;"></div>
+                </div>
+                
+                <!-- Abbrechen Button mit verbessertem Styling -->
+                <button onclick="cancelSearch()" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);" 
+                        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(239, 68, 68, 0.4)'"
+                        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(239, 68, 68, 0.3)'">
+                    🛑 Suche abbrechen
                 </button>
+                
+                <!-- Zusätzliche Info -->
+                <p style="margin: 15px 0 0 0; font-size: 12px; color: #6b7280; opacity: 0.8;">
+                    Durchsuche CSV-Daten mit KI-Modellen...
+                </p>
             </div>
 
             <!-- Ergebnisbereich -->
@@ -1082,24 +1108,81 @@ function safeSetHTML(element, html) {
 }
 
 // PERFORMANCE-FIX: Hilfsfunktionen für wiederverwendbare UI-Elemente
-function createLoadingHTML(title, message = '', showSpinner = true) {
+// TIMER-FIX 09.08.2025: Timer-System für Batch-Suchen
+let searchTimer = {
+    interval: null,
+    startTime: null,
+    
+    start: function() {
+        this.startTime = Date.now();
+        this.interval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Update timer in loading indicator
+            const timerElement = document.getElementById('loading-timer');
+            if (timerElement) {
+                timerElement.textContent = timeString;
+            }
+            
+            // Update timer in any visible loading messages
+            const loadingTimers = document.querySelectorAll('.search-timer');
+            loadingTimers.forEach(timer => {
+                timer.textContent = timeString;
+            });
+        }, 1000);
+    },
+    
+    stop: function() {
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = null;
+        }
+        this.startTime = null;
+    },
+    
+    getElapsed: function() {
+        if (!this.startTime) return '00:00';
+        const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+};
+
+function createLoadingHTML(title, message = '', showSpinner = true, showTimer = false) {
     const spinnerHTML = showSpinner ? `
         <div style="margin-top: 10px;">
             <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #0ea5e9; border-radius: 50%; animation: spin 1s linear infinite;"></div>
         </div>
     ` : '';
     
+    const timerHTML = showTimer ? `
+        <p class="search-timer" style="font-weight: bold; color: #2563eb; font-size: 20px; margin: 10px 0;">00:00</p>
+    ` : '';
+    
     return `
         <div style="padding: 20px; text-align: center; background: #f0f9ff; border-radius: 8px; border: 1px solid #0ea5e9;">
             <h3>${sanitizeHTML(title)}</h3>
             ${message ? `<p>${sanitizeHTML(message)}</p>` : ''}
+            ${timerHTML}
             ${spinnerHTML}
         </div>
     `;
 }
 
-function showLoadingMessage(element, title, message = '') {
-    element.innerHTML = createLoadingHTML(title, message);
+function showLoadingMessage(element, title, message = '', startTimer = false) {
+    element.innerHTML = createLoadingHTML(title, message, true, startTimer);
+    
+    if (startTimer) {
+        searchTimer.start();
+    }
+}
+
+function stopSearchTimer() {
+    searchTimer.stop();
 }
 
 function createErrorHTML(title, message = '') {
@@ -2047,7 +2130,7 @@ function startBatchSearch() {
     }
     
     showLoadingMessage(resultsDiv, `${searchTypeText} läuft mit ${selectedModels.length} Modellen...`, 
-        comprehensiveSearchEnabled ? "⚠️ ACHTUNG: Comprehensive Search kann 5-10 Minuten pro Mine dauern!" : "Dies kann einige Minuten dauern. Bitte warten Sie...");
+        comprehensiveSearchEnabled ? "⚠️ ACHTUNG: Comprehensive Search kann 5-10 Minuten pro Mine dauern!" : "Dies kann einige Minuten dauern. Bitte warten Sie...", true);
     
     // Erstelle FormData für multipart/form-data wie das Backend erwartet
     const formData = new FormData();
@@ -2072,6 +2155,7 @@ function startBatchSearch() {
     })
     .then(response => response.text())
     .then(html => {
+        stopSearchTimer(); // TIMER-FIX: Stop timer when batch search completes
         resultsDiv.innerHTML = html;
         
         // Speichere Ergebnisse für Tab-Switching
@@ -2081,9 +2165,29 @@ function startBatchSearch() {
         console.log('✅ Batch-Suche abgeschlossen');
     })
     .catch(error => {
+        stopSearchTimer(); // TIMER-FIX: Stop timer on error too
         const resultsDiv = document.getElementById('batch-results');
         showGracefulError('API_ERROR', error.message, resultsDiv, true, () => startBatchSearch());
     });
+}
+
+// TIMER-FIX: Cancel Search Function
+function cancelSearch() {
+    stopSearchTimer();
+    
+    // Hide loading indicators
+    const loadingElement = document.getElementById('loading');
+    if (loadingElement) {
+        loadingElement.style.display = 'none';
+    }
+    
+    // Clear results
+    const resultsDiv = document.getElementById('results');
+    if (resultsDiv) {
+        resultsDiv.innerHTML = '<p style="text-align: center; color: #666;">Suche abgebrochen</p>';
+    }
+    
+    console.log('🛑 Suche abgebrochen');
 }
 
 // Einzelsuche starten
@@ -6499,7 +6603,7 @@ async function loadConsolidatedResults(sortBy = 'mine_name', order = 'asc') {
     params.append('exclude_exa', 'true');
     
     try {
-        const response = await fetch(`${API_BASE_URL}/api/results/consolidated?${params}`);
+        const response = await fetch(`${API_BASE_URL}/api/consolidated/results?${params}`);
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -7126,7 +7230,7 @@ async function exportConsolidatedCSV() {
     params.append('exclude_exa', 'true');
     
     try {
-        const url = `${API_BASE_URL}/api/results/consolidated/export/csv?${params}`;
+        const url = `${API_BASE_URL}/api/consolidated/results/export/csv?${params}`;
         
         // Öffne Download-Link
         const link = document.createElement('a');
@@ -8609,7 +8713,163 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// MineSearch v2.1 - Enhanced JavaScript with CSV export and UI Testing initialized    </script>
+// HTMX-Timer-Integration 09.08.2025: Automatischer Timer bei allen HTMX-Requests
+document.addEventListener('DOMContentLoaded', function() {
+    // HTMX Event-Handler für automatischen Timer
+    document.body.addEventListener('htmx:beforeRequest', function(evt) {
+        console.log('🚀 HTMX Request gestartet, Timer wird gestartet');
+        searchTimer.start();
+        
+        // Verbesserte Ladeanimation mit pulsierendem Effekt
+        const loadingIndicator = document.getElementById('loading');
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'block';
+            loadingIndicator.style.animation = 'pulse 1.5s ease-in-out infinite';
+        }
+        
+        // Timer-Element sofort auf 00:00 setzen und sichtbar machen
+        const timerElement = document.getElementById('loading-timer');
+        if (timerElement) {
+            timerElement.textContent = '00:00';
+            timerElement.style.display = 'block';
+            timerElement.style.color = '#2563eb';
+            timerElement.style.fontWeight = 'bold';
+            timerElement.style.fontSize = '24px';
+        }
+        
+        // Ladetext aktualisieren
+        const loadingText = document.getElementById('loading-text');
+        if (loadingText) {
+            loadingText.textContent = 'Batch-Suche läuft...';
+            loadingText.style.color = '#1f2937';
+            loadingText.style.fontWeight = '500';
+        }
+    });
+    
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        console.log('✅ HTMX Request beendet, Timer wird gestoppt');
+        searchTimer.stop();
+        
+        // Ladeanimation ausblenden
+        const loadingIndicator = document.getElementById('loading');
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'none';
+        }
+        
+        // Finale Zeit anzeigen
+        const finalTime = searchTimer.getElapsed();
+        console.log(`⏱️ Suche abgeschlossen in: ${finalTime}`);
+        
+        // Optional: Erfolgsmeldung mit Zeit anzeigen
+        if (evt.detail.successful) {
+            showTemporaryMessage(`✅ Suche erfolgreich abgeschlossen in ${finalTime}`, 'success');
+        }
+    });
+    
+    document.body.addEventListener('htmx:sendError', function(evt) {
+        console.log('❌ HTMX Request Fehler, Timer wird gestoppt');
+        searchTimer.stop();
+        
+        const loadingIndicator = document.getElementById('loading');
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'none';
+        }
+        
+        showTemporaryMessage('❌ Fehler bei der Suche', 'error');
+    });
+});
+
+// Hilfsfunktion für temporäre Nachrichten
+function showTemporaryMessage(message, type = 'info') {
+    const messageDiv = document.createElement('div');
+    messageDiv.innerHTML = message;
+    messageDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        z-index: 9999;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transition: all 0.3s ease;
+        ${type === 'success' ? 'background: #10b981; color: white;' : 
+          type === 'error' ? 'background: #ef4444; color: white;' : 
+          'background: #3b82f6; color: white;'}
+    `;
+    
+    document.body.appendChild(messageDiv);
+    
+    // Nach 3 Sekunden ausblenden
+    setTimeout(() => {
+        messageDiv.style.opacity = '0';
+        messageDiv.style.transform = 'translateY(-20px)';
+        setTimeout(() => messageDiv.remove(), 300);
+    }, 3000);
+}
+
+// Verbesserte cancelSearch Funktion
+function cancelSearch() {
+    console.log('🛑 Suche wird abgebrochen');
+    searchTimer.stop();
+    
+    // HTMX Request abbrechen
+    if (window.htmx) {
+        // Alle laufenden Requests abbrechen
+        const activeRequests = document.querySelectorAll('[hx-request]');
+        activeRequests.forEach(el => {
+            htmx.remove(el, 'hx-request');
+        });
+    }
+    
+    // Ladeindikator ausblenden
+    const loadingIndicator = document.getElementById('loading');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'none';
+    }
+    
+    showTemporaryMessage('🛑 Suche wurde abgebrochen', 'info');
+}
+
+// CSS für Pulse-Animation hinzufügen
+const pulseStyles = document.createElement('style');
+pulseStyles.textContent = `
+    @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.7; transform: scale(1.05); }
+    }
+    
+    .loading-enhanced {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 100%);
+        border: 2px solid #3b82f6;
+        border-radius: 12px;
+        box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+    }
+    
+    .spinner {
+        border-color: #3b82f6 transparent #3b82f6 transparent;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    @keyframes progress-pulse {
+        0%, 100% { 
+            transform: translateX(-100%); 
+            opacity: 0.3; 
+        }
+        50% { 
+            transform: translateX(300%); 
+            opacity: 1; 
+        }
+    }
+`;
+document.head.appendChild(pulseStyles);
+
+// MineSearch v2.1 - Enhanced JavaScript with CSV export, UI Testing, and improved Timer system initialized    </script>
 
 </body>
 </html>
