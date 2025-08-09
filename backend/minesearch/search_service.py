@@ -40,6 +40,8 @@ class MineSearchService:
         self.enhanced_discovery = EnhancedSourceDiscovery()
         # Database Manager für Persistierung
         self.db_manager = DatabaseManager()
+        # Data Extractor für strukturierte Datenextraktion
+        self.data_extractor = DataExtractor()
     
     async def search_mine(self, mine_name: str, model: str, country: Optional[str] = None, 
                          commodity: Optional[str] = None, region: Optional[str] = None, 
@@ -619,7 +621,7 @@ class MineSearchService:
             model: Verwendetes Modell
         """
         try:
-            from database import Source
+            from minesearch.database import Source
             from urllib.parse import urlparse
             
             logger.info(f"[SOURCES TRACKING] Tracke {len(sources)} Sources für {model}")
@@ -674,6 +676,132 @@ class MineSearchService:
                 
         except Exception as e:
             logger.error(f"[SOURCES TRACKING] Fehler beim Sources-Tracking: {e}")
+
+
+    def _build_search_query(self, mine_name: str, name_variants: List[str], 
+                           country: Optional[str], currency: str, 
+                           restoration_terms: List[str]) -> str:
+        """
+        Erstellt die Such-Query für Provider
+        
+        Args:
+            mine_name: Name der Mine
+            name_variants: Namensvarianten
+            country: Land
+            currency: Währung
+            restoration_terms: Restaurationskostenbegriffe
+            
+        Returns:
+            Such-Query String
+        """
+        location = f" in {country}" if country else ""
+        variants_text = ", ".join(name_variants[:3])  # Limit auf 3 Varianten
+        
+        return f"""
+        Find detailed mining information about "{mine_name}"{location}.
+        Also search for variants: {variants_text}
+        
+        Required information:
+        1. Mine location (GPS coordinates, region)
+        2. Operating company/owner
+        3. Commodity/mineral type
+        4. Production data (annual output, reserves)
+        5. Mine type (open-pit, underground, etc.)
+        6. Activity status (active, planned, closed)
+        7. Restoration/closure costs in {currency}
+        8. Environmental data
+        9. Employment numbers
+        10. Technical specifications
+        
+        Provide specific, factual data only. Include sources and dates.
+        """
+    
+    def _validate_result(self, content: str, mine_name: str, 
+                        name_variants: List[str]) -> tuple:
+        """
+        Validiert Suchergebnis auf Relevanz
+        
+        Args:
+            content: Suchinhalt
+            mine_name: Mine-Name
+            name_variants: Namensvarianten
+            
+        Returns:
+            (is_valid, confidence_score)
+        """
+        if not content or len(content.strip()) < 50:
+            return False, 0.0
+        
+        # Prüfe ob Mine-Name oder Varianten im Content vorkommen
+        content_lower = content.lower()
+        mine_name_lower = mine_name.lower()
+        
+        name_match = mine_name_lower in content_lower
+        variant_matches = sum(1 for variant in name_variants 
+                            if variant.lower() in content_lower)
+        
+        # Prüfe auf Mining-relevante Begriffe
+        mining_terms = ['mine', 'mining', 'extraction', 'ore', 'mineral', 
+                       'production', 'reserves', 'deposit']
+        mining_matches = sum(1 for term in mining_terms 
+                           if term in content_lower)
+        
+        # Berechne Confidence Score
+        confidence = 0.0
+        if name_match:
+            confidence += 0.4
+        confidence += min(variant_matches * 0.2, 0.3)
+        confidence += min(mining_matches * 0.05, 0.3)
+        
+        is_valid = confidence >= 0.3  # Mindestens 30% Confidence
+        
+        return is_valid, confidence
+    
+    def _calculate_data_quality(self, structured_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Berechnet Datenqualitäts-Metriken
+        
+        Args:
+            structured_data: Strukturierte Daten
+            
+        Returns:
+            Qualitäts-Metriken
+        """
+        if not structured_data:
+            return {
+                'completion_percentage': 0,
+                'filled_fields': 0,
+                'total_fields': len(CSV_COLUMNS),
+                'quality_score': 0.0
+            }
+        
+        # Zähle gefüllte Felder (nicht leer, nicht "k.A.", nicht None)
+        filled_fields = 0
+        for key, value in structured_data.items():
+            if value and str(value).strip() and str(value).strip().lower() != 'k.a.':
+                filled_fields += 1
+        
+        total_fields = len(CSV_COLUMNS)
+        completion_percentage = (filled_fields / total_fields) * 100 if total_fields > 0 else 0
+        
+        # Qualitäts-Score basierend auf wichtigen Feldern
+        important_fields = ['Mine Name', 'Country', 'Commodity', 'Betreiber', 'Aktivitätsstatus']
+        important_filled = sum(1 for field in important_fields 
+                             if structured_data.get(field) and 
+                             str(structured_data[field]).strip() and 
+                             str(structured_data[field]).strip().lower() != 'k.a.')
+        
+        quality_score = (important_filled / len(important_fields)) * 0.7 + \
+                       (completion_percentage / 100) * 0.3
+        
+        return {
+            'completion_percentage': completion_percentage,
+            'filled_fields': filled_fields,
+            'total_fields': total_fields,
+            'quality_score': quality_score,
+            'important_fields_filled': important_filled,
+            'important_fields_total': len(important_fields)
+        }
 
 
 # Service-Instanz für Kompatibilität (DEPRECATED - use services_container)

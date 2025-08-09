@@ -170,7 +170,7 @@ class SourceRegistry:
     
     def __init__(self):
         # Import hier um zirkuläre Imports zu vermeiden
-        from database import db_manager
+        from minesearch.database import db_manager
         self.db = db_manager
         self.sessions: Dict[str, SearchSession] = {}  # Sessions bleiben in-memory
     
@@ -188,7 +188,7 @@ class SourceRegistry:
     
     def get_source(self, url: str) -> Optional[SourceRecord]:
         """Hole Quelle aus Registry"""
-        from database import Source
+        from minesearch.database import Source
         with self.db.get_session() as session:
             db_source = session.query(Source).filter_by(url=url).first()
             if db_source:
@@ -222,7 +222,7 @@ class SourceRegistry:
     
     def get_top_sources(self, limit: int = 10, source_type: Optional[str] = None) -> List[SourceRecord]:
         """Hole Top-Quellen sortiert nach Zuverlässigkeit"""
-        from database import Source
+        from minesearch.database import Source
         with self.db.get_session() as session:
             query = session.query(Source)
             if source_type:

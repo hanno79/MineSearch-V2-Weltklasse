@@ -29,7 +29,7 @@ async def get_results(
     
     ÄNDERUNG 09.07.2025: Erweitert um Sortierung und Exa-Filter
     """
-    from database import db_manager, SearchResult
+    from minesearch.database import db_manager, SearchResult
     from sqlalchemy import desc as sql_desc, asc as sql_asc
     
     with db_manager.get_session() as session:
@@ -107,7 +107,7 @@ async def get_results(
 @router.get("/results/stats")
 async def get_result_statistics():
     """Hole Statistiken über gespeicherte Ergebnisse"""
-    from database import db_manager
+    from minesearch.database import db_manager
     
     stats = db_manager.get_statistics()
     return {
@@ -118,7 +118,7 @@ async def get_result_statistics():
 @router.get("/results/sessions")
 async def get_result_sessions(limit: int = Query(20)):
     """Hole gruppierte Such-Sessions"""
-    from database import db_manager
+    from minesearch.database import db_manager
     
     sessions = db_manager.get_sessions(limit=limit)
     return {
@@ -129,7 +129,7 @@ async def get_result_sessions(limit: int = Query(20)):
 @router.get("/results/{result_id}")
 async def get_result_by_id(result_id: int):
     """Hole einzelnes Suchergebnis nach ID"""
-    from database import db_manager
+    from minesearch.database import db_manager
     
     result = db_manager.get_search_result_by_id(result_id)
     if not result:
@@ -143,7 +143,7 @@ async def get_result_by_id(result_id: int):
 @router.delete("/results/{result_id}")
 async def delete_result(result_id: int):
     """Lösche einzelnes Suchergebnis"""
-    from database import db_manager, SearchResult
+    from minesearch.database import db_manager, SearchResult
     
     with db_manager.get_session() as session:
         result = session.query(SearchResult).filter_by(id=result_id).first()
@@ -174,7 +174,7 @@ async def export_results_csv(
     CSV-EXPORT 19.07.2025: Neue Route für CSV-Download mit | als Separator
     """
     from fastapi.responses import StreamingResponse
-    from database import db_manager, SearchResult
+    from minesearch.database import db_manager, SearchResult
     from sqlalchemy import desc as sql_desc, asc as sql_asc
     import io
     from typing import List

@@ -7,7 +7,7 @@ Beschreibung: Model-Information Routes
 
 from fastapi import APIRouter, Query
 import logging
-from providers.registry import provider_registry
+from minesearch.providers.registry import provider_registry
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

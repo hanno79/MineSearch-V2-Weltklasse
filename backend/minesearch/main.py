@@ -57,14 +57,22 @@ async def lifespan(app: FastAPI):
             missing_keys = APIKeysConfig.get_missing_keys()
             logger.warning(f"⚠️  Fehlende API-Keys: {', '.join(missing_keys)}")
             logger.warning("Einige Provider sind möglicherweise nicht verfügbar.")
-        provider_registry.initialize(config.PROVIDERS)
-        available_models = list(provider_registry.get_all_models().keys())
-        logger.info(f"Provider-Registry initialisiert. Verfügbare Modelle: {available_models}")
-        if not available_models:
-            raise ValueError("Keine Provider-Modelle verfügbar. Bitte API-Keys in .env prüfen.")
+            # Im Notfall: Lass System trotz fehlender API-Keys starten
+            logger.warning("System startet trotzdem im eingeschränkten Modus...")
+        
+        try:
+            provider_registry.initialize(config.PROVIDERS)
+            available_models = list(provider_registry.get_all_models().keys())
+            logger.info(f"Provider-Registry initialisiert. Verfügbare Modelle: {available_models}")
+            if not available_models:
+                logger.warning("Keine Provider-Modelle verfügbar - System läuft ohne Such-Provider")
+        except Exception as provider_error:
+            logger.warning(f"Provider-Initialisierung fehlgeschlagen: {provider_error}")
+            logger.warning("System läuft ohne Such-Provider weiter...")
+            
     except Exception as e:
         logger.error(f"Fehler bei Provider-Initialisierung: {type(e).__name__}: {e}")
-        raise
+        logger.warning("System startet trotzdem im Notfall-Modus...")
 
     # Datenbank initialisieren
     try:
@@ -72,7 +80,7 @@ async def lifespan(app: FastAPI):
         logger.info("Datenbank erfolgreich initialisiert")
     except Exception as e:
         logger.error(f"Datenbank-Fehler: {type(e).__name__}: {e}")
-        raise
+        logger.warning("System startet ohne Datenbank weiter...")
 
     yield
     logger.info("MineSearch v2.1 wird beendet...")

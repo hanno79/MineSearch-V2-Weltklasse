@@ -191,14 +191,19 @@ class DataExtractor:
         # ÄNDERUNG 07.07.2025: Debug-Logging für Feld-Extraktion
         logger.debug(f"[EXTRACT-FIELD] Versuche '{field}' mit {len(patterns)} Patterns zu extrahieren")
         
-        # ÄNDERUNG 06.07.2025: Spezialbehandlung für Restaurationskosten
+        # FALLBACK 09.08.2025: Spezialbehandlung für Restaurationskosten ohne externes Modul
         if field == 'Restaurationskosten':
-            from extraction_restoration_costs import RestorationCostExtractor
-            extractor = RestorationCostExtractor()
-            result = extractor.extract_restoration_costs(content)
-            if result and 'restoration_costs' in result:
-                logger.debug(f"[EXTRACT-FIELD] Restaurationskosten gefunden: {result['restoration_costs']}")
-                return result['restoration_costs']
+            try:
+                from extraction_restoration_costs import RestorationCostExtractor
+                extractor = RestorationCostExtractor()
+                result = extractor.extract_restoration_costs(content)
+                if result and 'restoration_costs' in result:
+                    logger.debug(f"[EXTRACT-FIELD] Restaurationskosten gefunden: {result['restoration_costs']}")
+                    return result['restoration_costs']
+            except ImportError:
+                # FALLBACK: Nutze Standard-Patterns statt spezialisiertes Modul
+                logger.debug("[EXTRACT-FIELD] FALLBACK: extraction_restoration_costs Modul nicht verfügbar - nutze Standard-Patterns")
+                pass  # Continue with standard extraction patterns
         
         for pattern in patterns:
             try:

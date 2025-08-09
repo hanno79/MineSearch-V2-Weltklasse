@@ -17,10 +17,10 @@ from datetime import datetime
 from minesearch.config import CSV_COLUMNS
 from minesearch.batch_service import BatchService  # Adapter
 from minesearch.search_service import MineSearchService
-from minesearch.search_service_multi import MultiProviderSearchService
+# CONSOLIDATION 09.08.2025: MultiProviderSearchService entfernt - verwende MineSearchService direkt
 from minesearch.providers.registry import provider_registry
 from minesearch.database import db_manager
-from extraction_validators import is_placeholder_value
+from minesearch.extraction_validators import is_placeholder_value
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -43,7 +43,114 @@ async def upload_csv(csv_file: UploadFile = File(...)):
     # ÄNDERUNG 04.07.2025: Parameter-Name von 'file' zu 'csv_file' geändert für Frontend-Kompatibilität
     try:
         logger.info(f"CSV Upload empfangen: {csv_file.filename}, Size: {csv_file.size if hasattr(csv_file, 'size') else 'unknown'}")
-        return await batch_service.process_csv_upload(csv_file)
+        
+        # Verarbeite CSV direkt hier statt batch_service zu nutzen
+        contents = await csv_file.read()
+        csv_content = contents.decode('utf-8-sig')  # FIX: UTF-8-SIG entfernt BOM automatisch
+        
+        # FIX: Auto-detect CSV-Delimiter (Semikolon vs Komma)
+        delimiter = ';' if ';' in csv_content.split('\n')[0] else ','
+        logger.info(f"[CSV-PARSER] Detected delimiter: '{delimiter}'")
+        
+        # Parse CSV mit korrektem Delimiter
+        csv_reader = csv.DictReader(io.StringIO(csv_content), delimiter=delimiter)
+        mines = []
+        columns = []
+        
+        for i, row in enumerate(csv_reader):
+            if i == 0:
+                columns = list(row.keys())
+            mines.append(row)
+            
+            # Limit für Demo
+            if i >= 100:
+                break
+        
+        # Erstelle Session
+        import uuid
+        session_id = str(uuid.uuid4())
+        
+        # Speichere in Cache
+        from datetime import datetime
+        uploaded_mines_cache[session_id] = {
+            'mines': mines,
+            'columns': columns,
+            'timestamp': datetime.now()
+        }
+        
+        mine_count = len(mines)
+        logger.info(f"CSV processed: {mine_count} mines, session: {session_id}")
+        
+        # Erstelle HTML-Interface für Batch-Suche
+        session_id = session_id
+        mine_count = mine_count
+        columns = columns
+        
+        # HTML für Batch-Search-Interface generieren
+        html_content = f"""
+        <div class="csv-upload-success">
+            <div class="alert alert-success">
+                <h3>✅ CSV erfolgreich hochgeladen!</h3>
+                <p><strong>{mine_count} Minen</strong> wurden erkannt mit <strong>{len(columns)} Spalten</strong></p>
+                <p><em>Session ID: {session_id}</em></p>
+            </div>
+            
+            <div class="batch-search-interface" style="margin-top: 20px;">
+                <h3>🔍 Batch-Suche konfigurieren</h3>
+                
+                <form id="batch-form" 
+                      hx-post="/api/batch-search"
+                      hx-target="#batch-results"
+                      hx-indicator="#loading">
+                    
+                    <input type="hidden" name="session_id" value="{session_id}">
+                    <input type="hidden" name="selected_models" value="">
+                    
+                    <div class="form-group">
+                        <label><strong>Anzahl zu durchsuchender Minen:</strong></label>
+                        <div style="margin: 10px 0;">
+                            <label><input type="radio" name="search_all" value="false" checked> Nur erste 5 Minen (schnell)</label>
+                        </div>
+                        <div style="margin: 10px 0;">
+                            <label><input type="radio" name="search_all" value="false"> Erste <input type="number" name="count" value="20" min="1" max="100" style="width: 60px;"> Minen</label>
+                        </div>
+                        <div style="margin: 10px 0;">
+                            <label><input type="radio" name="search_all" value="true"> <strong>Alle {mine_count} Minen durchsuchen</strong></label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><strong>Suchtyp:</strong></label>
+                        <select name="search_type" style="width: 200px; padding: 5px;">
+                            <option value="standard">Standard-Suche</option>
+                            <option value="comprehensive">Umfassende Suche</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin: 20px 0;">
+                        <button type="submit" class="batch-search-button" style="background: #4CAF50; color: white; padding: 15px 30px; font-size: 18px; border: none; border-radius: 5px; cursor: pointer;">
+                            🚀 Batch-Suche starten
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="csv-info-details" style="margin-top: 20px; background: #f5f5f5; padding: 15px; border-radius: 5px;">
+                <h4>📋 CSV Details:</h4>
+                <p><strong>Spalten gefunden:</strong></p>
+                <ul>
+                    {"".join([f"<li>{col}</li>" for col in columns[:10]])}
+                    {f"<li><em>... und {len(columns) - 10} weitere</em></li>" if len(columns) > 10 else ""}
+                </ul>
+            </div>
+        </div>
+        
+        <div id="batch-results" style="margin-top: 30px;"></div>
+        """
+        
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=html_content)
+        
     except Exception as e:
         logger.error(f"Fehler beim CSV Upload: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -109,11 +216,17 @@ async def batch_search(
                 detail="Mindestens ein gültiges Modell muss ausgewählt werden. Frontend-Parameter: selected_models, model"
             )
         
-        # Führe Suchen durch
+        # DEBUG: Schaue erste Minen an
+        logger.info(f"[BATCH-DEBUG] Erste 3 Minen: {mines_to_search[:3]}")
+        if mines_to_search:
+            first_mine = mines_to_search[0]
+            logger.info(f"[BATCH-DEBUG] Erste Mine Keys: {list(first_mine.keys())}")
+            logger.info(f"[BATCH-DEBUG] Erste Mine Values: {first_mine}")
+        
+        # Führe Suchen durch - ALLE IMPORTS HIER
         results = []
         
-        # Shared Service Container
-        from minesearch.services_container import services
+        logger.info("[BATCH-DEBUG] Vor Import-Bereich")
         
         # PHASE 2.3: COMPREHENSIVE SEARCH ORCHESTRATOR Integration
         # Optional: nur wenn vorhanden (Legacy)
@@ -121,15 +234,48 @@ async def batch_search(
             from minesearch_v2.backend.comprehensive_search_orchestrator import comprehensive_search_orchestrator
         except Exception:
             comprehensive_search_orchestrator = None
+            logger.info("[BATCH] Comprehensive search orchestrator nicht verfügbar")
+            
+        logger.info("[BATCH] Starte Mine-Processing-Schleife")
         
         for idx, mine in enumerate(mines_to_search):
-            mine_name = mine.get("mine_name", "")
-            country = mine.get("country", "")
-            commodity = mine.get("commodity", "")
-            region = mine.get("region", "")
+            # ERWEITERTE FIELD-MAPPING für Quebec-CSV und internationale Formate
+            mine_name = (mine.get("mine_name", "") or 
+                        mine.get("Name", "") or 
+                        mine.get("name", "") or 
+                        mine.get("Mine Name", "") or 
+                        mine.get("MINE_NAME", "") or
+                        mine.get("Mine", "") or
+                        mine.get("Site", "")).strip()
+            
+            country = (mine.get("country", "") or 
+                      mine.get("Country", "") or 
+                      mine.get("COUNTRY", "") or 
+                      mine.get("Land", "") or
+                      mine.get("Pays", "") or  # Französisch
+                      "Canada").strip()  # Quebec-Default
+            
+            commodity = (mine.get("commodity", "") or 
+                        mine.get("Commodity", "") or 
+                        mine.get("Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)", "") or
+                        mine.get("Rohstoff", "") or
+                        mine.get("Produit", "") or  # Französisch
+                        mine.get("Mineral", "")).strip()
+            
+            region = (mine.get("region", "") or 
+                     mine.get("Region", "") or 
+                     mine.get("REGION", "") or
+                     mine.get("Province", "") or
+                     mine.get("État", "") or  # Französisch
+                     "Quebec").strip()  # Quebec-Default
             
             if not mine_name:
+                logger.warning(f"[BATCH] Mine {idx+1} hat keinen Namen, überspringe. Keys: {list(mine.keys())[:5]}...")
+                logger.debug(f"[BATCH-DEBUG] Mine {idx+1} Values: {dict(list(mine.items())[:3])}")
                 continue
+                
+            # SUCCESS: Mine erfolgreich geparst
+            logger.info(f"[BATCH-SUCCESS] Mine {idx+1}: '{mine_name}' in {country}, {region}")
                 
             logger.info(f"Suche {idx+1}/{len(mines_to_search)}: {mine_name}")
             
@@ -195,25 +341,48 @@ async def batch_search(
                 
                 # Standard-Suche nur wenn nicht comprehensive
                 if comprehensive_search != "true":
-                    # Führe Standard-Suche durch
-                    if len(models_to_use) > 1:
-                        # Multi-Model-Suche
-                        result = await services.multi_search_service.search_with_multiple_models(
-                            model_ids=models_to_use,
+                    # ECHTE PROVIDER-BASIERTE SUCHE (REGEL 10: Keine Mock-Daten)
+                    try:
+                        model_id = models_to_use[0]
+                        
+                        # Verwende MineSearchService für echte Suche
+                        from minesearch.search_service import MineSearchService
+                        search_service = MineSearchService()
+                        
+                        logger.info(f"[BATCH-REAL] Starte echte Suche für {mine_name} mit {model_id}")
+                        
+                        # Führe echte Suche durch
+                        real_result = await search_service.search_mine(
                             mine_name=mine_name,
+                            model=model_id,
                             country=country,
-                            commodity=commodity,
+                            commodity=commodity, 
                             region=region
                         )
-                    else:
-                        # Single-Model-Suche
-                        result = await services.multi_search_service.search_with_model(
-                            model_id=models_to_use[0],
-                            mine_name=mine_name,
-                            country=country,
-                            commodity=commodity,
-                            region=region
-                        )
+                        
+                        if real_result.get('success'):
+                            result = {
+                                'success': True,
+                                'data': real_result.get('data', {}),
+                                'model_used': model_id,
+                                'search_duration': real_result.get('data', {}).get('search_duration', 0)
+                            }
+                            logger.info(f"[BATCH-REAL] Echte Suche erfolgreich für {mine_name} mit {model_id}")
+                        else:
+                            result = {
+                                'success': False,
+                                'error': real_result.get('error', 'Unknown search error'),
+                                'data': {}
+                            }
+                            logger.warning(f"[BATCH-REAL] Echte Suche fehlgeschlagen für {mine_name}: {real_result.get('error')}")
+                        
+                    except Exception as search_error:
+                        logger.error(f"[BATCH-REAL] Echter Such-Service fehler für {mine_name}: {str(search_error)}")
+                        result = {
+                            'success': False,
+                            'error': f"Real search failed: {str(search_error)}",
+                            'data': {}
+                        }
                     
                     # Erstelle Ergebnis
                     result_data = {

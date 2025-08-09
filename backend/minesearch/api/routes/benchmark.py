@@ -34,7 +34,7 @@ async def get_recent_search_results(
     FRONTEND-FIX 19.07.2025: Erweitert um Sortierung und Filterung
     """
     try:
-        from database import SearchResult
+        from minesearch.database import SearchResult
         from sqlalchemy import desc, asc, func
         from datetime import datetime, timedelta
         
@@ -304,7 +304,7 @@ async def get_all_benchmark_results(
         Liste von Benchmark-Ergebnissen
     """
     with db_manager.get_session() as session:
-        from database import ModelStatistics
+        from minesearch.database import ModelStatistics
         
         query = session.query(ModelStatistics)
         
@@ -423,7 +423,7 @@ async def get_field_statistics(
         Liste von Feld-Statistiken pro Modell
     """
     with db_manager.get_session() as session:
-        from database import FieldStatistics
+        from minesearch.database import FieldStatistics
         
         query = session.query(FieldStatistics)
         
@@ -473,7 +473,7 @@ async def get_benchmark_charts(
         Strukturierte Daten für verschiedene Chart-Typen
     """
     with db_manager.get_session() as session:
-        from database import ModelSummary
+        from minesearch.database import ModelSummary
         from sqlalchemy import desc
         
         query = session.query(ModelSummary)
@@ -566,7 +566,7 @@ async def get_field_comparison():
         Vergleichsdaten für alle Felder über alle Modelle mit conditional metadata
     """
     with db_manager.get_session() as session:
-        from database import FieldStatistics
+        from minesearch.database import FieldStatistics
         from sqlalchemy import func
         
         # REPARIERT 14.07.2025: SQLite-kompatible Aggregation (bool_or existiert nicht in SQLite)
@@ -675,7 +675,7 @@ async def capture_search_statistics(stats_data: Dict[str, Any]):
         
         # Erstelle ModelStatistics-Eintrag
         with db_manager.get_session() as session:
-            from database import ModelStatistics
+            from minesearch.database import ModelStatistics
             
             stat = ModelStatistics(
                 model_id=stats_data['model_id'],
@@ -707,7 +707,7 @@ async def capture_search_statistics(stats_data: Dict[str, Any]):
             logger.info(f"[BENCHMARK] API-Erfolg: {api_success}, Daten-Erfolg: {data_success}, Felder: {real_fields_count}")
             
             # ÄNDERUNG 08.07.2025: Erfasse feld-spezifische Statistiken
-            from database import FieldStatistics
+            from minesearch.database import FieldStatistics
             from config import CSV_COLUMNS
             
             # Gehe durch alle möglichen Felder
@@ -793,7 +793,7 @@ async def get_model_summaries(
         Sortierte Liste von Modell-Zusammenfassungen
     """
     with db_manager.get_session() as session:
-        from database import ModelSummary
+        from minesearch.database import ModelSummary
         from sqlalchemy import desc as sql_desc, asc as sql_asc
         
         query = session.query(ModelSummary)

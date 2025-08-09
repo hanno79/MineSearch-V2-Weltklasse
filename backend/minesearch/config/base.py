@@ -60,7 +60,8 @@ class Config(APIKeysConfig):
     if _db_url_env and _db_url_env.strip():
         DATABASE_URL = _db_url_env
     else:
-        _db_path = os.getenv('DATABASE_PATH', 'data/minesearch.db')
+        # FIX: Korrigierter DB-Pfad nach Codebase-Bereinigung
+        _db_path = os.getenv('DATABASE_PATH', 'backend/minesearch/database/mines.db')
         # Absoluten Pfad bilden, dann als sqlite URL
         _db_path_abs = (_ROOT / _db_path).resolve()
         DATABASE_URL = f"sqlite:///{_db_path_abs}"

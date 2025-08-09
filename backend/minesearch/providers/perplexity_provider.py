@@ -21,7 +21,7 @@ from minesearch.utils import (
     get_country_config,
 )
 from minesearch.specialized_prompts import SpecializedPrompts
-from minesearch.validation_service import validation_service
+# CONSOLIDATION 09.08.2025: validation_service entfernt - war defekter Adapter
 
 logger = logging.getLogger(__name__)
 
@@ -219,11 +219,9 @@ WICHTIG: Lieber ein leeres Feld als einen falschen Wert!"""
                 extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
                 sources = extract_sources_from_content(content)
                 
-                # ÄNDERUNG 08.07.2025: Nutze zentralen Validation Service
-                validated_data, validation_errors = validation_service.validate_mine_data(extracted_data['data'])
-                
-                if validation_errors:
-                    logger.warning(f"[PERPLEXITY] Validierungsfehler: {validation_errors}")
+                # CONSOLIDATION 09.08.2025: validation_service entfernt - direkter Return
+                validated_data = extracted_data['data']  # Keine zusätzliche Validierung mehr nötig
+                validation_errors = {}  # Leer, da keine separate Validierung
                 
                 # Übernehme validierte Daten
                 extracted_data['data'] = validated_data

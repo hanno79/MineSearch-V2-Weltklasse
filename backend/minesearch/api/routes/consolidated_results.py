@@ -209,7 +209,7 @@ def _calculate_best_value(value_analysis, field_name=None):
         display_val = analysis['display_value'].strip().upper()
         
         # Import is_placeholder_value für Template-Pattern-Erkennung
-        from extraction_validators import is_placeholder_value
+        from minesearch.extraction_validators import is_placeholder_value
         
         if display_val in ['X', 'N/A', 'UNBEKANNT', 'KEINE ANGABEN', 'NICHT VERFÜGBAR', '']:
             non_x_bonus = 0  # Keine Bonus für Platzhalter-Werte
@@ -266,7 +266,7 @@ def _calculate_best_value(value_analysis, field_name=None):
         'supporting_sources': best_value['unique_real_sources'][:3]  # Zeige nur ersten 3 URLs
     }
 
-@router.get("/results/consolidated")
+@router.get("/results")
 async def get_consolidated_results(
     country: Optional[str] = Query(None),
     region: Optional[str] = Query(None),
@@ -283,7 +283,7 @@ async def get_consolidated_results(
     - Alle Feldwerte mit Quellen in eckigen Klammern [Model1, Model2]
     - Details-Akkordeon zeigt Modell-spezifische Ergebnisse
     """
-    from database import db_manager
+    from minesearch.database import db_manager
     from sqlalchemy import desc as sql_desc, asc as sql_asc
     from datetime import datetime, timedelta
     
@@ -619,7 +619,7 @@ async def get_consolidated_results(
             }
         }
 
-@router.get("/results/consolidated/{mine_name}/details")
+@router.get("/results/{mine_name}/details")
 async def get_mine_model_details(
     mine_name: str,
     country: Optional[str] = Query(None),
@@ -630,7 +630,7 @@ async def get_mine_model_details(
     Hole detaillierte Modell-spezifische Ergebnisse für eine Mine
     Für das Details-Akkordeon
     """
-    from database import db_manager
+    from minesearch.database import db_manager
     from datetime import datetime, timedelta
     
     with db_manager.get_session() as session:
@@ -703,7 +703,7 @@ async def get_mine_model_details(
             }
         }
 
-@router.get("/results/consolidated/export/csv")
+@router.get("/results/export/csv")
 async def export_consolidated_csv(
     country: Optional[str] = Query(None),
     region: Optional[str] = Query(None),

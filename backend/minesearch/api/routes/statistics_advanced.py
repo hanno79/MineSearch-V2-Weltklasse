@@ -12,7 +12,7 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from minesearch.database import db_manager, SearchResult, ModelSummary
-from minesearch.source_stats_manager import source_stats_manager
+# from minesearch.source_stats_manager import source_stats_manager  # DISABLED: Module nicht vorhanden
 from minesearch.api.routes.statistics_utils import StatisticsCalculator, StatisticsAnalyzer, StatisticsTimeAnalyzer
 
 logger = logging.getLogger(__name__)

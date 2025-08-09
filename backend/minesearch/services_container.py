@@ -27,11 +27,12 @@ class ServiceContainer:
         
         # Service Instanzen (lazy loading)
         self._mine_search_service = None
-        self._enhanced_search_service = None
-        self._multi_search_service = None
         self._benchmark_service = None
-        self._web_fetch_service = None
-        self._validation_service = None
+        # CONSOLIDATION 09.08.2025: Entfernte obsolete Services:
+        # - enhanced_search_service (search_service_multi_enhanced)  
+        # - multi_search_service (search_service_multi)
+        # - validation_service (validation_service)
+        # - web_fetch_service (nicht mehr verwendet)
         
         self._initialized = True
         logger.info("[SERVICE-CONTAINER] Initialized")
@@ -45,23 +46,8 @@ class ServiceContainer:
             logger.info("[SERVICE-CONTAINER] MineSearchService created")
         return self._mine_search_service
     
-    @property
-    def enhanced_search_service(self):
-        """Lazy loading EnhancedMultiProviderSearchService"""
-        if self._enhanced_search_service is None:
-            from minesearch.search_service_multi_enhanced import EnhancedMultiProviderSearchService
-            self._enhanced_search_service = EnhancedMultiProviderSearchService()
-            logger.info("[SERVICE-CONTAINER] EnhancedMultiProviderSearchService created")
-        return self._enhanced_search_service
-    
-    @property
-    def multi_search_service(self):
-        """Lazy loading MultiProviderSearchService"""
-        if self._multi_search_service is None:
-            from minesearch.search_service_multi import MultiProviderSearchService
-            self._multi_search_service = MultiProviderSearchService()
-            logger.info("[SERVICE-CONTAINER] MultiProviderSearchService created")
-        return self._multi_search_service
+    # CONSOLIDATION 09.08.2025: enhanced_search_service und multi_search_service entfernt
+    # Alle Multi-Provider-Funktionalität ist jetzt in MineSearchService integriert
     
     @property
     def benchmark_service(self):
@@ -72,32 +58,15 @@ class ServiceContainer:
             logger.info("[SERVICE-CONTAINER] ModelBenchmarkService created")
         return self._benchmark_service
     
-    @property
-    def web_fetch_service(self):
-        """Lazy loading WebFetchService"""
-        if self._web_fetch_service is None:
-            from minesearch.web_fetch_service import WebFetchService
-            self._web_fetch_service = WebFetchService()
-            logger.info("[SERVICE-CONTAINER] WebFetchService created")
-        return self._web_fetch_service
-    
-    @property
-    def validation_service(self):
-        """Lazy loading ValidationService"""
-        if self._validation_service is None:
-            from minesearch.validation_service import ValidationService
-            self._validation_service = ValidationService()
-            logger.info("[SERVICE-CONTAINER] ValidationService created")
-        return self._validation_service
+    # CONSOLIDATION 09.08.2025: web_fetch_service und validation_service entfernt
+    # - web_fetch_service: Nicht mehr verwendet
+    # - validation_service: War defekter Adapter zu gelöschtem minesearch_v2
     
     def reset(self):
         """Reset für Tests"""
         self._mine_search_service = None
-        self._enhanced_search_service = None
-        self._multi_search_service = None
         self._benchmark_service = None
-        self._web_fetch_service = None
-        self._validation_service = None
+        # CONSOLIDATION 09.08.2025: Obsolete Service-Referenzen entfernt
         logger.info("[SERVICE-CONTAINER] Reset")
 
 # Singleton-Instanz

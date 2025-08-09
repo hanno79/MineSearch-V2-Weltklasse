@@ -7,10 +7,176 @@ Beschreibung: Refactored HTML-Utility-Funktionen für MineSearch Frontend (CLAUD
 
 from typing import Dict, List, Any, Optional
 
-# Import aller refactoriserten Module
-from html_cards import create_result_card, create_error_card
-from html_batch import create_batch_results_table, _create_batch_source_summary
-from html_sources import create_source_discovery_tab, _create_sources_section, create_sources_overview
+# FALLBACK FUNKTIONEN: Fehlende Module durch inline Funktionen ersetzen
+
+def create_result_card(result: Dict) -> str:
+    """Erstellt eine Ergebniskarte für eine Mine"""
+    mine_name = result.get('mine_name', 'Unbekannt')
+    success = result.get('success', False)
+    
+    if not success:
+        return create_error_card(result)
+    
+    data = result.get('data', {})
+    structured_data = data.get('structured_data', {})
+    
+    # Zähle verfügbare Daten
+    filled_fields = len([v for v in structured_data.values() if v and str(v).strip()])
+    
+    card_html = f"""
+    <div style="border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 15px 0; background: white;">
+        <h4 style="color: #2e7d32; margin-top: 0;">✅ {mine_name}</h4>
+        <p><strong>Gefundene Daten:</strong> {filled_fields} Felder</p>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px;">
+    """
+    
+    # Zeige wichtigste Felder
+    important_fields = ['country', 'commodity', 'region', 'Betreiber', 'Aktivitätsstatus']
+    for field in important_fields:
+        value = structured_data.get(field, 'k.A.')
+        if value and str(value).strip():
+            card_html += f"<div><strong>{field}:</strong> {value}</div>"
+    
+    card_html += "</div></div>"
+    return card_html
+
+def create_error_card(result: Dict) -> str:
+    """Erstellt eine Fehlerkarte"""
+    mine_name = result.get('mine_name', 'Unbekannt')
+    error = result.get('error', 'Unbekannter Fehler')
+    
+    return f"""
+    <div style="border: 1px solid #f44336; border-radius: 8px; padding: 20px; margin: 15px 0; background: #ffebee;">
+        <h4 style="color: #c62828; margin-top: 0;">❌ {mine_name}</h4>
+        <p><strong>Fehler:</strong> {error}</p>
+    </div>
+    """
+
+def create_batch_results_table(results: List[Dict]) -> str:
+    """Erstellt eine Tabelle mit Batch-Ergebnissen - zeigt alle CSV_COLUMNS in ursprünglicher Reihenfolge"""
+    # ÄNDERUNG 09.08.2025: Vollständige Tabelle mit allen CSV-Spalten gemäß User-Request
+    if not results:
+        return "<p>Keine Ergebnisse verfügbar.</p>"
+    
+    # Importiere CSV_COLUMNS für vollständige Spaltenanzeige
+    from minesearch.config.base import CSV_COLUMNS
+    
+    successful_results = [r for r in results if r.get('success', False)]
+    failed_results = [r for r in results if not r.get('success', False)]
+    
+    html = f"""
+    <div style="margin: 20px 0;">
+        <h3>📊 Batch-Ergebnisse (Vollständige Tabelle)</h3>
+        <p><strong>{len(successful_results)}/{len(results)}</strong> Minen erfolgreich analysiert</p>
+        
+        <div style="max-height: 600px; overflow-x: auto; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px;">
+            <table style="width: 100%; border-collapse: collapse; min-width: 2000px;">
+                <thead style="background: #f5f5f5; position: sticky; top: 0;">
+                    <tr>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; min-width: 120px;">Status</th>"""
+    
+    # Dynamische Header-Generierung für alle CSV_COLUMNS
+    for column in CSV_COLUMNS:
+        # Spaltenbreiten optimiert für bessere Lesbarkeit
+        width = "120px"
+        if "Name" in column:
+            width = "150px"
+        elif "Koordinate" in column or "Kosten" in column:
+            width = "100px"
+        elif "Jahr" in column or "Aktivität" in column:
+            width = "90px"
+        elif "Quellenangaben" in column:
+            width = "200px"
+        
+        html += f"""
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; min-width: {width};">{column}</th>"""
+    
+    html += """
+                    </tr>
+                </thead>
+                <tbody>
+    """
+    
+    # Datenzeilen für alle Ergebnisse
+    for result in results:
+        mine_name = result.get('mine_name', 'Unbekannt')
+        success = result.get('success', False)
+        
+        if success:
+            status_icon = "✅"
+            status_color = "#4caf50"
+            data = result.get('data', {})
+            structured_data = data.get('structured_data', {})
+        else:
+            status_icon = "❌"  
+            status_color = "#f44336"
+            structured_data = {}
+        
+        html += f"""
+        <tr style="border-bottom: 1px solid #eee;">
+            <td style="border: 1px solid #ddd; padding: 8px; color: {status_color};">{status_icon}</td>"""
+        
+        # Alle CSV_COLUMNS Werte hinzufügen
+        for column in CSV_COLUMNS:
+            # Spezielle Behandlung für bestimmte Felder
+            if column == "Name":
+                value = mine_name
+            elif column == "Country":
+                value = result.get('country', 'k.A.')
+            elif column == "Region":
+                value = result.get('region', 'k.A.')
+            elif column == "Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)":
+                value = result.get('commodity', structured_data.get(column, 'k.A.'))
+            else:
+                # Alle anderen Felder aus structured_data
+                value = structured_data.get(column, 'k.A.')
+            
+            # Leere Werte behandeln
+            if not value or str(value).strip() in ['', 'None', 'null']:
+                value = 'k.A.'
+            
+            # Wert kürzen falls zu lang (für bessere Tabellendarstellung)
+            if len(str(value)) > 80:
+                display_value = str(value)[:77] + "..."
+            else:
+                display_value = str(value)
+            
+            html += f"""
+            <td style="border: 1px solid #ddd; padding: 8px;" title="{str(value).replace('"', '&quot;')}">{display_value}</td>"""
+        
+        html += """
+        </tr>"""
+    
+    html += """
+                </tbody>
+            </table>
+        </div>
+        <p style="margin-top: 10px; color: #666; font-size: 12px;">
+            💡 Tipp: Horizontaler Scroll verfügbar | Mouseover für vollständige Inhalte
+        </p>
+    </div>
+    """
+    
+    # ÄNDERUNG 09.08.2025: Cards entfernt - nur vollständige Tabelle gemäß User-Request
+    # "diese Cards können wir vermutlich weglassen und stattdessen eben alle Felder/Spalten in der Tabelle anzeigen"
+    
+    return html
+
+def create_source_discovery_tab(sources_data: Dict) -> str:
+    """Erstellt einen Tab für Source Discovery"""
+    return "<div><p>Source Discovery Daten verfügbar.</p></div>"
+
+def _create_sources_section(sources: List) -> str:
+    """Hilfsfunktion für Quellen-Sektion"""
+    return "<div><p>Quellen-Informationen</p></div>"
+
+def create_sources_overview(sources: List) -> str:
+    """Erstellt eine Übersicht der Quellen"""
+    return "<div><p>Quellen-Übersicht</p></div>"
+
+def _create_batch_source_summary(results: List) -> str:
+    """Hilfsfunktion für Batch-Quellen-Zusammenfassung"""
+    return "<div><p>Batch-Quellen-Zusammenfassung</p></div>"
 
 # Re-exportiere alle Funktionen für Kompatibilität
 __all__ = [

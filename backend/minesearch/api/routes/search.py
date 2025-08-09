@@ -16,8 +16,8 @@ from ..models import MineSearchRequest, MineSearchResponse, MultiSearchRequest, 
 
 # Backend Services (package‑relative imports)
 from minesearch.search_service import MineSearchService
-from minesearch.search_service_multi import multi_search_service
-from minesearch.search_service_multi_enhanced import EnhancedMultiProviderSearchService
+# CONSOLIDATION 09.08.2025: multi_search_service und EnhancedMultiProviderSearchService entfernt
+# Alle Multi-Provider-Funktionalität ist jetzt in MineSearchService integriert
 from minesearch.providers.registry import provider_registry
 from minesearch.model_benchmark_service import ModelBenchmarkService
 from minesearch.search_utils import count_filled_fields
@@ -261,7 +261,7 @@ async def smart_search(request: SmartSearchRequest):
         
         # Speichere Ergebnis
         if result.get('success') and result.get('data'):
-            from database import db_manager
+            from minesearch.database import db_manager
             try:
                 models_used = ", ".join(result.get('models_used', []))
                 db_manager.save_search_result(
@@ -301,7 +301,7 @@ async def enhanced_search(request: MineSearchRequest):
         
         # Speichere Ergebnis
         if result.get('success') and result.get('data'):
-            from database import db_manager
+            from minesearch.database import db_manager
             try:
                 db_manager.save_search_result(
                     mine_name=mine_name,

@@ -15,9 +15,8 @@ from collections import defaultdict
 
 from minesearch.database import db_manager
 from minesearch.database.models import ModelStatistics, FieldStatistics, FieldConsistency, ModelSummary
-from minesearch.search_service_multi import multi_search_service
-from minesearch.search_service import search_service
-from minesearch.search_service_multi_enhanced import enhanced_search_service
+# CONSOLIDATION 09.08.2025: Multi-Service-Imports entfernt  
+from minesearch.search_service import search_service  # Nur noch der Hauptservice
 from minesearch.providers.registry import provider_registry
 from minesearch.config import CSV_COLUMNS
 
@@ -365,7 +364,7 @@ class ModelBenchmarkService:
         if not sources:
             return
             
-        from database import db_manager
+        from minesearch.database import db_manager
         from urllib.parse import urlparse
         
         # Update max 5 sources to avoid spam
