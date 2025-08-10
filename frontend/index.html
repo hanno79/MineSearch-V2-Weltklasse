@@ -2402,8 +2402,9 @@ function displayGroupedSources(data, currentSort = 'count', currentOrder = 'desc
     `;
     
     grouped_sources.forEach(source => {
-        const averageScore = source.avg_score ? source.avg_score.toFixed(1) : 'N/A';
-        const successRate = source.success_rate ? (source.success_rate).toFixed(1) + '%' : 'N/A';
+        // ÄNDERUNG 10.08.2025: Korrektur der API-Feldnamen - avg_reliability_score statt avg_score
+        const averageScore = source.avg_reliability_score ? source.avg_reliability_score.toFixed(1) : 'N/A';
+        const successRate = source.avg_success_rate ? (source.avg_success_rate).toFixed(1) + '%' : 'N/A';
         
         // SYNTAX-FIX: Escape domain für onclick-Handler außerhalb Template-String
         const escapedDomain = safeJSONStringify(source.domain);
@@ -2416,7 +2417,7 @@ function displayGroupedSources(data, currentSort = 'count', currentOrder = 'desc
                 <td>${successRate}</td>
                 <td>${source.total_searches || 0}</td>
                 <td>
-                    <button onclick="toggleSourceDetails(${escapedDomain})" 
+                    <button onclick='toggleSourceDetails(event, ${escapedDomain})' 
                             style="background: #3b82f6; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">
                         📊 Details
                     </button>
@@ -4954,19 +4955,32 @@ async function loadDomainSources(domain, contentDiv) {
 }
 
 // DETAILS ACCORDION AGENT: Enhanced Source Details with Full Metadata Display
-window.toggleSourceDetails = coordinateUIEvent('DetailsToggle', async function(domain) {
+window.toggleSourceDetails = coordinateUIEvent('DetailsToggle', async function(event, domain) {
     const detailsRow = document.getElementById(`details-${domain}`);
     const contentDiv = document.getElementById(`content-${domain}`);
-    const button = event.target.closest('button');
+    const button = event?.target?.closest('button') || event?.currentTarget;
     
     if (!detailsRow || !contentDiv) {
         console.error(`❌ Details elements not found for domain: ${domain}`);
         return;
     }
     
+    // Bestimme den aktiven Button (mit Fallback-Mechanismus)
+    let activeButton = button;
+    if (!activeButton) {
+        console.warn(`⚠️ Button not found via event, trying fallback for domain: ${domain}`);
+        activeButton = document.querySelector(`button[onclick*="${domain}"]`);
+        if (activeButton) {
+            console.log(`✅ Found button via fallback for domain: ${domain}`);
+        } else {
+            console.error(`❌ No button found for domain: ${domain}`);
+            return;
+        }
+    }
+    
     // Verhindere mehrfache schnelle Klicks
-    if (button.disabled) return;
-    button.disabled = true;
+    if (activeButton.disabled) return;
+    activeButton.disabled = true;
     
     try {
         // Enhanced Toggle Logic with Animation
@@ -4980,9 +4994,9 @@ window.toggleSourceDetails = coordinateUIEvent('DetailsToggle', async function(d
             uiCoordinationState.activeDetails.add(domain);
             
             // Update Button State with icons
-            button.innerHTML = '<span class="button-icon">⏳</span><span class="button-text">Lädt...</span>';
-            button.style.background = '#f59e0b';
-            button.style.transform = 'scale(1.05)';
+            activeButton.innerHTML = '<span class="button-icon">⏳</span><span class="button-text">Lädt...</span>';
+            activeButton.style.background = '#f59e0b';
+            activeButton.style.transform = 'scale(1.05)';
             
             // Show Row with enhanced Animation
             detailsRow.style.display = 'table-row';
@@ -5000,9 +5014,9 @@ window.toggleSourceDetails = coordinateUIEvent('DetailsToggle', async function(d
             await loadEnhancedSourceDetails(domain, contentDiv);
             
             // Update Button to "Close" State with animation
-            button.innerHTML = '<span class="button-icon">📊</span><span class="button-text">Schließen ▲</span>';
-            button.style.background = '#dc2626';
-            button.style.transform = 'scale(1)';
+            activeButton.innerHTML = '<span class="button-icon">📊</span><span class="button-text">Schließen ▲</span>';
+            activeButton.style.background = '#dc2626';
+            activeButton.style.transform = 'scale(1)';
             
         } else {
             // SCHLIESSEN: Verstecke Details mit Animation
@@ -5011,9 +5025,9 @@ window.toggleSourceDetails = coordinateUIEvent('DetailsToggle', async function(d
             // Remove from active details tracking
             uiCoordinationState.activeDetails.delete(domain);
             
-            button.innerHTML = '<span class="button-icon">📊</span><span class="button-text">Details</span>';
-            button.style.background = '#3b82f6'; // Blau für "öffnen"
-            button.style.transform = 'scale(1)';
+            activeButton.innerHTML = '<span class="button-icon">📊</span><span class="button-text">Details</span>';
+            activeButton.style.background = '#3b82f6'; // Blau für "öffnen"
+            activeButton.style.transform = 'scale(1)';
             
             // Entferne Animation-Klasse
             detailsRow.classList.remove('expanded');
@@ -5025,12 +5039,12 @@ window.toggleSourceDetails = coordinateUIEvent('DetailsToggle', async function(d
         }
     } catch (error) {
         console.error('Error toggling source details:', error);
-        button.innerHTML = '📊 Details';
-        button.style.background = '#3b82f6';
+        activeButton.innerHTML = '📊 Details';
+        activeButton.style.background = '#3b82f6';
     } finally {
         // Re-enable button nach kurzer Verzögerung
         setTimeout(() => {
-            button.disabled = false;
+            activeButton.disabled = false;
         }, 100);
         console.log(`🎯 Details Toggle completed for ${domain}. Active details: ${Array.from(uiCoordinationState.activeDetails).join(', ')}`);
     }
@@ -5183,14 +5197,21 @@ async function loadEnhancedSourceDetails(domain, contentDiv) {
     `;
     
     try {
-        // Fetch detailed source data - KORRIGIERT: Richtiger Endpoint
+        // ÄNDERUNG 10.08.2025: Fetch mit Timeout und verbesserten Headers
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 Sekunden Timeout
+        
         const response = await fetch(`${API_BASE_URL}/api/sources/by-domain/${encodeURIComponent(domain)}?_cache_bust=${Date.now()}`, {
+            signal: controller.signal,
             headers: {
+                'Accept': 'application/json',
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
                 'Expires': '0'
             }
         });
+        
+        clearTimeout(timeoutId);
         
         if (!response.ok) {
             // Graceful Error Handling ohne Console-Spam
@@ -5205,22 +5226,61 @@ async function loadEnhancedSourceDetails(domain, contentDiv) {
             }
         }
         
-        const data = await response.json();
+        // ÄNDERUNG 10.08.2025: Robustes JSON-Parsing mit detailliertem Error-Handling
+        let data;
+        let responseText;
         
-        if (data.success && data.sources && data.sources.length > 0) {
-            displayEnhancedSourceDetails(domain, data, contentDiv);
-        } else if (data.success && data.sources && data.sources.length === 0) {
+        try {
+            responseText = await response.text();
+            console.log(`[JSON-DEBUG] Response text length: ${responseText.length} characters`);
+            
+            if (!responseText || responseText.trim() === '') {
+                throw new Error('Leere Response vom Server erhalten');
+            }
+            
+            // Prüfe auf truncated JSON (häufigste Ursache für "unexpected end of input")
+            if (!responseText.trim().endsWith('}') && !responseText.trim().endsWith(']')) {
+                console.warn(`[JSON-WARNING] Response scheint abgeschnitten zu sein. Letzten 50 Zeichen: "${responseText.slice(-50)}"`);
+                throw new Error('Response scheint unvollständig zu sein');
+            }
+            
+            data = JSON.parse(responseText);
+            console.log(`[JSON-DEBUG] Successfully parsed JSON, success: ${data.success}`);
+            
+        } catch (jsonError) {
+            console.error(`[JSON-ERROR] Fehler beim Parsen der JSON-Response:`, jsonError);
+            console.error(`[JSON-ERROR] Response Text (erste 200 Zeichen): "${responseText ? responseText.substring(0, 200) : 'undefined'}"`);
+            
+            displaySourceDetailsGenericError(domain, `JSON-Parsing-Fehler: ${jsonError.message}`, contentDiv);
+            return;
+        }
+        
+        // ÄNDERUNG 10.08.2025: Angepasst für neue API-Response-Struktur
+        const responseData = data.data || data; // Fallback für alte API-Struktur
+        
+        if (data.success && responseData.sources && responseData.sources.length > 0) {
+            console.log(`[DETAILS-SUCCESS] Loading ${responseData.sources.length} sources for domain: ${domain}`);
+            displayEnhancedSourceDetails(domain, responseData, contentDiv);
+        } else if (data.success && responseData.sources && responseData.sources.length === 0) {
+            console.log(`[DETAILS-EMPTY] No sources found for domain: ${domain}`);
             displaySourceDetailsEmpty(domain, contentDiv);
         } else {
+            console.warn(`[DETAILS-ERROR] API error for domain: ${domain}`, data);
             displaySourceDetailsError(domain, data.error || 'Unbekannter Fehler', contentDiv);
         }
         
     } catch (error) {
-        // Robustes Error-Handling ohne Console-Spam
-        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        // ÄNDERUNG 10.08.2025: Erweiteres Error-Handling für verschiedene Fehlertypen
+        console.error(`[FETCH-ERROR] Details-Loading failed for domain: ${domain}`, error);
+        
+        if (error.name === 'AbortError') {
+            displaySourceDetailsGenericError(domain, 'Request-Timeout: Server antwortet nicht rechtzeitig (15s)', contentDiv);
+        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
             displaySourceDetailsNetworkError(domain, contentDiv);
+        } else if (error.message.includes('JSON')) {
+            displaySourceDetailsGenericError(domain, `Daten-Parsing-Fehler: ${error.message}`, contentDiv);
         } else {
-            displaySourceDetailsGenericError(domain, error.message, contentDiv);
+            displaySourceDetailsGenericError(domain, `Unbekannter Fehler: ${error.message}`, contentDiv);
         }
     }
 }
@@ -5331,14 +5391,35 @@ function displaySourceDetailsGenericError(domain, errorMessage, contentDiv) {
 
 // SOURCE DETAILS ARCHITECT: Comprehensive Source Details with Enhanced Analytics & Visualizations
 function displayEnhancedSourceDetails(domain, data, contentDiv) {
-    const sources = data.sources || [];
-    const totalSources = sources.length;
-    
-    // Calculate comprehensive statistics
-    const stats = calculateSourceStatistics(sources, data);
-    const performanceMetrics = calculateFieldPerformance(sources);
-    const scoreBreakdown = calculateScoreBreakdown(sources);
-    const usageAnalytics = calculateUsageAnalytics(sources);
+    try {
+        const sources = data.sources || [];
+        const totalSources = sources.length;
+        
+        // DEFENSIVE: Validiere Input-Daten
+        if (!sources || !Array.isArray(sources)) {
+            console.error(`[DISPLAY-ERROR] Invalid sources data for domain: ${domain}`, sources);
+            displaySourceDetailsGenericError(domain, 'Ungültige Quelldaten erhalten', contentDiv);
+            return;
+        }
+        
+        console.log(`[DISPLAY-SUCCESS] Rendering details for ${totalSources} sources in domain: ${domain}`);
+        
+        // Calculate comprehensive statistics mit Error-Handling
+        let stats, performanceMetrics, scoreBreakdown, usageAnalytics;
+        
+        try {
+            stats = calculateSourceStatistics(sources, data);
+            performanceMetrics = calculateFieldPerformance(sources);
+            scoreBreakdown = calculateScoreBreakdown(sources);
+            usageAnalytics = calculateUsageAnalytics(sources);
+        } catch (calcError) {
+            console.error(`[CALC-ERROR] Statistics calculation failed for domain: ${domain}`, calcError);
+            // Fallback: Verwende einfache Statistiken
+            stats = { avgReliability: 0, successRate: 0, lastActivity: 'Unbekannt', successfulSources: 0 };
+            performanceMetrics = { fieldsFound: 0, coverage: 0 };
+            scoreBreakdown = { weightedScore: 0, minScore: 0, maxScore: 0 };
+            usageAnalytics = { totalUsage: 0, avgPerSource: 0 };
+        }
     
     let detailsHTML = `
         <div class="source-details-architect-container" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 0; margin: 0;">
@@ -5491,12 +5572,17 @@ function displayEnhancedSourceDetails(domain, data, contentDiv) {
         </div>
     `;
     
-    contentDiv.innerHTML = detailsHTML;
-    
-    // Initialize interactive features
-    initializeSourceDetailsInteractivity(domain);
-    
-    console.log(`✅ SOURCE DETAILS ARCHITECT: Enhanced Details loaded for ${domain}: ${totalSources} sources with comprehensive analytics`);
+        contentDiv.innerHTML = detailsHTML;
+        
+        // Initialize interactive features
+        initializeSourceDetailsInteractivity(domain);
+        
+        console.log(`✅ SOURCE DETAILS ARCHITECT: Enhanced Details loaded for ${domain}: ${totalSources} sources with comprehensive analytics`);
+        
+    } catch (displayError) {
+        console.error(`[DISPLAY-FATAL] Critical error displaying details for domain: ${domain}`, displayError);
+        displaySourceDetailsGenericError(domain, `Rendering-Fehler: ${displayError.message}`, contentDiv);
+    }
 }
 
 // SOURCE DETAILS ARCHITECT: Analytics & Statistics Functions

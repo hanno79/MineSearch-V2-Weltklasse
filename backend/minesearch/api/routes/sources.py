@@ -179,6 +179,106 @@ async def get_source_by_id(source_id: int):
             "data": source.to_dict()
         }
 
+@router.get("/sources/by-domain/{domain}")
+async def get_sources_by_domain(domain: str):
+    """
+    ÄNDERUNG 10.08.2025: Neuer Endpoint für Domain-spezifische Quellen-Details
+    Hole alle Quellen und detaillierte Informationen für eine spezifische Domain
+    """
+    from minesearch.database import db_manager
+    
+    # Input-Validierung
+    if not domain or domain.strip() == "":
+        raise HTTPException(status_code=400, detail="Domain darf nicht leer sein")
+    
+    domain = domain.strip()
+    logger.info(f"[SOURCES BY DOMAIN] Fetching details for domain: {domain}")
+    
+    try:
+        with db_manager.get_session() as session:
+            # Hole alle Quellen für die Domain
+            sources_query = session.query(Source).filter(Source.domain == domain)
+            sources = sources_query.all()
+            
+            if not sources:
+                logger.warning(f"[SOURCES BY DOMAIN] No sources found for domain: {domain}")
+                raise HTTPException(status_code=404, detail=f"Keine Quellen für Domain '{domain}' gefunden")
+            
+            # Berechne detaillierte Domain-Statistiken
+            total_sources = len(sources)
+            total_searches = sum(s.total_searches for s in sources)
+            successful_searches = sum(s.successful_searches for s in sources) 
+            avg_reliability = sum(s.reliability_score for s in sources) / total_sources
+            success_rate = (successful_searches / total_searches * 100) if total_searches > 0 else 0
+            
+            # Sammle zusätzliche Metadaten
+            countries = list(set(s.country for s in sources if s.country))
+            source_types = list(set(s.source_type for s in sources))
+            recent_access = any(s.last_successful_access for s in sources)
+            
+            # Erstelle detaillierte Response - optimiert für Performance bei großen Domains
+            sources_data = []
+            for source in sources:
+                source_dict = source.to_dict()
+                
+                # Berechne spezifische Metriken pro Quelle (optimiert)
+                source_dict['individual_success_rate'] = round(
+                    source.successful_searches / source.total_searches * 100 
+                    if source.total_searches > 0 else 0, 2
+                )
+                
+                # Optimiere last_access_days_ago Berechnung
+                if source.last_successful_access and source.created_at:
+                    try:
+                        source_dict['last_access_days_ago'] = (source.last_successful_access - source.created_at).days
+                    except (TypeError, AttributeError):
+                        source_dict['last_access_days_ago'] = None
+                else:
+                    source_dict['last_access_days_ago'] = None
+                    
+                # Entferne potentiell große/unnötige Felder für bessere Performance
+                if 'typical_content_types' in source_dict and not source_dict['typical_content_types']:
+                    source_dict['typical_content_types'] = []
+                    
+                sources_data.append(source_dict)
+            
+            # Sortiere Quellen nach Zuverlässigkeit
+            sources_data.sort(key=lambda x: x['reliability_score'], reverse=True)
+            
+            result = {
+                "domain": domain,
+                "summary": {
+                    "total_sources": total_sources,
+                    "total_searches": total_searches,
+                    "successful_searches": successful_searches,
+                    "avg_reliability_score": round(avg_reliability, 2),
+                    "success_rate_percent": round(success_rate, 2),
+                    "countries_covered": countries,
+                    "source_types": source_types,
+                    "has_recent_access": recent_access
+                },
+                "sources": sources_data,
+                "metadata": {
+                    "best_source": sources_data[0] if sources_data else None,
+                    "worst_source": sources_data[-1] if sources_data else None,
+                    "total_countries": len(countries),
+                    "total_source_types": len(source_types)
+                }
+            }
+            
+            logger.info(f"[SOURCES BY DOMAIN] Successfully fetched {total_sources} sources for domain: {domain}")
+            
+            return {
+                "success": True,
+                "data": result
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[SOURCES BY DOMAIN] Error fetching sources for domain {domain}: {e}")
+        raise HTTPException(status_code=500, detail=f"Interner Server-Fehler: {str(e)}")
+
 @router.post("/sources/search")
 async def search_sources_for_mine(
     mine_name: str = Body(...),
