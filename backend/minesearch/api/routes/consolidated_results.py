@@ -703,6 +703,163 @@ async def get_mine_model_details(
             }
         }
 
+@router.get("/mine/{mine_name}")
+async def get_mine_consolidated_details(
+    mine_name: str,
+    days_back: int = Query(30),
+    exclude_exa: bool = Query(True)
+):
+    """
+    Hole konsolidierte Details für eine spezifische Mine
+    Frontend Compatibility Route: /api/consolidated/mine/{name}
+    """
+    from minesearch.database import db_manager
+    from datetime import datetime, timedelta
+    
+    with db_manager.get_session() as session:
+        query = session.query(SearchResult).filter(SearchResult.mine_name == mine_name)
+        
+        # Filter anwenden
+        if exclude_exa:
+            query = query.filter(~SearchResult.model_used.like('exa:%'))
+        
+        # Zeitfilter
+        if days_back > 0:
+            cutoff = datetime.now() - timedelta(days=days_back)
+            query = query.filter(SearchResult.search_timestamp >= cutoff)
+        
+        results = query.all()
+        
+        if not results:
+            raise HTTPException(status_code=404, detail=f"Keine konsolidierten Daten für Mine '{mine_name}' gefunden")
+        
+        # Wiederverwendung der Konsolidierungs-Logik aus get_consolidated_results
+        mine_data = {
+            'mine_name': mine_name,
+            'country': '',
+            'region': '',
+            'consolidated_fields': {},
+            'model_results': [],
+            'model_count': 0,
+            'last_updated': None,
+            'total_sources': 0,
+            'source_mapping': {}
+        }
+        
+        # Process all results for this mine
+        for result in results:
+            # Basis-Informationen setzen
+            mine_data['country'] = result.country or mine_data['country']
+            mine_data['region'] = result.region or mine_data['region']
+            mine_data['model_count'] += 1
+            
+            # Letzte Aktualisierung
+            if not mine_data['last_updated'] or result.search_timestamp > mine_data['last_updated']:
+                mine_data['last_updated'] = result.search_timestamp
+            
+            # Quellen zählen
+            mine_data['total_sources'] += len(result.sources or [])
+            
+            # Felder konsolidieren
+            if result.structured_data:
+                for original_field_name, field_value in result.structured_data.items():
+                    final_field_name, processed_value = _consolidate_and_rename_field(original_field_name, field_value)
+                    
+                    # Only process non-X values
+                    has_real_data = (processed_value and str(processed_value).strip() and 
+                                   str(processed_value).strip().upper() != 'X')
+                    
+                    if final_field_name not in mine_data['consolidated_fields']:
+                        mine_data['consolidated_fields'][final_field_name] = {
+                            'raw_values': [],
+                            'ai_models': [],
+                            'real_sources': [],
+                            'value_details': []
+                        }
+                    
+                    if has_real_data:
+                        clean_value = str(processed_value).strip()
+                        
+                        # Extract real data sources
+                        real_sources = []
+                        if result.sources:
+                            for source in result.sources:
+                                if isinstance(source, str) and ('http' in source or 'www.' in source):
+                                    real_sources.append(source)
+                                elif isinstance(source, dict) and source.get('url'):
+                                    real_sources.append(source['url'])
+                        
+                        mine_data['consolidated_fields'][final_field_name]['raw_values'].append(clean_value)
+                        mine_data['consolidated_fields'][final_field_name]['ai_models'].append(result.model_used)
+                        mine_data['consolidated_fields'][final_field_name]['real_sources'].append(real_sources)
+                        mine_data['consolidated_fields'][final_field_name]['value_details'].append({
+                            'value': clean_value,
+                            'ai_model': result.model_used,
+                            'real_sources': real_sources,
+                            'search_timestamp': result.search_timestamp,
+                            'data_quality': result.data_quality or {},
+                            'search_duration': result.search_duration or 0
+                        })
+        
+        # Implementiere "Best Value" Algorithmus
+        best_values = {}
+        detailed_breakdown = {}
+        
+        for field_name, field_info in mine_data['consolidated_fields'].items():
+            # Analysiere alle Werte für dieses Feld
+            value_analysis = _analyze_field_values(field_info['value_details'])
+            
+            # Bestimme besten Wert
+            best_value_info = _calculate_best_value(value_analysis, field_name)
+            
+            # Speichere besten Wert (ohne Metadaten-Felder)
+            metadaten_felder = ['Mine', 'Land', 'Zuverlässigkeit', 'Modelle', 'Letzte Aktualisierung', 'Details']
+            if field_name not in metadaten_felder:
+                display_value = best_value_info['display_value']
+                if not display_value or display_value.strip().upper() in ['', 'X', 'N/A', 'KEINE ANGABEN', 'NICHT VERFÜGBAR']:
+                    display_value = 'Unbekannt'
+                best_values[field_name] = display_value
+            
+            # Detaillierte Aufschlüsselung
+            detailed_breakdown[field_name] = {
+                'best_value': best_value_info,
+                'all_values': value_analysis,
+                'statistics': {
+                    'total_sources': len(set([detail['ai_model'] for detail in field_info['value_details']])),
+                    'unique_values': len(value_analysis),
+                    'confidence_score': best_value_info['confidence_score'],
+                    'total_real_sources': sum(len(detail['real_sources']) for detail in field_info['value_details'])
+                }
+            }
+        
+        # Calculate overall confidence
+        confidence_scores = [details['best_value']['confidence_score'] 
+                           for details in detailed_breakdown.values() 
+                           if details['best_value']['confidence_score'] > 0]
+        overall_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0
+        
+        # Source summary for compatibility with frontend modal
+        source_summary = {
+            'total_unique_sources': mine_data['total_sources'],
+            'total_models': mine_data['model_count']
+        }
+        
+        return {
+            "success": True,
+            "data": {
+                "mine_name": mine_name,
+                "country": mine_data['country'],
+                "region": mine_data['region'],
+                "best_values": best_values,
+                "detailed_breakdown": detailed_breakdown,
+                "overall_confidence": round(overall_confidence, 1),
+                "source_summary": source_summary,
+                "model_count": mine_data['model_count'],
+                "last_updated": mine_data['last_updated'].isoformat() if mine_data['last_updated'] else None,
+                "total_sources": mine_data['total_sources']
+            }
+        }
+
 @router.get("/results/export/csv")
 async def export_consolidated_csv(
     country: Optional[str] = Query(None),

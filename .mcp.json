@@ -6,7 +6,10 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "/app"],
       "transport": "stdio",
-      "scope": "project"
+      "scope": "project",
+      "timeout": 30000,
+      "retries": 2,
+      "errorHandling": "graceful"
     },
     "github": {
       "description": "GitHub Integration für Repository-Verwaltung",
@@ -14,6 +17,9 @@
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "transport": "stdio",
       "scope": "project",
+      "timeout": 30000,
+      "retries": 2,
+      "errorHandling": "graceful",
       "env": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN}"
       }
@@ -23,31 +29,37 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-memory"],
       "transport": "stdio",
-      "scope": "project"
-    },
-    "taskmanager": {
-      "description": "Task-Management und To-Do-Listen Verwaltung",
-      "url": "https://server.smithery.ai/@kazuph/mcp-taskmanager/mcp?api_key=4b9fe93e-542f-464a-99be-6df27bb558ef",
-      "transport": "sse",
-      "scope": "project"
-    },
-    "context7": {
-      "description": "Kontext-Management und Speicher für langfristige Projekt-Informationen",
-      "url": "https://server.smithery.ai/@upstash/context7-mcp/mcp?api_key=4b9fe93e-542f-464a-99be-6df27bb558ef",
-      "transport": "sse",
-      "scope": "project"
-    },
-    "playwright": {
-      "description": "Browser-Automatisierung und Web-Testing mit Playwright",
-      "url": "https://server.smithery.ai/@cloudflare/playwright-mcp/mcp?api_key=4b9fe93e-542f-464a-99be-6df27bb558ef",
-      "transport": "sse",
-      "scope": "project"
+      "scope": "project",
+      "timeout": 30000,
+      "retries": 2,
+      "errorHandling": "graceful"
     },
     "puppeteer": {
-      "command": "node",
-      "args": [
-        "/usr/lib/node_modules/@modelcontextprotocol/server-puppeteer/dist/index.js"
-      ]
+      "description": "Puppeteer Browser-Automatisierung für Tests und Scraping",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
+      "transport": "stdio",
+      "scope": "project",
+      "timeout": 30000,
+      "retries": 2,
+      "errorHandling": "graceful"
+    },
+    "ref": {
+      "description": "Ref.tools - Referenz und Code-Dokumentations-Tools",
+      "url": "https://api.ref.tools/mcp?apiKey=ref-8f290247572d4a37c54c",
+      "transport": "http",
+      "scope": "project",
+      "timeout": 30000,
+      "retries": 3,
+      "errorHandling": "graceful"
     }
+  },
+  "globalSettings": {
+    "logLevel": "info",
+    "errorHandling": "graceful",
+    "fallbackMode": true,
+    "healthCheckInterval": 60000,
+    "enableHealthChecks": true,
+    "healthCheckTimeout": 10000
   }
 }

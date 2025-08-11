@@ -1,0 +1,4 @@
+CHANGELOG — Pickaxe + Magnifier Icon
+2025-08-10 15:30:56
+- Initial creation of favicon set (SVG, ICO, PNGs).
+- Implemented backup-on-overwrite, logging, and high-res master downscaling.

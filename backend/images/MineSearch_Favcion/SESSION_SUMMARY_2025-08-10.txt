@@ -1,0 +1,6 @@
+Session Summary
+- User chose design #1: Pickaxe + Magnifier (fits mining + research).
+- Style: minimal, dark graphite with amber accent, transparent BG.
+- Deliverables: favicon.ico (multi-size), favicon.svg, and PNG sizes; README + changelog.
+- Integration snippet provided for HTML <head> and Express static hosting.
+- No external sources used (original design).

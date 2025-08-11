@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background is transparent -->
+  <!-- Pickaxe handle -->
+  <g transform="translate(28,18) rotate(-65)">
+    <rect x="-2.2" y="-15" width="4.4" height="36" rx="2.2" fill="#2E2E2E"/>
+  </g>
+
+  <!-- Pickaxe head -->
+  <g transform="translate(16,17) rotate(25)">
+    <path d="M -20 -3 C -18 -5, 18 -5, 20 -3 L 21 -1 C 21 1, -21 1, -21 -1 Z" fill="#2E2E2E"/>
+  </g>
+
+  <!-- Magnifying lens ring -->
+  <circle cx="36" cy="36" r="16" stroke="#2E2E2E" stroke-width="3.2" fill="none"/>
+  <!-- Accent arc -->
+  <path d="M 49 31 A 16 16 0 0 1 46 25" stroke="#FFC107" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+
+  <!-- Magnifier handle -->
+  <g transform="translate(36,36) rotate(45)">
+    <rect x="6" y="0" width="14" height="4.4" rx="2.2" fill="#2E2E2E"/>
+  </g>
+</svg>
