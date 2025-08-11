@@ -87,15 +87,7 @@ OPENROUTER_MODELS = {
         'supports_web_search': False,
         'is_free': True
     },
-    'horizon-beta': {
-        'id': 'openrouter/horizon-beta',
-        'name': 'Horizon Beta (Experimentell)',
-        'timeout': 120,
-        'max_tokens': 8000,
-        'description': 'Experimentelles Horizon Beta Modell - Neueste Generation für Mining-Datenextraktion',
-        'supports_web_search': False,
-        'is_free': True
-    },
+    # DEPRECATED 11.08.2025: horizon-beta entfernt - Modell deprecated
     'minimax-m1': {
         'id': 'minimax/minimax-m1',
         'name': 'MiniMax M1',
@@ -591,46 +583,10 @@ GROK_MODELS = {
         'supports_web_search': True,
         'is_free': False
     },
-    # MODEL-FIX 15.07.2025: Fehlende Grok-Modelle hinzugefügt
-    'grok-2': {
-        'id': 'grok-2',
-        'name': 'Grok 2',
-        'timeout': 120,
-        'max_tokens': 8000,
-        'description': 'xAI Grok 2 - Bewährtes Modell mit Web-Zugriff',
-        'supports_web_search': True,
-        'supports_deep_research': False,
-        'is_free': False
-    },
-    'grok-2-mini': {
-        'id': 'grok-2-mini',
-        'name': 'Grok 2 Mini',
-        'timeout': 60,
-        'max_tokens': 4000,
-        'description': 'xAI Grok 2 Mini - Kosteneffiziente Version',
-        'supports_web_search': True,
-        'is_free': False
-    },
-    'grok-beta': {
-        'id': 'grok-beta',
-        'name': 'Grok Beta',
-        'timeout': 90,
-        'max_tokens': 6000,
-        'description': 'xAI Grok Beta - Experimentelle Features',
-        'supports_web_search': True,
-        'supports_deep_research': False,
-        'is_free': False
-    },
-    'grok-vision-beta': {
-        'id': 'grok-vision-beta',
-        'name': 'Grok Vision Beta',
-        'timeout': 90,
-        'max_tokens': 6000,
-        'description': 'xAI Grok Vision Beta - Multimodal mit Bildverarbeitung',
-        'supports_web_search': True,
-        'supports_deep_research': False,
-        'is_free': False
-    }
+    # DEPRECATED 11.08.2025: grok-2 entfernt - Modell deprecated
+    # DEPRECATED 11.08.2025: grok-2-mini entfernt - Modell deprecated
+    # DEPRECATED 11.08.2025: grok-beta entfernt - Modell deprecated
+    # DEPRECATED 11.08.2025: grok-vision-beta entfernt - Modell deprecated
 }
 
 # ENTFERNT 06.08.2025: DeepSeek-Duplikate eliminiert
