@@ -1,0 +1,157 @@
+/**
+ * Author: rahn
+ * Datum: 12.08.2025  
+ * Version: 1.0
+ * Beschreibung: TAB-AUTOLOADER System für MineSearch 2.0 Tab-Navigation
+ */
+
+/**
+ * Auto-Loading System für Tab-Inhalte
+ * Lädt automatisch Daten beim ersten Besuch eines Tabs
+ */
+const TabAutoLoader = {
+    loadedTabs: new Set(['single']), // Single-Tab ist default geladen
+    
+    /**
+     * Initialisiert das Auto-Loading-System
+     */
+    initialize() {
+        console.log('🔄 [TAB-AUTOLOADER] Initializing tab auto-loading system...');
+        
+        // Event Listener für alle Tab Radio Buttons
+        const tabInputs = document.querySelectorAll('.tab-navigation input[type="radio"]');
+        tabInputs.forEach(tabInput => {
+            tabInput.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    this.handleTabChange(e.target.id);
+                }
+            });
+        });
+        
+        // Initial load für default tab
+        this.handleTabChange('single-tab');
+    },
+    
+    /**
+     * Behandelt Tab-Wechsel und triggert Auto-Loading
+     */
+    handleTabChange(tabId) {
+        const tabName = tabId.replace('-tab', '');
+        console.log(`🔄 [TAB-AUTOLOADER] Switching to tab: ${tabName}`);
+        
+        // Update CSS-Klassen für Tab-Anzeige
+        this.updateTabDisplay(tabName);
+        
+        // Prüfe ob Tab bereits geladen wurde
+        if (!this.loadedTabs.has(tabName)) {
+            console.log(`📥 [TAB-AUTOLOADER] First visit to ${tabName} tab - auto-loading data...`);
+            this.loadTabData(tabName);
+            this.loadedTabs.add(tabName);
+        } else {
+            console.log(`✅ [TAB-AUTOLOADER] Tab ${tabName} already loaded`);
+        }
+    },
+    
+    /**
+     * Aktualisiert CSS-Klassen für Tab-Display
+     */
+    updateTabDisplay(activeTabName) {
+        console.log(`🎨 [TAB-AUTOLOADER] Updating tab display for: ${activeTabName}`);
+        
+        // 1. Container-Klassen aktualisieren
+        const container = document.querySelector('.container');
+        if (container) {
+            // Entferne alle Tab-Klassen
+            const tabClasses = ['tab-single', 'tab-csv', 'tab-sources', 'tab-statistics', 'tab-consolidated'];
+            container.classList.remove(...tabClasses);
+            
+            // Füge aktive Tab-Klasse hinzu
+            container.classList.add(`tab-${activeTabName}`);
+            console.log(`✅ [TAB-AUTOLOADER] Set container class to: tab-${activeTabName}`);
+        }
+        
+        // 2. Tab-Content-Sections verwalten - KRITISCH für Sichtbarkeit
+        const allTabContents = document.querySelectorAll('.tab-content');
+        allTabContents.forEach(tabContent => {
+            tabContent.classList.remove('active');
+        });
+        
+        // Aktiviere nur den gewünschten Tab
+        const targetTabMap = {
+            'single': 'single-search',
+            'csv': 'csv-upload', 
+            'sources': 'sources',
+            'statistics': 'statistics',
+            'consolidated': 'consolidated'
+        };
+        
+        const targetTabId = targetTabMap[activeTabName];
+        const activeTab = document.getElementById(targetTabId);
+        
+        if (activeTab) {
+            activeTab.classList.add('active');
+            console.log(`✅ [TAB-AUTOLOADER] Activated tab content: ${targetTabId}`);
+        } else {
+            console.error(`❌ [TAB-AUTOLOADER] Tab content not found: ${targetTabId}`);
+        }
+    },
+    
+    /**
+     * Lädt Daten für einen spezifischen Tab
+     */
+    loadTabData(tabName) {
+        switch(tabName) {
+            case 'sources':
+                console.log('📚 [TAB-AUTOLOADER] Loading sources data...');
+                if (typeof loadSources === 'function') {
+                    loadSources();
+                } else {
+                    console.error('❌ [TAB-AUTOLOADER] loadSources function not found');
+                }
+                break;
+                
+            case 'statistics':
+                console.log('📊 [TAB-AUTOLOADER] Loading statistics data...');
+                if (typeof loadModelStatistics === 'function') {
+                    loadModelStatistics();
+                } else {
+                    console.error('❌ [TAB-AUTOLOADER] loadModelStatistics function not found');
+                }
+                break;
+                
+            case 'consolidated':
+                console.log('📋 [TAB-AUTOLOADER] Loading consolidated results...');
+                if (typeof loadConsolidatedResults === 'function') {
+                    loadConsolidatedResults();
+                } else {
+                    console.error('❌ [TAB-AUTOLOADER] loadConsolidatedResults function not found');
+                }
+                break;
+                
+            case 'csv':
+                console.log('📊 [TAB-AUTOLOADER] CSV tab - no auto-loading needed');
+                break;
+                
+            case 'single':
+                console.log('🔍 [TAB-AUTOLOADER] Single search tab - no auto-loading needed');
+                break;
+                
+            default:
+                console.warn(`⚠️ [TAB-AUTOLOADER] Unknown tab: ${tabName}`);
+        }
+    }
+};
+
+// Auto-Initialize TabAutoLoader when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        TabAutoLoader.initialize();
+    });
+} else {
+    TabAutoLoader.initialize();
+}
+
+console.log('🔄 [TAB-AUTOLOADER] Tab Auto-Loading System loaded');
+
+// Export für globale Verfügbarkeit
+window.TabAutoLoader = TabAutoLoader;

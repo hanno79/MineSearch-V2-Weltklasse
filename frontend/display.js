@@ -195,7 +195,7 @@ async function loadConsolidatedResults(sortBy = 'mine_name', order = 'asc') {
  * DISPLAY COMPREHENSIVE MODEL STATISTICS: Zeigt detaillierte Modell-Statistiken
  */
 function displayComprehensiveModelStatistics(data) {
-    console.log('📊 [STATISTICS] Displaying comprehensive model statistics');
+    console.log('📊 [STATISTICS] Displaying comprehensive model statistics with DATA-CARDS');
     
     const targetElement = document.getElementById('model-statistics-table-container');
     if (!targetElement) {
@@ -209,48 +209,8 @@ function displayComprehensiveModelStatistics(data) {
         return;
     }
     
-    let html = `
-        <div class="statistics-header">
-            <h3>📊 Modell-Statistiken (${models.length} Modelle)</h3>
-        </div>
-        <div class="statistics-table">
-            <table class="consolidated-table">
-                <thead>
-                    <tr>
-                        <th>Modell</th>
-                        <th>Provider</th>
-                        <th>Score</th>
-                        <th>Erfolg</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-    
-    models.forEach(model => {
-        const successRate = model.success_rate || 0;
-        const score = model.overall_score || 0;
-        
-        html += `
-            <tr>
-                <td><strong>${model.model_id || 'Unbekannt'}</strong></td>
-                <td>${model.provider || 'Unbekannt'}</td>
-                <td><span class="score">${score.toFixed(1)}</span></td>
-                <td><span class="success-rate">${successRate.toFixed(1)}%</span></td>
-                <td><span class="status ${model.is_active ? 'active' : 'inactive'}">
-                    ${model.is_active ? 'Aktiv' : 'Inaktiv'}
-                </span></td>
-            </tr>
-        `;
-    });
-    
-    html += `
-                </tbody>
-            </table>
-        </div>
-    `;
-    
-    targetElement.innerHTML = html;
+    // 🚀 REVOLUTION: Verwende moderne Data-Cards für Modell-Statistiken
+    renderDataCardGrid(models, targetElement, 'model_stats');
 }
 
 /**
@@ -361,7 +321,7 @@ window.loadModelStatistics = async function() {
  * GROUPED SOURCES DISPLAY: Zeigt gruppierte Quellen-Daten
  */
 function displayGroupedSources(data, currentSort = 'count', currentOrder = 'desc') {
-    console.log(`🎨 [DISPLAY] Rendering grouped sources (${data.grouped_sources?.length || 0} groups)`);
+    console.log(`🎨 [DISPLAY] Rendering grouped sources with DATA-CARDS (${data.grouped_sources?.length || 0} groups)`);
     
     const container = document.getElementById('sources-table-container');
     if (!container) return;
@@ -374,100 +334,18 @@ function displayGroupedSources(data, currentSort = 'count', currentOrder = 'desc
         return;
     }
     
-    let html = `
-        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0; color: #374151;">📊 Quellen-Übersicht</h3>
-            <div>
-                <strong>${data.total_sources || 0}</strong> Quellen aus <strong>${data.grouped_sources.length}</strong> Domains
-            </div>
-        </div>
-        
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb;">
-                <thead style="background: #f9fafb;">
-                    <tr>
-                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb;">
-                            <a href="#" onclick="loadSources('domain', '${currentSort === 'domain' && currentOrder === 'asc' ? 'desc' : 'asc'}'); return false;"
-                               style="color: #374151; text-decoration: none; font-weight: 600;">
-                                Domain ${currentSort === 'domain' ? (currentOrder === 'asc' ? '↑' : '↓') : ''}
-                            </a>
-                        </th>
-                        <th style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-                            <a href="#" onclick="loadSources('count', '${currentSort === 'count' && currentOrder === 'desc' ? 'asc' : 'desc'}'); return false;"
-                               style="color: #374151; text-decoration: none; font-weight: 600;">
-                                Anzahl ${currentSort === 'count' ? (currentOrder === 'desc' ? '↓' : '↑') : ''}
-                            </a>
-                        </th>
-                        <th style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-                            <a href="#" onclick="loadSources('avg_reliability_score', '${currentSort === 'avg_reliability_score' && currentOrder === 'desc' ? 'asc' : 'desc'}'); return false;"
-                               style="color: #374151; text-decoration: none; font-weight: 600;">
-                                Ø Zuverlässigkeit ${currentSort === 'avg_reliability_score' ? (currentOrder === 'desc' ? '↓' : '↑') : ''}
-                            </a>
-                        </th>
-                        <th style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">Details</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-    
-    data.grouped_sources.forEach((source, index) => {
-        const domain = source.domain || 'Unknown';
-        const count = source.count || 0;
-        const avgScore = source.avg_reliability_score || 0;
-        const successRate = source.avg_success_rate || 0;
-        
-        const scoreColor = avgScore >= 80 ? '#059669' : avgScore >= 60 ? '#0891b2' : avgScore >= 40 ? '#ea580c' : '#dc2626';
-        const escapedDomain = safeJSONStringify(domain);
-        
-        // Main source row
-        html += `
-            <tr style="background: ${index % 2 === 1 ? '#f9fafb' : 'white'};">
-                <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-weight: 500;">
-                    ${sanitizeHTML(domain)}
-                </td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-                    <span style="font-weight: bold; color: #374151;">${count}</span>
-                </td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-                    <span style="color: ${scoreColor}; font-weight: bold;">${avgScore.toFixed(1)}%</span>
-                    <br>
-                    <small style="color: #6b7280;">${successRate.toFixed(1)}% Erfolg</small>
-                </td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-                    <button onclick='toggleSourceDetails(event, ${escapedDomain})' 
-                            style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                        Details
-                    </button>
-                </td>
-            </tr>
-            <tr id="details-${domain}" class="accordion-details-row" style="display: none;">
-                <td colspan="4" style="padding: 0; border: none;">
-                    <div id="content-${domain}" style="padding: 16px; background: #f8fafc; border-left: 4px solid #3b82f6; margin: 8px;">
-                        <div class="loading-spinner" style="text-align: center; padding: 20px;">
-                            <span style="color: #6b7280;">📊 Lade Details für ${sanitizeHTML(domain)}...</span>
-                        </div>
-                    </div>
-                </td>
-            </tr>
-        `;
-    });
-    
-    html += `
-                </tbody>
-            </table>
-        </div>
-    `;
-    
-    container.innerHTML = html;
+    // 🚀 REVOLUTION: Verwende moderne Data-Cards für Quellen-Übersicht
+    renderDataCardGrid(data.grouped_sources, container, 'sources');
 }
 
 /**
- * RESULTS TABLE DISPLAY: Zeigt Suchergebnisse in Tabelle
+ * RESULTS TABLE DISPLAY: Zeigt Suchergebnisse mit modernen Data-Cards
+ * PHASE 3: TABELLEN-REVOLUTION - Ersetzt hässliche HTML-Tabelle
  */
 function displayResultsTable(results, sortBy, order) {
-    console.log(`🎨 [DISPLAY] Rendering results table (${results?.length || 0} results)`);
+    console.log(`🎨 [DISPLAY] Rendering results with DATA-CARDS (${results?.length || 0} results)`);
     
-    const container = document.getElementById('results-table-container');
+    const container = document.getElementById('results');
     if (!container) return;
     
     if (!results || results.length === 0) {
@@ -478,82 +356,15 @@ function displayResultsTable(results, sortBy, order) {
         return;
     }
     
-    const successfulResults = results.filter(r => r.success).length;
-    
-    let html = `
-        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0; color: #374151;">🔍 Suchergebnisse</h3>
-            <div>
-                <strong>${successfulResults}</strong> von <strong>${results.length}</strong> Suchen erfolgreich
-            </div>
-        </div>
-        
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb;">
-                <thead style="background: #f9fafb;">
-                    <tr>
-                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; font-weight: 600;">Mine</th>
-                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; font-weight: 600;">Modell</th>
-                        <th style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 600;">Status</th>
-                        <th style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 600;">Felder</th>
-                        <th style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 600;">Datum</th>
-                        <th style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 600;">Aktionen</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-    
-    results.forEach((result, index) => {
-        const mineName = result.mine_name || 'Unbekannt';
-        const modelName = result.model_name || 'Unbekannt';
-        const success = result.success;
-        const fieldsCount = result.structured_data ? Object.keys(result.structured_data).length : 0;
-        const timestamp = result.search_timestamp ? new Date(result.search_timestamp).toLocaleString('de-DE') : 'Unbekannt';
-        
-        const statusColor = success ? '#059669' : '#dc2626';
-        const statusText = success ? 'Erfolgreich' : 'Fehlgeschlagen';
-        
-        html += `
-            <tr style="background: ${index % 2 === 1 ? '#f9fafb' : 'white'};">
-                <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-weight: 500;">
-                    ${sanitizeHTML(mineName)}
-                </td>
-                <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
-                    ${sanitizeHTML(modelName)}
-                </td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-                    <span style="color: ${statusColor}; font-weight: bold;">${statusText}</span>
-                </td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-                    <span style="font-weight: bold;">${fieldsCount}</span>
-                </td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb; font-size: 12px;">
-                    ${timestamp}
-                </td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-                    <button onclick='viewResultDetail(${index}, ${JSON.stringify(result)})' 
-                            style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                        Details
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
-    
-    html += `
-                </tbody>
-            </table>
-        </div>
-    `;
-    
-    container.innerHTML = html;
+    // 🚀 REVOLUTION: Verwende moderne Data-Cards statt hässlicher Tabelle  
+    renderDataCardGrid(results, container, 'search_result');
 }
 
 /**
  * CONSOLIDATED RESULTS DISPLAY: Zeigt konsolidierte Ergebnisse
  */
 function displayConsolidatedResults(data, sortBy, order) {
-    console.log(`🎨 [DISPLAY] Rendering consolidated results (${data.consolidated_results?.length || 0} mines)`);
+    console.log(`🎨 [DISPLAY] Rendering consolidated results with DATA-CARDS (${data.consolidated_results?.length || 0} mines)`);
     
     const container = document.getElementById('consolidated-table-container');
     if (!container) return;
@@ -566,65 +377,8 @@ function displayConsolidatedResults(data, sortBy, order) {
         return;
     }
     
-    let html = `
-        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0; color: #374151;">📈 Konsolidierte Ergebnisse</h3>
-            <div>
-                <strong>${data.consolidated_results.length}</strong> Minen konsolidiert
-            </div>
-        </div>
-        
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb;">
-                <thead style="background: #f9fafb;">
-                    <tr>
-                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; font-weight: 600;">Mine</th>
-                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; font-weight: 600;">Land</th>
-                        <th style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 600;">Felder</th>
-                        <th style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 600;">Quellen</th>
-                        <th style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 600;">Aktionen</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-    
-    data.consolidated_results.forEach((result, index) => {
-        const mineName = result.mine_name || 'Unbekannt';
-        const country = result.best_values?.country || 'Unbekannt';
-        const fieldsCount = result.best_values ? Object.keys(result.best_values).length : 0;
-        const sourcesCount = result.source_summary?.total_unique_sources || 0;
-        
-        html += `
-            <tr style="background: ${index % 2 === 1 ? '#f9fafb' : 'white'};">
-                <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-weight: 500;">
-                    ${sanitizeHTML(mineName)}
-                </td>
-                <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
-                    ${sanitizeHTML(country)}
-                </td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-                    <span style="font-weight: bold;">${fieldsCount}</span>
-                </td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-                    <span style="font-weight: bold;">${sourcesCount}</span>
-                </td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-                    <button onclick='viewConsolidatedDetail("${mineName.replace(/"/g, '\\"')}")' 
-                            style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                        Details
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
-    
-    html += `
-                </tbody>
-            </table>
-        </div>
-    `;
-    
-    container.innerHTML = html;
+    // 🚀 REVOLUTION: Verwende moderne Data-Cards statt hässlicher Tabelle
+    renderDataCardGrid(data.consolidated_results, container, 'consolidated');
 }
 
 // ============================================
