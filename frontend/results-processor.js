@@ -18,6 +18,18 @@
 function displayResults(data) {
     console.log('📊 [RESULTS] Displaying search results');
     
+    // CRITICAL DEBUG: Log exact data structure
+    console.log('🔍 [DEBUG] Data structure analysis:');
+    console.log('  data exists:', !!data);
+    console.log('  data.success:', data?.success);
+    console.log('  data.data exists:', !!data?.data);
+    console.log('  data.data.results exists:', !!data?.data?.results);
+    console.log('  data.data.results is array:', Array.isArray(data?.data?.results));
+    console.log('  data keys:', data ? Object.keys(data) : 'no data');
+    if (data?.data) {
+        console.log('  data.data keys:', Object.keys(data.data));
+    }
+    
     const resultsDiv = document.getElementById('results');
     if (!resultsDiv) {
         console.error('❌ [RESULTS] Results div not found');
@@ -938,6 +950,13 @@ async function displayMultiModelComparison(successfulResults, fullData) {
     const resultsDiv = document.getElementById('results');
     
     try {
+        // CRITICAL FIX: Check if comparison engine is available
+        if (typeof window.generateComparison !== 'function') {
+            console.warn('⚠️ [PHASE 4] Comparison engine not available, falling back to simple display');
+            displaySimpleMultiModelResults(successfulResults, fullData);
+            return;
+        }
+        
         // Generate comparison using Phase 4 engine
         const comparison = await window.generateComparison(successfulResults);
         
@@ -1161,7 +1180,78 @@ function toggleIndividualResults() {
     }
 }
 
+/**
+ * SIMPLE MULTI-MODEL DISPLAY: Fallback function for when comparison engine is not available
+ */
+function displaySimpleMultiModelResults(successfulResults, fullData) {
+    console.log(`📊 [SIMPLE] Displaying ${successfulResults.length} successful results without comparison`);
+    
+    const resultsDiv = document.getElementById('results');
+    
+    let resultsHTML = `
+        <div class="simple-multi-model-results">
+            <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #10b981; margin-bottom: 20px;">
+                <h3 style="color: #059669; margin: 0 0 10px 0;">✅ Multi-Model-Suchergebnisse</h3>
+                <p style="color: #047857; margin: 0;">
+                    ${successfulResults.length} von ${fullData.total_models || successfulResults.length} Modellen haben erfolgreich gesucht
+                </p>
+                <p style="color: #047857; margin: 5px 0 0 0; font-size: 0.9em;">
+                    ${fullData.search_query || 'Multi-Model Search'} • ${new Date().toLocaleString()}
+                </p>
+            </div>
+    `;
+    
+    successfulResults.forEach((result, index) => {
+        resultsHTML += `
+            <div class="model-result-card" style="margin: 15px 0; padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px; background: white;">
+                <h4 style="margin: 0 0 10px 0; color: #374151;">
+                    🤖 ${result.model_id}
+                    <span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; margin-left: 10px;">
+                        Erfolgreich
+                    </span>
+                </h4>
+                
+                ${result.data && result.data.structured_data ? `
+                    <div style="background: #f9fafb; padding: 10px; border-radius: 6px; margin: 10px 0;">
+                        <strong>📋 Strukturierte Daten:</strong>
+                        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 8px; font-size: 0.9em;">
+                            ${Object.entries(result.data.structured_data).slice(0, 8).map(([key, value]) => `
+                                <div style="font-weight: 600; color: #4b5563;">${key}:</div>
+                                <div style="color: #6b7280;">${value || 'k.A.'}</div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                ${result.sources && result.sources.length > 0 ? `
+                    <div style="margin-top: 10px;">
+                        <strong>🔗 Quellen (${result.sources.length}):</strong>
+                        <div style="margin-top: 5px; font-size: 0.85em;">
+                            ${result.sources.slice(0, 3).map(source => `
+                                <div style="color: #059669;">• ${source}</div>
+                            `).join('')}
+                            ${result.sources.length > 3 ? `<div style="color: #6b7280;">... und ${result.sources.length - 3} weitere</div>` : ''}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                ${result.search_duration ? `
+                    <div style="margin-top: 10px; font-size: 0.85em; color: #6b7280;">
+                        ⏱️ Suchdauer: ${(result.search_duration / 1000).toFixed(1)}s
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    });
+    
+    resultsHTML += `</div>`;
+    
+    safeSetHTML(resultsDiv, resultsHTML);
+    console.log('✅ [SIMPLE] Simple multi-model results displayed successfully');
+}
+
 // Export Phase 4 functions
+window.displaySimpleMultiModelResults = displaySimpleMultiModelResults;
 window.displayMultiModelComparison = displayMultiModelComparison;
 window.displaySingleModelFromMulti = displaySingleModelFromMulti;
 window.displayMultiModelErrors = displayMultiModelErrors;

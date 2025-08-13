@@ -23,10 +23,14 @@ function startSingleSearch() {
         return;
     }
     
-    // Hole Search-Optionen
-    const twoPhaseEnabled = document.getElementById('two_phase_enabled').checked;
-    const smartSearchEnabled = document.getElementById('smart_search_enabled').checked;
-    const comprehensiveSearchEnabled = document.getElementById('comprehensive_search_enabled').checked;
+    // Hole Search-Optionen (mit Null-Checks für fehlende Elements)
+    const twoPhaseElement = document.getElementById('two_phase_enabled');
+    const smartSearchElement = document.getElementById('smart_search_enabled');  
+    const comprehensiveElement = document.getElementById('comprehensive_search_enabled');
+    
+    const twoPhaseEnabled = twoPhaseElement ? twoPhaseElement.checked : false;
+    const smartSearchEnabled = smartSearchElement ? smartSearchElement.checked : false;
+    const comprehensiveSearchEnabled = comprehensiveElement ? comprehensiveElement.checked : false;
     
     const formData = new FormData(document.getElementById('single-search-form'));
     
@@ -75,7 +79,7 @@ function startSingleSearch() {
         }
         
         if (data.success) {
-            displayResults(data.data);
+            displayResults(data);  // CRITICAL FIX: Pass full data object, not just data.data
             showNotification(`✅ ${searchTypeText} erfolgreich abgeschlossen`, 'success');
         } else {
             console.error(`❌ [SEARCH] API Error:`, data.error);
@@ -96,13 +100,14 @@ function startSingleSearch() {
 }
 
 /**
- * BATCH SEARCH: Startet eine Batch-Suche mit CSV-Upload
+ * BATCH SEARCH: Startet eine Batch-Suche mit 2-Schritt-Workflow (CSV Upload + Batch Search)
+ * ÄNDERUNG 13.08.2025: Implementierung des korrekten Backend-Workflows
  */
-function startBatchSearch() {
-    const formData = new FormData(document.getElementById('batch-search-form'));
+async function startBatchSearch() {
+    const formData = new FormData(document.getElementById('csv-form'));
     
     // Validiere Eingaben
-    const csvFile = formData.get('csv_file');
+    const csvFile = formData.get('file');
     const selectedModels = Array.from(document.querySelectorAll('input[name="model"]:checked')).map(cb => cb.value);
     
     if (!csvFile || csvFile.size === 0) {
@@ -115,20 +120,14 @@ function startBatchSearch() {
         return;
     }
     
-    // Hole Batch-Search-Optionen
-    const twoPhaseEnabled = document.getElementById('batch_two_phase_enabled').checked;
-    const smartSearchEnabled = document.getElementById('batch_smart_search_enabled').checked;
-    const comprehensiveSearchEnabled = document.getElementById('batch_comprehensive_search_enabled').checked;
+    // Hole Batch-Search-Optionen (mit Null-Checks für fehlende Elements)
+    const batchTwoPhaseElement = document.getElementById('batch_two_phase_enabled');
+    const batchSmartSearchElement = document.getElementById('batch_smart_search_enabled');
+    const batchComprehensiveElement = document.getElementById('batch_comprehensive_search_enabled');
     
-    // Füge Modelle zur FormData hinzu
-    selectedModels.forEach(model => {
-        formData.append('selected_models', model);
-    });
-    
-    // Füge Search-Optionen hinzu
-    formData.append('twoPhase', twoPhaseEnabled);
-    formData.append('smartSearch', smartSearchEnabled);
-    formData.append('comprehensive', comprehensiveSearchEnabled);
+    const twoPhaseEnabled = batchTwoPhaseElement ? batchTwoPhaseElement.checked : false;
+    const smartSearchEnabled = batchSmartSearchElement ? batchSmartSearchElement.checked : false;
+    const comprehensiveSearchEnabled = batchComprehensiveElement ? batchComprehensiveElement.checked : false;
     
     let searchTypeText = "Batch Standard-Suche";
     if (comprehensiveSearchEnabled) {
@@ -141,40 +140,98 @@ function startBatchSearch() {
     
     console.log(`📊 [BATCH-SEARCH] Starte ${searchTypeText} mit ${selectedModels.length} Modellen`);
     
-    const resultsDiv = document.getElementById('results');
-    showLoadingMessage(resultsDiv, `${searchTypeText} läuft...`, 
-        `CSV-Datei: ${csvFile.name} | Modelle: ${selectedModels.length}`, 
+    const resultsDiv = document.getElementById('batch-results');
+    showLoadingMessage(resultsDiv, `CSV wird hochgeladen...`, 
+        `CSV-Datei: ${csvFile.name} | Vorbereitung für ${selectedModels.length} Modelle`, 
         true
     );
     
-    // Timer wird bereits durch showLoadingMessage(startTimer=true) gestartet
-    console.log('🕒 [BATCH-TIMER] Timer should be started by showLoadingMessage');
-    
-    fetch(`${window.API_BASE_URL}/api/batch-search`, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.text())
-    .then(data => {
-        console.log(`✅ [BATCH-SEARCH] Response received`);
+    try {
+        // SCHRITT 1: CSV UPLOAD - Erstelle Session ID
+        console.log('📤 [BATCH-STEP-1] Uploading CSV file...');
         
+        const uploadFormData = new FormData();
+        uploadFormData.append('csv_file', csvFile);
+        
+        const uploadResponse = await fetch(`${window.API_BASE_URL}/api/upload-csv`, {
+            method: 'POST',
+            body: uploadFormData
+        });
+        
+        if (!uploadResponse.ok) {
+            throw new Error(`CSV Upload fehlgeschlagen: ${uploadResponse.status}`);
+        }
+        
+        // Extract session_id from HTML response (backend sends HTML with hidden session_id field)
+        const uploadHtml = await uploadResponse.text();
+        console.log(`✅ [BATCH-STEP-1] CSV uploaded successfully, HTML length: ${uploadHtml.length}`);
+        
+        // Extract session_id from HTML using regex
+        const sessionIdMatch = uploadHtml.match(/name="session_id"\s+value="([^"]+)"/);
+        if (!sessionIdMatch) {
+            throw new Error('Session ID konnte nicht aus Upload-Response extrahiert werden');
+        }
+        
+        const sessionId = sessionIdMatch[1];
+        console.log(`🎯 [BATCH-STEP-1] Session ID extracted: ${sessionId}`);
+        
+        // Update UI for batch search phase
+        showLoadingMessage(resultsDiv, `${searchTypeText} läuft...`, 
+            `Session: ${sessionId.substring(0, 8)}... | Verarbeitung mit ${selectedModels.length} Modellen`, 
+            false // Don't restart timer, continue from upload phase
+        );
+        
+        // SCHRITT 2: BATCH SEARCH mit Session ID
+        console.log('🔍 [BATCH-STEP-2] Starting batch search with session ID...');
+        
+        const batchFormData = new FormData();
+        batchFormData.append('session_id', sessionId);
+        batchFormData.append('search_type', comprehensiveSearchEnabled ? 'comprehensive' : 'standard');
+        batchFormData.append('search_all', 'false'); // Default
+        batchFormData.append('count', '10'); // Default count
+        
+        // Add selected models as comma-separated string
+        batchFormData.append('selected_models', selectedModels.join(','));
+        
+        // Add search options
+        batchFormData.append('twoPhase', twoPhaseEnabled.toString());
+        batchFormData.append('smartSearch', smartSearchEnabled.toString());
+        batchFormData.append('comprehensive', comprehensiveSearchEnabled.toString());
+        
+        const batchResponse = await fetch(`${window.API_BASE_URL}/api/batch-search`, {
+            method: 'POST',
+            body: batchFormData
+        });
+        
+        if (!batchResponse.ok) {
+            const errorText = await batchResponse.text();
+            console.error(`❌ [BATCH-STEP-2] Batch search failed: ${batchResponse.status}`, errorText);
+            throw new Error(`Batch-Suche fehlgeschlagen (${batchResponse.status}): ${errorText}`);
+        }
+        
+        const batchResultsHtml = await batchResponse.text();
+        console.log(`✅ [BATCH-STEP-2] Batch search completed, HTML length: ${batchResultsHtml.length}`);
+        
+        // Stop timer
         if (typeof window.searchTimer !== 'undefined' && window.searchTimer.stop) {
             window.searchTimer.stop();
         }
         
-        resultsDiv.innerHTML = data;
+        // Display results using safeSetHTML for proper HTML rendering
+        safeSetHTML(resultsDiv, batchResultsHtml);
         showNotification(`✅ ${searchTypeText} erfolgreich abgeschlossen`, 'success');
-    })
-    .catch(error => {
+        
+    } catch (error) {
         console.error(`❌ [BATCH-SEARCH] Error:`, error);
         
+        // Stop timer
         if (typeof window.searchTimer !== 'undefined' && window.searchTimer.stop) {
             window.searchTimer.stop();
         }
         
         resultsDiv.innerHTML = createErrorHTML('Batch-Suche fehlgeschlagen', error.message);
         showNotification(`❌ Batch-Suche fehlgeschlagen: ${error.message}`, 'error');
-    });
+    }
 }
 
 // ============================================
