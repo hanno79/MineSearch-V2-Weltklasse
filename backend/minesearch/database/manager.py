@@ -59,7 +59,11 @@ class DatabaseManager:
                 # Verwende Domain aus URL falls nicht gegeben
                 if not domain:
                     domain = parsed.netloc
-            except Exception:
+            except (ValueError, AttributeError) as e:
+                logger.debug(f"[DB] URL-Parsing-Fehler für '{url}': {e}")
+                base_url = url
+            except Exception as e:
+                logger.warning(f"[DB] Unerwarteter Fehler beim URL-Parsing: {e}")
                 base_url = url
         else:
             # Spezialbehandlung für Document-Search

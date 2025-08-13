@@ -1,0 +1,117 @@
+{
+  "timestamp": "2025-08-13T09:19:35.290Z",
+  "summary": {
+    "total": 8,
+    "passed": 2,
+    "failed": 6,
+    "totalErrors": 7
+  },
+  "results": [
+    {
+      "name": "1. Startseite laden",
+      "status": "PASSED",
+      "duration": 420,
+      "timestamp": "2025-08-13T09:19:17.602Z"
+    },
+    {
+      "name": "2. Grundlegende UI-Elemente prüfen",
+      "status": "FAILED",
+      "duration": 5014,
+      "error": "Waiting for selector `#searchContainer` failed: Waiting failed: 5000ms exceeded",
+      "timestamp": "2025-08-13T09:19:22.616Z"
+    },
+    {
+      "name": "3. Model-Selection Dropdown testen",
+      "status": "FAILED",
+      "duration": 5000,
+      "error": "Waiting for selector `#modelSelect` failed: Waiting failed: 5000ms exceeded",
+      "timestamp": "2025-08-13T09:19:27.823Z"
+    },
+    {
+      "name": "4. Such-Funktionalität testen",
+      "status": "FAILED",
+      "duration": 6546,
+      "error": "Waiting for selector `#searchQuery` failed: Waiting failed: 5000ms exceeded",
+      "timestamp": "2025-08-13T09:19:34.572Z"
+    },
+    {
+      "name": "5. Tab-System testen",
+      "status": "FAILED",
+      "duration": 1,
+      "error": "No element found for selector: #searchTab",
+      "timestamp": "2025-08-13T09:19:34.790Z"
+    },
+    {
+      "name": "6. Data-Cards System prüfen",
+      "status": "FAILED",
+      "duration": 1,
+      "error": "No element found for selector: #searchTab",
+      "timestamp": "2025-08-13T09:19:34.988Z"
+    },
+    {
+      "name": "7. JavaScript-Fehler prüfen",
+      "status": "PASSED",
+      "duration": 2,
+      "timestamp": "2025-08-13T09:19:35.171Z"
+    },
+    {
+      "name": "8. Responsive Design testen",
+      "status": "FAILED",
+      "duration": 2,
+      "error": "this.page.waitForTimeout is not a function",
+      "timestamp": "2025-08-13T09:19:35.173Z"
+    }
+  ],
+  "errors": [
+    {
+      "type": "console-error",
+      "message": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "timestamp": "2025-08-13T09:19:17.413Z"
+    },
+    {
+      "type": "test-error",
+      "test": "2. Grundlegende UI-Elemente prüfen",
+      "message": "Waiting for selector `#searchContainer` failed: Waiting failed: 5000ms exceeded",
+      "timestamp": "2025-08-13T09:19:22.616Z"
+    },
+    {
+      "type": "test-error",
+      "test": "3. Model-Selection Dropdown testen",
+      "message": "Waiting for selector `#modelSelect` failed: Waiting failed: 5000ms exceeded",
+      "timestamp": "2025-08-13T09:19:27.823Z"
+    },
+    {
+      "type": "test-error",
+      "test": "4. Such-Funktionalität testen",
+      "message": "Waiting for selector `#searchQuery` failed: Waiting failed: 5000ms exceeded",
+      "timestamp": "2025-08-13T09:19:34.572Z"
+    },
+    {
+      "type": "test-error",
+      "test": "5. Tab-System testen",
+      "message": "No element found for selector: #searchTab",
+      "timestamp": "2025-08-13T09:19:34.790Z"
+    },
+    {
+      "type": "test-error",
+      "test": "6. Data-Cards System prüfen",
+      "message": "No element found for selector: #searchTab",
+      "timestamp": "2025-08-13T09:19:34.988Z"
+    },
+    {
+      "type": "test-error",
+      "test": "8. Responsive Design testen",
+      "message": "this.page.waitForTimeout is not a function",
+      "timestamp": "2025-08-13T09:19:35.173Z"
+    }
+  ],
+  "screenshots": [
+    "01_startseite_geladen_1755076757422.png",
+    "error_2._Grundlegende_UI-Elemente_prüfen_1755076762617.png",
+    "error_3._Model-Selection_Dropdown_testen_1755076767823.png",
+    "error_4._Such-Funktionalität_testen_1755076774572.png",
+    "error_5._Tab-System_testen_1755076774790.png",
+    "error_6._Data-Cards_System_prüfen_1755076774988.png",
+    "error_8._Responsive_Design_testen_1755076775173.png"
+  ]
+}

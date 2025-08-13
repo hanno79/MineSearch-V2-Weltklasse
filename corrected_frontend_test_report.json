@@ -1,0 +1,128 @@
+{
+  "timestamp": "2025-08-13T09:21:13.092Z",
+  "testVersion": "1.1 - Korrigierte DOM-Selektoren",
+  "summary": {
+    "total": 10,
+    "passed": 4,
+    "failed": 6,
+    "totalErrors": 6,
+    "criticalErrors": 0
+  },
+  "results": [
+    {
+      "name": "1. Startseite laden und initialisieren",
+      "status": "FAILED",
+      "duration": 239,
+      "error": "this.page.waitForTimeout is not a function",
+      "timestamp": "2025-08-13T09:21:10.565Z"
+    },
+    {
+      "name": "2. Header und grundlegende UI-Elemente prüfen",
+      "status": "PASSED",
+      "duration": 214,
+      "timestamp": "2025-08-13T09:21:10.979Z"
+    },
+    {
+      "name": "3. Model-Selection System prüfen",
+      "status": "PASSED",
+      "duration": 842,
+      "timestamp": "2025-08-13T09:21:11.821Z"
+    },
+    {
+      "name": "4. Tab-System testen",
+      "status": "FAILED",
+      "duration": 30,
+      "error": "Node is either not clickable or not an Element",
+      "timestamp": "2025-08-13T09:21:11.851Z"
+    },
+    {
+      "name": "5. Such-Funktionalität und Formular testen",
+      "status": "FAILED",
+      "duration": 14,
+      "error": "Node is either not clickable or not an Element",
+      "timestamp": "2025-08-13T09:21:12.082Z"
+    },
+    {
+      "name": "6. JavaScript-Module und Exception-Handler validieren",
+      "status": "PASSED",
+      "duration": 231,
+      "timestamp": "2025-08-13T09:21:12.538Z"
+    },
+    {
+      "name": "7. Statistics Tab und Daten-Laden testen",
+      "status": "FAILED",
+      "duration": 9,
+      "error": "Node is either not clickable or not an Element",
+      "timestamp": "2025-08-13T09:21:12.547Z"
+    },
+    {
+      "name": "8. Sources Tab und Quellen-System testen",
+      "status": "FAILED",
+      "duration": 15,
+      "error": "Node is either not clickable or not an Element",
+      "timestamp": "2025-08-13T09:21:12.764Z"
+    },
+    {
+      "name": "9. Responsive Design testen",
+      "status": "FAILED",
+      "duration": 3,
+      "error": "this.page.waitForTimeout is not a function",
+      "timestamp": "2025-08-13T09:21:12.971Z"
+    },
+    {
+      "name": "10. Error-Handler und Exception-Behandlung testen",
+      "status": "PASSED",
+      "duration": 2,
+      "timestamp": "2025-08-13T09:21:13.092Z"
+    }
+  ],
+  "errors": [
+    {
+      "type": "test-error",
+      "test": "1. Startseite laden und initialisieren",
+      "message": "this.page.waitForTimeout is not a function",
+      "timestamp": "2025-08-13T09:21:10.565Z"
+    },
+    {
+      "type": "test-error",
+      "test": "4. Tab-System testen",
+      "message": "Node is either not clickable or not an Element",
+      "timestamp": "2025-08-13T09:21:11.851Z"
+    },
+    {
+      "type": "test-error",
+      "test": "5. Such-Funktionalität und Formular testen",
+      "message": "Node is either not clickable or not an Element",
+      "timestamp": "2025-08-13T09:21:12.082Z"
+    },
+    {
+      "type": "test-error",
+      "test": "7. Statistics Tab und Daten-Laden testen",
+      "message": "Node is either not clickable or not an Element",
+      "timestamp": "2025-08-13T09:21:12.547Z"
+    },
+    {
+      "type": "test-error",
+      "test": "8. Sources Tab und Quellen-System testen",
+      "message": "Node is either not clickable or not an Element",
+      "timestamp": "2025-08-13T09:21:12.764Z"
+    },
+    {
+      "type": "test-error",
+      "test": "9. Responsive Design testen",
+      "message": "this.page.waitForTimeout is not a function",
+      "timestamp": "2025-08-13T09:21:12.971Z"
+    }
+  ],
+  "screenshots": [
+    "02_ui_grundelemente_1755076870797.png",
+    "03_model_selection_1755076871594.png",
+    "06_js_validation_1755076872309.png",
+    "error_1._Startseite_laden_und_initialisieren_1755076870566.png",
+    "error_4._Tab-System_testen_1755076871851.png",
+    "error_5._Such-Funktionalität_und_Formular_testen_1755076872082.png",
+    "error_7._Statistics_Tab_und_Daten-Laden_testen_1755076872547.png",
+    "error_8._Sources_Tab_und_Quellen-System_testen_1755076872764.png",
+    "error_9._Responsive_Design_testen_1755076872971.png"
+  ]
+}

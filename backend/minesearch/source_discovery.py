@@ -266,7 +266,11 @@ class SourceDiscovery:
             context = ' '.join(context.split())
             
             return f"...{context}..."
-        except Exception:
+        except (TypeError, AttributeError) as e:
+            logger.debug(f"[SOURCE_DISCOVERY] Context-Extraction-Fehler für '{target}': {e}")
+            return ""
+        except Exception as e:
+            logger.warning(f"[SOURCE_DISCOVERY] Unerwarteter Fehler bei Context-Extraction: {e}")
             return ""
     
     def _is_valid_source(self, value: str, seen_values: set, min_length: Optional[int] = None) -> bool:
@@ -366,5 +370,9 @@ def _extract_context(content: str, target: str, context_length: int = 100) -> st
         context = ' '.join(context.split())
         
         return f"...{context}..."
-    except Exception:
+    except (TypeError, AttributeError) as e:
+        logger.debug(f"[SOURCE_DISCOVERY] Context-Extraction-Fehler für '{target}': {e}")
+        return ""
+    except Exception as e:
+        logger.warning(f"[SOURCE_DISCOVERY] Unerwarteter Fehler bei Context-Extraction: {e}")
         return ""

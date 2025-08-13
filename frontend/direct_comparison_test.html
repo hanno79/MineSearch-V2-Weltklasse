@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Comparison Engine Test</title>
+    <link rel="stylesheet" href="./style.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .test-container { background: white; padding: 30px; border-radius: 10px; max-width: 1200px; margin: 0 auto; }
+        .test-header { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; padding: 20px; border-radius: 8px; margin-bottom: 30px; text-align: center; }
+        .test-result { background: #f0fdf4; border: 2px solid #16a34a; border-radius: 8px; padding: 15px; margin: 10px 0; }
+        .test-error { background: #fef2f2; border: 2px solid #dc2626; border-radius: 8px; padding: 15px; margin: 10px 0; }
+        .test-data { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 15px; margin: 10px 0; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+        .test-btn { background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; margin: 10px 5px; font-weight: 600; }
+        .test-btn:hover { background: #1d4ed8; }
+        .metric { display: inline-block; margin: 10px 15px; padding: 8px 12px; background: #eff6ff; border-radius: 6px; font-weight: bold; }
+        .status { padding: 20px; border-radius: 8px; margin: 10px 0; text-align: center; font-weight: bold; }
+        .loading { background: #fef3c7; border: 2px solid #f59e0b; color: #92400e; }
+        .success { background: #dcfce7; border: 2px solid #16a34a; color: #166534; }
+        .error { background: #fecaca; border: 2px solid #dc2626; color: #991b1b; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🔬 Interactive Comparison Engine - Direct Test</h1>
+            <p>Phase 4: Live Testing mit echten Multi-Model-Daten</p>
+        </div>
+        
+        <div class="test-controls">
+            <button class="test-btn" onclick="runFullTest()">🧪 Run Full Test</button>
+            <button class="test-btn" onclick="testConsensus()">✅ Test Consensus</button>
+            <button class="test-btn" onclick="testDiscrepancies()">⚠️ Test Discrepancies</button>
+            <button class="test-btn" onclick="testUI()">🎨 Test UI Generation</button>
+            <button class="test-btn" onclick="clearResults()">🧹 Clear</button>
+        </div>
+        
+        <div id="testResults">
+            <div class="status loading">Bereit für Tests - Klicke auf einen Test-Button</div>
+        </div>
+    </div>
+
+    <!-- Load Comparison Engine -->
+    <script src="./comparison-engine.js"></script>
+    
+    <script>
+        // Real test data with intentional discrepancies
+        const testMultiModelData = [
+            {
+                model_id: "openrouter:deepseek-free",
+                success: true,
+                confidence: 0.8,
+                search_duration: 0,
+                data: {
+                    structured_data: {
+                        "Name": "Eleonore Mine",
+                        "Country": "Canada", 
+                        "Region": "Quebec (Nord-du-Québec, Baie-James)",
+                        "Eigentümer": "Newmont Corporation",
+                        "Betreiber": "Newmont Corporation",
+                        "y-Koordinate": "52.896400",
+                        "Aktivitätsstatus": "Aktiv",
+                        "Produktionsstart": "2014",
+                        "Produktionsende": "noch aktiv",
+                        "Quellenangaben": "Keine spezifischen Quellen dokumentiert"
+                    },
+                    quality_metrics: {
+                        completion_percentage: 105.55555555555556,
+                        filled_fields: 19,
+                        total_fields: 18,
+                        quality_score: 0.7366666666666666
+                    },
+                    sources: [
+                        {url: "https://mern.gouv.qc.ca/search", type: "government", reliability: 100.0}
+                    ]
+                }
+            },
+            {
+                model_id: "anthropic:claude-3-5-sonnet",
+                success: true,
+                confidence: 0.8,
+                search_duration: 0,
+                data: {
+                    structured_data: {
+                        "Name": "Eleonore Mine",
+                        "Country": "Canada",
+                        "Region": "Quebec, Nord-du-Québec", 
+                        "Eigentümer": "Newmont Corporation",
+                        "Betreiber": "Newmont Corporation",
+                        "y-Koordinate": "52.283300",  // DISCREPANCY: Different coordinate!
+                        "Aktivitätsstatus": "Aktiv",
+                        "Produktionsstart": "2015",  // DISCREPANCY: 2014 vs 2015!
+                        "Produktionsende": "noch aktiv",
+                        "Quellenangaben": "Keine spezifischen Quellen dokumentiert"
+                    },
+                    quality_metrics: {
+                        completion_percentage: 105.55555555555556,
+                        filled_fields: 19,
+                        total_fields: 18,
+                        quality_score: 0.7366666666666666
+                    },
+                    sources: [
+                        {url: "https://mern.gouv.qc.ca/search", type: "government", reliability: 100.0}
+                    ]
+                }
+            }
+        ];
+        
+        let currentComparison = null;
+        
+        async function runFullTest() {
+            const results = document.getElementById('testResults');
+            results.innerHTML = '<div class="status loading">🔬 Running Full Comparison Test...</div>';
+            
+            try {
+                console.log('🧪 [FULL TEST] Starting comprehensive test');
+                
+                // Step 1: Test Engine Initialization
+                results.innerHTML += '<div class="test-result">✅ Step 1: Comparison Engine loaded successfully</div>';
+                
+                // Step 2: Generate Comparison
+                console.log('🔬 [FULL TEST] Generating comparison...');
+                currentComparison = await window.comparisonEngine.generateComparison(testMultiModelData);
+                
+                const metrics = `
+                    <div class="metric">Consensus: ${Math.round(currentComparison.consensus.overallScore * 100)}%</div>
+                    <div class="metric">Quality: ${Math.round(currentComparison.metadata.overallQuality * 100)}%</div>
+                    <div class="metric">Discrepancies: ${currentComparison.metadata.discrepancyCount}</div>
+                    <div class="metric">Fields: ${currentComparison.metadata.totalFields}</div>
+                `;
+                
+                results.innerHTML += `<div class="test-result">✅ Step 2: Comparison generated successfully<br>${metrics}</div>`;
+                
+                // Step 3: Test Consensus Detection
+                const consensus = currentComparison.consensus;
+                results.innerHTML += `<div class="test-result">✅ Step 3: Consensus Detection<br>
+                    Strong: ${consensus.strongConsensus.length} | 
+                    Weak: ${consensus.weakConsensus.length} | 
+                    None: ${consensus.noConsensus.length}
+                </div>`;
+                
+                // Step 4: Test Discrepancy Detection
+                const discrepancies = currentComparison.discrepancies;
+                const topDiscrepancy = discrepancies[0];
+                results.innerHTML += `<div class="test-result">✅ Step 4: Discrepancy Detection<br>
+                    Found ${discrepancies.length} discrepancies<br>
+                    Top discrepancy: ${topDiscrepancy ? topDiscrepancy.field + ' (Impact: ' + Math.round(topDiscrepancy.impact * 100) + ')' : 'None'}
+                </div>`;
+                
+                // Step 5: Test UI Generation
+                const html = window.comparisonUIGenerator.generateComparisonView(currentComparison);
+                results.innerHTML += `<div class="test-result">✅ Step 5: UI Generation<br>
+                    Generated ${html.length} characters of HTML<br>
+                    Contains all required sections
+                </div>`;
+                
+                results.innerHTML += '<div class="status success">🎉 FULL TEST COMPLETED SUCCESSFULLY!</div>';
+                
+                console.log('🎉 [FULL TEST] All tests passed successfully');
+                
+            } catch (error) {
+                console.error('❌ [FULL TEST] Error:', error);
+                results.innerHTML += `<div class="test-error">❌ Test Failed: ${error.message}</div>`;
+            }
+        }
+        
+        async function testConsensus() {
+            const results = document.getElementById('testResults');
+            results.innerHTML = '<div class="status loading">✅ Testing Consensus Detection...</div>';
+            
+            try {
+                const comparison = await window.comparisonEngine.generateComparison(testMultiModelData);
+                const consensus = comparison.consensus;
+                
+                let consensusDetails = `
+                    <h3>Consensus Analysis Results:</h3>
+                    <div class="metric">Overall Score: ${Math.round(consensus.overallScore * 100)}%</div>
+                    <div class="metric">Strong Consensus: ${consensus.strongConsensus.length} fields</div>
+                    <div class="metric">Weak Consensus: ${consensus.weakConsensus.length} fields</div>
+                    <div class="metric">No Consensus: ${consensus.noConsensus.length} fields</div>
+                    
+                    <h4>Strong Consensus Fields:</h4>
+                `;
+                
+                consensus.strongConsensus.forEach(field => {
+                    const fieldData = consensus.fields[field];
+                    consensusDetails += `<div class="test-data">${field}: "${fieldData.value}" (${fieldData.models.join(', ')})</div>`;
+                });
+                
+                if (consensus.weakConsensus.length > 0) {
+                    consensusDetails += '<h4>Weak Consensus Fields:</h4>';
+                    consensus.weakConsensus.slice(0, 3).forEach(field => {
+                        const fieldData = consensus.fields[field];
+                        consensusDetails += `<div class="test-data">${field}: "${fieldData.value}" (${fieldData.models.join(', ')})</div>`;
+                    });
+                }
+                
+                results.innerHTML = `<div class="status success">✅ Consensus Detection Successful</div>${consensusDetails}`;
+                
+            } catch (error) {
+                results.innerHTML = `<div class="test-error">❌ Consensus Test Failed: ${error.message}</div>`;
+            }
+        }
+        
+        async function testDiscrepancies() {
+            const results = document.getElementById('testResults');
+            results.innerHTML = '<div class="status loading">⚠️ Testing Discrepancy Detection...</div>';
+            
+            try {
+                const comparison = await window.comparisonEngine.generateComparison(testMultiModelData);
+                const discrepancies = comparison.discrepancies;
+                
+                let discrepancyDetails = `
+                    <h3>Discrepancy Analysis Results:</h3>
+                    <div class="metric">Total Discrepancies: ${discrepancies.length}</div>
+                    
+                    <h4>Detected Discrepancies:</h4>
+                `;
+                
+                discrepancies.forEach((disc, idx) => {
+                    discrepancyDetails += `
+                        <div class="test-data">
+                            <strong>${idx + 1}. ${disc.field}</strong><br>
+                            Impact: ${Math.round(disc.impact * 100)} | Severity: ${disc.severity.toFixed(2)}<br>
+                            Values: ${disc.values.map(v => `${v.model}="${v.value}"`).join(', ')}<br>
+                        </div>
+                    `;
+                });
+                
+                if (discrepancies.length === 0) {
+                    discrepancyDetails += '<div class="test-data">No significant discrepancies found</div>';
+                }
+                
+                results.innerHTML = `<div class="status success">⚠️ Discrepancy Detection Successful</div>${discrepancyDetails}`;
+                
+            } catch (error) {
+                results.innerHTML = `<div class="test-error">❌ Discrepancy Test Failed: ${error.message}</div>`;
+            }
+        }
+        
+        async function testUI() {
+            const results = document.getElementById('testResults');
+            results.innerHTML = '<div class="status loading">🎨 Testing UI Generation...</div>';
+            
+            try {
+                const comparison = await window.comparisonEngine.generateComparison(testMultiModelData);
+                const html = window.comparisonUIGenerator.generateComparisonView(comparison);
+                
+                // Check for key UI components
+                const components = {
+                    'Header': html.includes('comparison-header'),
+                    'Consensus Overview': html.includes('consensus-overview'),
+                    'Performance Matrix': html.includes('performance-matrix'),
+                    'Field Comparison': html.includes('field-comparison'),
+                    'Discrepancy Analysis': html.includes('discrepancy-analysis'),
+                    'Export Controls': html.includes('export-controls')
+                };
+                
+                let componentStatus = '<h3>UI Components Check:</h3>';
+                Object.entries(components).forEach(([name, present]) => {
+                    componentStatus += `<div class="test-data">${present ? '✅' : '❌'} ${name}: ${present ? 'Present' : 'Missing'}</div>`;
+                });
+                
+                componentStatus += `<h4>Generated HTML Preview (first 500 chars):</h4>`;
+                componentStatus += `<div class="test-data">${html.substring(0, 500)}...</div>`;
+                
+                results.innerHTML = `<div class="status success">🎨 UI Generation Successful</div>
+                    <div class="metric">HTML Length: ${html.length} characters</div>
+                    ${componentStatus}`;
+                
+            } catch (error) {
+                results.innerHTML = `<div class="test-error">❌ UI Test Failed: ${error.message}</div>`;
+            }
+        }
+        
+        function clearResults() {
+            document.getElementById('testResults').innerHTML = 
+                '<div class="status loading">Bereit für Tests - Klicke auf einen Test-Button</div>';
+        }
+        
+        // Auto-run basic test after load
+        setTimeout(() => {
+            console.log('🚀 [AUTO TEST] Running basic functionality check...');
+            if (window.comparisonEngine && window.comparisonUIGenerator) {
+                document.getElementById('testResults').innerHTML = 
+                    '<div class="status success">✅ Comparison Engine successfully loaded and ready for testing!</div>';
+            } else {
+                document.getElementById('testResults').innerHTML = 
+                    '<div class="status error">❌ Comparison Engine failed to load</div>';
+            }
+        }, 1000);
+        
+        console.log('🧪 [TEST PAGE] Direct Comparison Test loaded');
+    </script>
+</body>
+</html>

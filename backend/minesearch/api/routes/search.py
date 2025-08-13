@@ -173,12 +173,11 @@ async def search_two_phase(request: MineSearchRequest):
     Phase 2: Detaillierte Datenextraktion mit Premium-Modellen
     """
     try:
-        result = await services.multi_search_service.search_two_phase(
-            mine_name=request.mine_name,
-            country=request.country,
-            commodity=request.commodity,
-            region=request.region
-        )
+        # CONSOLIDATION FIX 12.08.2025: Two-Phase temporär deaktiviert
+        result = {
+            'success': False,
+            'error': 'Two-Phase-Suche temporär nicht verfügbar - verwenden Sie Multi-Model-Suche stattdessen'
+        }
         
         # Speichere Ergebnis
         if result.get('success') and result.get('data'):
@@ -211,37 +210,79 @@ async def search_two_phase(request: MineSearchRequest):
 async def search_multiple_models(request: MultiSearchRequest):
     """Suche mit mehreren Modellen gleichzeitig"""
     try:
-        result = await services.multi_search_service.search_with_multiple_models(
-            model_ids=request.model_ids,
-            mine_name=request.mine_name,
-            country=request.country,
-            commodity=request.commodity,
-            region=request.region
-        )
+        # CONSOLIDATION FIX 12.08.2025: Verwende MineSearchService für Multi-Model-Suche
+        search_service = services.mine_search_service
+        results = []
+        
+        for model_id in request.model_ids:
+            try:
+                # Einzelne Suche pro Modell
+                single_result = await search_service.search_mine(
+                    mine_name=request.mine_name,
+                    country=request.country,
+                    commodity=request.commodity,
+                    region=request.region,
+                    model=model_id
+                )
+                
+                # Formatiere Ergebnis für Multi-Search Response
+                if single_result.get('success'):
+                    results.append({
+                        'model_id': model_id,
+                        'success': True,
+                        'data': single_result.get('data', {}),
+                        'sources': single_result.get('sources', []),
+                        'search_duration': single_result.get('search_duration', 0)
+                    })
+                else:
+                    results.append({
+                        'model_id': model_id,
+                        'success': False,
+                        'error': single_result.get('error', 'Unknown error')
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Fehler bei Modell {model_id}: {str(e)}")
+                results.append({
+                    'model_id': model_id,
+                    'success': False,
+                    'error': str(e)
+                })
+        
+        # Sammle erfolgreiche Ergebnisse
+        successful_results = [r for r in results if r['success']]
+        
+        result = {
+            'success': len(successful_results) > 0,
+            'data': {
+                'results': results,
+                'total_models': len(request.model_ids),
+                'successful_models': len(successful_results),
+                'search_query': f"Mine: {request.mine_name}, Country: {request.country}, Commodity: {request.commodity}"
+            },
+            'timestamp': datetime.now().isoformat()
+        }
         
         # Speichere alle erfolgreichen Ergebnisse
-        if result.get('success') and result.get('results'):
-            from minesearch.database import db_manager
-            for model_id, model_result in result['results'].items():
-                if model_result.get('success') and model_result.get('data'):
-                    try:
+        if successful_results:
+            try:
+                from minesearch.database import db_manager
+                for model_result in successful_results:
+                    if model_result.get('data'):
                         db_manager.save_search_result(
                             mine_name=request.mine_name,
-                            model_used=model_id,
+                            model_used=model_result['model_id'],
                             structured_data=model_result['data'].get('structured_data', {}),
-                            sources=model_result['data'].get('sources', []),
+                            sources=model_result.get('sources', []),
                             country=request.country,
                             region=request.region,
                             commodity=request.commodity,
                             search_type='multi_model',
-                            search_duration=model_result.get('search_duration'),
-                            structured_data_with_sources=model_result['data'].get('structured_data_with_sources'),
-                            source_index=model_result['data'].get('source_index'),
-                            data_quality=model_result['data'].get('data_quality'),
+                            search_duration=model_result.get('search_duration', 0),
                             success=True
                         )
-                    except Exception as e:
-                        logger.error(f"Fehler beim Speichern für Modell {model_id}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Fehler beim Speichern der Multi-Model-Ergebnisse: {str(e)}")
         
         return result
     except Exception as e:
@@ -252,12 +293,11 @@ async def search_multiple_models(request: MultiSearchRequest):
 async def smart_search(request: SmartSearchRequest):
     """Intelligente Suche mit automatischer Modell-Auswahl"""
     try:
-        result = await services.multi_search_service.smart_search(
-            mine_name=request.mine_name,
-            country=request.country,
-            commodity=request.commodity,
-            region=request.region
-        )
+        # CONSOLIDATION FIX 12.08.2025: Smart-Search temporär deaktiviert  
+        result = {
+            'success': False,
+            'error': 'Smart-Search temporär nicht verfügbar - verwenden Sie Multi-Model-Suche stattdessen'
+        }
         
         # Speichere Ergebnis
         if result.get('success') and result.get('data'):

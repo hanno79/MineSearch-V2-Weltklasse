@@ -114,7 +114,11 @@ class ServiceManager:
                 sock.settimeout(1)
                 result = sock.connect_ex(('localhost', port))
                 return result != 0  # 0 = Verbindung erfolgreich (Port belegt)
-        except Exception:
+        except OSError as e:
+            logger.debug(f"[SERVICE_MANAGER] Socket-Fehler beim Port-Check {port}: {e}")
+            return True  # Bei Fehler als verfügbar annehmen
+        except Exception as e:
+            logger.warning(f"[SERVICE_MANAGER] Unerwarteter Fehler bei Port-Check {port}: {e}")
             return True  # Bei Fehler als verfügbar annehmen
     
     def stop_service_by_pid(self, pid: int, service_name: str) -> bool:

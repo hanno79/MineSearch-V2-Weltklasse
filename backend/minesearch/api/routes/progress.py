@@ -12,7 +12,16 @@ import logging
 import json
 from typing import Optional, Dict, Any
 
-from simple_progress_tracker import simple_progress_tracker
+try:
+    from simple_progress_tracker import simple_progress_tracker
+except ImportError:
+    # Fallback: Simple in-memory tracker
+    class SimpleProgressTracker:
+        def __init__(self):
+            self.sessions = {}
+            self.websocket_connections = {}
+    
+    simple_progress_tracker = SimpleProgressTracker()
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -262,8 +271,12 @@ async def cleanup_session(session_id: str):
             for websocket in simple_progress_tracker.websocket_connections[session_id]:
                 try:
                     await websocket.close()
-                except:
-                    pass
+                except ConnectionError as e:
+                    logger.debug(f"[PROGRESS] WebSocket bereits geschlossen: {e}")
+                except RuntimeError as e:
+                    logger.debug(f"[PROGRESS] WebSocket Runtime-Error beim Schließen: {e}")
+                except Exception as e:
+                    logger.warning(f"[PROGRESS] Unerwarteter Fehler beim Schließen der WebSocket: {e}")
             del simple_progress_tracker.websocket_connections[session_id]
         
         return JSONResponse(content={

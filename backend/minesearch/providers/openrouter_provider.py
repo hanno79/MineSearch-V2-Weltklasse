@@ -365,7 +365,11 @@ ANTWORTE IM STRUKTURIERTEN FORMAT wie im System-Prompt beschrieben."""
                 error_data = response.json()
                 error_msg = error_data.get('error', {}).get('message', 'Unbekannter Fehler')
                 return f"OpenRouter Fehler: {error_msg}"
-            except:
+            except json.JSONDecodeError:
+                logger.warning(f"[OPENROUTER] Fehlerhafte JSON-Antwort bei Status {response.status_code}: {response.text[:100]}")
+                return f"API Fehler: {response.status_code} - Ungültige JSON-Antwort"
+            except (KeyError, AttributeError) as e:
+                logger.warning(f"[OPENROUTER] Unerwartete Fehler-Struktur: {e}")
                 return f"API Fehler: {response.status_code} - {response.text[:200]}"
     
     def get_models(self) -> Dict[str, ModelConfig]:

@@ -644,7 +644,14 @@ class MineSearchService:
                             parsed = urlparse(source_url)
                             base_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip('/')
                             domain = parsed.netloc
-                        except:
+                        except ValueError as e:
+                            logger.warning(f"[SOURCES TRACKING] Ungültige URL-Syntax: {source_url} - {e}")
+                            continue
+                        except AttributeError as e:
+                            logger.warning(f"[SOURCES TRACKING] URL-Parsing-Fehler: {source_url} - {e}")
+                            continue
+                        except Exception as e:
+                            logger.error(f"[SOURCES TRACKING] Unerwarteter URL-Fehler: {source_url} - {e}")
                             continue
                         
                         # Finde oder erstelle Source in DB

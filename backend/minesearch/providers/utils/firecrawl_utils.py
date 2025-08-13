@@ -125,8 +125,10 @@ class FirecrawlExtractor:
                     decimal = -decimal
                     
                 return decimal
-        except:
-            pass
+        except (ValueError, AttributeError) as e:
+            logger.debug(f"[FIRECRAWL] DMS-Parsing-Fehler für '{dms_string}': {e}")
+        except Exception as e:
+            logger.warning(f"[FIRECRAWL] Unerwarteter Fehler bei DMS-Konvertierung: {e}")
         return None
 
 

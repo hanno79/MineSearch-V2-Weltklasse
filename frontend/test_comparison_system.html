@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 4: Interactive Comparison Test</title>
+    <link rel="stylesheet" href="./style.css">
+    <style>
+        .test-container {
+            max-width: 1600px;
+            margin: 20px auto;
+            padding: 20px;
+            background: var(--gray-50);
+            border-radius: var(--radius-lg);
+        }
+        
+        .test-header {
+            background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+            color: white;
+            padding: 20px;
+            border-radius: var(--radius-lg);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .test-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+        
+        .test-btn {
+            background: var(--primary-600);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        .test-btn:hover {
+            background: var(--primary-700);
+            transform: translateY(-2px);
+        }
+        
+        .comparison-results {
+            min-height: 400px;
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            border: 2px solid var(--gray-200);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: var(--gray-600);
+        }
+        
+        .success-indicator {
+            background: var(--success-50);
+            border: 2px solid var(--success-200);
+            color: var(--success-800);
+            padding: 15px;
+            border-radius: var(--radius-md);
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .error-indicator {
+            background: var(--error-50);
+            border: 2px solid var(--error-200);
+            color: var(--error-800);
+            padding: 15px;
+            border-radius: var(--radius-md);
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .test-data {
+            background: var(--gray-100);
+            padding: 15px;
+            border-radius: var(--radius-md);
+            margin-bottom: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🔬 Phase 4: Interactive Comparison System Test</h1>
+            <p>Testing the new Multi-Model Comparison Engine with real data</p>
+        </div>
+        
+        <div class="test-controls">
+            <button class="test-btn" onclick="testWithRealData()">
+                🧪 Test mit echten Multi-Model-Daten
+            </button>
+            <button class="test-btn" onclick="testConsensusDetection()">
+                ✅ Test Consensus Detection
+            </button>
+            <button class="test-btn" onclick="testDiscrepancyAnalysis()">
+                ⚠️ Test Discrepancy Analysis
+            </button>
+            <button class="test-btn" onclick="clearResults()">
+                🧹 Clear Results
+            </button>
+        </div>
+        
+        <div id="testResults" class="comparison-results">
+            <div class="loading">Klicke auf einen Test-Button um zu starten...</div>
+        </div>
+    </div>
+
+    <!-- Load required scripts -->
+    <script src="./comparison-engine.js"></script>
+    
+    <script>
+        console.log('🧪 [TEST] Comparison System Test geladen');
+        
+        // Real Multi-Model Data from API Response
+        const realMultiModelData = [
+            {
+                "model_id": "openrouter:deepseek-free",
+                "success": true,
+                "confidence": 0.8,
+                "search_duration": 0,
+                "data": {
+                    "structured_data": {
+                        "Name": "Eleonore Mine",
+                        "Country": "Canada", 
+                        "Region": "Quebec (Nord-du-Québec, Baie-James)",
+                        "Eigentümer": "Newmont Corporation",
+                        "Betreiber": "Newmont Corporation",
+                        "x-Koordinate": "X",
+                        "y-Koordinate": "52.896400",
+                        "Aktivitätsstatus": "Aktiv",
+                        "Restaurationskosten": "X",
+                        "Jahr der Aufnahme der Kosten": "X",
+                        "Jahr der Erstellung des Dokumentes": "X",
+                        "Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)": "X",
+                        "Minentyp (Untertage/ Open-Pit/ usw.)": "X",
+                        "Produktionsstart": "2014",
+                        "Produktionsende": "noch aktiv",
+                        "Fördermenge/Jahr": "X",
+                        "Fläche der Mine in qkm": "X",
+                        "Quellenangaben": "Keine spezifischen Quellen dokumentiert"
+                    },
+                    "quality_metrics": {
+                        "completion_percentage": 105.55555555555556,
+                        "filled_fields": 19,
+                        "total_fields": 18,
+                        "quality_score": 0.7366666666666666,
+                        "important_fields_filled": 3,
+                        "important_fields_total": 5
+                    },
+                    "sources": [
+                        {"url": "https://mern.gouv.qc.ca/search", "type": "government", "reliability": 100.0},
+                        {"url": "https://nrcan.gc.ca/search", "type": "government", "reliability": 100.0}
+                    ]
+                }
+            },
+            {
+                "model_id": "anthropic:claude-3-5-sonnet",
+                "success": true,
+                "confidence": 0.8,
+                "search_duration": 0,
+                "data": {
+                    "structured_data": {
+                        "Name": "Eleonore Mine",
+                        "Country": "Canada",
+                        "Region": "Quebec, Nord-du-Québec", 
+                        "Eigentümer": "Newmont Corporation",
+                        "Betreiber": "Newmont Corporation",
+                        "x-Koordinate": "X",
+                        "y-Koordinate": "52.283300",
+                        "Aktivitätsstatus": "Aktiv",
+                        "Restaurationskosten": "X",
+                        "Jahr der Aufnahme der Kosten": "X",
+                        "Jahr der Erstellung des Dokumentes": "X",
+                        "Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)": "X",
+                        "Minentyp (Untertage/ Open-Pit/ usw.)": "X",
+                        "Produktionsstart": "2015",
+                        "Produktionsende": "noch aktiv",
+                        "Fördermenge/Jahr": "X",
+                        "Fläche der Mine in qkm": "X",
+                        "Quellenangaben": "Keine spezifischen Quellen dokumentiert"
+                    },
+                    "quality_metrics": {
+                        "completion_percentage": 105.55555555555556,
+                        "filled_fields": 19,
+                        "total_fields": 18,
+                        "quality_score": 0.7366666666666666,
+                        "important_fields_filled": 3,
+                        "important_fields_total": 5
+                    },
+                    "sources": [
+                        {"url": "https://mern.gouv.qc.ca/search", "type": "government", "reliability": 100.0},
+                        {"url": "https://blm.gov/search", "type": "government", "reliability": 100.0}
+                    ]
+                }
+            }
+        ];
+        
+        async function testWithRealData() {
+            console.log('🧪 [TEST] Starte Test mit echten Multi-Model-Daten');
+            
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '<div class="loading">🔬 Analysiere Multi-Model-Daten...</div>';
+            
+            try {
+                // Generate comparison using the real data
+                const comparison = await window.comparisonEngine.generateComparison(realMultiModelData);
+                
+                console.log('✅ [TEST] Comparison generiert:', comparison);
+                
+                // Generate UI
+                const comparisonHTML = window.comparisonUIGenerator.generateComparisonView(comparison);
+                
+                resultsDiv.innerHTML = `
+                    <div class="success-indicator">
+                        ✅ Interactive Comparison erfolgreich generiert!<br>
+                        Consensus Score: ${Math.round(comparison.consensus.overallScore * 100)}% | 
+                        Quality: ${Math.round(comparison.metadata.overallQuality * 100)}% |
+                        Discrepancies: ${comparison.metadata.discrepancyCount}
+                    </div>
+                    ${comparisonHTML}
+                `;
+                
+            } catch (error) {
+                console.error('❌ [TEST] Comparison fehlgeschlagen:', error);
+                resultsDiv.innerHTML = `
+                    <div class="error-indicator">
+                        ❌ Test fehlgeschlagen: ${error.message}
+                    </div>
+                    <div class="test-data">${JSON.stringify(error, null, 2)}</div>
+                `;
+            }
+        }
+        
+        async function testConsensusDetection() {
+            console.log('🧪 [TEST] Teste Consensus Detection');
+            
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '<div class="loading">✅ Analysiere Consensus...</div>';
+            
+            try {
+                const comparison = await window.comparisonEngine.generateComparison(realMultiModelData);
+                
+                const consensusDetails = {
+                    strongConsensus: comparison.consensus.strongConsensus,
+                    weakConsensus: comparison.consensus.weakConsensus,
+                    noConsensus: comparison.consensus.noConsensus,
+                    overallScore: comparison.consensus.overallScore,
+                    consensusFields: Object.keys(comparison.consensus.fields)
+                };
+                
+                resultsDiv.innerHTML = `
+                    <div class="success-indicator">
+                        ✅ Consensus Detection erfolgreich!
+                    </div>
+                    <h3>📊 Consensus Analysis Results:</h3>
+                    <div class="test-data">${JSON.stringify(consensusDetails, null, 2)}</div>
+                `;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="error-indicator">❌ Consensus Test fehlgeschlagen: ${error.message}</div>
+                `;
+            }
+        }
+        
+        async function testDiscrepancyAnalysis() {
+            console.log('🧪 [TEST] Teste Discrepancy Analysis');
+            
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '<div class="loading">⚠️ Analysiere Discrepancies...</div>';
+            
+            try {
+                const comparison = await window.comparisonEngine.generateComparison(realMultiModelData);
+                
+                const discrepancyDetails = {
+                    totalDiscrepancies: comparison.discrepancies.length,
+                    topDiscrepancies: comparison.discrepancies.slice(0, 3),
+                    severityBreakdown: comparison.discrepancies.map(d => ({
+                        field: d.field,
+                        severity: d.severity,
+                        impact: d.impact,
+                        valueCount: d.values.length
+                    }))
+                };
+                
+                resultsDiv.innerHTML = `
+                    <div class="success-indicator">
+                        ⚠️ Discrepancy Analysis erfolgreich!
+                    </div>
+                    <h3>📋 Discrepancy Analysis Results:</h3>
+                    <div class="test-data">${JSON.stringify(discrepancyDetails, null, 2)}</div>
+                `;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="error-indicator">❌ Discrepancy Test fehlgeschlagen: ${error.message}</div>
+                `;
+            }
+        }
+        
+        function clearResults() {
+            document.getElementById('testResults').innerHTML = 
+                '<div class="loading">Klicke auf einen Test-Button um zu starten...</div>';
+        }
+        
+        // Export functions für die Comparison Engine
+        window.exportComparison = function(comparisonId, format) {
+            console.log(`📤 [EXPORT] Exporting comparison ${comparisonId} in format: ${format}`);
+            alert(`Export ${format} für Comparison ${comparisonId} - Feature wird implementiert in nächster Phase!`);
+        };
+        
+        window.showAllDiscrepancies = function(comparisonId) {
+            console.log(`📋 [DISCREPANCIES] Showing all discrepancies for ${comparisonId}`);
+            alert(`Showing all discrepancies für ${comparisonId} - Feature wird implementiert!`);
+        };
+        
+        console.log('✅ [TEST] Test System bereit');
+    </script>
+</body>
+</html>

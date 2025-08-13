@@ -469,7 +469,14 @@ class FirecrawlProvider(AbstractProvider):
                 if domain not in domain_groups:
                     domain_groups[domain] = []
                 domain_groups[domain].append(url)
-            except:
+            except ValueError as e:
+                logger.debug(f"[FIRECRAWL] Ungültige URL '{url}': {e}")
+                continue
+            except ImportError as e:
+                logger.error(f"[FIRECRAWL] urlparse Import-Fehler: {e}")
+                continue
+            except Exception as e:
+                logger.warning(f"[FIRECRAWL] Unerwarteter URL-Parsing-Fehler für '{url}': {e}")
                 continue
         
         # Crawle jede Domain

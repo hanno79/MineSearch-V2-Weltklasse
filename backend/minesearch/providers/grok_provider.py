@@ -312,7 +312,11 @@ ZEITLICHER FOKUS:
 → Bitte warten Sie 60 Sekunden"""
                 else:
                     return "💳 API Quota überschritten. Prüfen Sie Ihr xAI-Konto."
-            except:
+            except json.JSONDecodeError:
+                logger.warning(f"[GROK] Rate-Limit-Response nicht als JSON parsbar: {response.text[:100]}")
+                return "⏱️ Rate Limit erreicht. Bitte warten Sie einen Moment."
+            except (KeyError, AttributeError) as e:
+                logger.warning(f"[GROK] Unerwartete Rate-Limit-Struktur: {e}")
                 return "⏱️ Rate Limit erreicht. Bitte warten Sie einen Moment."
         
         elif response.status_code == 503:

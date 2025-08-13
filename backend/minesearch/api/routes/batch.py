@@ -232,9 +232,15 @@ async def batch_search(
         # Optional: nur wenn vorhanden (Legacy)
         try:
             from minesearch_v2.backend.comprehensive_search_orchestrator import comprehensive_search_orchestrator
-        except Exception:
+        except ImportError:
             comprehensive_search_orchestrator = None
             logger.info("[BATCH] Comprehensive search orchestrator nicht verfügbar")
+        except ModuleNotFoundError:
+            comprehensive_search_orchestrator = None
+            logger.info("[BATCH] Comprehensive search orchestrator Modul nicht gefunden")
+        except Exception as e:
+            comprehensive_search_orchestrator = None
+            logger.warning(f"[BATCH] Unerwarteter Fehler beim Import des Orchestrators: {e}")
             
         logger.info("[BATCH] Starte Mine-Processing-Schleife")
         

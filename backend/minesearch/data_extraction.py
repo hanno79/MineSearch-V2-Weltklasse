@@ -506,8 +506,10 @@ def _get_source_patterns_for_value(value: str) -> List[str]:
                 first_word = value.split()[0]
                 escaped_first_word = re.escape(first_word)
                 patterns.append(rf'{escaped_first_word}[^\n]*?\[(\d+(?:,\s*\d+)*)\]')
-            except:
-                pass
+            except (IndexError, ValueError) as e:
+                logger.debug(f"[DATA_EXTRACTION] Fehler beim Splitten von '{value}': {e}")
+            except Exception as e:
+                logger.warning(f"[DATA_EXTRACTION] Unerwarteter Fehler bei Pattern-Generierung: {e}")
     
     return patterns
 

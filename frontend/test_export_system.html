@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 4: Export System Test</title>
+    <link rel="stylesheet" href="./style.css">
+    <style>
+        .export-test-container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        
+        .export-header {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .export-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .export-btn {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        
+        .export-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(37,99,235,0.3);
+        }
+        
+        .export-btn.consensus { background: linear-gradient(135deg, #16a34a, #15803d); }
+        .export-btn.detailed { background: linear-gradient(135deg, #ea580c, #dc2626); }
+        .export-btn.json { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+        .export-btn.report { background: linear-gradient(135deg, #0891b2, #0e7490); }
+        .export-btn.csv { background: linear-gradient(135deg, #059669, #047857); }
+        
+        .test-results {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .comparison-preview {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 5px;
+        }
+        
+        .status-success { background: #dcfce7; color: #166534; }
+        .status-error { background: #fecaca; color: #991b1b; }
+        .status-info { background: #dbeafe; color: #1e40af; }
+        
+        .export-history {
+            background: #fffbeb;
+            border: 2px solid #fcd34d;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="export-test-container">
+        <div class="export-header">
+            <h1>📤 Export System Test</h1>
+            <p>Phase 4: Interactive Comparison Export Functions</p>
+        </div>
+        
+        <div class="export-controls">
+            <button class="export-btn consensus" onclick="testExport('consensus')">
+                📋 Consensus Data
+            </button>
+            <button class="export-btn detailed" onclick="testExport('detailed')">
+                📊 Detailed Analysis
+            </button>
+            <button class="export-btn json" onclick="testExport('json')">
+                💾 Raw JSON
+            </button>
+            <button class="export-btn report" onclick="testExport('report')">
+                📄 HTML Report
+            </button>
+            <button class="export-btn csv" onclick="testExport('csv')">
+                📈 CSV Data
+            </button>
+            <button class="export-btn" onclick="generateTestComparison()">
+                🔬 Generate Test Comparison
+            </button>
+        </div>
+        
+        <div id="testResults" class="test-results">
+            <div style="text-align: center; padding: 20px; color: #64748b;">
+                Klicke auf "Generate Test Comparison" um zu starten...
+            </div>
+        </div>
+        
+        <div id="exportHistory" class="export-history" style="display: none;">
+            <h3>📜 Export History</h3>
+            <div id="historyList"></div>
+        </div>
+    </div>
+
+    <!-- Load required scripts -->
+    <script src="./comparison-engine.js"></script>
+    <script src="./comparison-export.js"></script>
+    
+    <script>
+        let testComparison = null;
+        
+        // Test data with discrepancies
+        const exportTestData = [
+            {
+                model_id: "openrouter:deepseek-free",
+                success: true,
+                confidence: 0.85,
+                search_duration: 2.3,
+                data: {
+                    structured_data: {
+                        "Name": "Eleonore Mine",
+                        "Country": "Canada", 
+                        "Region": "Quebec (Nord-du-Québec, Baie-James)",
+                        "Eigentümer": "Newmont Corporation",
+                        "Betreiber": "Newmont Corporation",
+                        "y-Koordinate": "52.896400",
+                        "Aktivitätsstatus": "Aktiv",
+                        "Restaurationskosten": "250 Mio CAD",
+                        "Produktionsstart": "2014",
+                        "Produktionsende": "noch aktiv",
+                        "Fördermenge/Jahr": "300.000 Unzen Gold",
+                        "Quellenangaben": "Newmont Reports, MERN Quebec"
+                    },
+                    quality_metrics: {
+                        completion_percentage: 95.5,
+                        filled_fields: 12,
+                        total_fields: 18,
+                        quality_score: 0.85,
+                        important_fields_filled: 8,
+                        important_fields_total: 10
+                    },
+                    sources: [
+                        {url: "https://mern.gouv.qc.ca/search", type: "government", reliability: 100.0},
+                        {url: "https://newmont.com/operations", type: "company", reliability: 95.0}
+                    ]
+                }
+            },
+            {
+                model_id: "anthropic:claude-3-5-sonnet",
+                success: true,
+                confidence: 0.9,
+                search_duration: 1.8,
+                data: {
+                    structured_data: {
+                        "Name": "Eleonore Mine",
+                        "Country": "Canada",
+                        "Region": "Quebec, Nord-du-Québec", 
+                        "Eigentümer": "Newmont Corporation",
+                        "Betreiber": "Newmont Corporation",
+                        "y-Koordinate": "52.283300",  // DISCREPANCY: Different coordinate!
+                        "Aktivitätsstatus": "Aktiv",
+                        "Restaurationskosten": "275 Mio CAD", // DISCREPANCY: Different cost!
+                        "Produktionsstart": "2015",  // DISCREPANCY: Different start year!
+                        "Produktionsende": "noch aktiv",
+                        "Fördermenge/Jahr": "250.000 Unzen Gold", // DISCREPANCY: Different volume!
+                        "Quellenangaben": "Technical Reports, Government Data"
+                    },
+                    quality_metrics: {
+                        completion_percentage: 88.9,
+                        filled_fields: 11,
+                        total_fields: 18,
+                        quality_score: 0.78,
+                        important_fields_filled: 7,
+                        important_fields_total: 10
+                    },
+                    sources: [
+                        {url: "https://mern.gouv.qc.ca/search", type: "government", reliability: 100.0},
+                        {url: "https://sedar.com", type: "regulatory", reliability: 90.0}
+                    ]
+                }
+            },
+            {
+                model_id: "openrouter:meta-llama",
+                success: true,
+                confidence: 0.72,
+                search_duration: 3.1,
+                data: {
+                    structured_data: {
+                        "Name": "Eleonore Mine",
+                        "Country": "Canada",
+                        "Region": "Quebec Province", 
+                        "Eigentümer": "Newmont Corp.",
+                        "Betreiber": "Newmont Operations",
+                        "y-Koordinate": "52.500000",  // DISCREPANCY: Another coordinate!
+                        "Aktivitätsstatus": "Active",
+                        "Restaurationskosten": "260 Mio CAD", // DISCREPANCY: Third different cost!
+                        "Produktionsstart": "2014",
+                        "Produktionsende": "Active",
+                        "Fördermenge/Jahr": "280.000 oz Gold", // DISCREPANCY: Another volume!
+                        "Quellenangaben": "Mining databases, Company reports"
+                    },
+                    quality_metrics: {
+                        completion_percentage: 77.8,
+                        filled_fields: 10,
+                        total_fields: 18,
+                        quality_score: 0.72,
+                        important_fields_filled: 6,
+                        important_fields_total: 10
+                    },
+                    sources: [
+                        {url: "https://mining-database.com", type: "industry", reliability: 75.0}
+                    ]
+                }
+            }
+        ];
+        
+        async function generateTestComparison() {
+            console.log('🔬 [EXPORT TEST] Generating test comparison...');
+            
+            const results = document.getElementById('testResults');
+            results.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <div style="display: inline-block; width: 32px; height: 32px; border: 3px solid #f3f3f3; border-top: 3px solid #16a34a; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                    <p style="margin-top: 15px; color: #16a34a; font-weight: 600;">Generating comparison with 3 models...</p>
+                </div>
+            `;
+            
+            try {
+                // Generate comparison
+                testComparison = await window.comparisonEngine.generateComparison(exportTestData);
+                
+                console.log('✅ [EXPORT TEST] Test comparison generated:', testComparison);
+                
+                // Display comparison preview
+                const preview = `
+                    <div class="comparison-preview">
+                        <h3>🔬 Generated Test Comparison</h3>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 20px 0;">
+                            <div class="status-indicator status-info">
+                                ID: ${testComparison.id}
+                            </div>
+                            <div class="status-indicator status-success">
+                                Models: ${testComparison.models.length}
+                            </div>
+                            <div class="status-indicator status-info">
+                                Consensus: ${Math.round(testComparison.consensus.overallScore * 100)}%
+                            </div>
+                            <div class="status-indicator status-error">
+                                Discrepancies: ${testComparison.metadata.discrepancyCount}
+                            </div>
+                        </div>
+                        
+                        <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                            <h4>📊 Analysis Summary:</h4>
+                            <ul style="margin: 10px 0; padding-left: 20px;">
+                                <li><strong>Models Analyzed:</strong> ${testComparison.models.join(', ')}</li>
+                                <li><strong>Strong Consensus Fields:</strong> ${testComparison.consensus.strongConsensus.length}</li>
+                                <li><strong>Major Discrepancies:</strong> ${testComparison.discrepancies.filter(d => d.severity > 0.5).length}</li>
+                                <li><strong>Data Quality:</strong> ${Math.round(testComparison.metadata.overallQuality * 100)}%</li>
+                            </ul>
+                        </div>
+                        
+                        <div style="text-align: center; margin-top: 20px;">
+                            <p style="color: #16a34a; font-weight: 600;">✅ Ready for Export Testing!</p>
+                            <p style="color: #64748b; font-size: 14px;">Klicke auf einen Export-Button oben um verschiedene Formate zu testen.</p>
+                        </div>
+                    </div>
+                `;
+                
+                results.innerHTML = preview;
+                
+            } catch (error) {
+                console.error('❌ [EXPORT TEST] Error generating comparison:', error);
+                results.innerHTML = `
+                    <div class="status-indicator status-error" style="display: block; text-align: center;">
+                        ❌ Error generating test comparison: ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        async function testExport(format) {
+            if (!testComparison) {
+                alert('Bitte erst "Generate Test Comparison" klicken!');
+                return;
+            }
+            
+            console.log(`📤 [EXPORT TEST] Testing ${format} export...`);
+            
+            try {
+                const exportResult = await window.comparisonExporter.exportComparison(testComparison.id, format);
+                
+                console.log(`✅ [EXPORT TEST] ${format} export successful:`, exportResult);
+                
+                // Update export history
+                updateExportHistory();
+                
+                // Show success message
+                const statusElement = document.createElement('div');
+                statusElement.className = 'status-indicator status-success';
+                statusElement.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 10000;';
+                statusElement.innerHTML = `✅ ${format.toUpperCase()} Export erfolgreich!<br><small>${exportResult.filename}</small>`;
+                document.body.appendChild(statusElement);
+                
+                setTimeout(() => statusElement.remove(), 4000);
+                
+            } catch (error) {
+                console.error(`❌ [EXPORT TEST] ${format} export failed:`, error);
+                
+                const statusElement = document.createElement('div');
+                statusElement.className = 'status-indicator status-error';
+                statusElement.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 10000;';
+                statusElement.innerHTML = `❌ ${format.toUpperCase()} Export fehlgeschlagen!<br><small>${error.message}</small>`;
+                document.body.appendChild(statusElement);
+                
+                setTimeout(() => statusElement.remove(), 4000);
+            }
+        }
+        
+        function updateExportHistory() {
+            const history = window.comparisonExporter.getExportHistory();
+            const historyDiv = document.getElementById('exportHistory');
+            const historyList = document.getElementById('historyList');
+            
+            if (history.length === 0) {
+                historyDiv.style.display = 'none';
+                return;
+            }
+            
+            historyDiv.style.display = 'block';
+            
+            historyList.innerHTML = history.slice(-5).reverse().map((item, idx) => `
+                <div style="background: white; padding: 10px; border-radius: 6px; margin: 8px 0; border: 1px solid #e5e7eb;">
+                    <strong>${item.format.toUpperCase()}</strong> - ${item.filename}
+                    <div style="font-size: 12px; color: #64748b; margin-top: 5px;">
+                        ${new Date(item.timestamp).toLocaleString()} | Comparison: ${item.comparisonId.substring(0, 8)}...
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Auto-check if engines are loaded
+        setTimeout(() => {
+            if (window.comparisonEngine && window.comparisonExporter) {
+                console.log('✅ [EXPORT TEST] All systems loaded successfully');
+            } else {
+                console.error('❌ [EXPORT TEST] Systems not properly loaded');
+            }
+        }, 1000);
+        
+        console.log('📤 [EXPORT TEST] Export test page loaded');
+    </script>
+</body>
+</html>

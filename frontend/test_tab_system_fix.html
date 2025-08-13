@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Tab System Test</title>
+    <style>
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border: 2px solid #ccc;
+            margin: 10px;
+        }
+        .tab-content.active {
+            display: block;
+            background: #e8f4fd;
+            border-color: #007bff;
+        }
+        .tab-navigation {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab-navigation input[type="radio"] {
+            display: none;
+        }
+        .tab-navigation label {
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .tab-navigation input[type="radio"]:checked + label {
+            background: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Tab System Test</h1>
+    
+    <nav class="tab-navigation">
+        <input type="radio" id="single-tab" name="tab" value="single" checked>
+        <label for="single-tab">🔍 Einzelsuche</label>
+        
+        <input type="radio" id="csv-tab" name="tab" value="csv">
+        <label for="csv-tab">📊 CSV-Upload</label>
+        
+        <input type="radio" id="sources-tab" name="tab" value="sources">
+        <label for="sources-tab">📚 Quellen</label>
+        
+        <input type="radio" id="statistics-tab" name="tab" value="statistics">
+        <label for="statistics-tab">📈 Statistiken</label>
+        
+        <input type="radio" id="consolidated-tab" name="tab" value="consolidated">
+        <label for="consolidated-tab">📋 Konsolidiert</label>
+    </nav>
+
+    <section id="single-search" class="tab-content active">
+        <h2>🔍 Single Search</h2>
+        <p>Das ist der Einzelsuch-Tab. Dieser sollte standardmäßig sichtbar sein.</p>
+    </section>
+    
+    <section id="csv-upload" class="tab-content">
+        <h2>📊 CSV Upload</h2>
+        <p>Das ist der CSV-Upload-Tab. Nur sichtbar wenn CSV-Tab aktiv ist.</p>
+    </section>
+    
+    <section id="sources" class="tab-content">
+        <h2>📚 Quellen</h2>
+        <p>Das ist der Quellen-Tab. Sollte Quellen-Daten laden wenn aktiviert.</p>
+        <div id="sources-table-container">
+            <p>Hier werden die Quellen geladen...</p>
+        </div>
+    </section>
+    
+    <section id="statistics" class="tab-content">
+        <h2>📈 Statistiken</h2>
+        <p>Das ist der Statistiken-Tab. Sollte Modell-Statistiken laden.</p>
+        <div id="model-statistics-table-container">
+            <p>Hier werden die Statistiken geladen...</p>
+        </div>
+    </section>
+    
+    <section id="consolidated" class="tab-content">
+        <h2>📋 Konsolidierte Ergebnisse</h2>
+        <p>Das ist der Konsolidierte-Tab. Sollte konsolidierte Ergebnisse laden.</p>
+        <div id="consolidated-table-container">
+            <p>Hier werden die konsolidierten Ergebnisse geladen...</p>
+        </div>
+    </section>
+    
+    <script>
+        // Mock functions für Test
+        window.loadSources = function() {
+            console.log('✅ loadSources called');
+            document.getElementById('sources-table-container').innerHTML = '<p style="color: green;">✅ Quellen erfolgreich geladen!</p>';
+        };
+        
+        window.loadModelStatistics = function() {
+            console.log('✅ loadModelStatistics called');
+            document.getElementById('model-statistics-table-container').innerHTML = '<p style="color: green;">✅ Statistiken erfolgreich geladen!</p>';
+        };
+        
+        window.loadConsolidatedResults = function() {
+            console.log('✅ loadConsolidatedResults called');
+            document.getElementById('consolidated-table-container').innerHTML = '<p style="color: green;">✅ Konsolidierte Ergebnisse erfolgreich geladen!</p>';
+        };
+    </script>
+    
+    <!-- Include our TabAutoLoader -->
+    <script src="/static/tab-autoloader.js"></script>
+    
+    <div style="margin-top: 30px; padding: 20px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
+        <h3>🧪 Test Anweisungen:</h3>
+        <ol>
+            <li>Standardmäßig sollte nur der <strong>Einzelsuche-Tab</strong> sichtbar sein</li>
+            <li>Klicken Sie auf andere Tab-Labels um zwischen Tabs zu wechseln</li>
+            <li>Nur der aktive Tab sollte sichtbar sein</li>
+            <li>Beim ersten Besuch eines Tabs sollten Daten geladen werden</li>
+            <li>Console-Logs zeigen das Tab-Switching-Verhalten</li>
+        </ol>
+        <p><strong>Erwartetes Verhalten:</strong> Nur ein Tab ist gleichzeitig sichtbar, Tab-Wechsel funktioniert smooth</p>
+    </div>
+</body>
+</html>
