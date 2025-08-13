@@ -20,9 +20,13 @@ const TabAutoLoader = {
         
         // Event Listener für alle Tab Radio Buttons
         const tabInputs = document.querySelectorAll('.tab-navigation input[type="radio"]');
+        console.log(`🎯 [TAB-AUTOLOADER] Found ${tabInputs.length} tab radio buttons`);
+        
         tabInputs.forEach(tabInput => {
+            console.log(`🎯 [TAB-AUTOLOADER] Setting up listener for: ${tabInput.id}`);
             tabInput.addEventListener('change', (e) => {
                 if (e.target.checked) {
+                    console.log(`📡 [TAB-AUTOLOADER] Tab changed to: ${e.target.id} (value: ${e.target.value})`);
                     this.handleTabChange(e.target.id);
                 }
             });
@@ -37,7 +41,7 @@ const TabAutoLoader = {
      */
     handleTabChange(tabId) {
         const tabName = tabId.replace('-tab', '');
-        console.log(`🔄 [TAB-AUTOLOADER] Switching to tab: ${tabName}`);
+        console.log(`🔄 [TAB-AUTOLOADER] Switching to tab: ${tabName} (from ${tabId})`);
         
         // Update CSS-Klassen für Tab-Anzeige
         this.updateTabDisplay(tabName);
@@ -72,8 +76,12 @@ const TabAutoLoader = {
         
         // 2. Tab-Content-Sections verwalten - KRITISCH für Sichtbarkeit
         const allTabContents = document.querySelectorAll('.tab-content');
+        console.log(`🎨 [TAB-AUTOLOADER] Found ${allTabContents.length} tab contents to manage`);
+        
         allTabContents.forEach(tabContent => {
+            // WICHTIG: Verstecke alle Tabs durch Entfernen der active-Klasse
             tabContent.classList.remove('active');
+            console.log(`🔄 [TAB-AUTOLOADER] Deactivated tab: ${tabContent.id}`);
         });
         
         // Aktiviere nur den gewünschten Tab
@@ -89,10 +97,12 @@ const TabAutoLoader = {
         const activeTab = document.getElementById(targetTabId);
         
         if (activeTab) {
+            // WICHTIG: Aktiviere nur den gewünschten Tab durch active-Klasse
             activeTab.classList.add('active');
-            console.log(`✅ [TAB-AUTOLOADER] Activated tab content: ${targetTabId}`);
+            console.log(`✅ [TAB-AUTOLOADER] Activated tab content: ${targetTabId} with 'active' class`);
         } else {
             console.error(`❌ [TAB-AUTOLOADER] Tab content not found: ${targetTabId}`);
+            console.log(`Available tabs:`, Array.from(allTabContents).map(t => t.id));
         }
     },
     
@@ -104,9 +114,11 @@ const TabAutoLoader = {
             case 'sources':
                 console.log('📚 [TAB-AUTOLOADER] Loading sources data...');
                 if (typeof loadSources === 'function') {
-                    loadSources();
+                    loadSources('count', 'desc'); // Sort by count, descending
+                } else if (typeof window.loadSources === 'function') {
+                    window.loadSources('count', 'desc');
                 } else {
-                    console.error('❌ [TAB-AUTOLOADER] loadSources function not found');
+                    console.error('❌ [TAB-AUTOLOADER] loadSources function not found in global or window scope');
                 }
                 break;
                 
@@ -114,17 +126,21 @@ const TabAutoLoader = {
                 console.log('📊 [TAB-AUTOLOADER] Loading statistics data...');
                 if (typeof loadModelStatistics === 'function') {
                     loadModelStatistics();
+                } else if (typeof window.loadModelStatistics === 'function') {
+                    window.loadModelStatistics();
                 } else {
-                    console.error('❌ [TAB-AUTOLOADER] loadModelStatistics function not found');
+                    console.error('❌ [TAB-AUTOLOADER] loadModelStatistics function not found in global or window scope');
                 }
                 break;
                 
             case 'consolidated':
                 console.log('📋 [TAB-AUTOLOADER] Loading consolidated results...');
                 if (typeof loadConsolidatedResults === 'function') {
-                    loadConsolidatedResults();
+                    loadConsolidatedResults('mine_name', 'asc');
+                } else if (typeof window.loadConsolidatedResults === 'function') {
+                    window.loadConsolidatedResults('mine_name', 'asc');
                 } else {
-                    console.error('❌ [TAB-AUTOLOADER] loadConsolidatedResults function not found');
+                    console.error('❌ [TAB-AUTOLOADER] loadConsolidatedResults function not found in global or window scope');
                 }
                 break;
                 

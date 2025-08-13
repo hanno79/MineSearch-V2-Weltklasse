@@ -221,35 +221,96 @@ async function loadModelsForFilter() {
         
         console.log(`🏷️ [DEBUG] Providers found: ${Object.keys(providerGroups).join(', ')}`);
         
-        // Generiere HTML für Model Selection
-        let modelsHTML = '';
+        // PHASE 2: Search Interface Revolution - Intelligente Provider-Kategorisierung
+        console.log('🎨 [UI-REVOLUTION] Implementing Smart Model Selection...');
         
+        // Smart Provider Categories & Priorities
+        const providerCategories = {
+            recommended: ['perplexity', 'openrouter', 'abacus'],
+            webSearch: ['tavily', 'exa', 'grok'],
+            premium: ['openai', 'anthropic', 'gemini'],
+            scraping: ['scrapingbee', 'firecrawl', 'brightdata']
+        };
+        
+        // Smart Defaults für beliebte Modelle
+        const smartDefaults = [
+            'perplexity:sonar-pro',
+            'openrouter:deepseek-free', 
+            'abacus:deep-agent'
+        ];
+        
+        let modelsHTML = `
+            <div class="search-interface-revolution">
+                <!-- Quick Start Section -->
+                <div class="quick-start-section">
+                    <h4 style="color: var(--primary-700); margin-bottom: var(--space-md); display: flex; align-items: center; gap: var(--space-sm);">
+                        ⚡ Quick Start
+                        <span style="background: var(--success-100); color: var(--success-700); padding: 4px 8px; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">Empfohlen</span>
+                    </h4>
+                    <div class="quick-selection-pills">
+                        <button type="button" class="quick-pill recommended" onclick="selectQuickPreset('recommended')" title="Beste Allround-Modelle für Mining-Recherche">
+                            🏆 Beste Auswahl (3 Modelle)
+                        </button>
+                        <button type="button" class="quick-pill web-focus" onclick="selectQuickPreset('webSearch')" title="Modelle mit Web-Zugriff für aktuelle Daten">
+                            🌐 Web-Suche (6 Modelle)
+                        </button>
+                        <button type="button" class="quick-pill premium" onclick="selectQuickPreset('premium')" title="Premium-Modelle für komplexe Analysen">
+                            💎 Premium (12 Modelle)
+                        </button>
+                        <button type="button" class="quick-pill all" onclick="selectQuickPreset('all')" title="Alle verfügbaren Modelle verwenden">
+                            🚀 Alle (55 Modelle)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Advanced Selection (Initially Hidden) -->
+                <div class="advanced-selection-section" style="display: none;">
+                    <div style="display: flex; justify-content: between; align-items: center; margin-bottom: var(--space-md);">
+                        <h4 style="color: var(--gray-700); margin: 0;">⚙️ Erweiterte Auswahl</h4>
+                        <button type="button" class="hide-advanced-btn" onclick="hideAdvancedSelection()">
+                            ⬆️ Verbergen
+                        </button>
+                    </div>
+        `;
+        
+        // Generate Provider Groups with improved UX
         Object.entries(providerGroups).forEach(([provider, models]) => {
-            const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
+            const providerName = getProviderDisplayName(provider);
             const providerId = provider.replace(/[^a-zA-Z0-9]/g, '_');
+            const categoryInfo = getProviderCategory(provider, providerCategories);
             
             modelsHTML += `
-                <div class="provider-group" data-provider="${provider}">
-                    <div style="display: flex; align-items: center; padding: 10px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; margin-bottom: 5px; cursor: pointer;" 
-                         onclick="toggleProviderModels('${provider}')">
+                <div class="provider-group ${categoryInfo.class}" data-provider="${provider}">
+                    <div class="provider-header" onclick="toggleProviderModels('${provider}')">
                         <input type="checkbox" id="provider_${providerId}" 
                                onchange="toggleProviderCheckbox('${provider}')" 
-                               onclick="event.stopPropagation()"
-                               style="margin-right: 10px;">
-                        <strong style="flex: 1;">${providerName}</strong>
-                        <span class="provider-toggle" style="font-weight: bold; color: #6c757d;">▼</span>
+                               onclick="event.stopPropagation()">
+                        <div class="provider-info">
+                            <strong>${categoryInfo.icon} ${providerName}</strong>
+                            <span class="provider-meta">${models.length} Modelle • ${categoryInfo.description}</span>
+                        </div>
+                        <span class="provider-toggle">▼</span>
                     </div>
-                    <div class="models-list" style="margin-left: 20px; display: block;">
+                    <div class="models-list" style="display: none;">
             `;
             
             models.forEach(model => {
                 const modelDisplayName = model.id.split(':')[1] || model.id;
+                const isDefault = smartDefaults.includes(model.id);
+                const modelMeta = getModelMeta(model.info);
+                
                 modelsHTML += `
-                    <label style="display: block; padding: 5px; cursor: pointer;">
+                    <label class="model-option ${isDefault ? 'recommended' : ''}">
                         <input type="checkbox" name="model" value="${model.id}" 
-                               onchange="updateProviderCheckboxState('${provider}')"
-                               style="margin-right: 8px;">
-                        ${modelDisplayName}
+                               ${isDefault ? 'checked' : ''}
+                               onchange="updateProviderCheckboxState('${provider}')">
+                        <div class="model-details">
+                            <span class="model-name">${modelDisplayName} ${isDefault ? '⭐' : ''}</span>
+                            <span class="model-description">${modelMeta.description}</span>
+                            <div class="model-tags">
+                                ${modelMeta.tags.map(tag => `<span class="tag ${tag.class}">${tag.text}</span>`).join('')}
+                            </div>
+                        </div>
                     </label>
                 `;
             });
@@ -260,8 +321,34 @@ async function loadModelsForFilter() {
             `;
         });
         
+        modelsHTML += `
+                </div>
+                
+                <!-- Show Advanced Button -->
+                <div class="show-advanced-section">
+                    <button type="button" class="show-advanced-btn" onclick="showAdvancedSelection()">
+                        ⚙️ Erweiterte Auswahl anzeigen (${Object.values(data.models).length} Modelle)
+                    </button>
+                </div>
+                
+                <!-- Selection Summary -->
+                <div class="selection-summary">
+                    <div class="selected-count">
+                        <strong id="selected-models-count">3</strong> Modelle ausgewählt
+                    </div>
+                    <button type="button" class="clear-selection" onclick="clearAllModels()" style="display: none;">
+                        Alle abwählen
+                    </button>
+                </div>
+            </div>
+        `;
+        
         modelSelection.innerHTML = modelsHTML;
-        console.log(`✅ [MODEL-FILTER] ${Object.keys(providerGroups).length} Provider mit ${Object.values(data.models).length} Modellen geladen`);
+        console.log(`✅ [UI-REVOLUTION] Smart Model Selection with ${Object.keys(providerGroups).length} providers and ${Object.values(data.models).length} models loaded`);
+        
+        // Initialize UI Revolution features
+        initializeQuickPresets(providerGroups, data.models);
+        updateSelectionCounter();
         
     } catch (error) {
         console.error('❌ [MODEL-FILTER] Error loading models:', error);
@@ -444,6 +531,213 @@ function processSearchResults(data, searchType = 'single') {
 // GLOBAL EXPORTS & INITIALIZATION
 // ============================================
 
+// ============================================
+// UI REVOLUTION: SMART MODEL SELECTION
+// Phase 2 Implementation
+// ============================================
+
+// Helper Functions für Search Interface Revolution
+function getProviderDisplayName(provider) {
+    const displayNames = {
+        'perplexity': 'Perplexity',
+        'openrouter': 'OpenRouter', 
+        'abacus': 'Abacus AI',
+        'tavily': 'Tavily Search',
+        'exa': 'Exa Neural',
+        'scrapingbee': 'ScrapingBee',
+        'firecrawl': 'Firecrawl',
+        'brightdata': 'Bright Data',
+        'openai': 'OpenAI',
+        'anthropic': 'Anthropic',
+        'gemini': 'Google Gemini',
+        'grok': 'Grok (X.AI)'
+    };
+    return displayNames[provider] || provider.charAt(0).toUpperCase() + provider.slice(1);
+}
+
+function getProviderCategory(provider, categories) {
+    if (categories.recommended.includes(provider)) {
+        return {
+            class: 'recommended-provider',
+            icon: '🏆',
+            description: 'Empfohlen für Mining-Recherche'
+        };
+    }
+    if (categories.webSearch.includes(provider)) {
+        return {
+            class: 'web-provider',
+            icon: '🌐',
+            description: 'Web-Suche mit aktuellen Daten'
+        };
+    }
+    if (categories.premium.includes(provider)) {
+        return {
+            class: 'premium-provider',
+            icon: '💎',
+            description: 'Premium-Modelle für komplexe Analysen'
+        };
+    }
+    if (categories.scraping.includes(provider)) {
+        return {
+            class: 'scraping-provider',
+            icon: '🔍',
+            description: 'Web-Scraping und Datenextraktion'
+        };
+    }
+    return {
+        class: 'standard-provider',
+        icon: '🤖',
+        description: 'Standard-Modelle'
+    };
+}
+
+function getModelMeta(modelInfo) {
+    const tags = [];
+    let description = modelInfo.description || 'KI-Modell für Mining-Analyse';
+    
+    // Add capability tags
+    if (modelInfo.is_free) {
+        tags.push({ text: 'Kostenlos', class: 'free' });
+    }
+    if (modelInfo.supports_web_search) {
+        tags.push({ text: 'Web-Suche', class: 'web' });
+    }
+    if (modelInfo.supports_deep_research) {
+        tags.push({ text: 'Deep Research', class: 'research' });
+    }
+    if (modelInfo.max_tokens >= 10000) {
+        tags.push({ text: 'Large Context', class: 'large' });
+    }
+    
+    return { description, tags };
+}
+
+// Quick Preset Functions
+function selectQuickPreset(presetType) {
+    console.log(`🎯 [UI-REVOLUTION] Selecting preset: ${presetType}`);
+    
+    // Clear all selections first
+    clearAllModels();
+    
+    const providerCategories = {
+        recommended: ['perplexity', 'openrouter', 'abacus'],
+        webSearch: ['tavily', 'exa', 'grok'],
+        premium: ['openai', 'anthropic', 'gemini'],
+        scraping: ['scrapingbee', 'firecrawl', 'brightdata']
+    };
+    
+    let modelsToSelect = [];
+    
+    switch(presetType) {
+        case 'recommended':
+            modelsToSelect = [
+                'perplexity:sonar-pro',
+                'openrouter:deepseek-free',
+                'abacus:deep-agent'
+            ];
+            break;
+            
+        case 'webSearch':
+            modelsToSelect = document.querySelectorAll('input[name="model"]');
+            modelsToSelect = Array.from(modelsToSelect)
+                .filter(input => {
+                    const provider = input.value.split(':')[0];
+                    return providerCategories.webSearch.includes(provider);
+                })
+                .map(input => input.value);
+            break;
+            
+        case 'premium':
+            modelsToSelect = document.querySelectorAll('input[name="model"]');
+            modelsToSelect = Array.from(modelsToSelect)
+                .filter(input => {
+                    const provider = input.value.split(':')[0];
+                    return providerCategories.premium.includes(provider);
+                })
+                .map(input => input.value);
+            break;
+            
+        case 'all':
+            modelsToSelect = Array.from(document.querySelectorAll('input[name="model"]'))
+                .map(input => input.value);
+            break;
+    }
+    
+    // Select the models
+    modelsToSelect.forEach(modelId => {
+        const checkbox = document.querySelector(`input[name="model"][value="${modelId}"]`);
+        if (checkbox) {
+            checkbox.checked = true;
+            // Update provider checkbox state
+            const provider = modelId.split(':')[0];
+            updateProviderCheckboxState(provider);
+        }
+    });
+    
+    // Update counter and highlight selected preset
+    updateSelectionCounter();
+    
+    // Highlight selected preset
+    document.querySelectorAll('.quick-pill').forEach(pill => {
+        pill.classList.remove('active');
+    });
+    document.querySelector(`.quick-pill.${presetType}`)?.classList.add('active');
+    
+    console.log(`✅ [UI-REVOLUTION] Selected ${modelsToSelect.length} models for preset: ${presetType}`);
+}
+
+function showAdvancedSelection() {
+    document.querySelector('.advanced-selection-section').style.display = 'block';
+    document.querySelector('.show-advanced-section').style.display = 'none';
+    console.log('🔧 [UI-REVOLUTION] Advanced selection shown');
+}
+
+function hideAdvancedSelection() {
+    document.querySelector('.advanced-selection-section').style.display = 'none';
+    document.querySelector('.show-advanced-section').style.display = 'block';
+    console.log('🔧 [UI-REVOLUTION] Advanced selection hidden');
+}
+
+function clearAllModels() {
+    document.querySelectorAll('input[name="model"]').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    document.querySelectorAll('input[id^="provider_"]').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    document.querySelectorAll('.quick-pill').forEach(pill => {
+        pill.classList.remove('active');
+    });
+    
+    updateSelectionCounter();
+    console.log('🧹 [UI-REVOLUTION] All models cleared');
+}
+
+function updateSelectionCounter() {
+    const selectedCount = document.querySelectorAll('input[name="model"]:checked').length;
+    const counterElement = document.getElementById('selected-models-count');
+    const clearButton = document.querySelector('.clear-selection');
+    
+    if (counterElement) {
+        counterElement.textContent = selectedCount;
+    }
+    
+    if (clearButton) {
+        clearButton.style.display = selectedCount > 0 ? 'block' : 'none';
+    }
+}
+
+function initializeQuickPresets(providerGroups, models) {
+    // Set default preset selection (recommended)
+    setTimeout(() => {
+        selectQuickPreset('recommended');
+    }, 500);
+    
+    console.log('🎨 [UI-REVOLUTION] Quick presets initialized with smart defaults');
+}
+
 // Export search functions to global scope
 window.startSingleSearch = startSingleSearch;
 window.startBatchSearch = startBatchSearch;
@@ -451,6 +745,13 @@ window.loadModelsForFilter = loadModelsForFilter;
 window.validateSearchForm = validateSearchForm;
 window.handleSearchOptionsChange = handleSearchOptionsChange;
 window.SearchState = SearchState;
+
+// Export UI Revolution functions
+window.selectQuickPreset = selectQuickPreset;
+window.showAdvancedSelection = showAdvancedSelection;
+window.hideAdvancedSelection = hideAdvancedSelection;
+window.clearAllModels = clearAllModels;
+window.updateSelectionCounter = updateSelectionCounter;
 window.processSearchResults = processSearchResults;
 
 // Initialize search options event handlers

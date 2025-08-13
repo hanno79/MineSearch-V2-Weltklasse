@@ -457,25 +457,18 @@ function showConsolidatedDetailModal(mineName, mineData) {
                 ${mineData.best_values ? `
                     <div class="mine-fields">
                         <h4>📋 Beste Werte</h4>
-                        <div class="fields-table">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Feld</th>
-                                        <th>Wert</th>
-                                        <th>Quelle</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${Object.entries(mineData.best_values).map(([field, value]) => `
-                                        <tr>
-                                            <td><strong>${field}</strong></td>
-                                            <td>${value || 'Nicht verfügbar'}</td>
-                                            <td><small>Konsolidiert</small></td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
+                        <div class="fields-data-grid">
+                            ${Object.entries(mineData.best_values).map(([field, value]) => `
+                                <div class="field-data-card">
+                                    <div class="field-header">
+                                        <span class="field-name">${field}</span>
+                                        <span class="source-badge">📊 Konsolidiert</span>
+                                    </div>
+                                    <div class="field-value">
+                                        ${value || '<span class="missing-value">Nicht verfügbar</span>'}
+                                    </div>
+                                </div>
+                            `).join('')}
                         </div>
                     </div>
                 ` : ''}

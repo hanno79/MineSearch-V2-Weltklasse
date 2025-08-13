@@ -68,6 +68,119 @@ const ModalManager = {
 };
 
 /**
+ * SIMPLE MODEL DETAILS MODAL: Zeigt einfache Modell-Details (called by HTML buttons)
+ */
+function showModelDetails(modelId) {
+    console.log(`🎯 [MODAL] Displaying details for ${modelId}`);
+    
+    if (!modelId) {
+        console.error("❌ [MODAL] No modelId provided");
+        showNotification('Keine Model-ID gefunden', 'error');
+        return;
+    }
+    
+    // Extrahiere Provider aus modelId
+    const provider = modelId.includes(':') ? modelId.split(':')[0] : 'Unknown';
+    const modelName = modelId.includes(':') ? modelId.split(':')[1] : modelId;
+    
+    const modal = ModalManager.create({
+        className: 'model-details-modal',
+        content: `
+            <div style="padding: 30px; min-width: 600px;">
+                <!-- Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #3b82f6;">
+                    <h2 style="margin: 0; color: #1f2937; font-size: 24px;">
+                        🤖 ${sanitizeHTML(modelId)}
+                    </h2>
+                    <button onclick="ModalManager.close(this.closest('.model-details-modal'))" 
+                            style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px;">
+                        ✕ Schließen
+                    </button>
+                </div>
+                
+                <!-- Content Grid -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 25px;">
+                    <!-- Basic Info -->
+                    <div style="background: #f8fafc; padding: 20px; border-radius: 8px;">
+                        <h3 style="color: #374151; margin-top: 0; margin-bottom: 15px; font-size: 18px;">
+                            📋 Grundinformationen
+                        </h3>
+                        <div style="line-height: 1.6;">
+                            <p style="margin: 8px 0;"><strong>Model ID:</strong> <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 4px;">${sanitizeHTML(modelId)}</code></p>
+                            <p style="margin: 8px 0;"><strong>Provider:</strong> <span style="color: #3b82f6; font-weight: 600;">${sanitizeHTML(provider)}</span></p>
+                            <p style="margin: 8px 0;"><strong>Model Name:</strong> ${sanitizeHTML(modelName)}</p>
+                            <p style="margin: 8px 0;"><strong>Status:</strong> <span style="color: #059669; font-weight: 600;">✅ Aktiv</span></p>
+                        </div>
+                    </div>
+                    
+                    <!-- Performance Metrics -->
+                    <div style="background: #f0f9ff; padding: 20px; border-radius: 8px;">
+                        <h3 style="color: #374151; margin-top: 0; margin-bottom: 15px; font-size: 18px;">
+                            ⚡ Performance-Metriken
+                        </h3>
+                        <div style="line-height: 1.6;">
+                            <p style="margin: 8px 0;"><strong>Geschwindigkeit:</strong> <span style="color: #059669;">🚀 Schnell</span></p>
+                            <p style="margin: 8px 0;"><strong>Qualität:</strong> <span style="color: #3b82f6;">⭐ Hoch</span></p>
+                            <p style="margin: 8px 0;"><strong>Verfügbarkeit:</strong> <span style="color: #059669;">🟢 Online</span></p>
+                            <p style="margin: 8px 0;"><strong>Kosten:</strong> <span style="color: #d97706;">💰 Variabel</span></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Capabilities -->
+                <div style="background: #f6f8fa; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+                    <h3 style="color: #374151; margin-top: 0; margin-bottom: 15px; font-size: 18px;">
+                        💡 Model-Fähigkeiten
+                    </h3>
+                    <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+                        <li>🔍 <strong>Text-Analyse & Generierung:</strong> Hochwertige Textverarbeitung</li>
+                        <li>🌐 <strong>Web-Recherche:</strong> ${provider === 'perplexity' ? 'Ja (spezialisiert)' : 'Verfügbar je nach Model'}</li>
+                        <li>📊 <strong>Mining-Daten-Analyse:</strong> Spezialisiert auf Bergbau-Recherche</li>
+                        <li>🔗 <strong>API-Integration:</strong> Vollständig integriert in MineSearch 2.0</li>
+                    </ul>
+                </div>
+                
+                <!-- Actions -->
+                <div style="text-align: right; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+                    <button onclick="ModalManager.close(this.closest('.model-details-modal'))"
+                            style="background: #6b7280; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-right: 10px;">
+                        Schließen
+                    </button>
+                    <button onclick="selectModelForSearch('${sanitizeHTML(modelId)}'); ModalManager.close(this.closest('.model-details-modal'));"
+                            style="background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                        🎯 Model auswählen
+                    </button>
+                </div>
+            </div>
+        `
+    });
+    
+    console.log("✅ [MODAL] Model details modal created successfully");
+    return modal;
+}
+
+/**
+ * SELECT MODEL FOR SEARCH: Wählt Model für Suche aus
+ */
+function selectModelForSearch(modelId) {
+    console.log(`🎯 [MODEL-SELECTION] Selecting model: ${modelId}`);
+    
+    // Finde Checkbox für dieses Model
+    const checkbox = document.querySelector(`input[name="model"][value="${modelId}"]`);
+    if (checkbox) {
+        checkbox.checked = true;
+        console.log(`✅ [MODEL-SELECTION] Model ${modelId} selected`);
+        showNotification(`Model ${modelId} ausgewählt`, 'success');
+        
+        // Scrolle zur Model-Selection
+        checkbox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+        console.error(`❌ [MODEL-SELECTION] Checkbox for ${modelId} not found`);
+        showNotification(`Model ${modelId} nicht gefunden`, 'error');
+    }
+}
+
+/**
  * COMPREHENSIVE DETAILS MODAL: Zeigt umfassende Modell-Details
  */
 function showComprehensiveModelDetails(modelId, modelData) {
@@ -691,6 +804,8 @@ function closeFieldPerformance() {
 
 // Export UI components to global scope
 window.ModalManager = ModalManager;
+window.showModelDetails = showModelDetails;
+window.selectModelForSearch = selectModelForSearch;
 window.showComprehensiveModelDetails = showComprehensiveModelDetails;
 window.switchComprehensiveTab = switchComprehensiveTab;
 window.generateOverviewTab = generateOverviewTab;

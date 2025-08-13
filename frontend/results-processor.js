@@ -13,7 +13,7 @@
 // ============================================
 
 /**
- * DISPLAY RESULTS: Zeigt Suchergebnisse an
+ * DISPLAY RESULTS: Zeigt Suchergebnisse an mit Phase 4 Multi-Model Support
  */
 function displayResults(data) {
     console.log('📊 [RESULTS] Displaying search results');
@@ -31,38 +31,40 @@ function displayResults(data) {
     }
     
     try {
+        // PHASE 4: MULTI-MODEL COMPARISON DETECTION
+        if (data.data && data.data.results && Array.isArray(data.data.results)) {
+            console.log('🔬 [PHASE 4] Multi-model results detected');
+            
+            const successfulResults = data.data.results.filter(r => r.success && r.data);
+            
+            if (successfulResults.length >= 2) {
+                console.log(`🔬 [PHASE 4] Interactive comparison for ${successfulResults.length} models`);
+                displayMultiModelComparison(successfulResults, data.data);
+                return;
+            } else if (successfulResults.length === 1) {
+                console.log('📊 [PHASE 3] Single successful model from multi-search');
+                displaySingleModelFromMulti(successfulResults[0], data.data);
+                return;
+            } else {
+                console.log('❌ [RESULTS] No successful models in multi-search');
+                displayMultiModelErrors(data.data.results);
+                return;
+            }
+        }
+        
+        // PHASE 3: SINGLE MODEL RESULTS
         if (data.success && data.data) {
-            // Success case
-            console.log('✅ [RESULTS] Displaying successful results');
+            console.log('✅ [RESULTS] Displaying single model results');
             
             // Save results to session for restoration
             if (typeof saveSearchResults === 'function') {
                 saveSearchResults(data, 'single');
             }
             
-            // Display results
-            const resultHTML = `
-                <div style="padding: 20px; background: #f0fdf4; border-radius: 8px; border: 1px solid #10b981; margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 15px;">
-                        <h3 style="margin: 0; color: #059669;">✅ Suchergebnis für: ${sanitizeHTML(data.data.mine_name || 'Unbekannt')}</h3>
-                        <button onclick="exportSearchResults('${data.data.mine_name || 'result'}')" 
-                                style="background: #059669; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                            📥 Exportieren
-                        </button>
-                    </div>
-                    
-                    ${generateResultSummary(data.data)}
-                    
-                    <div class="result-details" style="margin-top: 20px;">
-                        <details style="background: #f9f9f9; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0;">
-                            <summary style="cursor: pointer; font-weight: bold; color: #374151; margin-bottom: 10px;">
-                                📋 Vollständige Daten anzeigen
-                            </summary>
-                            <pre style="background: #ffffff; padding: 15px; border-radius: 4px; white-space: pre-wrap; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; border: 1px solid #d1d5db; margin-top: 10px;">${sanitizeHTML(JSON.stringify(data.data, null, 2))}</pre>
-                        </details>
-                    </div>
-                </div>
-            `;
+            // PHASE 3: Results Presentation Revolution - Card-based Layout
+            console.log('🎨 [RESULTS-REVOLUTION] Implementing modern card-based results...');
+            
+            const resultHTML = generateModernResultCard(data.data);
             
             safeSetHTML(resultsDiv, resultHTML);
             
@@ -402,57 +404,144 @@ function displayBatchResults(results) {
 }
 
 /**
- * GENERATE BATCH RESULTS TABLE: Erstellt Tabelle für Batch-Ergebnisse
+ * GENERATE BATCH RESULTS CARDS: Erstellt moderne Data-Cards für Batch-Ergebnisse
+ * PHASE 3: TABELLEN-REVOLUTION - Ersetzt hässliche HTML-Tabelle
  */
 function generateBatchResultsTable(results) {
     if (!results || results.length === 0) {
-        return '<p>Keine Ergebnisse verfügbar</p>';
+        return `
+            <div style="text-align: center; padding: var(--space-xl); color: var(--gray-500);">
+                <h3>Keine Ergebnisse verfügbar</h3>
+                <p>Es wurden keine Batch-Ergebnisse gefunden.</p>
+            </div>
+        `;
     }
     
-    const tableRows = results.map((result, index) => {
-        const status = result.success ? 
-            '<span style="color: #059669; font-weight: bold;">✅ Erfolg</span>' : 
-            '<span style="color: #dc2626; font-weight: bold;">❌ Fehler</span>';
+    // Use our data-card system for batch results
+    const batchCards = results.map((result, index) => {
+        // Transform result to match our mine data card format
+        const mineData = {
+            mine_name: result.mine_name || 'Unbekannte Mine',
+            country: result.country || 'Unbekannt',
+            commodity: result.commodity || 'Unbekannt',
+            model_used: result.model_used || 'Unbekannt',
+            success: result.success,
+            fields_found: result.structured_data ? Object.keys(result.structured_data).length : 0,
+            result_index: index,
+            raw_result: result
+        };
         
-        const fieldsFound = result.structured_data ? Object.keys(result.structured_data).length : 0;
-        
-        return `
-            <tr style="border-bottom: 1px solid #e5e7eb;">
-                <td style="padding: 8px; text-align: center;">${index + 1}</td>
-                <td style="padding: 8px; font-weight: 500;">${sanitizeHTML(result.mine_name || 'Unbekannt')}</td>
-                <td style="padding: 8px;">${sanitizeHTML(result.country || 'Unbekannt')}</td>
-                <td style="padding: 8px;">${sanitizeHTML(result.commodity || 'Unbekannt')}</td>
-                <td style="padding: 8px; text-align: center;">${status}</td>
-                <td style="padding: 8px; text-align: center;">${fieldsFound}</td>
-                <td style="padding: 8px; font-size: 11px;">${sanitizeHTML(result.model_used || 'Unbekannt')}</td>
-                <td style="padding: 8px; text-align: center;">
-                    <button onclick="viewResultDetail(${index}, ${safeJSONStringify(result)})" 
-                            style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;">
-                        Details
-                    </button>
-                </td>
-            </tr>
-        `;
+        return generateBatchResultCard(mineData);
     }).join('');
     
     return `
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; font-size: 13px;">
-            <thead style="background: #f9fafb;">
-                <tr>
-                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; border-bottom: 1px solid #e5e7eb;">#</th>
-                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Mine</th>
-                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Land</th>
-                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Rohstoff</th>
-                    <th style="padding: 12px 8px; text-align: center; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Status</th>
-                    <th style="padding: 12px 8px; text-align: center; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Felder</th>
-                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Modell</th>
-                    <th style="padding: 12px 8px; text-align: center; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Aktionen</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${tableRows}
-            </tbody>
-        </table>
+        <div class="batch-results-header" style="margin-bottom: var(--space-lg);">
+            <h3 style="margin: 0; color: #374151;">
+                📊 Batch-Suchergebnisse 
+                (${results.length} ${results.length === 1 ? 'Ergebnis' : 'Ergebnisse'})
+            </h3>
+        </div>
+        <div class="data-card-grid">
+            ${batchCards}
+        </div>
+    `;
+}
+
+/**
+ * GENERATE BATCH RESULT CARD: Erstellt moderne Batch-Result-Card
+ */
+function generateBatchResultCard(mineData) {
+    const mineName = mineData.mine_name;
+    const country = mineData.country;
+    const commodity = mineData.commodity;
+    const model = mineData.model_used;
+    const success = mineData.success;
+    const fieldsFound = mineData.fields_found;
+    const index = mineData.result_index;
+    
+    // Status styling
+    const statusClass = success ? 'status-success' : 'status-error';
+    const statusText = success ? '✅ Erfolg' : '❌ Fehler';
+    const statusColor = success ? 'var(--success-600)' : 'var(--error-600)';
+    
+    // Quality indicator based on fields found
+    let qualityLevel = 'Niedrig';
+    let qualityClass = 'status-error';
+    if (fieldsFound >= 15) {
+        qualityLevel = 'Exzellent';
+        qualityClass = 'status-success';
+    } else if (fieldsFound >= 10) {
+        qualityLevel = 'Gut';
+        qualityClass = 'status-success';
+    } else if (fieldsFound >= 5) {
+        qualityLevel = 'Durchschnitt';
+        qualityClass = 'status-warning';
+    }
+    
+    return `
+        <div class="mine-data-card batch-result-card" data-mine="${mineName}" data-index="${index}">
+            <!-- CARD HEADER -->
+            <div class="card-header">
+                <h3 class="card-title">
+                    🏭 ${mineName}
+                </h3>
+                <p class="card-subtitle">📍 ${country}</p>
+                <div class="mine-type-badge ${statusClass}">
+                    ${statusText}
+                </div>
+            </div>
+            
+            <!-- CARD BODY -->
+            <div class="card-body">
+                <div class="data-row">
+                    <span class="data-label">🌍 Land</span>
+                    <span class="data-value">${country}</span>
+                </div>
+                
+                <div class="data-row">
+                    <span class="data-label">⚖️ Rohstoff</span>
+                    <span class="data-value">${commodity}</span>
+                </div>
+                
+                <div class="data-row">
+                    <span class="data-label">📊 Gefundene Felder</span>
+                    <span class="data-value" style="font-size: 1.2em; color: var(--primary-600);">
+                        ${fieldsFound} Felder
+                    </span>
+                </div>
+                
+                <div class="data-row">
+                    <span class="data-label">📈 Datenqualität</span>
+                    <span class="status-indicator ${qualityClass}">
+                        ${qualityLevel}
+                    </span>
+                </div>
+                
+                <div class="data-row">
+                    <span class="data-label">🤖 Modell</span>
+                    <span class="data-value" style="font-size: 0.9em;">
+                        ${model}
+                    </span>
+                </div>
+            </div>
+            
+            <!-- CARD ACTIONS -->
+            <div class="card-actions">
+                <div>
+                    <button class="action-button" onclick="viewResultDetail(${index}, ${safeJSONStringify(mineData.raw_result)})">
+                        📊 Details anzeigen
+                    </button>
+                    <button class="action-button secondary" onclick="exportSearchResults('${mineName}')">
+                        📤 Exportieren
+                    </button>
+                </div>
+                <div>
+                    <button class="action-button secondary" onclick="saveToFavorites('${mineName}')">
+                        ⭐ Merken
+                    </button>
+                </div>
+            </div>
+        </div>
     `;
 }
 
@@ -543,6 +632,284 @@ window.retryLastSearch = function() {
 // GLOBAL EXPORTS
 // ============================================
 
+// ============================================
+// PHASE 3: RESULTS PRESENTATION REVOLUTION
+// Modern Card-based Results Display
+// ============================================
+
+/**
+ * RESULTS REVOLUTION: Generate Modern Result Card
+ */
+function generateModernResultCard(data) {
+    console.log('🎨 [RESULTS-CARD] Generating modern result card...');
+    
+    const mineName = data.mine_name || 'Unbekannt';
+    const mineLocation = data.location || data.land || 'Unbekannt';
+    const mineType = data.mine_type || data.rohstoff || 'Unbekannt';
+    
+    // Extract key metrics
+    const keyMetrics = extractKeyMetrics(data);
+    const qualityScore = calculateDataQuality(data);
+    
+    return `
+        <div class="results-revolution-container">
+            <div class="result-card modern-card">
+                <!-- Card Header -->
+                <div class="card-header">
+                    <div class="mine-info">
+                        <h2 class="mine-title">⛏️ ${sanitizeHTML(mineName)}</h2>
+                        <div class="mine-meta">
+                            <span class="location-tag">📍 ${sanitizeHTML(mineLocation)}</span>
+                            <span class="type-tag">💎 ${sanitizeHTML(mineType)}</span>
+                            <div class="quality-score ${getQualityClass(qualityScore)}">
+                                <span class="score-label">Datenqualität:</span>
+                                <span class="score-value">${qualityScore}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="action-btn primary" onclick="exportSearchResults('${mineName}')">
+                            📥 Export
+                        </button>
+                        <button class="action-btn secondary" onclick="shareResult('${mineName}')">
+                            🔗 Teilen
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Key Metrics Grid -->
+                <div class="metrics-grid">
+                    ${generateMetricsCards(keyMetrics)}
+                </div>
+
+                <!-- Interactive Sections -->
+                <div class="result-sections">
+                    <!-- Quick Summary -->
+                    <div class="section-card summary-section">
+                        <div class="section-header">
+                            <h4>📊 Zusammenfassung</h4>
+                            <span class="expand-btn" onclick="toggleSection('summary')">▼</span>
+                        </div>
+                        <div class="section-content" id="summary-content">
+                            ${generateSmartSummary(data)}
+                        </div>
+                    </div>
+
+                    <!-- Financial Data -->
+                    ${generateFinancialSection(data)}
+
+                    <!-- Technical Data -->
+                    ${generateTechnicalSection(data)}
+
+                    <!-- Environmental Data -->
+                    ${generateEnvironmentalSection(data)}
+                </div>
+
+                <!-- Raw Data (Collapsed by default) -->
+                <div class="section-card raw-data-section">
+                    <div class="section-header" onclick="toggleSection('raw-data')">
+                        <h4>🔧 Vollständige Rohdaten</h4>
+                        <span class="expand-btn">▼</span>
+                    </div>
+                    <div class="section-content collapsed" id="raw-data-content">
+                        <div class="json-viewer">
+                            <pre class="json-data">${sanitizeHTML(JSON.stringify(data, null, 2))}</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Result Footer -->
+                <div class="card-footer">
+                    <div class="result-timestamp">
+                        ⏰ Erstellt: ${new Date().toLocaleString('de-DE')}
+                    </div>
+                    <div class="result-actions">
+                        <button class="action-link" onclick="retryLastSearch()">
+                            🔄 Neu suchen
+                        </button>
+                        <button class="action-link" onclick="saveToFavorites('${mineName}')">
+                            ⭐ Zu Favoriten
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Helper Functions for Results Revolution
+function extractKeyMetrics(data) {
+    const metrics = [];
+    
+    if (data.foerdermenge || data.production) {
+        metrics.push({ label: 'Förderung', value: data.foerdermenge || data.production, unit: 't/Jahr', icon: '⚡', type: 'production' });
+    }
+    if (data.revenues || data.umsatz) {
+        metrics.push({ label: 'Umsatz', value: data.revenues || data.umsatz, unit: '€', icon: '💰', type: 'financial' });
+    }
+    if (data.employees || data.mitarbeiter) {
+        metrics.push({ label: 'Mitarbeiter', value: data.employees || data.mitarbeiter, unit: 'Personen', icon: '👥', type: 'employment' });
+    }
+    if (data.area || data.flaeche) {
+        metrics.push({ label: 'Fläche', value: data.area || data.flaeche, unit: 'km²', icon: '🗺️', type: 'area' });
+    }
+    
+    return metrics;
+}
+
+function calculateDataQuality(data) {
+    const importantFields = ['mine_name', 'location', 'mine_type', 'rohstoff', 'foerdermenge', 'production', 'revenues', 'umsatz', 'employees', 'mitarbeiter'];
+    let filledFields = 0;
+    importantFields.forEach(field => {
+        if (data[field] && data[field] !== 'Unbekannt' && data[field] !== '') filledFields++;
+    });
+    return Math.round((filledFields / importantFields.length) * 100);
+}
+
+function getQualityClass(score) {
+    if (score >= 80) return 'quality-excellent';
+    if (score >= 60) return 'quality-good';
+    if (score >= 40) return 'quality-fair';
+    return 'quality-poor';
+}
+
+function generateMetricsCards(metrics) {
+    if (metrics.length === 0) return '<div class="no-metrics">📊 Mining-Kennzahlen werden geladen...</div>';
+    
+    return metrics.map(metric => `
+        <div class="metric-card ${metric.type}">
+            <div class="metric-icon">${metric.icon}</div>
+            <div class="metric-content">
+                <div class="metric-label">${metric.label}</div>
+                <div class="metric-value">${metric.value} <span class="metric-unit">${metric.unit}</span></div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function generateSmartSummary(data) {
+    const mineName = data.mine_name || 'Diese Mine';
+    const location = data.location || data.land;
+    const type = data.mine_type || data.rohstoff;
+    
+    let summary = `${mineName}`;
+    if (location) summary += ` befindet sich in ${location}`;
+    if (type) summary += ` und produziert ${type}`;
+    if (data.foerdermenge || data.production) summary += `. Die jährliche Förderung beträgt ${data.foerdermenge || data.production}.`;
+    if (data.employees || data.mitarbeiter) summary += ` Das Unternehmen beschäftigt ${data.employees || data.mitarbeiter} Mitarbeiter.`;
+    
+    return summary || 'Keine detaillierten Informationen verfügbar.';
+}
+
+function generateFinancialSection(data) {
+    const hasFinancialData = data.revenues || data.umsatz || data.costs || data.kosten || data.profit || data.gewinn;
+    if (!hasFinancialData) return '';
+    
+    return `
+        <div class="section-card financial-section">
+            <div class="section-header" onclick="toggleSection('financial')">
+                <h4>💰 Finanzdaten</h4>
+                <span class="expand-btn">▼</span>
+            </div>
+            <div class="section-content collapsed" id="financial-content">
+                <div class="financial-grid">
+                    ${data.revenues || data.umsatz ? `<div class="financial-item"><span class="label">Umsatz:</span><span class="value">${data.revenues || data.umsatz}</span></div>` : ''}
+                    ${data.costs || data.kosten ? `<div class="financial-item"><span class="label">Kosten:</span><span class="value">${data.costs || data.kosten}</span></div>` : ''}
+                    ${data.profit || data.gewinn ? `<div class="financial-item"><span class="label">Gewinn:</span><span class="value">${data.profit || data.gewinn}</span></div>` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function generateTechnicalSection(data) {
+    const hasTechnicalData = data.equipment || data.ausstattung || data.technology || data.technologie;
+    if (!hasTechnicalData) return '';
+    
+    return `
+        <div class="section-card technical-section">
+            <div class="section-header" onclick="toggleSection('technical')">
+                <h4>🔧 Technische Daten</h4>
+                <span class="expand-btn">▼</span>
+            </div>
+            <div class="section-content collapsed" id="technical-content">
+                <div class="technical-grid">
+                    ${data.equipment || data.ausstattung ? `<div class="technical-item"><span class="label">Ausstattung:</span><span class="value">${data.equipment || data.ausstattung}</span></div>` : ''}
+                    ${data.technology || data.technologie ? `<div class="technical-item"><span class="label">Technologie:</span><span class="value">${data.technology || data.technologie}</span></div>` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function generateEnvironmentalSection(data) {
+    const hasEnvironmentalData = data.environmental_impact || data.umwelt || data.sustainability || data.nachhaltigkeit;
+    if (!hasEnvironmentalData) return '';
+    
+    return `
+        <div class="section-card environmental-section">
+            <div class="section-header" onclick="toggleSection('environmental')">
+                <h4>🌱 Umwelt & Nachhaltigkeit</h4>
+                <span class="expand-btn">▼</span>
+            </div>
+            <div class="section-content collapsed" id="environmental-content">
+                <div class="environmental-grid">
+                    ${data.environmental_impact || data.umwelt ? `<div class="environmental-item"><span class="label">Umweltauswirkung:</span><span class="value">${data.environmental_impact || data.umwelt}</span></div>` : ''}
+                    ${data.sustainability || data.nachhaltigkeit ? `<div class="environmental-item"><span class="label">Nachhaltigkeit:</span><span class="value">${data.sustainability || data.nachhaltigkeit}</span></div>` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function toggleSection(sectionId) {
+    const content = document.getElementById(`${sectionId}-content`);
+    const expandBtn = content?.parentElement.querySelector('.expand-btn');
+    
+    if (content && expandBtn) {
+        if (content.classList.contains('collapsed')) {
+            content.classList.remove('collapsed');
+            expandBtn.textContent = '▲';
+        } else {
+            content.classList.add('collapsed');
+            expandBtn.textContent = '▼';
+        }
+        console.log(`🔄 [RESULTS-CARD] Toggled section: ${sectionId}`);
+    }
+}
+
+function shareResult(mineName) {
+    const url = window.location.href;
+    const text = `Schaue dir diese Mining-Daten für ${mineName} an:`;
+    
+    if (navigator.share) {
+        navigator.share({ title: `Mining Daten: ${mineName}`, text, url });
+    } else {
+        navigator.clipboard.writeText(`${text} ${url}`);
+        if (typeof showNotification === 'function') {
+            showNotification('Link in Zwischenablage kopiert', 'success');
+        }
+    }
+    console.log(`🔗 [RESULTS-CARD] Shared result for: ${mineName}`);
+}
+
+function saveToFavorites(mineName) {
+    const favorites = JSON.parse(localStorage.getItem('mining_favorites') || '[]');
+    
+    if (!favorites.includes(mineName)) {
+        favorites.push(mineName);
+        localStorage.setItem('mining_favorites', JSON.stringify(favorites));
+        if (typeof showNotification === 'function') {
+            showNotification(`${mineName} zu Favoriten hinzugefügt`, 'success');
+        }
+    } else {
+        if (typeof showNotification === 'function') {
+            showNotification(`${mineName} bereits in Favoriten`, 'info');
+        }
+    }
+    console.log(`⭐ [RESULTS-CARD] Added to favorites: ${mineName}`);
+}
+
 // Export result processing functions to global scope
 window.displayResults = displayResults;
 window.generateResultSummary = generateResultSummary;
@@ -552,4 +919,252 @@ window.processSearchResults = processSearchResults;
 window.displayBatchResults = displayBatchResults;
 window.generateBatchResultsTable = generateBatchResultsTable;
 
-console.log('📊 MineSearch 2.0 - Results Processor loaded');
+// Export Results Revolution functions
+window.generateModernResultCard = generateModernResultCard;
+window.toggleSection = toggleSection;
+window.shareResult = shareResult;
+window.saveToFavorites = saveToFavorites;
+
+// ============================================
+// PHASE 4: MULTI-MODEL COMPARISON FUNCTIONS
+// ============================================
+
+/**
+ * MULTI-MODEL COMPARISON: Zeigt Interactive Comparison für mehrere Modelle
+ */
+async function displayMultiModelComparison(successfulResults, fullData) {
+    console.log(`🔬 [PHASE 4] Displaying interactive comparison for ${successfulResults.length} models`);
+    
+    const resultsDiv = document.getElementById('results');
+    
+    try {
+        // Generate comparison using Phase 4 engine
+        const comparison = await window.generateComparison(successfulResults);
+        
+        // Generate comparison UI
+        const comparisonHTML = window.generateComparisonView(comparison);
+        
+        // Add meta information about the search
+        const searchInfo = fullData.search_query || 'Multi-Model Search';
+        const timestamp = new Date().toLocaleString();
+        
+        const fullHTML = `
+            <div class="multi-model-results">
+                <div class="search-metadata">
+                    <h2>🔬 Multi-Model Analysis Results</h2>
+                    <div class="search-info">
+                        <span class="search-query">${searchInfo}</span>
+                        <span class="search-timestamp">${timestamp}</span>
+                    </div>
+                </div>
+                
+                ${comparisonHTML}
+                
+                <div class="individual-results-toggle">
+                    <button onclick="toggleIndividualResults()" class="toggle-btn">
+                        📋 Show Individual Model Results
+                    </button>
+                    <div id="individual-results" style="display: none;">
+                        ${generateIndividualModelResults(successfulResults)}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        safeSetHTML(resultsDiv, fullHTML);
+        
+        // Save to session storage for restoration
+        if (typeof saveSearchResults === 'function') {
+            saveSearchResults({
+                success: true,
+                data: fullData,
+                comparison: comparison
+            }, 'multi-model');
+        }
+        
+        console.log('✅ [PHASE 4] Multi-model comparison displayed successfully');
+        
+    } catch (error) {
+        console.error('❌ [PHASE 4] Error displaying comparison:', error);
+        
+        // Fallback to individual results
+        displayIndividualResultsFallback(successfulResults);
+    }
+}
+
+/**
+ * SINGLE MODEL FROM MULTI: Zeigt einzelnes erfolgreiches Ergebnis aus Multi-Search
+ */
+function displaySingleModelFromMulti(result, fullData) {
+    console.log('📊 [PHASE 4] Displaying single successful model from multi-search');
+    
+    const resultsDiv = document.getElementById('results');
+    
+    const searchInfo = fullData.search_query || 'Multi-Model Search';
+    const totalModels = fullData.total_models || 1;
+    const successfulModels = fullData.successful_models || 1;
+    
+    const singleResultHTML = `
+        <div class="single-from-multi">
+            <div class="search-metadata">
+                <h2>📊 Search Results</h2>
+                <div class="search-info">
+                    <span class="search-query">${searchInfo}</span>
+                    <span class="model-info">${successfulModels}/${totalModels} models successful</span>
+                </div>
+                <div class="search-warning">
+                    ⚠️ Only one model returned results. For better insights, try different models or check your search criteria.
+                </div>
+            </div>
+            
+            <div class="successful-model">
+                <h3>✅ Successful Model: ${result.model_id}</h3>
+                ${generateModernResultCard(result.data)}
+            </div>
+            
+            ${fullData.results.length > 1 ? generateFailedModelsInfo(fullData.results.filter(r => !r.success)) : ''}
+        </div>
+    `;
+    
+    safeSetHTML(resultsDiv, singleResultHTML);
+}
+
+/**
+ * MULTI MODEL ERRORS: Zeigt Fehler-Zusammenfassung für Multi-Model-Search
+ */
+function displayMultiModelErrors(results) {
+    console.log('❌ [PHASE 4] Displaying multi-model errors');
+    
+    const resultsDiv = document.getElementById('results');
+    
+    const errorSummary = results.map(result => ({
+        model: result.model_id,
+        error: result.error || 'Unknown error',
+        success: result.success
+    }));
+    
+    const errorHTML = errorSummary.map(item => `
+        <div class="model-error">
+            <div class="model-name">${item.model}</div>
+            <div class="error-message">${item.error}</div>
+        </div>
+    `).join('');
+    
+    const fullErrorHTML = `
+        <div class="multi-model-errors">
+            <div class="error-header">
+                <h2>❌ Multi-Model Search Failed</h2>
+                <p>No models returned successful results. Please check the errors below:</p>
+            </div>
+            
+            <div class="error-list">
+                ${errorHTML}
+            </div>
+            
+            <div class="error-suggestions">
+                <h3>💡 Suggestions:</h3>
+                <ul>
+                    <li>Try different models from the Quick Selection</li>
+                    <li>Check your API keys in the provider settings</li>
+                    <li>Simplify your search criteria</li>
+                    <li>Try a single model search first</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    safeSetHTML(resultsDiv, fullErrorHTML);
+}
+
+/**
+ * INDIVIDUAL MODEL RESULTS: Generiert Einzelergebnisse für Vergleich
+ */
+function generateIndividualModelResults(results) {
+    console.log('📋 [PHASE 4] Generating individual model results');
+    
+    return results.map((result, index) => `
+        <div class="individual-model-result" data-model="${result.model_id}">
+            <div class="model-header">
+                <h3>${result.model_id}</h3>
+                <div class="model-meta">
+                    Model ${index + 1} of ${results.length} • 
+                    ${result.data.quality_metrics ? Math.round(result.data.quality_metrics.quality_score * 100) + '% quality' : 'N/A'}
+                </div>
+            </div>
+            <div class="model-result-content">
+                ${generateModernResultCard(result.data)}
+            </div>
+        </div>
+    `).join('');
+}
+
+/**
+ * FAILED MODELS INFO: Zeigt Information über fehlgeschlagene Modelle
+ */
+function generateFailedModelsInfo(failedResults) {
+    if (!failedResults || failedResults.length === 0) return '';
+    
+    const failedHTML = failedResults.map(result => `
+        <div class="failed-model">
+            <span class="model-name">${result.model_id}</span>
+            <span class="error-message">${(result.error || 'Unknown error').substring(0, 100)}...</span>
+        </div>
+    `).join('');
+    
+    return `
+        <div class="failed-models-section">
+            <h4>❌ Failed Models (${failedResults.length})</h4>
+            <div class="failed-models-list">
+                ${failedHTML}
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * INDIVIDUAL RESULTS FALLBACK: Fallback für Comparison-Fehler
+ */
+function displayIndividualResultsFallback(results) {
+    console.log('🔄 [PHASE 4] Using fallback: individual results display');
+    
+    const resultsDiv = document.getElementById('results');
+    
+    const fallbackHTML = `
+        <div class="comparison-fallback">
+            <div class="fallback-header">
+                <h2>📊 Individual Model Results</h2>
+                <p>Comparison analysis temporarily unavailable. Showing individual results:</p>
+            </div>
+            
+            ${generateIndividualModelResults(results)}
+        </div>
+    `;
+    
+    safeSetHTML(resultsDiv, fallbackHTML);
+}
+
+/**
+ * TOGGLE INDIVIDUAL RESULTS: Zeigt/versteckt individuelle Ergebnisse
+ */
+function toggleIndividualResults() {
+    const individualDiv = document.getElementById('individual-results');
+    const toggleBtn = document.querySelector('.toggle-btn');
+    
+    if (individualDiv && toggleBtn) {
+        if (individualDiv.style.display === 'none') {
+            individualDiv.style.display = 'block';
+            toggleBtn.textContent = '📋 Hide Individual Model Results';
+        } else {
+            individualDiv.style.display = 'none';
+            toggleBtn.textContent = '📋 Show Individual Model Results';
+        }
+    }
+}
+
+// Export Phase 4 functions
+window.displayMultiModelComparison = displayMultiModelComparison;
+window.displaySingleModelFromMulti = displaySingleModelFromMulti;
+window.displayMultiModelErrors = displayMultiModelErrors;
+window.toggleIndividualResults = toggleIndividualResults;
+
+console.log('📊 MineSearch 2.0 - Results Processor with Revolution loaded');
