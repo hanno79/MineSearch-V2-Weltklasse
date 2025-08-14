@@ -209,7 +209,8 @@ function createLoadingHTML(title, message = '', showSpinner = true, showTimer = 
 }
 
 function showLoadingMessage(element, title, message = '', startTimer = false, showCancelButton = false, cancelFunction = '') {
-    element.innerHTML = createLoadingHTML(title, message, true, startTimer, showCancelButton, cancelFunction);
+    // FIX: Correct parameter order - createLoadingHTML expects showTimer as 4th param, not startTimer
+    element.innerHTML = createLoadingHTML(title, message, true, false, showCancelButton, cancelFunction);
     
     if (startTimer) {
         searchTimer.start();

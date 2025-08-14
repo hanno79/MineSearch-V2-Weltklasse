@@ -54,10 +54,13 @@ function startSingleSearch() {
     console.log(`🔍 [SEARCH] Starte ${searchTypeText} mit ${selectedModels.length} Modellen`);
     console.log(`📋 [SEARCH] Request Body:`, requestBody);
     
+    // Initialize AbortController für Single Search
+    singleSearchAbortController = new AbortController();
+    
     const resultsDiv = document.getElementById('results');
     showLoadingMessage(resultsDiv, `${searchTypeText} läuft...`, 
         `Mine: ${requestBody.mine_name || 'Alle'} | Land: ${requestBody.country || 'Alle'} | Rohstoff: ${requestBody.commodity || 'Alle'}`, 
-        true
+        true, true, 'cancelSingleSearch()'  // Show cancel button for Single Search
     );
     
     // Timer wird bereits durch showLoadingMessage(startTimer=true) gestartet
@@ -68,7 +71,8 @@ function startSingleSearch() {
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal: singleSearchAbortController.signal  // Add AbortController signal
     })
     .then(response => response.json())
     .then(data => {
@@ -88,6 +92,14 @@ function startSingleSearch() {
         }
     })
     .catch(error => {
+        // Check if search was aborted by user
+        if (error.name === 'AbortError') {
+            console.log('🛑 [SEARCH] Single search was aborted by user');
+            // Don't show error notification for user-initiated abort
+            // UI is already updated by cancelSingleSearch()
+            return;
+        }
+        
         console.error(`❌ [SEARCH] Network Error:`, error);
         
         if (typeof window.searchTimer !== 'undefined' && window.searchTimer.stop) {
@@ -105,8 +117,9 @@ function startSingleSearch() {
  * ÄNDERUNG 14.08.2025: AbortController Support für Abbruch-Funktion
  */
 
-// Global abort controller für Batch Search
+// Global abort controllers
 let batchSearchAbortController = null;
+let singleSearchAbortController = null;
 
 async function startBatchSearch() {
     const formData = new FormData(document.getElementById('csv-form'));
@@ -250,18 +263,27 @@ async function startBatchSearch() {
         showNotification(`✅ ${searchTypeText} erfolgreich abgeschlossen`, 'success');
         
     } catch (error) {
-        console.error(`❌ [BATCH-SEARCH] Error:`, error);
-        
-        // Stop timer
-        if (typeof window.searchTimer !== 'undefined' && window.searchTimer.stop) {
-            window.searchTimer.stop();
-        }
-        
-        // Handle abort vs other errors
+        // Handle abort vs other errors FIRST (consistent with Single Search)
         if (error.name === 'AbortError') {
-            resultsDiv.innerHTML = createErrorHTML('Batch-Suche abgebrochen', 'Die Suche wurde vom Benutzer abgebrochen.');
-            showNotification(`🛑 Batch-Suche wurde abgebrochen`, 'info');
+            console.log('🛑 [BATCH-SEARCH] Batch search was aborted by user');
+            
+            // Stop timer
+            if (typeof window.searchTimer !== 'undefined' && window.searchTimer.stop) {
+                window.searchTimer.stop();
+            }
+            
+            // UI is already updated by cancelBatchSearch()
+            // Don't show notification - already shown by cancelBatchSearch()
+            return;
         } else {
+            // Only log non-abort errors
+            console.error(`❌ [BATCH-SEARCH] Error:`, error);
+            
+            // Stop timer
+            if (typeof window.searchTimer !== 'undefined' && window.searchTimer.stop) {
+                window.searchTimer.stop();
+            }
+            
             resultsDiv.innerHTML = createErrorHTML('Batch-Suche fehlgeschlagen', error.message);
             showNotification(`❌ Batch-Suche fehlgeschlagen: ${error.message}`, 'error');
         }
@@ -277,12 +299,68 @@ async function startBatchSearch() {
 function cancelBatchSearch() {
     console.log('🛑 [CANCEL-BATCH] Aborting batch search...');
     
+    // Stop timer (consistent with Single Search)
+    if (typeof window.searchTimer !== 'undefined' && window.searchTimer.stop) {
+        window.searchTimer.stop();
+        console.log('⏹️ [CANCEL-BATCH] Timer stopped');
+    }
+    
+    // Abort API request
     if (batchSearchAbortController) {
         batchSearchAbortController.abort();
         console.log('✅ [CANCEL-BATCH] Batch search aborted successfully');
     } else {
         console.log('⚠️ [CANCEL-BATCH] No active batch search to abort');
     }
+    
+    // Reset UI state (consistent with Single Search)
+    const resultsDiv = document.getElementById('results');
+    if (resultsDiv) {
+        resultsDiv.innerHTML = `
+            <div style="padding: 20px; text-align: center; background: #fff3cd; border-radius: 8px; border: 1px solid #ffc107;">
+                <h3>🛑 Batch-Suche abgebrochen</h3>
+                <p>Die Batch-Suche wurde erfolgreich abgebrochen.</p>
+            </div>
+        `;
+    }
+    
+    // Show notification
+    showNotification('🛑 Batch-Suche erfolgreich abgebrochen', 'info');
+}
+
+/**
+ * CANCEL SINGLE SEARCH: Bricht die laufende Single-Suche ab
+ */
+function cancelSingleSearch() {
+    console.log('🛑 [CANCEL-SINGLE] Aborting single search...');
+    
+    // Stop timer
+    if (typeof window.searchTimer !== 'undefined' && window.searchTimer.stop) {
+        window.searchTimer.stop();
+        console.log('⏹️ [CANCEL-SINGLE] Timer stopped');
+    }
+    
+    // Abort API request
+    if (singleSearchAbortController) {
+        singleSearchAbortController.abort();
+        console.log('✅ [CANCEL-SINGLE] Single search aborted successfully');
+    } else {
+        console.log('⚠️ [CANCEL-SINGLE] No active single search to abort');
+    }
+    
+    // Reset UI state
+    const resultsDiv = document.getElementById('results');
+    if (resultsDiv) {
+        resultsDiv.innerHTML = `
+            <div style="padding: 20px; text-align: center; background: #fff3cd; border-radius: 8px; border: 1px solid #ffc107;">
+                <h3>🛑 Suche abgebrochen</h3>
+                <p>Die Suche wurde erfolgreich abgebrochen.</p>
+            </div>
+        `;
+    }
+    
+    // Show notification
+    showNotification('🛑 Suche erfolgreich abgebrochen', 'info');
 }
 
 // ============================================
@@ -850,6 +928,7 @@ function initializeQuickPresets(providerGroups, models) {
 window.startSingleSearch = startSingleSearch;
 window.startBatchSearch = startBatchSearch;
 window.cancelBatchSearch = cancelBatchSearch;
+window.cancelSingleSearch = cancelSingleSearch;
 window.loadModelsForFilter = loadModelsForFilter;
 window.validateSearchForm = validateSearchForm;
 window.handleSearchOptionsChange = handleSearchOptionsChange;

@@ -61,53 +61,10 @@ function safeSetHTML(element, html) {
 // LOADING STATE HELPERS
 // ============================================
 
-/**
- * LOADING HTML GENERATOR: Erstellt Loading-HTML mit Spinner und Timer
- */
-function createLoadingHTML(title, message = '', showSpinner = true, showTimer = false) {
-    const spinnerHTML = showSpinner ? `
-        <div style="margin-top: 10px;">
-            <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #0ea5e9; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-        </div>
-    ` : '';
-    
-    // Timer wird durch #loading-timer im HTML angezeigt - kein extra HTML nötig
-    const timerHTML = '';
-    
-    return `
-        <div style="text-align: center; padding: 40px;">
-            <h3 style="color: #0ea5e9; margin-bottom: 10px;">${sanitizeHTML(title)}</h3>
-            ${message ? `<p style="color: #6b7280; margin-bottom: 10px;">${sanitizeHTML(message)}</p>` : ''}
-            ${spinnerHTML}
-            ${timerHTML}
-        </div>
-        <style>
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-            @keyframes loading-progress {
-                0% { width: 0%; }
-                50% { width: 75%; }
-                100% { width: 100%; }
-            }
-        </style>
-    `;
-}
+// ENTFERNT: Veraltete createLoadingHTML Funktion - verwende utils.js Version
+// Die createLoadingHTML in utils.js hat korrekte Cancel-Button-Unterstützung
 
-/**
- * SHOW LOADING MESSAGE: Zeigt Loading-Message in Element
- */
-function showLoadingMessage(element, title, message = '', startTimer = false) {
-    element.innerHTML = createLoadingHTML(title, message, true, startTimer);
-    
-    if (startTimer) {
-        // Verwende das Master-Timer-System aus utils.js
-        if (typeof window.searchTimer !== 'undefined' && window.searchTimer.start) {
-            window.searchTimer.start();
-        }
-    }
-}
+// ENTFERNT: showLoadingMessage - verwende utils.js Version
 
 /**
  * ENHANCED LOADING STATE: Erweiterte Loading-Anzeige mit Progress-Bar
@@ -464,8 +421,8 @@ function coordinateUIEvent(eventName, eventHandler) {
 window.escapeJavaScriptString = escapeJavaScriptString;
 window.safeJSONStringify = safeJSONStringify;
 window.safeSetHTML = safeSetHTML;
-window.createLoadingHTML = createLoadingHTML;
-window.showLoadingMessage = showLoadingMessage;
+// ENTFERNT: Global overrides für createLoadingHTML und showLoadingMessage
+// Utils.js Funktionen werden verwendet (haben Cancel-Button-Support)
 window.showEnhancedLoadingState = showEnhancedLoadingState;
 window.createErrorHTML = createErrorHTML;
 window.createSuccessMessage = createSuccessMessage;
