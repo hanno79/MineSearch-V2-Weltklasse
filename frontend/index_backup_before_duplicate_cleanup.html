@@ -8,11 +8,6 @@
     <meta http-equiv="Expires" content="0">
     <title>MineSearch 2.0 - Mining Recherche System</title>
     
-    <!-- Favicon Links -->
-    <link rel="icon" href="/static/favicon.ico" sizes="any">
-    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/static/favicon-192.png">
-    
     <!-- CRITICAL: Set API_BASE_URL before any module loading -->
     <script>
         window.API_BASE_URL = 'http://localhost:8000';
@@ -76,14 +71,10 @@
                 </div>
                 
                 <div class="header-quick-search">
-                    <div class="quick-search-header">
-                        <span class="search-label">⚡ Quick Search</span>
-                        <small class="search-description">Schnelle Sofort-Suche</small>
-                    </div>
                     <div class="quick-search-container">
-                        <input type="text" id="quick-search-input" placeholder="Mine-Name eingeben... z.B. 'Eleonore Mine'" class="quick-search-field">
-                        <button type="button" class="quick-search-btn" onclick="executeQuickSearch()" title="Sofort-Suche starten">
-                            <span class="search-icon">⚡</span>
+                        <input type="text" id="quick-search-input" placeholder="Quick Search... z.B. 'Goldmine Kanada'" class="quick-search-field">
+                        <button type="button" class="quick-search-btn" onclick="executeQuickSearch()">
+                            <span class="search-icon">🔍</span>
                         </button>
                     </div>
                     <div class="quick-search-suggestions" id="quick-search-suggestions" style="display: none;">
@@ -183,118 +174,93 @@
             </div>
         </div>
 
-        <!-- OLD TAB NAVIGATION REMOVED - Now using Header Navigation only -->
+        <!-- TAB NAVIGATION -->
+        <nav class="tab-navigation">
+            <input type="radio" id="single-tab" name="tab" value="single" checked>
+            <label for="single-tab">🔍 Einzelsuche</label>
+            
+            <input type="radio" id="csv-tab" name="tab" value="csv">
+            <label for="csv-tab">📊 CSV-Upload</label>
+            
+            <input type="radio" id="sources-tab" name="tab" value="sources">
+            <label for="sources-tab">📚 Quellen</label>
+            
+            <input type="radio" id="statistics-tab" name="tab" value="statistics">
+            <label for="statistics-tab">📈 Statistiken</label>
+            
+            <input type="radio" id="consolidated-tab" name="tab" value="consolidated">
+            <label for="consolidated-tab">📋 Konsolidiert</label>
+        </nav>
 
         <main>
-            <!-- PHASE 2: CRITICAL RESTORATION - Modellauswahl ist essentiell für das System -->
-            
-            <!-- GLOBALE MODELLAUSWAHL - KRITISCH FÜR ALLE SUCHFUNKTIONEN -->
-            <section class="global-model-selection">
-                <div class="model-selection-header">
-                    <h3>🤖 Modell-Auswahl</h3>
-                    <p class="model-description">
-                        <strong>Wählen Sie ein oder mehrere AI-Modelle für Ihre Suche aus.</strong><br>
-                        <small>Diese Auswahl gilt für alle Suchtypen (Quick Search, Advanced Search, CSV Batch)</small>
-                    </p>
+            <!-- Globaler Such-Modus -->
+            <section class="search-mode">
+                <div style="margin-bottom: 15px;">
+                    <label><strong>Such-Modelle wählen:</strong></label>
+                    <div id="model-selection" style="margin-top: 10px; padding: 10px; background: #f9f9f9; border-radius: 5px;">
+                        <!-- Modelle werden dynamisch geladen -->
+                        <p style="color: #666;">Lade verfügbare Modelle...</p>
+                    </div>
+                    <small style="display: block; margin-top: 8px; color: #666;">
+                        Wählen Sie ein oder mehrere Modelle für Ihre Suche aus.
+                    </small>
                 </div>
                 
-                <div id="model-selection" class="model-selection-container">
-                    <!-- Modelle werden dynamisch geladen -->
-                    <div class="model-loading">
-                        <p style="color: #666; text-align: center; padding: 20px;">
-                            🔄 Lade verfügbare Modelle...
-                        </p>
-                    </div>
+                <div style="background: #f0f8ff; padding: 12px; border-radius: 5px; margin-top: 10px;">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="two_phase_enabled" style="width: 18px; height: 18px;" checked>
+                        <span><strong>🔍 2-Phasen-Suche aktivieren</strong></span>
+                    </label>
+                    <small style="display: block; margin-top: 8px; margin-left: 28px; color: #555;">
+                        Führt zusätzliche gezielte Suchen zu den besten gefundenen Quellen durch.<br>
+                        <strong>Wird automatisch aktiviert</strong> bei wenigen Daten, fehlenden Restaurationskosten oder wenigen Quellen.<br>
+                        Verlängert die Suche um 1-2 Minuten, liefert aber deutlich mehr Quellen und Details.
+                    </small>
                 </div>
                 
-                <div class="model-selection-info">
-                    <div class="selection-tips">
-                        <strong>💡 Empfehlungen:</strong>
-                        <ul>
-                            <li><strong>Schnell:</strong> Nutzen Sie 1-2 Modelle für schnelle Ergebnisse</li>
-                            <li><strong>Umfassend:</strong> Wählen Sie mehrere Modelle für detailliertere Resultate</li>
-                            <li><strong>Qualität:</strong> Premium-Modelle liefern oft bessere Datenqualität</li>
-                        </ul>
-                    </div>
+                <div style="background: #f0fdf4; padding: 12px; border-radius: 5px; margin-top: 10px;">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="smart_search_enabled" style="width: 18px; height: 18px;" checked>
+                        <span><strong>🤖 Smart-Search aktivieren</strong></span>
+                    </label>
+                    <small style="display: block; margin-top: 8px; margin-left: 28px; color: #555;">
+                        Beginnt mit schneller Suche und wechselt automatisch zu einem besseren Modell,<br>
+                        wenn weniger als 40% der Daten gefunden wurden. Transparenter Suchverlauf.
+                    </small>
                 </div>
             </section>
 
             <!-- SINGLE SEARCH TAB -->
             <section id="single-search" class="tab-content active">
-                <div class="search-type-header">
-                    <h2>🔍 Advanced Search</h2>
-                    <p class="search-type-description">
-                        <strong>🎯 Detaillierte Mine-Recherche</strong> mit erweiterten Filteroptionen<br>
-                        <small>Für präzise Suchen mit mehreren Parametern - alle Einstellungen über Header → Settings verfügbar</small>
-                    </p>
-                </div>
-                
-                <div class="search-comparison-info">
-                    <div class="search-option">
-                        <strong>⚡ Quick Search</strong> (Header): Schnelle Sofort-Suche nur mit Mine-Name
-                    </div>
-                    <div class="search-option current">
-                        <strong>🎯 Advanced Search</strong> (hier): Mine-Name + Land + Rohstoff + Region + erweiterte Einstellungen
-                    </div>
-                </div>
-                
-                <!-- CURRENT SEARCH SETTINGS STATUS -->
-                <div class="search-settings-status">
-                    <div class="settings-status-header">
-                        <h4>📊 Aktuelle Such-Einstellungen</h4>
-                        <button type="button" class="settings-quick-link" onclick="toggleSettingsModal()" title="Such-Einstellungen anpassen">
-                            ⚙️ Anpassen
-                        </button>
-                    </div>
-                    <div class="settings-status-grid" id="current-settings-display">
-                        <div class="setting-item">
-                            <span class="setting-icon">🔍</span>
-                            <span class="setting-name">2-Phasen-Suche:</span>
-                            <span class="setting-value" id="status-2phase">Lädt...</span>
-                        </div>
-                        <div class="setting-item">
-                            <span class="setting-icon">🤖</span>
-                            <span class="setting-name">Smart-Search:</span>
-                            <span class="setting-value" id="status-smart">Lädt...</span>
-                        </div>
-                        <div class="setting-item">
-                            <span class="setting-icon">🎯</span>
-                            <span class="setting-name">Modelle:</span>
-                            <span class="setting-value" id="status-models">Lädt...</span>
-                        </div>
-                    </div>
-                    <div class="settings-help">
-                        <small>💡 <strong>Tipp:</strong> Klicken Sie auf "⚙️ Anpassen" um Such-Optionen zu ändern. Diese Einstellungen gelten für alle Suchtypen.</small>
-                    </div>
-                </div>
+                <h2>🔍 Mining-Einzelsuche</h2>
                 
                 <form id="single-search-form" onsubmit="startSingleSearch(); return false;">
                     <div class="form-group">
-                        <label for="mine_name">Mine Name: <span class="required">*</span></label>
+                        <label for="mine_name">Mine Name:</label>
                         <input type="text" id="mine_name" name="mine_name" 
                                placeholder="z.B. Eleonore Mine" required>
                     </div>
                     
                     <div class="form-group">
-                        <label for="country">Land: <span class="optional">(optional)</span></label>
+                        <label for="country">Land:</label>
                         <input type="text" id="country" name="country" 
                                placeholder="z.B. Canada, Australia">
                     </div>
                     
                     <div class="form-group">
-                        <label for="commodity">Rohstoff: <span class="optional">(optional)</span></label>
+                        <label for="commodity">Rohstoff:</label>
                         <input type="text" id="commodity" name="commodity" 
                                placeholder="z.B. Gold, Kupfer">
                     </div>
                     
                     <div class="form-group">
-                        <label for="region">Region: <span class="optional">(optional)</span></label>
+                        <label for="region">Region:</label>
                         <input type="text" id="region" name="region" 
                                placeholder="z.B. Quebec, Western Australia">
                     </div>
                     
                     <button type="submit" id="start-search" class="unified-search-button">
-                        🎯 Advanced Search starten
+                        🔍 Suche starten
                     </button>
                 </form>
 
@@ -320,44 +286,6 @@ Canadian Malartic,Canada,Gold,Quebec</pre>
                     <div class="form-group">
                         <label for="csv_file">CSV-Datei auswählen:</label>
                         <input type="file" id="csv_file" name="file" accept=".csv" required>
-                    </div>
-                    
-                    <!-- Batch Options -->
-                    <div class="batch-options-section">
-                        <h4 style="color: var(--primary-700); margin-bottom: var(--space-md); display: flex; align-items: center; gap: var(--space-sm);">
-                            ⚙️ Batch-Optionen
-                            <span style="background: var(--info-100); color: var(--info-700); padding: 4px 8px; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">Neue Funktionen</span>
-                        </h4>
-                        
-                        <div class="batch-count-options">
-                            <div class="batch-option">
-                                <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer; padding: var(--space-md); border: 2px solid var(--success-200); border-radius: var(--radius-md); background: var(--success-50);">
-                                    <input type="radio" name="batch_mode" value="limited" checked id="batch-limited">
-                                    <div>
-                                        <strong>🧪 Nur erste <input type="number" id="batch-count" value="3" min="1" max="100" style="width: 60px; margin: 0 5px; padding: 2px 5px; border: 1px solid var(--success-300); border-radius: 4px;"> Minen</strong>
-                                        <div style="font-size: 0.875rem; color: var(--success-700); margin-top: 4px;">
-                                            Empfohlen für Tests und schnelle Ergebnisse
-                                        </div>
-                                    </div>
-                                </label>
-                            </div>
-                            
-                            <div class="batch-option">
-                                <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer; padding: var(--space-md); border: 2px solid var(--gray-200); border-radius: var(--radius-md); background: var(--gray-50);">
-                                    <input type="radio" name="batch_mode" value="all" id="batch-all">
-                                    <div>
-                                        <strong>🚀 Alle Minen durchsuchen</strong>
-                                        <div style="font-size: 0.875rem; color: var(--gray-600); margin-top: 4px;">
-                                            Vollständige Batch-Verarbeitung aller CSV-Einträge
-                                        </div>
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
-                        
-                        <div class="batch-info" style="margin-top: var(--space-md); padding: var(--space-md); background: var(--blue-50); border-radius: var(--radius-md); border: 1px solid var(--blue-200);">
-                            <strong>💡 Tipp:</strong> Nutzen Sie die begrenzte Anzahl für schnelle Tests. Die Batch-Suche kann jederzeit abgebrochen werden.
-                        </div>
                     </div>
                     
                     <button type="submit" id="start-batch" class="unified-search-button">

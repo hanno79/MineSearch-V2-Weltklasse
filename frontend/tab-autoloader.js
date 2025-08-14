@@ -18,22 +18,34 @@ const TabAutoLoader = {
     initialize() {
         console.log('🔄 [TAB-AUTOLOADER] Initializing tab auto-loading system...');
         
-        // Event Listener für alle Tab Radio Buttons
-        const tabInputs = document.querySelectorAll('.tab-navigation input[type="radio"]');
-        console.log(`🎯 [TAB-AUTOLOADER] Found ${tabInputs.length} tab radio buttons`);
+        // Event Listener für Header Navigation Items (UPDATED für Header Navigation)
+        const navItems = document.querySelectorAll('.nav-item');
+        console.log(`🎯 [TAB-AUTOLOADER] Found ${navItems.length} header navigation items`);
         
-        tabInputs.forEach(tabInput => {
-            console.log(`🎯 [TAB-AUTOLOADER] Setting up listener for: ${tabInput.id}`);
-            tabInput.addEventListener('change', (e) => {
-                if (e.target.checked) {
-                    console.log(`📡 [TAB-AUTOLOADER] Tab changed to: ${e.target.id} (value: ${e.target.value})`);
-                    this.handleTabChange(e.target.id);
-                }
+        navItems.forEach(navItem => {
+            const tabName = navItem.dataset.tab;
+            console.log(`🎯 [TAB-AUTOLOADER] Setting up listener for: ${tabName}`);
+            navItem.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log(`📡 [TAB-AUTOLOADER] Tab changed to: ${tabName} via header navigation`);
+                this.handleTabChange(`${tabName}-tab`); // Convert to old tab format for compatibility
             });
         });
         
-        // Initial load für default tab
-        this.handleTabChange('single-tab');
+        // FIX: Wait for header navigation to initialize first
+        // Initial load für default tab - delayed to allow header sync
+        setTimeout(() => {
+            console.log('🔄 [TAB-AUTOLOADER] Delayed initialization - checking current state...');
+            // Check if header navigation has already set a different state
+            if (window.NavigationState && window.NavigationState.currentTab) {
+                const currentTab = window.NavigationState.currentTab;
+                console.log(`🎯 [TAB-AUTOLOADER] Header navigation is set to: ${currentTab}`);
+                this.handleTabChange(`${currentTab}-tab`);
+            } else {
+                // Fallback to default
+                this.handleTabChange('single-tab');
+            }
+        }, 100); // Small delay to let header navigation initialize first
     },
     
     /**

@@ -102,7 +102,12 @@ function startSingleSearch() {
 /**
  * BATCH SEARCH: Startet eine Batch-Suche mit 2-Schritt-Workflow (CSV Upload + Batch Search)
  * ÄNDERUNG 13.08.2025: Implementierung des korrekten Backend-Workflows
+ * ÄNDERUNG 14.08.2025: AbortController Support für Abbruch-Funktion
  */
+
+// Global abort controller für Batch Search
+let batchSearchAbortController = null;
+
 async function startBatchSearch() {
     const formData = new FormData(document.getElementById('csv-form'));
     
@@ -129,6 +134,21 @@ async function startBatchSearch() {
     const smartSearchEnabled = batchSmartSearchElement ? batchSmartSearchElement.checked : false;
     const comprehensiveSearchEnabled = batchComprehensiveElement ? batchComprehensiveElement.checked : false;
     
+    // NEUE FUNKTION: Batch Count Optionen auslesen
+    const batchModeElement = document.querySelector('input[name="batch_mode"]:checked');
+    const batchCountElement = document.getElementById('batch-count');
+    
+    const batchMode = batchModeElement ? batchModeElement.value : 'limited'; // Default: limited
+    const batchCount = batchCountElement ? parseInt(batchCountElement.value) : 3; // Default: 3
+    
+    // Validierung
+    if (batchMode === 'limited' && (isNaN(batchCount) || batchCount < 1 || batchCount > 100)) {
+        showNotification('Die Anzahl der Minen muss zwischen 1 und 100 liegen.', 'warning');
+        return;
+    }
+    
+    console.log(`📊 [BATCH-OPTIONS] Mode: ${batchMode}, Count: ${batchCount}`);
+    
     let searchTypeText = "Batch Standard-Suche";
     if (comprehensiveSearchEnabled) {
         searchTypeText = "🚀 Batch Comprehensive Search";
@@ -138,12 +158,18 @@ async function startBatchSearch() {
         searchTypeText = "🔍 Batch 2-Phasen-Suche";
     }
     
-    console.log(`📊 [BATCH-SEARCH] Starte ${searchTypeText} mit ${selectedModels.length} Modellen`);
+    // Erweitere Search Type Text mit Count-Information
+    const countText = batchMode === 'all' ? 'alle Minen' : `erste ${batchCount} Minen`;
+    console.log(`📊 [BATCH-SEARCH] Starte ${searchTypeText} mit ${selectedModels.length} Modellen für ${countText}`);
+    
+    // Erstelle neue AbortController für diese Suche
+    batchSearchAbortController = new AbortController();
+    const signal = batchSearchAbortController.signal;
     
     const resultsDiv = document.getElementById('batch-results');
     showLoadingMessage(resultsDiv, `CSV wird hochgeladen...`, 
-        `CSV-Datei: ${csvFile.name} | Vorbereitung für ${selectedModels.length} Modelle`, 
-        true
+        `CSV-Datei: ${csvFile.name} | Verarbeitung: ${countText} mit ${selectedModels.length} Modellen`, 
+        true, true, 'cancelBatchSearch()'  // Show cancel button
     );
     
     try {
@@ -155,7 +181,8 @@ async function startBatchSearch() {
         
         const uploadResponse = await fetch(`${window.API_BASE_URL}/api/upload-csv`, {
             method: 'POST',
-            body: uploadFormData
+            body: uploadFormData,
+            signal: signal  // Add abort support
         });
         
         if (!uploadResponse.ok) {
@@ -178,7 +205,7 @@ async function startBatchSearch() {
         // Update UI for batch search phase
         showLoadingMessage(resultsDiv, `${searchTypeText} läuft...`, 
             `Session: ${sessionId.substring(0, 8)}... | Verarbeitung mit ${selectedModels.length} Modellen`, 
-            false // Don't restart timer, continue from upload phase
+            false, true, 'cancelBatchSearch()' // Don't restart timer, continue from upload phase, show cancel button
         );
         
         // SCHRITT 2: BATCH SEARCH mit Session ID
@@ -187,8 +214,8 @@ async function startBatchSearch() {
         const batchFormData = new FormData();
         batchFormData.append('session_id', sessionId);
         batchFormData.append('search_type', comprehensiveSearchEnabled ? 'comprehensive' : 'standard');
-        batchFormData.append('search_all', 'false'); // Default
-        batchFormData.append('count', '10'); // Default count
+        batchFormData.append('search_all', batchMode === 'all' ? 'true' : 'false');
+        batchFormData.append('count', batchMode === 'limited' ? batchCount.toString() : '0');
         
         // Add selected models as comma-separated string
         batchFormData.append('selected_models', selectedModels.join(','));
@@ -200,7 +227,8 @@ async function startBatchSearch() {
         
         const batchResponse = await fetch(`${window.API_BASE_URL}/api/batch-search`, {
             method: 'POST',
-            body: batchFormData
+            body: batchFormData,
+            signal: signal  // Add abort support
         });
         
         if (!batchResponse.ok) {
@@ -229,8 +257,31 @@ async function startBatchSearch() {
             window.searchTimer.stop();
         }
         
-        resultsDiv.innerHTML = createErrorHTML('Batch-Suche fehlgeschlagen', error.message);
-        showNotification(`❌ Batch-Suche fehlgeschlagen: ${error.message}`, 'error');
+        // Handle abort vs other errors
+        if (error.name === 'AbortError') {
+            resultsDiv.innerHTML = createErrorHTML('Batch-Suche abgebrochen', 'Die Suche wurde vom Benutzer abgebrochen.');
+            showNotification(`🛑 Batch-Suche wurde abgebrochen`, 'info');
+        } else {
+            resultsDiv.innerHTML = createErrorHTML('Batch-Suche fehlgeschlagen', error.message);
+            showNotification(`❌ Batch-Suche fehlgeschlagen: ${error.message}`, 'error');
+        }
+    } finally {
+        // Clean up abort controller
+        batchSearchAbortController = null;
+    }
+}
+
+/**
+ * CANCEL BATCH SEARCH: Bricht die laufende Batch-Suche ab
+ */
+function cancelBatchSearch() {
+    console.log('🛑 [CANCEL-BATCH] Aborting batch search...');
+    
+    if (batchSearchAbortController) {
+        batchSearchAbortController.abort();
+        console.log('✅ [CANCEL-BATCH] Batch search aborted successfully');
+    } else {
+        console.log('⚠️ [CANCEL-BATCH] No active batch search to abort');
     }
 }
 
@@ -798,6 +849,7 @@ function initializeQuickPresets(providerGroups, models) {
 // Export search functions to global scope
 window.startSingleSearch = startSingleSearch;
 window.startBatchSearch = startBatchSearch;
+window.cancelBatchSearch = cancelBatchSearch;
 window.loadModelsForFilter = loadModelsForFilter;
 window.validateSearchForm = validateSearchForm;
 window.handleSearchOptionsChange = handleSearchOptionsChange;

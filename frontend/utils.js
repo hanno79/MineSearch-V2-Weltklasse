@@ -164,7 +164,7 @@ window.searchTimer = searchTimer;
 // HTML GENERATION UTILITIES
 // ============================================
 
-function createLoadingHTML(title, message = '', showSpinner = true, showTimer = false) {
+function createLoadingHTML(title, message = '', showSpinner = true, showTimer = false, showCancelButton = false, cancelFunction = '') {
     const spinnerHTML = showSpinner ? `
         <div style="margin-top: 10px;">
             <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #0ea5e9; border-radius: 50%; animation: spin 1s linear infinite;"></div>
@@ -174,18 +174,42 @@ function createLoadingHTML(title, message = '', showSpinner = true, showTimer = 
     // Timer wird über #loading-timer im HTML angezeigt - kein extra Element nötig
     const timerHTML = '';
     
+    // Cancel Button nur für Batch-Operationen
+    const cancelButtonHTML = showCancelButton && cancelFunction ? `
+        <div style="margin-top: 15px;">
+            <button onclick="${cancelFunction}" 
+                    style="
+                        background: #ef4444; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 16px; 
+                        border-radius: 6px; 
+                        cursor: pointer; 
+                        font-size: 14px;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                    "
+                    onmouseover="this.style.background='#dc2626'"
+                    onmouseout="this.style.background='#ef4444'">
+                🛑 Abbrechen
+            </button>
+        </div>
+    ` : '';
+    
     return `
         <div style="padding: 20px; text-align: center; background: #f0f9ff; border-radius: 8px; border: 1px solid #0ea5e9;">
             <h3>${sanitizeHTML(title)}</h3>
             ${message ? `<p>${sanitizeHTML(message)}</p>` : ''}
             ${timerHTML}
             ${spinnerHTML}
+            ${cancelButtonHTML}
         </div>
     `;
 }
 
-function showLoadingMessage(element, title, message = '', startTimer = false) {
-    element.innerHTML = createLoadingHTML(title, message, true, startTimer);
+function showLoadingMessage(element, title, message = '', startTimer = false, showCancelButton = false, cancelFunction = '') {
+    element.innerHTML = createLoadingHTML(title, message, true, startTimer, showCancelButton, cancelFunction);
     
     if (startTimer) {
         searchTimer.start();
