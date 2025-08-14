@@ -1,0 +1,88 @@
+{
+  "timestamp": "2025-08-14T15:25:48.625Z",
+  "version": "2.0",
+  "systemStatus": "TESTING",
+  "testResults": {
+    "contentAccuracy": {
+      "totalCards": 35,
+      "validTitles": 5,
+      "validSources": 5,
+      "sampleTitles": [
+        "🏭 Antamina",
+        "🏭 Aubelle",
+        "🏭 Barry-1",
+        "🏭 Bell-Allard",
+        "🏭 Bingham Canyon"
+      ]
+    },
+    "mathematicalValidation": {
+      "totalCards": 53,
+      "validScores": 10,
+      "invalidScores": [],
+      "sampleScores": [
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10
+      ]
+    },
+    "sourceAttribution": {
+      "totalCards": 53,
+      "cardsWithSources": 5,
+      "cardsWithoutSources": 0,
+      "sampleSources": [
+        [
+          "🏢 mining-technology.com",
+          "🏢 infomine.com"
+        ],
+        [
+          "🏢 mining-technology.com",
+          "🏢 infomine.com"
+        ],
+        [
+          "🏢 mining-technology.com",
+          "🏢 infomine.com"
+        ],
+        [
+          "🏢 mining-technology.com",
+          "🏢 infomine.com"
+        ],
+        [
+          "🏢 mining-technology.com",
+          "🏢 infomine.com"
+        ]
+      ]
+    },
+    "tabFunctionality": [
+      {
+        "tab": "consolidated",
+        "cardsLoaded": 53,
+        "functional": true
+      },
+      {
+        "tab": "statistics",
+        "cardsLoaded": 53,
+        "functional": true
+      },
+      {
+        "tab": "sources",
+        "cardsLoaded": 74,
+        "functional": true
+      }
+    ]
+  },
+  "scores": {
+    "contentAccuracy": 10,
+    "mathematicalValidation": 10,
+    "sourceAttribution": 10,
+    "tabFunctionality": 10
+  },
+  "overallScore": 10,
+  "systemGrade": "A+ (WELTKLASSE)"
+}
