@@ -1,0 +1,1285 @@
+{
+  "timestamp": "2025-08-14T11:01:36.259Z",
+  "analysis_type": "Deep Content Analysis",
+  "summary": {
+    "totalIssues": 92,
+    "criticalIssues": 18,
+    "mathematicalErrors": 36,
+    "logicalInconsistencies": 56,
+    "consistencyIssues": 0
+  },
+  "detailedFindings": {
+    "contentIssues": [
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-1: Shows model ID \"🤖 openrouter:deepseek-free\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-1: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-2: Shows model ID \"🤖 openrouter:deepseek-free_openrouter:mistral-small-free\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-2: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-3: Shows model ID \"🤖 openrouter:mistral-small-free\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-3: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-4: Shows model ID \"🤖 openrouter:kimi-k2\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-4: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-5: Shows model ID \"🤖 openrouter:deepseek-free_openrouter:deepseek-chimera-free_openrouter:mistral-small-free_openrouter:horizon-beta_openrouter:minimax-m1_openrouter:llama-3.3-nemotron-super_openrouter:llama-3.1-nemotron-ultra_openrouter:kimi-k2_openrouter:glm-4.5-air-free\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-5: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-6: Shows model ID \"🤖 perplexity:sonar_openrouter:deepseek-free_openrouter:deepseek-chimera-free_openrouter:mistral-small-free_openrouter:horizon-beta_openrouter:minimax-m1_openrouter:llama-3.3-nemotron-super_openrouter:llama-3.1-nemotron-ultra_openrouter:kimi-k2_openrouter:glm-4.5-air-free\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-6: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-7: Shows model ID \"🤖 openrouter:deepseek-chimera-free\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-7: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.139Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-8: Shows model ID \"🤖 openrouter:horizon-beta\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-8: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-9: Shows model ID \"🤖 openrouter:llama-3.1-nemotron-ultra\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-9: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-10: Shows model ID \"🤖 openrouter:llama-3.3-nemotron-super\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-10: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-11: Shows model ID \"🤖 openrouter:glm-4.5-air-free\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-11: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-12: Shows model ID \"🤖 openrouter:minimax-m1\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-12: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-13: Shows model ID \"🤖 openrouter:deepseek-free_openrouter:deepseek-chat_openrouter:deepseek-reasoner_openrouter:deepseek-chimera-free_openrouter:mistral-small-free_openrouter:horizon-beta_openrouter:minimax-m1_openrouter:llama-3.3-nemotron-super_openrouter:llama-3.1-nemotron-ultra_openrouter:kimi-k2_openrouter:glm-4.5_openrouter:glm-4.5-air-free_openrouter:gpt-oss-20b_openrouter:gpt-oss-120b\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-13: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-14: Shows model ID \"🤖 openrouter:glm-4.5\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-14: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-15: Shows model ID \"🤖 openrouter:deepseek-chat\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-15: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-16: Shows model ID \"🤖 openrouter:deepseek-reasoner\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-16: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-17: Shows model ID \"🤖 openrouter:gpt-oss-20b\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-17: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Technical ID as Title",
+        "description": "Card-18: Shows model ID \"🤖 openrouter:gpt-oss-120b\" instead of mine name",
+        "severity": "critical",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-18: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-19: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-20: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-21: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-22: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-23: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-24: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-25: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-26: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-27: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-28: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-29: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-30: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-31: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-32: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-33: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-34: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-35: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-36: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-37: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-38: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-39: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-40: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-41: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-42: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-43: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-44: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-45: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-46: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-47: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-48: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-49: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-50: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-51: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-52: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "Placeholder Sources",
+        "description": "Card-53: All sources are placeholders",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:26.140Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-1: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-2: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-3: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-4: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-5: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-6: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-7: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-8: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-9: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-10: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-11: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-12: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-13: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-14: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-15: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-16: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-17: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-18: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-19: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-20: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      },
+      {
+        "category": "No URLs",
+        "description": "Source-21: No URLs found in source entry",
+        "severity": "high",
+        "timestamp": "2025-08-14T11:01:36.258Z"
+      }
+    ],
+    "mathematicalValidation": [
+      {
+        "cardId": "Card-1",
+        "issue": "Performance score 54.5 exceeds maximum 10",
+        "severity": "high",
+        "value": "54.5/10"
+      },
+      {
+        "cardId": "Card-2",
+        "issue": "Performance score 54.4 exceeds maximum 10",
+        "severity": "high",
+        "value": "54.4/10"
+      },
+      {
+        "cardId": "Card-3",
+        "issue": "Performance score 54.4 exceeds maximum 10",
+        "severity": "high",
+        "value": "54.4/10"
+      },
+      {
+        "cardId": "Card-4",
+        "issue": "Performance score 48.1 exceeds maximum 10",
+        "severity": "high",
+        "value": "48.1/10"
+      },
+      {
+        "cardId": "Card-5",
+        "issue": "Performance score 47.9 exceeds maximum 10",
+        "severity": "high",
+        "value": "47.9/10"
+      },
+      {
+        "cardId": "Card-6",
+        "issue": "Performance score 46 exceeds maximum 10",
+        "severity": "high",
+        "value": "46.0/10"
+      },
+      {
+        "cardId": "Card-7",
+        "issue": "Performance score 46 exceeds maximum 10",
+        "severity": "high",
+        "value": "46.0/10"
+      },
+      {
+        "cardId": "Card-8",
+        "issue": "Performance score 46 exceeds maximum 10",
+        "severity": "high",
+        "value": "46.0/10"
+      },
+      {
+        "cardId": "Card-9",
+        "issue": "Performance score 46 exceeds maximum 10",
+        "severity": "high",
+        "value": "46.0/10"
+      },
+      {
+        "cardId": "Card-10",
+        "issue": "Performance score 46 exceeds maximum 10",
+        "severity": "high",
+        "value": "46.0/10"
+      },
+      {
+        "cardId": "Card-11",
+        "issue": "Performance score 46 exceeds maximum 10",
+        "severity": "high",
+        "value": "46.0/10"
+      },
+      {
+        "cardId": "Card-12",
+        "issue": "Performance score 46 exceeds maximum 10",
+        "severity": "high",
+        "value": "46.0/10"
+      },
+      {
+        "cardId": "Card-13",
+        "issue": "Performance score 45.1 exceeds maximum 10",
+        "severity": "high",
+        "value": "45.1/10"
+      },
+      {
+        "cardId": "Card-14",
+        "issue": "Performance score 45.1 exceeds maximum 10",
+        "severity": "high",
+        "value": "45.1/10"
+      },
+      {
+        "cardId": "Card-15",
+        "issue": "Performance score 45.1 exceeds maximum 10",
+        "severity": "high",
+        "value": "45.1/10"
+      },
+      {
+        "cardId": "Card-16",
+        "issue": "Performance score 45.1 exceeds maximum 10",
+        "severity": "high",
+        "value": "45.1/10"
+      },
+      {
+        "cardId": "Card-17",
+        "issue": "Performance score 45.1 exceeds maximum 10",
+        "severity": "high",
+        "value": "45.1/10"
+      },
+      {
+        "cardId": "Card-18",
+        "issue": "Performance score 45.1 exceeds maximum 10",
+        "severity": "high",
+        "value": "45.1/10"
+      },
+      {
+        "cardId": "Stats-1",
+        "issue": "Performance score 54.51 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 54.51
+      },
+      {
+        "cardId": "Stats-2",
+        "issue": "Performance score 54.41 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 54.41
+      },
+      {
+        "cardId": "Stats-3",
+        "issue": "Performance score 54.41 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 54.41
+      },
+      {
+        "cardId": "Stats-4",
+        "issue": "Performance score 48.11 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 48.11
+      },
+      {
+        "cardId": "Stats-5",
+        "issue": "Performance score 47.91 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 47.91
+      },
+      {
+        "cardId": "Stats-6",
+        "issue": "Performance score 46.01 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-7",
+        "issue": "Performance score 46.01 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-8",
+        "issue": "Performance score 46.01 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-9",
+        "issue": "Performance score 46.01 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-10",
+        "issue": "Performance score 46.01 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-11",
+        "issue": "Performance score 46.01 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-12",
+        "issue": "Performance score 46.01 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-13",
+        "issue": "Performance score 45.11 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 45.11
+      },
+      {
+        "cardId": "Stats-14",
+        "issue": "Performance score 45.11 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 45.11
+      },
+      {
+        "cardId": "Stats-15",
+        "issue": "Performance score 45.11 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 45.11
+      },
+      {
+        "cardId": "Stats-16",
+        "issue": "Performance score 45.11 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 45.11
+      },
+      {
+        "cardId": "Stats-17",
+        "issue": "Performance score 45.11 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 45.11
+      },
+      {
+        "cardId": "Stats-18",
+        "issue": "Performance score 45.11 exceeds maximum scale of 10",
+        "severity": "critical",
+        "expected": "≤ 10",
+        "actual": 45.11
+      }
+    ],
+    "logicalValidation": [
+      {
+        "cardId": "Card-1",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-1",
+        "issue": "High performance score 54.5 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 54.5,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-1",
+        "issue": "115 searches performed but 0% success rate - system might be broken",
+        "severity": "critical",
+        "metrics": {
+          "totalSearches": 115,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-2",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-2",
+        "issue": "High performance score 54.4 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 54.4,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-3",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-3",
+        "issue": "High performance score 54.4 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 54.4,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-4",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-4",
+        "issue": "High performance score 48.1 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 48.1,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-5",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-5",
+        "issue": "High performance score 47.9 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 47.9,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-5",
+        "issue": "110 searches performed but 0% success rate - system might be broken",
+        "severity": "critical",
+        "metrics": {
+          "totalSearches": 110,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-6",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-6",
+        "issue": "High performance score 46 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 46,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-7",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-7",
+        "issue": "High performance score 46 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 46,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-8",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-8",
+        "issue": "High performance score 46 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 46,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-9",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-9",
+        "issue": "High performance score 46 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 46,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-10",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-10",
+        "issue": "High performance score 46 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 46,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-11",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-11",
+        "issue": "High performance score 46 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 46,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-12",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-12",
+        "issue": "High performance score 46 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 46,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-13",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-13",
+        "issue": "High performance score 45.1 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 45.1,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-14",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-14",
+        "issue": "High performance score 45.1 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 45.1,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-15",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-15",
+        "issue": "High performance score 45.1 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 45.1,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-16",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-16",
+        "issue": "High performance score 45.1 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 45.1,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-17",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-17",
+        "issue": "High performance score 45.1 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 45.1,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Card-18",
+        "issue": "0% success rate but performance level is \"Exzellent\"",
+        "severity": "high",
+        "metrics": {
+          "successRate": 0,
+          "level": "Exzellent"
+        }
+      },
+      {
+        "cardId": "Card-18",
+        "issue": "High performance score 45.1 but 0% success rate",
+        "severity": "high",
+        "metrics": {
+          "score": 45.1,
+          "successRate": 0
+        }
+      },
+      {
+        "cardId": "Stats-1",
+        "issue": "0% success rate but performance score is 54.51 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 54.51
+      },
+      {
+        "cardId": "Stats-2",
+        "issue": "0% success rate but performance score is 54.41 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 54.41
+      },
+      {
+        "cardId": "Stats-3",
+        "issue": "0% success rate but performance score is 54.41 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 54.41
+      },
+      {
+        "cardId": "Stats-4",
+        "issue": "0% success rate but performance score is 48.11 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 48.11
+      },
+      {
+        "cardId": "Stats-5",
+        "issue": "0% success rate but performance score is 47.91 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 47.91
+      },
+      {
+        "cardId": "Stats-6",
+        "issue": "0% success rate but performance score is 46.01 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-7",
+        "issue": "0% success rate but performance score is 46.01 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-8",
+        "issue": "0% success rate but performance score is 46.01 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-9",
+        "issue": "0% success rate but performance score is 46.01 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-10",
+        "issue": "0% success rate but performance score is 46.01 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-11",
+        "issue": "0% success rate but performance score is 46.01 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-12",
+        "issue": "0% success rate but performance score is 46.01 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 46.01
+      },
+      {
+        "cardId": "Stats-13",
+        "issue": "0% success rate but performance score is 45.11 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 45.11
+      },
+      {
+        "cardId": "Stats-14",
+        "issue": "0% success rate but performance score is 45.11 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 45.11
+      },
+      {
+        "cardId": "Stats-15",
+        "issue": "0% success rate but performance score is 45.11 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 45.11
+      },
+      {
+        "cardId": "Stats-16",
+        "issue": "0% success rate but performance score is 45.11 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 45.11
+      },
+      {
+        "cardId": "Stats-17",
+        "issue": "0% success rate but performance score is 45.11 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 45.11
+      },
+      {
+        "cardId": "Stats-18",
+        "issue": "0% success rate but performance score is 45.11 (should be ≤ 3)",
+        "severity": "high",
+        "expected": "≤ 3",
+        "actual": 45.11
+      }
+    ],
+    "consistencyValidation": [],
+    "plausibilityChecks": []
+  },
+  "rawData": {
+    "ergebnisseCards": 53,
+    "statistikenCards": 53,
+    "quellenEntries": 21
+  },
+  "recommendations": [
+    "🚨 CRITICAL: Fix critical content issues immediately",
+    "🔢 MATH: Review and correct mathematical calculations",
+    "🧠 LOGIC: Address logical inconsistencies in data presentation"
+  ]
+}

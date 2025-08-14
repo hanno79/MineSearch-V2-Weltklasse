@@ -76,11 +76,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Load model statistics if function is available
+    // Load model statistics ONLY if statistics tab is active
     if (typeof loadModelStatistics === 'function') {
         setTimeout(() => {
-            console.log('🔄 [INIT] Auto-loading model statistics...');
-            loadModelStatistics();
+            // BUGFIX 14.08.2025: Nur Model-Statistiken laden wenn Statistics-Tab aktiv ist
+            // Problem: Automatisches Laden überschrieb Consolidated-Results-Anzeige  
+            const activeTab = document.querySelector('input[name="tab"]:checked');
+            const isStatisticsTab = activeTab && activeTab.value === 'statistics';
+            
+            if (isStatisticsTab) {
+                console.log('🔄 [INIT] Auto-loading model statistics (statistics tab active)...');
+                loadModelStatistics();
+            } else {
+                console.log('🔄 [INIT] Skipping auto-load of model statistics (not on statistics tab)');
+            }
         }, 1000);
     }
 });
@@ -335,8 +344,11 @@ function setupTabNavigationHandlers() {
                 const target = mutation.target;
                 if (target.classList.contains('active') && target.textContent.includes('Statistiken')) {
                     // Statistics tab was activated - auto-load data
+                    // BUGFIX 14.08.2025: Nur laden wenn wirklich Statistics-Tab aktiv ist
                     setTimeout(() => {
-                        if (typeof loadModelStatistics === 'function') {
+                        const activeTab = document.querySelector('input[name="tab"]:checked');
+                        if (activeTab && activeTab.value === 'statistics' && typeof loadModelStatistics === 'function') {
+                            console.log('📊 [OBSERVER] Loading model statistics (statistics tab activated)');
                             loadModelStatistics();
                         }
                     }, 500);

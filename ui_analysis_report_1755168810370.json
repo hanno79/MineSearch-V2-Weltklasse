@@ -1,0 +1,72 @@
+{
+  "timestamp": "2025-08-14T10:53:30.370Z",
+  "summary": {
+    "totalIssues": 2,
+    "highSeverityIssues": 1,
+    "screenshotsTaken": 3
+  },
+  "referenceData": {
+    "mineNames": [
+      "🤖 openrouter:deepseek-free",
+      "🤖 openrouter:deepseek-free_openrouter:mistral-small-free",
+      "🤖 openrouter:mistral-small-free",
+      "🤖 openrouter:kimi-k2",
+      "🤖 openrouter:deepseek-free_openrouter:deepseek-chimera-free_openrouter:mistral-small-free_openrouter:horizon-beta_openrouter:minimax-m1_openrouter:llama-3.3-nemotron-super_openrouter:llama-3.1-nemotron-ultra_openrouter:kimi-k2_openrouter:glm-4.5-air-free"
+    ],
+    "modelNames": [],
+    "sourceNames": [
+      "⚠️ Keine Quellen verfügbar"
+    ],
+    "counts": {
+      "totalMines": 53,
+      "totalSources": 21
+    }
+  },
+  "detailedResults": {
+    "ergebnisse": {
+      "totalCards": 53
+    },
+    "statistiken": {},
+    "quellen": {},
+    "crossValidation": {},
+    "issues": [
+      {
+        "category": "Modal Test Error",
+        "description": "Error testing modal: elementHandle.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    58 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is not visible\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n",
+        "severity": "medium",
+        "tab": "ergebnisse",
+        "timestamp": "2025-08-14T10:53:14.524Z"
+      },
+      {
+        "category": "No Statistics Cards",
+        "description": "No statistics cards found",
+        "severity": "high",
+        "tab": "statistiken",
+        "timestamp": "2025-08-14T10:53:25.267Z"
+      }
+    ],
+    "screenshots": [
+      {
+        "name": "ergebnisse_initial",
+        "filename": "analysis_ergebnisse_initial_1755168754559.png",
+        "description": "Initial view of Ergebnisse tab",
+        "timestamp": "2025-08-14T10:52:36.354Z"
+      },
+      {
+        "name": "statistiken_initial",
+        "filename": "analysis_statistiken_initial_1755168798586.png",
+        "description": "Initial view of Statistiken tab",
+        "timestamp": "2025-08-14T10:53:20.258Z"
+      },
+      {
+        "name": "quellen_initial",
+        "filename": "analysis_quellen_initial_1755168809307.png",
+        "description": "Initial view of Quellen tab",
+        "timestamp": "2025-08-14T10:53:30.339Z"
+      }
+    ]
+  },
+  "recommendations": [
+    "🚨 CRITICAL: 1 high-severity issues need immediate attention"
+  ]
+}
