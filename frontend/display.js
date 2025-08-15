@@ -818,17 +818,42 @@ function showConsolidatedDetailModal(mineName, mineData) {
                 <div class="fields-data-grid">
                     ${Object.entries(mineData.best_values)
                         .filter(([field, value]) => !field.startsWith('_'))  // Filtere Meta-Felder wie _source_mapping
-                        .map(([field, value]) => `
+                        .map(([field, value]) => {
+                            // PHASE 16.2: Hole Field-spezifische Source-Informationen
+                            const fieldData = mineData.structured_fields ? mineData.structured_fields[field] : null;
+                            const sourceCount = fieldData ? (fieldData.source_references?.length || 0) : 0;
+                            const confidenceScore = fieldData ? fieldData.confidence_score : null;
+                            
+                            return `
                         <div class="field-data-card">
                             <div class="field-header">
                                 <span class="field-name">${field}</span>
-                                <span class="source-badge">📊 Konsolidiert</span>
+                                <div class="field-source-info">
+                                    ${sourceCount > 0 ? `
+                                        <span class="source-count-badge" title="${sourceCount} Quellen verwendet">
+                                            📊 ${sourceCount} Quellen
+                                        </span>
+                                    ` : '<span class="source-badge">📊 Konsolidiert</span>'}
+                                    ${confidenceScore !== null ? `
+                                        <span class="confidence-badge" title="Vertrauens-Score basierend auf Quellenqualität">
+                                            🎯 ${confidenceScore}%
+                                        </span>
+                                    ` : ''}
+                                </div>
                             </div>
                             <div class="field-value">
                                 ${value || '<span class="missing-value">Nicht verfügbar</span>'}
                             </div>
+                            ${sourceCount > 0 ? `
+                                <div class="field-sources-preview">
+                                    <button class="btn-mini" onclick="showFieldSourceDetails('${mineName.replace(/'/g, "\\'")}', '${field.replace(/'/g, "\\'")}')">
+                                        📚 Quellen anzeigen
+                                    </button>
+                                </div>
+                            ` : ''}
                         </div>
-                    `).join('')}
+                    `;
+                        }).join('')}
                 </div>
             </div>
         ` : ''}
@@ -1208,12 +1233,222 @@ window.closeModal = closeModal;
 window.loadEnhancedSourceDetails = loadEnhancedSourceDetails;
 
 // ============================================
+// CSV EXPORT FUNCTIONS - PHASE 16.1
+// ============================================
+
+/**
+ * PHASE 16.1: CSV Export für Consolidated Results
+ * Exportiert alle konsolidierten Minen-Daten als CSV-Datei
+ */
+async function exportConsolidatedCSV() {
+    console.log('📊 [CSV-EXPORT] Starting CSV export for consolidated results...');
+    
+    try {
+        // Zeige Loading-Status
+        const exportBtn = document.getElementById('csv-export-btn') || document.querySelector('button[onclick="exportConsolidatedCSV()"]');
+        if (exportBtn) {
+            exportBtn.textContent = '⏳ Exportiere...';
+            exportBtn.disabled = true;
+        }
+        
+        // Hole die aktuellen Filter-Parameter
+        const country = document.getElementById('consolidated_country')?.value || '';
+        const region = document.getElementById('consolidated_region')?.value || '';
+        const daysBack = document.getElementById('consolidated_days')?.value || '30';
+        const sortBy = document.getElementById('consolidated_sort')?.value || 'mine_name';
+        
+        // PHASE 16.3: Verwende dedizierten CSV Export Endpunkt
+        const params = new URLSearchParams({
+            exclude_exa: 'true',
+            days_back: daysBack,
+            sort_by: sortBy
+        });
+        
+        if (country) params.append('country', country);
+        if (region) params.append('region', region);
+        
+        // PHASE 16.3 FIX: Korrekte API-Route für CSV Export
+        const csvUrl = `${window.API_BASE_URL}/api/consolidated/results/export/csv?${params.toString()}`;
+        
+        // Trigger download durch temporäres Link-Element
+        const downloadLink = document.createElement('a');
+        downloadLink.href = csvUrl;
+        downloadLink.style.display = 'none';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        
+        console.log(`✅ [CSV-EXPORT] CSV Export gestartet: ${csvUrl}`);
+        showNotification(`✅ CSV Export gestartet - Download beginnt automatisch`, 'success');
+        
+    } catch (error) {
+        console.error('❌ [CSV-EXPORT] Export error:', error);
+        showNotification(`❌ CSV Export fehlgeschlagen: ${error.message}`, 'error');
+    } finally {
+        // Button zurücksetzen
+        if (exportBtn) {
+            exportBtn.textContent = '📊 CSV Export (| separiert)';
+            exportBtn.disabled = false;
+        }
+    }
+}
+
+// PHASE 16.3: CSV-Generierungsfunktionen entfernt - Backend übernimmt CSV-Export vollständig
+// CSV Export erfolgt jetzt server-seitig über /api/consolidated/results/export/csv
+
+// ============================================
+// FIELD-SPECIFIC SOURCE DETAILS - PHASE 16.2
+// ============================================
+
+/**
+ * PHASE 16.2: Zeigt detaillierte Quelleninformationen für ein spezifisches Feld
+ */
+async function showFieldSourceDetails(mineName, fieldName) {
+    console.log(`📚 [FIELD-SOURCES] Loading source details for: ${mineName} -> ${fieldName}`);
+    
+    try {
+        // API call to get detailed field sources
+        const response = await fetch(`${window.API_BASE_URL}/api/consolidated/mine/${encodeURIComponent(mineName)}?include_sources=true`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success || !data.data || !data.data.structured_fields) {
+            throw new Error('Keine Feldquellen verfügbar');
+        }
+        
+        const fieldData = data.data.structured_fields[fieldName];
+        if (!fieldData) {
+            throw new Error(`Feld '${fieldName}' nicht gefunden`);
+        }
+        
+        // Generiere Field-Source-Details HTML
+        const sourceDetailsHTML = generateFieldSourceDetailsHTML(mineName, fieldName, fieldData);
+        
+        // Show modal using existing modal system
+        showModal(`📚 Quellen: ${fieldName}`, sourceDetailsHTML, 'medium');
+        
+    } catch (error) {
+        console.error(`❌ [FIELD-SOURCES] Error:`, error);
+        showNotification(`❌ Fehler beim Laden der Feldquellen: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * Generiert HTML für Field-spezifische Source-Details
+ */
+function generateFieldSourceDetailsHTML(mineName, fieldName, fieldData) {
+    const value = fieldData.value || 'Nicht verfügbar';
+    const confidenceScore = fieldData.confidence_score || 0;
+    const sourceReferences = fieldData.source_references || [];
+    const globalSourceNumbers = fieldData.global_source_numbers || [];
+    
+    let sourcesHTML = '';
+    
+    if (sourceReferences.length === 0) {
+        sourcesHTML = '<div class="no-sources">Keine spezifischen Quellen für dieses Feld verfügbar.</div>';
+    } else {
+        sourcesHTML = sourceReferences.map((sourceUrl, index) => {
+            const sourceNumber = globalSourceNumbers[index] || (index + 1);
+            const domain = sourceUrl ? new URL(sourceUrl).hostname : 'Unbekannt';
+            
+            return `
+                <div class="field-source-item">
+                    <div class="source-header">
+                        <span class="source-number">[${sourceNumber}]</span>
+                        <span class="source-domain">${domain}</span>
+                    </div>
+                    <div class="source-url" title="${sourceUrl}">
+                        ${sourceUrl.length > 80 ? sourceUrl.substring(0, 77) + '...' : sourceUrl}
+                    </div>
+                    <div class="source-actions">
+                        <button class="btn-small" onclick="openSourceInNewTab('${sourceUrl}')">
+                            🔗 Öffnen
+                        </button>
+                        <button class="btn-small" onclick="copyToClipboard('${sourceUrl}')">
+                            📋 Kopieren
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    return `
+        <div class="field-source-details">
+            <div class="field-summary">
+                <h4>📊 Feld-Zusammenfassung</h4>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <strong>Mine:</strong> ${mineName}
+                    </div>
+                    <div class="summary-item">
+                        <strong>Feld:</strong> ${fieldName}
+                    </div>
+                    <div class="summary-item">
+                        <strong>Wert:</strong> ${value}
+                    </div>
+                    <div class="summary-item">
+                        <strong>Vertrauen:</strong> ${confidenceScore}%
+                    </div>
+                    <div class="summary-item">
+                        <strong>Quellen:</strong> ${sourceReferences.length}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="field-sources-list">
+                <h4>📚 Quellendetails</h4>
+                ${sourcesHTML}
+            </div>
+            
+            <div class="source-legend">
+                <p><small>💡 <strong>Tipp:</strong> Klicken Sie auf "🔗 Öffnen" um die Original-Quelle zu besuchen.</small></p>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Öffnet eine Quelle in einem neuen Tab
+ */
+function openSourceInNewTab(url) {
+    if (url && url.startsWith('http')) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+        showNotification('❌ Ungültige URL', 'error');
+    }
+}
+
+/**
+ * Kopiert Text in die Zwischenablage
+ */
+async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        showNotification('✅ URL kopiert!', 'success');
+    } catch (error) {
+        console.error('Failed to copy to clipboard:', error);
+        showNotification('❌ Kopieren fehlgeschlagen', 'error');
+    }
+}
+
+// ============================================
 // DEFINITIVE GLOBAL EXPORTS - NUR HIER!
 // ============================================
 // Alle wichtigen Tab-Loading-Funktionen exportieren
 window.loadSources = loadSources;
 window.loadResults = loadResults;
 window.loadConsolidatedResults = loadConsolidatedResults;
+
+// CSV Export Function - PHASE 16.1
+window.exportConsolidatedCSV = exportConsolidatedCSV;
+
+// PHASE 16.2: Field-specific Source Details Function
+window.showFieldSourceDetails = showFieldSourceDetails;
 
 // Display-Funktionen exportieren
 window.displayGroupedSources = displayGroupedSources;

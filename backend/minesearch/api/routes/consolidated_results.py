@@ -22,6 +22,12 @@ from .consolidated_field_utils import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# CSV imports for Phase 16.3
+import csv
+import io
+from fastapi.responses import StreamingResponse
+from datetime import datetime
+
 # Field mappings are now imported from consolidated_field_utils.py
 
 def _normalize_placeholder_value(value):
@@ -1022,6 +1028,11 @@ async def export_consolidated_csv(
     # Dann alle anderen Felder aus FIELD_ORDER (außer Metadaten und Details)
     excluded_field_keys = set(metadata_mapping.keys()) | {"Details"}
     remaining_fields = [f for f in FIELD_ORDER if f not in excluded_field_keys and f in all_fields]
+    
+    # CSV-FIX: Stelle sicher dass "Quellenangaben" immer in Header ist (auch wenn nicht in all_fields)
+    if "Quellenangaben" not in remaining_fields:
+        remaining_fields.append("Quellenangaben")
+    
     header.extend(remaining_fields)
     
     csv_lines.append("|".join(header))
@@ -1045,12 +1056,32 @@ async def export_consolidated_csv(
             elif field_type == "last_updated":
                 row.append(result.get("last_updated", ""))
         
-        # Restliche Felder aus best_values
+        # Restliche Felder aus best_values - mit spezieller Quellenangaben-Behandlung
         for field in remaining_fields:
-            value = result["best_values"].get(field, "")
-            # Escape Pipe-Zeichen in Werten
-            escaped_value = str(value).replace("|", "\\|") if value else ""
-            row.append(escaped_value)
+            if field == "Quellenangaben":
+                # CSV-FIX Phase 2: Quellenangaben speziell behandeln
+                sources_value = result["best_values"].get("Quellenangaben", "")
+                
+                # Falls keine Quellenangaben in best_values, versuche aus source_mapping zu generieren
+                if not sources_value or sources_value == "Nichts gefunden":
+                    source_mapping = result.get("source_mapping", {})
+                    if source_mapping:
+                        # Generiere kurze Quellenangaben-Liste aus source_mapping
+                        source_count = len(source_mapping)
+                        sources_value = f"{source_count} Quellen verfügbar"
+                    else:
+                        sources_value = "Keine Quellen verfügbar"
+                
+                # CSV-FIX Phase 3: Zeilenschaltungen durch Semikolon ersetzen
+                normalized_sources = str(sources_value).replace("\n", "; ").replace("\r", "")
+                # Escape Pipe-Zeichen
+                escaped_sources = normalized_sources.replace("|", "\\|")
+                row.append(escaped_sources)
+            else:
+                value = result["best_values"].get(field, "")
+                # Escape Pipe-Zeichen in Werten
+                escaped_value = str(value).replace("|", "\\|") if value else ""
+                row.append(escaped_value)
         
         csv_lines.append("|".join(row))
     
