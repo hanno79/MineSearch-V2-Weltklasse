@@ -463,7 +463,7 @@ function generateFieldBasedCard(mine) {
                 <div class="header-main">
                     <h3 class="mine-title">⛏️ ${metadata.mine_name}</h3>
                     <div class="mine-location">
-                        📍 ${metadata.country || 'Unbekannt'}${metadata.region ? `, ${metadata.region}` : ''}
+                        📍 ${metadata.country || 'Nichts gefunden'}${metadata.region ? `, ${metadata.region}` : ''}
                     </div>
                 </div>
                 <div class="field-summary-badge">
@@ -494,7 +494,7 @@ function generateFieldBasedCard(mine) {
                 <div class="card-stats">
                     <span class="stat">📊 ${mine.model_count || 0} AI-Modelle</span>
                     <span class="stat">📈 ${mine.total_sources || 0} Quellen</span>
-                    <span class="stat">🕒 ${mine.last_updated ? new Date(mine.last_updated).toLocaleDateString('de-DE') : 'Unbekannt'}</span>
+                    <span class="stat">🕒 ${mine.last_updated ? new Date(mine.last_updated).toLocaleDateString('de-DE') : 'Nichts gefunden'}</span>
                 </div>
             </div>
         </div>
@@ -539,7 +539,7 @@ function generateFieldDisplayGrid(structuredFields, priorityOrder) {
  * Erstellt Anzeige für ein einzelnes Feld mit Wert, Score und Quellenreferenzen
  */
 function generateSingleFieldDisplay(fieldName, fieldData) {
-    const value = fieldData.value || 'Unbekannt';
+    const value = fieldData.value || 'Nichts gefunden';  // PHASE 14.3: Einheitliche Frontend-Darstellung
     const confidenceScore = fieldData.confidence_score || 0;
     const sourceNumbers = fieldData.global_source_numbers || [];
     const sourceCount = fieldData.source_count || 0;
@@ -801,7 +801,7 @@ function showConsolidatedDetailModal(mineName, mineData) {
             <h4>📊 Zusammenfassung</h4>
             <div class="summary-grid">
                 <div class="summary-item">
-                    <strong>Land:</strong> ${mineData.best_values?.country || 'Nicht verfügbar'}
+                    <strong>Land:</strong> ${mineData.country || 'Nicht verfügbar'}${mineData.region ? `, ${mineData.region}` : ''}
                 </div>
                 <div class="summary-item">
                     <strong>Gefundene Felder:</strong> ${mineData.best_values ? Object.keys(mineData.best_values).length : 0}
@@ -1120,11 +1120,11 @@ function generateSourceDetailsHTML(domain, sources, statistics = {}) {
                     <div style="font-weight: 500; color: #374151;">Quelle ${index + 1}</div>
                     <div style="display: flex; gap: 12px; font-size: 11px;">
                         <span style="color: ${reliabilityColor}; font-weight: bold;">${reliability.toFixed(1)}%</span>
-                        <span style="color: ${statusColor}; font-weight: bold;">${source.status || 'unbekannt'}</span>
+                        <span style="color: ${statusColor}; font-weight: bold;">${source.status || 'nichts gefunden'}</span>
                     </div>
                 </div>
                 <div style="color: #6b7280; font-size: 11px;">
-                    Typ: ${source.type || 'general'} | Letzte Aktualisierung: ${source.last_updated ? new Date(source.last_updated).toLocaleDateString('de-DE') : 'Unbekannt'}
+                    Typ: ${source.type || 'general'} | Letzte Aktualisierung: ${source.last_updated ? new Date(source.last_updated).toLocaleDateString('de-DE') : 'Nichts gefunden'}
                 </div>
             </div>
         `;

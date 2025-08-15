@@ -24,17 +24,74 @@ router = APIRouter()
 
 # Field mappings are now imported from consolidated_field_utils.py
 
+def _normalize_placeholder_value(value):
+    """
+    PHASE 15.2/15.3 FIX: Normalisiert ALLE Platzhalter-Werte (auch bestehende Datenbank-Werte!)
+    
+    Behandelt sowohl neue als auch bereits in der DB gespeicherte LEER-Varianten
+    """
+    if not value or not str(value).strip():
+        return value
+    
+    value_str = str(value).strip()
+    
+    # Import der Pattern aus extraction_processors für Konsistenz
+    import re
+    
+    # Exakte Platzhalter-Matches
+    exact_placeholders = [
+        'LEER', 'Leer', 'leer', 'X', 'N/A', 'n/a', 'N.A.', 'n.a.',
+        'UNBEKANNT', 'UNKNOWN', 'NICHT GEFUNDEN', 'NOT FOUND',
+        'KEINE ANGABEN', 'NO DATA', 'K.A.', 'k.a.', 'K.A.', 
+        'NICHT VERFÜGBAR', 'NOT AVAILABLE', 'keine Daten',
+        'Keine Informationen gefunden', 'Nicht verfügbar', 'Unbekannt'
+    ]
+    
+    if value_str in exact_placeholders:
+        logger.debug(f"[PHASE 15.3] Exact match '{value_str}' -> 'Nichts gefunden'")
+        return 'Nichts gefunden'
+    
+    # PHASE 15.3 KRITISCH: Pattern für alle LEER-Varianten aus der Datenbank
+    leer_db_patterns = [
+        r'^LEER\s*-\s*.*',                    # "LEER - [beliebiger Text]"
+        r'^Leer\s*-\s*.*',                    # "Leer - [beliebiger Text]" 
+        r'^leer\s*-\s*.*',                    # "leer - [beliebiger Text]"
+        r'.*[Kk]eine spezifischen.*',         # "Keine/keine spezifischen [...]" (596x!)
+        r'.*[Kk]eine verlässlichen.*',        # "Keine verlässlichen [...]"
+        r'.*[Kk]eine öffentlichen.*',         # "Keine öffentlichen [...]"
+        r'.*[Kk]eine aktiven.*',              # "Keine aktiven [...]"
+        r'.*[Kk]eine spezifischen Daten.*',   # Spezifisch für DB-Varianten
+        r'.*[Nn]o specific.*',                # Englische Varianten
+        r'.*[Nn]ot available.*',              # "Not available"
+        r'.*dokumentiert$',                   # "spezifischen Quellen dokumentiert"
+    ]
+    
+    # Pattern-Matching für Datenbank-LEER-Varianten
+    for pattern in leer_db_patterns:
+        if re.match(pattern, value_str, re.IGNORECASE):
+            logger.debug(f"[PHASE 15.3] DB-Pattern match '{value_str[:50]}...' -> 'Nichts gefunden'")
+            return 'Nichts gefunden'
+    
+    # Echte Werte unverändert zurückgeben
+    return value_str
+
 def _analyze_field_values(value_details):
     """
     Analysiert alle Werte für ein Feld und gruppiert sie nach Eindeutigkeit
+    
+    PHASE 15.3 FIX: Normalisiert ALLE Werte BEVOR sie analysiert werden!
     
     Returns: Dict mit eindeutigen Werten und deren Metadaten
     """
     value_groups = {}
     
     for detail in value_details:
-        value = detail['value'].strip().lower()  # Normalisiert für Vergleich
-        display_value = detail['value'].strip()  # Original für Anzeige
+        # PHASE 15.3 KRITISCH: Normalisiere JEDEN Wert vor der Analyse!
+        original_value = detail['value'].strip()
+        normalized_display_value = _normalize_placeholder_value(original_value)
+        
+        value = normalized_display_value.strip().lower()  # Normalisiert für Vergleich
+        display_value = normalized_display_value  # Normalisiert für Anzeige
         
         if value not in value_groups:
             value_groups[value] = {
@@ -91,7 +148,7 @@ def _calculate_best_value(value_analysis, field_name=None):
     """
     if not value_analysis:
         return {
-            'display_value': 'Unbekannt',  # FIELD-CONSOLIDATION-FIX 06.08.2025: Bessere UX als X oder N/A
+            'display_value': 'Nichts gefunden',  # PHASE 14.2 FIX: Einheitliche User-gewünschte Darstellung
             'confidence_score': 0,
             'reason': 'Keine Daten verfügbar'
         }
@@ -114,11 +171,12 @@ def _calculate_best_value(value_analysis, field_name=None):
         # Import is_placeholder_value für Template-Pattern-Erkennung
         from minesearch.extraction_validators import is_placeholder_value
         
-        # PHASE 13.1 FIX: Erweiterte Platzhalter-Erkennung für konsistente Behandlung
+        # PHASE 14.2 FIX: Erweiterte Platzhalter-Erkennung inkl. "Nichts gefunden"
         placeholder_values = [
             'X', 'N/A', 'UNBEKANNT', 'KEINE ANGABEN', 'NICHT VERFÜGBAR', '',
             'UNKNOWN', 'NICHT GEFUNDEN', 'KEINE DATEN', 'NOT AVAILABLE',
-            'NOT FOUND', 'NO DATA', 'K.A.', 'K.A', 'N.A.', 'N.A'
+            'NOT FOUND', 'NO DATA', 'K.A.', 'K.A', 'N.A.', 'N.A',
+            'NICHTS GEFUNDEN', 'LEER'  # PHASE 14.2: Neue einheitliche Darstellung als Platzhalter
         ]
         
         if display_val in placeholder_values:
@@ -142,7 +200,7 @@ def _calculate_best_value(value_analysis, field_name=None):
     
     if not best_value:
         return {
-            'display_value': 'Unbekannt',  # FIELD-CONSOLIDATION-FIX 06.08.2025: Konsistente UX
+            'display_value': 'Nichts gefunden',  # PHASE 14.2 FIX: Einheitliche User-gewünschte Darstellung  
             'confidence_score': 0,
             'reason': 'Keine gültigen Werte gefunden'
         }
@@ -474,9 +532,11 @@ async def get_consolidated_results(
                 metadaten_felder = ['Mine', 'Land', 'Zuverlässigkeit', 'Modelle', 'Letzte Aktualisierung', 'Details']
                 if field_name not in metadaten_felder:  # Verhindere Duplikate in Frontend
                     display_value = best_value_info['display_value']
-                    # ENHANCED VALUE CLEANING 06.08.2025: Mehr Platzhalter-Werte erkennen
-                    if not display_value or display_value.strip().upper() in ['', 'X', 'N/A', 'KEINE ANGABEN', 'NICHT VERFÜGBAR']:
-                        display_value = 'Unbekannt'
+                    # PHASE 14.2 FIX: Einheitliche "Nichts gefunden" Darstellung für alle Platzhalter
+                    placeholder_indicators = ['', 'X', 'N/A', 'KEINE ANGABEN', 'NICHT VERFÜGBAR', 'UNBEKANNT', 
+                                            'LEER', 'UNKNOWN', 'NOT FOUND', 'NO DATA', 'K.A.', 'N.A.']
+                    if not display_value or display_value.strip().upper() in placeholder_indicators:
+                        display_value = 'Nichts gefunden'  # PHASE 14.2: Einheitliche User-gewünschte Darstellung
                     best_values[field_name] = display_value
                 
                 # Erstelle detaillierte Aufschlüsselung für Modal
@@ -551,7 +611,7 @@ async def get_consolidated_results(
                                 continue
                     
                     structured_fields[field_name] = {
-                        'value': best_values.get(field_name, 'Unbekannt'),
+                        'value': best_values.get(field_name, 'Nichts gefunden'),  # PHASE 14.2: Konsistente Darstellung
                         'confidence_score': field_breakdown['best_value']['confidence_score'],
                         'consistency_score': field_breakdown['statistics'].get('confidence_score', 0),
                         'source_count': field_breakdown['statistics']['total_sources'],
@@ -827,8 +887,11 @@ async def get_mine_consolidated_details(
             metadaten_felder = ['Mine', 'Land', 'Zuverlässigkeit', 'Modelle', 'Letzte Aktualisierung', 'Details']
             if field_name not in metadaten_felder:
                 display_value = best_value_info['display_value']
-                if not display_value or display_value.strip().upper() in ['', 'X', 'N/A', 'KEINE ANGABEN', 'NICHT VERFÜGBAR']:
-                    display_value = 'Unbekannt'
+                # PHASE 14.2 FIX: Einheitliche "Nichts gefunden" Darstellung (auch in mine detail route)
+                placeholder_indicators = ['', 'X', 'N/A', 'KEINE ANGABEN', 'NICHT VERFÜGBAR', 'UNBEKANNT', 
+                                        'LEER', 'UNKNOWN', 'NOT FOUND', 'NO DATA', 'K.A.', 'N.A.']
+                if not display_value or display_value.strip().upper() in placeholder_indicators:
+                    display_value = 'Nichts gefunden'
                 best_values[field_name] = display_value
             
             # Detaillierte Aufschlüsselung

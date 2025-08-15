@@ -27,7 +27,9 @@ def normalize_field_value(value: str) -> str:
         # Komplett leer = nicht gesucht (bleibt leer)
         return ''
     
-    # Verschiedene "nicht gefunden" Werte zu einheitlichem "X"
+    # PHASE 14.1 FIX: Vollständige "nicht gefunden" Werte-Erkennung mit Regex-Pattern-Unterstützung
+    
+    # Exakte String-Matches
     not_found_values = [
         'LEER', 'Leer', 'leer',
         'LEER - keine verlässlichen Daten verfügbar',
@@ -41,21 +43,50 @@ def normalize_field_value(value: str) -> str:
         'LEER - Typ unklar',
         'LEER',
         'Keine spezifischen Quellen gefunden',
+        'Keine spezifischen Daten gefunden',
         'Keine Informationen gefunden',
         'Nicht verfügbar',
         'Unbekannt',
-        'N/A', 'n/a',
+        'N/A', 'n/a', 'N.A.', 'n.a.',
         '-', '—', '–',
         'k.A.', 'k.a.', 'K.A.',
         'keine Daten',
         'nicht gefunden',
         'no data',
-        'unknown'
+        'unknown',
+        'not found',
+        'not available',
+        'keine Angaben',
+        'keine verlässlichen Daten'
+    ]
+    
+    # PHASE 14.1 FIX: Pattern für alle LEER-Varianten die durchrutschen (verstärkt!)
+    leer_patterns = [
+        r'^LEER\s*-\s*.*',           # "LEER - [beliebiger Text]"
+        r'^Leer\s*-\s*.*',           # "Leer - [beliebiger Text]" 
+        r'^leer\s*-\s*.*',           # "leer - [beliebiger Text]"
+        r'^LEER\s*$',                # "LEER" allein
+        r'^Leer\s*$',                # "Leer" allein
+        r'^leer\s*$',                # "leer" allein
+        r'.*LEER.*',                 # VERSTÄRKT: Alle Texte mit LEER
+        r'.*Leer.*',                 # VERSTÄRKT: Alle Texte mit Leer
+        r'.*leer.*',                 # VERSTÄRKT: Alle Texte mit leer
+        r'Keine spezifischen.*',     # "Keine spezifischen [...]"
+        r'keine spezifischen.*',     # "keine spezifischen [...]"
+        r'^.*keine verlässlichen.*', # "[...] keine verlässlichen [...]"
     ]
     
     value_cleaned = value.strip()
+    
+    # Exakte String-Matches prüfen
     if value_cleaned in not_found_values:
         return 'X'
+    
+    # PHASE 14.1 FIX: Pattern-Matching für LEER-Varianten die durchrutschen  
+    for pattern in leer_patterns:
+        if re.match(pattern, value_cleaned, re.IGNORECASE):
+            logger.debug(f"[PHASE 14.1] Pattern-Match '{value_cleaned}' -> X (Pattern: {pattern})")
+            return 'X'
     
     # Echte Daten unverändert
     return value
