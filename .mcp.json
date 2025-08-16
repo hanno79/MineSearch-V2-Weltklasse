@@ -52,6 +52,13 @@
       "timeout": 30000,
       "retries": 3,
       "errorHandling": "graceful"
+    },
+    "TestSprite": {
+      "command": "npx",
+      "args": ["@testsprite/testsprite-mcp@latest"],
+      "env": {
+        "API_KEY": "sk-user-QyPjJRs-NyUA6DsEhqeDCi2uf4OMdaSLp4RhiVvljd9a14Q7azGwqV6eTv50vLV7ezIrx7IkoB8L1nxwx-9qclKK6re8a-wRI6Q87oK1Eo8ILlvn0ykl2zzMV9HoH6AlNSw"
+      }
     }
   },
   "globalSettings": {

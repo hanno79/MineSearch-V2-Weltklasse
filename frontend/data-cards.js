@@ -1,11 +1,12 @@
 /**
  * Author: rahn
- * Datum: 12.08.2025
- * Version: 1.0
+ * Datum: 16.08.2025
+ * Version: 1.2.1 - SCORE-TRANSFORMATION-FIX
  * Beschreibung: MineSearch 2.0 - Data-Card-System mit Source-Attribution
  * 
  * PHASE 3: TABELLEN-REVOLUTION
  * Ersetzt hässliche HTML-Tabellen durch moderne, interaktive Data-Cards
+ * ÄNDERUNG 16.08.2025: Score-Breakdown-Anzeige für detaillierte Performance-Analyse
  */
 
 // ============================================
@@ -623,9 +624,9 @@ function generateModelStatsCard(modelData) {
     const modelName = modelData.model_id || 'Unbekanntes Modell';
     const provider = modelData.provider || 'Unbekannt';
     
-    // 🚨 PHASE 1.2: Mathematical Validation - Scores auf 0-10 begrenzen
+    // 🚨 SCORE-FIX: Backend sendet 0-100, Frontend zeigt 0-10 an - Korrekte Skalierung!
     const rawScore = modelData.overall_score || 0;
-    const score = Math.min(Math.max(rawScore, 0), 10);
+    const score = Math.min(Math.max((rawScore / 100) * 10, 0), 10);
     
     // 🚨 PHASE 1.2: Mathematical Validation - Erfolgsrate auf 0-100% begrenzen
     const rawSuccessRate = modelData.success_rate || 0;
@@ -678,8 +679,12 @@ function generateModelStatsCard(modelData) {
                     <span class="data-label">🎯 Performance-Score</span>
                     <span class="data-value performance-score" style="font-size: 1.2em;">
                         ${score.toFixed(1)}/10
+                        ${modelData.confidence_percentage ? `<small style="color: #666; font-size: 0.8em; display: block;">(Konfidenz: ${modelData.confidence_percentage}%)</small>` : ''}
                     </span>
                 </div>
+                
+                <!-- NEUE SCORE-KOMPONENTEN AUFSCHLÜSSELUNG -->
+                ${generateScoreBreakdown(modelData)}
                 
                 <div class="data-row">
                     <span class="data-label">✅ Erfolgsrate</span>
@@ -2136,9 +2141,61 @@ window.calculateDataQualityScore = calculateDataQualityScore;
 window.generateDataFieldCards = generateDataFieldCards;
 window.generateSourcesSection = generateSourcesSection;
 
+/**
+ * NEUE FUNKTION: Score-Breakdown für detaillierte Performance-Anzeige
+ */
+function generateScoreBreakdown(modelData) {
+    if (!modelData.score_breakdown) {
+        return ''; // Keine Breakdown-Daten verfügbar
+    }
+    
+    const breakdown = modelData.score_breakdown;
+    
+    return `
+        <div class="score-breakdown-section" style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 6px; font-size: 0.85em;">
+            <div style="font-weight: bold; margin-bottom: 8px; color: #495057;">📊 Score-Aufschlüsselung:</div>
+            
+            <div class="score-component" style="margin-bottom: 4px;">
+                <span style="color: #28a745;">🎯 Feldqualität:</span>
+                <span style="float: right; font-weight: bold;">${breakdown.fieldQuality?.score?.toFixed(1) || 'N/A'}/10</span>
+                <small style="display: block; color: #6c757d; font-size: 0.9em; margin-top: 2px;">
+                    ${breakdown.fieldQuality?.qualityLevel || 'N/A'} - ${breakdown.fieldQuality?.details?.percentage || '0.0'}% echte Werte
+                    ${breakdown.fieldQuality?.details?.qualityBreakdown ? 
+                        `<br>🟢 ${breakdown.fieldQuality.details.qualityBreakdown.high} hoch, 🟡 ${breakdown.fieldQuality.details.qualityBreakdown.medium} mittel, 🔴 ${breakdown.fieldQuality.details.qualityBreakdown.low} niedrig` : ''}
+                </small>
+            </div>
+            
+            <div class="score-component" style="margin-bottom: 4px;">
+                <span style="color: #17a2b8;">🔄 Konsistenz:</span>
+                <span style="float: right; font-weight: bold;">${breakdown.consistency?.score?.toFixed(1) || 'N/A'}/10</span>
+                <small style="display: block; color: #6c757d; font-size: 0.9em;">
+                    ${breakdown.consistency?.details?.interpretation || ''}
+                </small>
+            </div>
+            
+            <div class="score-component" style="margin-bottom: 4px;">
+                <span style="color: #ffc107;">⚡ Geschwindigkeit:</span>
+                <span style="float: right; font-weight: bold;">${breakdown.speed?.score?.toFixed(1) || 'N/A'}/10</span>
+                <small style="display: block; color: #6c757d; font-size: 0.9em;">
+                    ${breakdown.speed?.details?.avgResponseTimeFormatted || 'N/A'}
+                </small>
+            </div>
+            
+            <div class="score-component">
+                <span style="color: #fd7e14;">💰 Kosten:</span>
+                <span style="float: right; font-weight: bold;">${breakdown.cost?.score?.toFixed(1) || 'N/A'}/10</span>
+                <small style="display: block; color: #6c757d; font-size: 0.9em;">
+                    ${breakdown.cost?.details?.interpretation || 'N/A'}
+                </small>
+            </div>
+        </div>
+    `;
+}
+
 // Export Modal Functions
 window.closeMineModal = closeMineModal;
 window.shareMineData = shareMineData;
+window.generateScoreBreakdown = generateScoreBreakdown;
 
 console.log('🎨 MineSearch 2.0 - Data-Card-System mit Source-Attribution geladen');
 

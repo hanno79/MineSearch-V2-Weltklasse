@@ -14,6 +14,114 @@ from collections import defaultdict
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# PHASE 1.4: GLOBAL SOURCE INDEX CACHE 14.08.2025
+# Cache für Frontend-Mapping zwischen Quellenummern und URLs
+_global_source_index_cache = {}
+
+@router.get("/sources/index")
+async def get_source_index_mapping():
+    """
+    PHASE 1.4: Source-Index-Mapping für Frontend-Referenzen
+    Liefert Mapping zwischen Quellenummern und URLs für konsistente Referenzen
+    """
+    from minesearch.database import db_manager
+    
+    try:
+        with db_manager.get_session() as session:
+            # Alle aktiven Quellen holen für Index-Generierung
+            from minesearch.database.models import Source
+            sources = session.query(Source).filter(
+                Source.total_searches > 0
+            ).order_by(Source.url).all()
+            
+            # Generiere konsistenten Index basierend auf URL-Sortierung
+            source_index = {}
+            url_to_number = {}
+            
+            for idx, source in enumerate(sources, 1):
+                url_to_number[source.url] = idx
+                source_index[str(idx)] = {
+                    'url': source.url,
+                    'domain': source.domain,
+                    'reliability_score': source.reliability_score,
+                    'success_rate': round((source.successful_searches / source.total_searches * 100) if source.total_searches > 0 else 0, 1),
+                    'source_type': source.source_type,
+                    'country': source.country,
+                    'total_searches': source.total_searches,
+                    'last_access': source.last_successful_access.isoformat() if source.last_successful_access else None
+                }
+            
+            # Cache für weitere Anfragen
+            global _global_source_index_cache
+            _global_source_index_cache = {
+                'index': source_index,
+                'url_to_number': url_to_number,
+                'total_sources': len(sources)
+            }
+            
+            return {
+                "success": True,
+                "data": {
+                    "source_index": source_index,
+                    "url_to_number": url_to_number,
+                    "total_sources": len(sources),
+                    "index_version": "1.4.0"
+                }
+            }
+            
+    except Exception as e:
+        logger.error(f"[PHASE 1.4] Error generating source index: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generating source index: {str(e)}")
+
+@router.get("/sources/lookup/{source_number}")
+async def get_source_by_number(source_number: int):
+    """
+    PHASE 1.4: Hole Quellendetails anhand der globalen Referenznummer
+    """
+    global _global_source_index_cache
+    
+    # Refresh cache if empty
+    if not _global_source_index_cache:
+        await get_source_index_mapping()
+    
+    source_key = str(source_number)
+    if source_key not in _global_source_index_cache.get('index', {}):
+        raise HTTPException(status_code=404, detail=f"Source number {source_number} not found")
+    
+    source_info = _global_source_index_cache['index'][source_key]
+    
+    # Erweitere mit zusätzlichen Details
+    from minesearch.database import db_manager
+    try:
+        with db_manager.get_session() as session:
+            from minesearch.database.models import Source
+            source = session.query(Source).filter(Source.url == source_info['url']).first()
+            
+            if source:
+                detailed_info = source.to_dict()
+                detailed_info['reference_number'] = source_number
+                return {
+                    "success": True,
+                    "data": detailed_info
+                }
+            else:
+                return {
+                    "success": True, 
+                    "data": {
+                        **source_info,
+                        'reference_number': source_number
+                    }
+                }
+    except Exception as e:
+        logger.error(f"[PHASE 1.4] Error getting source details for #{source_number}: {e}")
+        return {
+            "success": True,
+            "data": {
+                **source_info,
+                'reference_number': source_number
+            }
+        }
+
 @router.get("/sources/grouped")
 async def get_grouped_sources(
     country: Optional[str] = Query(None),
@@ -21,13 +129,20 @@ async def get_grouped_sources(
     source_type: Optional[str] = Query(None),
     min_reliability: float = Query(0.0),
     sort_by: str = Query("count", description="Sort by: count, domain, avg_score, success_rate, searches"),
-    order: str = Query("desc", description="Order: asc or desc")
+    order: str = Query("desc", description="Order: asc or desc"),
+    include_reference_numbers: bool = Query(True, description="PHASE 1.4: Include global reference numbers")
 ):
     """
     ÄNDERUNG 09.07.2025: Neuer Endpoint für gruppierte Quellen-Darstellung
+    PHASE 1.4: Erweitert um globale Quellenreferenzen für Frontend-Integration
     Gruppiert Quellen nach Domain für bessere Übersichtlichkeit
     """
     from minesearch.database import db_manager
+    
+    # PHASE 1.4: Lade oder aktualisiere Source-Index falls nötig
+    global _global_source_index_cache
+    if include_reference_numbers and not _global_source_index_cache:
+        await get_source_index_mapping()
     
     # Hole alle Quellen mit Filtern
     sources = db_manager.get_sources_for_search(
@@ -44,6 +159,12 @@ async def get_grouped_sources(
     
     for source in sources:
         source_dict = source.to_dict()
+        
+        # PHASE 1.4: Füge globale Referenznummer hinzu falls verfügbar
+        if include_reference_numbers and _global_source_index_cache:
+            url_to_number = _global_source_index_cache.get('url_to_number', {})
+            source_dict['reference_number'] = url_to_number.get(source.url, None)
+        
         domain = source.domain
         grouped[domain].append(source_dict)
         
@@ -104,13 +225,36 @@ async def get_grouped_sources(
     elif sort_by == "searches":
         result.sort(key=lambda x: x["total_searches"], reverse=reverse_order)
     
+    # PHASE 1.4: Enhanced Return-Struktur mit Source-Index-Informationen
+    response_data = {
+        "grouped_sources": result,
+        "total_domains": len(result),
+        "total_sources": sum(g["count"] for g in result),
+        "sort_by": sort_by,
+        "order": order,
+        "filters_applied": {
+            "country": country,
+            "region": region, 
+            "source_type": source_type,
+            "min_reliability": min_reliability
+        }
+    }
+    
+    # PHASE 1.4: Füge Source-Index-Informationen hinzu falls aktiviert
+    if include_reference_numbers and _global_source_index_cache:
+        response_data["source_index_info"] = {
+            "total_indexed_sources": _global_source_index_cache.get('total_sources', 0),
+            "index_version": "1.4.0",
+            "has_reference_numbers": True
+        }
+    else:
+        response_data["source_index_info"] = {
+            "has_reference_numbers": False
+        }
+    
     return {
         "success": True,
-        "data": {
-            "grouped_sources": result,
-            "total_domains": len(result),
-            "total_sources": sum(g["count"] for g in result)
-        }
+        "data": response_data
     }
 
 @router.get("/sources")

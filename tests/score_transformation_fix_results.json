@@ -1,0 +1,13 @@
+{
+  "frontend_data": {
+    "modelName": "openrouter:deepseek-free",
+    "displayedScore": 5.5,
+    "successRate": null,
+    "cardText": "\n            \n            \n                \n                    \n                        \n                            \ud83e\udd16 openrouter:deepseek-free\n                        \n                        \ud83c\udfe2 openrouter\n                    \n                    \n                        INAKTIV\n                 ",
+    "scorePattern": "5.5/10"
+  },
+  "backend_data": null,
+  "transformation_correct": false,
+  "logic_consistent": false,
+  "overall_success": false
+}

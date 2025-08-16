@@ -32,20 +32,31 @@ const TabAutoLoader = {
             });
         });
         
-        // FIX: Wait for header navigation to initialize first
+        // FIX: Wait for header navigation to initialize first - EXTENDED DELAY
         // Initial load für default tab - delayed to allow header sync
         setTimeout(() => {
             console.log('🔄 [TAB-AUTOLOADER] Delayed initialization - checking current state...');
-            // Check if header navigation has already set a different state
+            
+            // KRITISCH: Warte auf NavigationState und gebe Header-Navigation Priorität
             if (window.NavigationState && window.NavigationState.currentTab) {
                 const currentTab = window.NavigationState.currentTab;
-                console.log(`🎯 [TAB-AUTOLOADER] Header navigation is set to: ${currentTab}`);
-                this.handleTabChange(`${currentTab}-tab`);
+                console.log(`🎯 [TAB-AUTOLOADER] Header navigation is set to: ${currentTab} - following header lead`);
+                
+                // Nur UI aktualisieren, KEINE neue handleTabChange() da Header bereits gesetzt hat
+                this.updateTabDisplay(currentTab);
+                
+                // Auto-Load nur wenn Tab noch nicht geladen
+                if (!this.loadedTabs.has(currentTab)) {
+                    console.log(`📥 [TAB-AUTOLOADER] Auto-loading data for header-selected tab: ${currentTab}`);
+                    this.loadTabData(currentTab);
+                    this.loadedTabs.add(currentTab);
+                }
             } else {
-                // Fallback to default
+                // Fallback nur wenn Header nicht initialisiert
+                console.log('🔄 [TAB-AUTOLOADER] No header state - using single fallback');
                 this.handleTabChange('single-tab');
             }
-        }, 100); // Small delay to let header navigation initialize first
+        }, 600); // ERWEITERTE Verzögerung: Header hat 500ms, wir warten 600ms
     },
     
     /**
@@ -119,18 +130,36 @@ const TabAutoLoader = {
     },
     
     /**
-     * Lädt Daten für einen spezifischen Tab
+     * Lädt Daten für einen spezifischen Tab - MIT DELAYED LOADING
      */
     loadTabData(tabName) {
+        console.log(`🔄 [TAB-AUTOLOADER] Loading data for tab: ${tabName}`);
+        
+        // KRITISCH: Warte auf display.js Funktionen mit retry-logic
+        this.loadTabDataWithRetry(tabName, 0);
+    },
+    
+    /**
+     * Lädt Tab-Daten mit Retry-Logic für display.js Funktionen
+     */
+    loadTabDataWithRetry(tabName, attempt = 0) {
+        const maxAttempts = 10;
+        const retryDelay = 300;
+        
         switch(tabName) {
             case 'sources':
                 console.log('📚 [TAB-AUTOLOADER] Loading sources data...');
                 if (typeof loadSources === 'function') {
-                    loadSources('count', 'desc'); // Sort by count, descending
+                    loadSources('count', 'desc');
+                    console.log('✅ [TAB-AUTOLOADER] Sources loaded via global function');
                 } else if (typeof window.loadSources === 'function') {
                     window.loadSources('count', 'desc');
+                    console.log('✅ [TAB-AUTOLOADER] Sources loaded via window.loadSources');
+                } else if (attempt < maxAttempts) {
+                    console.log(`🔄 [TAB-AUTOLOADER] loadSources not ready, retry ${attempt + 1}/${maxAttempts}...`);
+                    setTimeout(() => this.loadTabDataWithRetry(tabName, attempt + 1), retryDelay);
                 } else {
-                    console.error('❌ [TAB-AUTOLOADER] loadSources function not found in global or window scope');
+                    console.error('❌ [TAB-AUTOLOADER] loadSources function not found after all retries');
                 }
                 break;
                 
@@ -138,10 +167,15 @@ const TabAutoLoader = {
                 console.log('📊 [TAB-AUTOLOADER] Loading statistics data...');
                 if (typeof loadModelStatistics === 'function') {
                     loadModelStatistics();
+                    console.log('✅ [TAB-AUTOLOADER] Statistics loaded via global function');
                 } else if (typeof window.loadModelStatistics === 'function') {
                     window.loadModelStatistics();
+                    console.log('✅ [TAB-AUTOLOADER] Statistics loaded via window.loadModelStatistics');
+                } else if (attempt < maxAttempts) {
+                    console.log(`🔄 [TAB-AUTOLOADER] loadModelStatistics not ready, retry ${attempt + 1}/${maxAttempts}...`);
+                    setTimeout(() => this.loadTabDataWithRetry(tabName, attempt + 1), retryDelay);
                 } else {
-                    console.error('❌ [TAB-AUTOLOADER] loadModelStatistics function not found in global or window scope');
+                    console.error('❌ [TAB-AUTOLOADER] loadModelStatistics function not found after all retries');
                 }
                 break;
                 
@@ -149,10 +183,15 @@ const TabAutoLoader = {
                 console.log('📋 [TAB-AUTOLOADER] Loading consolidated results...');
                 if (typeof loadConsolidatedResults === 'function') {
                     loadConsolidatedResults('mine_name', 'asc');
+                    console.log('✅ [TAB-AUTOLOADER] Consolidated loaded via global function');
                 } else if (typeof window.loadConsolidatedResults === 'function') {
                     window.loadConsolidatedResults('mine_name', 'asc');
+                    console.log('✅ [TAB-AUTOLOADER] Consolidated loaded via window.loadConsolidatedResults');
+                } else if (attempt < maxAttempts) {
+                    console.log(`🔄 [TAB-AUTOLOADER] loadConsolidatedResults not ready, retry ${attempt + 1}/${maxAttempts}...`);
+                    setTimeout(() => this.loadTabDataWithRetry(tabName, attempt + 1), retryDelay);
                 } else {
-                    console.error('❌ [TAB-AUTOLOADER] loadConsolidatedResults function not found in global or window scope');
+                    console.error('❌ [TAB-AUTOLOADER] loadConsolidatedResults function not found after all retries');
                 }
                 break;
                 

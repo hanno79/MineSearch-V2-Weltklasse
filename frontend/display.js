@@ -1,7 +1,7 @@
 /**
  * Author: rahn
  * Datum: 10.08.2025
- * Version: 1.0
+ * Version: 2.7 - FIX: Model-ID Normalisierung für robuste Duplikat-Erkennung
  * Beschreibung: MineSearch 2.0 - Display & Data Loading Functions
  * 
  * ÄNDERUNG 10.08.2025: Extrahiert aus index.html (8343 → 500 Zeilen Regel)
@@ -297,10 +297,27 @@ window.loadModelStatistics = async function() {
         console.log('📋 [STATISTICS] Statistics data received:', data);
         
         if (data.success && data.data) {
-            displayComprehensiveModelStatistics(data.data);
+            // 🚀 LOGIC-REVOLUTION PHASE 1.2: Model-Splitting vor Display
+            const splitData = splitCombinedModels(data.data);
             
-            const totalModels = data.data.models ? data.data.models.length : 0;
-            showNotification(`✅ Modell-Statistiken geladen: ${totalModels} Modelle analysiert`, 'success');
+            // 🔄 MODEL KONSOLIDIERUNG PHASE 3: Konsolidiere Duplikate zu einer Card pro Modell
+            const consolidatedModels = consolidateModels(splitData.models);
+            const processedData = {
+                ...splitData,
+                models: consolidatedModels,
+                _consolidation_metadata: {
+                    split_count: splitData.models.length,
+                    consolidated_count: consolidatedModels.length,
+                    duplicates_removed: splitData.models.length - consolidatedModels.length
+                }
+            };
+            
+            displayComprehensiveModelStatistics(processedData);
+            
+            const originalModels = data.data.models ? data.data.models.length : 0;
+            const consolidatedCount = processedData._consolidation_metadata.consolidated_count;
+            const duplicatesRemoved = processedData._consolidation_metadata.duplicates_removed;
+            showNotification(`✅ Modell-Statistiken geladen: ${consolidatedCount} unique Modelle (${duplicatesRemoved} Duplikate konsolidiert)`, 'success');
         } else {
             throw new Error(data.error || 'Keine Statistik-Daten verfügbar');
         }
@@ -1434,6 +1451,470 @@ async function copyToClipboard(text) {
         console.error('Failed to copy to clipboard:', error);
         showNotification('❌ Kopieren fehlgeschlagen', 'error');
     }
+}
+
+// ============================================
+// LOGIC-REVOLUTION: MODEL-SPLITTING FUNCTION
+// ============================================
+
+/**
+ * LOGIC-REVOLUTION PHASE 2.1: Revolutionäre 5-Komponenten Score-Berechnung
+ * Neue Gewichtung: Feldqualität 25%, Konsistenz 25%, Geschwindigkeit 25%, Kosten 20%, Durchlauf-Vertrauen 5%
+ * STRICT RULE: Score = 0 bei 0% Erfolgsrate für ALLE Komponenten
+ */
+function calculateRevolutionary5ComponentScore(modelData) {
+    console.log(`🚀 [REVOLUTIONARY-SCORE] Calculating 5-component score for ${modelData.model_id}`);
+    
+    const successRate = modelData.success_rate || 0;
+    const searchCount = modelData.total_searches || 1;
+    const splitFactor = modelData._split_factor || 1;
+    
+    // STRICT RULE: Bei 0% Erfolgsrate alle Komponenten = 0
+    if (successRate === 0) {
+        console.log(`❌ [REVOLUTIONARY-SCORE] ${modelData.model_id}: 0% Erfolgsrate = 0 Gesamtscore`);
+        return {
+            totalScore: 0,
+            breakdown: {
+                fieldQuality: { score: 0, description: 'Feldqualität', details: 'Keine bei 0% Erfolgsrate' },
+                consistency: { score: 0, description: 'Konsistenz', details: 'Keine bei 0% Erfolgsrate' },
+                speed: { score: 0, description: 'Geschwindigkeit', details: 'Irrelevant bei 0% Erfolgsrate' },
+                cost: { score: 0, description: 'Kosteneffizienz', details: 'Irrelevant bei 0% Erfolgsrate' },
+                trustworthiness: { score: 0, description: 'Durchlauf-Vertrauen', details: 'Keine Vertrauenswürdigkeit bei 0% Erfolgsrate' }
+            },
+            confidenceLevel: 'Nicht verfügbar',
+            confidencePercentage: 0
+        };
+    }
+    
+    // === KOMPONENTE 1: FELDQUALITÄT (25%) ===
+    const fieldQualityScore = calculateRevolutionaryFieldQuality(modelData);
+    
+    // === KOMPONENTE 2: KONSISTENZ (25%) ===
+    const consistencyScore = calculateRevolutionaryConsistency(modelData);
+    
+    // === KOMPONENTE 3: GESCHWINDIGKEIT (25%) ===
+    const speedScore = calculateRevolutionarySpeed(modelData);
+    
+    // === KOMPONENTE 4: KOSTENEFFIZIENZ (20%) ===
+    const costScore = calculateRevolutionaryCost(modelData);
+    
+    // === KOMPONENTE 5: DURCHLAUF-VERTRAUEN (5%) ===
+    const trustworthinessScore = calculateRevolutionaryTrustworthiness(modelData);
+    
+    // Gewichtete Gesamtberechnung - NEUE GEWICHTUNG!
+    const totalScore = (
+        fieldQualityScore.score * 0.25 +
+        consistencyScore.score * 0.25 +
+        speedScore.score * 0.25 +
+        costScore.score * 0.20 +
+        trustworthinessScore.score * 0.05
+    );
+    
+    // Konfidenz basierend auf Durchläufen und Split-Faktor
+    const confidenceFactor = Math.min(searchCount / 10, 1.0) * (1 / Math.sqrt(splitFactor));
+    const confidencePercentage = Math.round(confidenceFactor * 100);
+    
+    let confidenceLevel = 'Niedrig';
+    if (confidencePercentage >= 80) confidenceLevel = 'Hoch';
+    else if (confidencePercentage >= 50) confidenceLevel = 'Mittel';
+    
+    console.log(`✅ [REVOLUTIONARY-SCORE] ${modelData.model_id}: Total=${totalScore.toFixed(1)}/100, Confidence=${confidencePercentage}%`);
+    
+    return {
+        totalScore: Math.min(Math.max(totalScore, 0), 100), // 0-100 Scale
+        breakdown: {
+            fieldQuality: fieldQualityScore,
+            consistency: consistencyScore,
+            speed: speedScore,
+            cost: costScore,
+            trustworthiness: trustworthinessScore
+        },
+        confidenceLevel: confidenceLevel,
+        confidencePercentage: confidencePercentage
+    };
+}
+
+/**
+ * KOMPONENTE 1: Revolutionäre Feldqualität (25%)
+ */
+function calculateRevolutionaryFieldQuality(modelData) {
+    const successRate = modelData.success_rate || 0;
+    if (successRate === 0) return { score: 0, description: 'Feldqualität', details: 'Keine bei 0% Erfolgsrate' };
+    
+    // FINAL OPTIMIZATION: Strenger Threshold - Niedrige Erfolgsrate = niedrige Scores
+    if (successRate < 0.3) {
+        // Unter 30% = Maximum 40 Punkte (4.0/10 auf Frontend-Scale)
+        const baseQuality = successRate * 40; // 0-12 Punkte bei unter 30%
+        return {
+            score: Math.min(baseQuality, 40),
+            description: 'Feldqualität', 
+            details: `${(successRate*100).toFixed(1)}% Erfolgsrate (niedrig)`
+        };
+    }
+    
+    // Ab 30% normale Berechnung
+    const baseQuality = successRate * 80; // 0-80 Punkte basierend auf Erfolgsrate
+    const qualityBonus = successRate >= 0.8 ? 20 : successRate >= 0.5 ? 10 : 0; // Bonus für hohe Erfolgsrate
+    
+    return {
+        score: Math.min(baseQuality + qualityBonus, 100),
+        description: 'Feldqualität',
+        details: `${(successRate*100).toFixed(1)}% Erfolgsrate`
+    };
+}
+
+/**
+ * KOMPONENTE 2: Revolutionäre Konsistenz (25%)
+ */
+function calculateRevolutionaryConsistency(modelData) {
+    const successRate = modelData.success_rate || 0;
+    if (successRate === 0) return { score: 0, description: 'Konsistenz', details: 'Keine bei 0% Erfolgsrate' };
+    
+    const searchCount = modelData.total_searches || 1;
+    const splitFactor = modelData._split_factor || 1;
+    
+    // FINAL OPTIMIZATION: Strenger Threshold auch für Konsistenz
+    if (successRate < 0.3) {
+        // Unter 30% = Reduzierte Konsistenz-Bewertung
+        const baseConsistency = successRate * 30; // 0-9 Punkte bei unter 30%
+        const trustBonus = Math.min(searchCount / 20, 0.5) * 10; // Reduzierter Bonus
+        return {
+            score: Math.min(baseConsistency + trustBonus, 40),
+            description: 'Konsistenz',
+            details: `${searchCount} Durchläufe, niedrige Rate: ${(successRate*100).toFixed(1)}%`
+        };
+    }
+    
+    // Ab 30% normale Berechnung
+    const baseConsistency = successRate * 70; // 0-70 Punkte
+    const trustBonus = Math.min(searchCount / 10, 1.0) * 20; // 0-20 Bonus für viele Durchläufe
+    const splitPenalty = Math.max(0, (splitFactor - 1) * 5); // Penalty für Split-Kombinationen
+    
+    return {
+        score: Math.min(Math.max(baseConsistency + trustBonus - splitPenalty, 0), 100),
+        description: 'Konsistenz',
+        details: `${searchCount} Durchläufe, Split-Faktor: ${splitFactor}`
+    };
+}
+
+/**
+ * KOMPONENTE 3: Revolutionäre Geschwindigkeit (25%)
+ */
+function calculateRevolutionarySpeed(modelData) {
+    const successRate = modelData.success_rate || 0;
+    if (successRate === 0) return { score: 0, description: 'Geschwindigkeit', details: 'Irrelevant bei 0% Erfolgsrate' };
+    
+    const provider = modelData.provider || 'unknown';
+    
+    // Provider-basierte Speed-Bewertung (da keine echten Timing-Daten verfügbar)
+    let baseSpeed = 50; // Default
+    if (['openrouter'].includes(provider)) baseSpeed = 75; // Schnell
+    else if (['perplexity'].includes(provider)) baseSpeed = 85; // Sehr schnell
+    else if (['abacus', 'exa'].includes(provider)) baseSpeed = 60; // Mittel
+    
+    // Erfolgsrate-Gewichtung
+    const speedScore = baseSpeed * successRate;
+    
+    return {
+        score: Math.min(speedScore, 100),
+        description: 'Geschwindigkeit',
+        details: `${provider} Provider`
+    };
+}
+
+/**
+ * KOMPONENTE 4: Revolutionäre Kosteneffizienz (20%)
+ */
+function calculateRevolutionaryCost(modelData) {
+    const successRate = modelData.success_rate || 0;
+    if (successRate === 0) return { score: 0, description: 'Kosteneffizienz', details: 'Irrelevant bei 0% Erfolgsrate' };
+    
+    const modelId = modelData.model_id || '';
+    const provider = modelData.provider || 'unknown';
+    
+    // Kosten-Tier basierend auf Model und Provider
+    let baseCost = 50; // Default
+    if (modelId.includes('free')) baseCost = 95; // Kostenlos = Sehr gut
+    else if (['openrouter', 'perplexity'].includes(provider)) baseCost = 80; // Günstig
+    else if (['openai', 'anthropic'].includes(provider)) baseCost = 30; // Teuer
+    else if (['abacus', 'exa'].includes(provider)) baseCost = 60; // Mittel
+    
+    // Erfolgsrate-Gewichtung
+    const costScore = baseCost * successRate;
+    
+    return {
+        score: Math.min(costScore, 100),
+        description: 'Kosteneffizienz',
+        details: modelId.includes('free') ? 'Kostenlos' : `${provider} Provider`
+    };
+}
+
+/**
+ * KOMPONENTE 5: Revolutionäres Durchlauf-Vertrauen (5%)
+ */
+function calculateRevolutionaryTrustworthiness(modelData) {
+    const successRate = modelData.success_rate || 0;
+    if (successRate === 0) return { score: 0, description: 'Durchlauf-Vertrauen', details: 'Keine Vertrauenswürdigkeit bei 0% Erfolgsrate' };
+    
+    const searchCount = modelData.total_searches || 1;
+    const splitFactor = modelData._split_factor || 1;
+    
+    // Vertrauen basierend auf Anzahl Durchläufe und Split-Penalty
+    const trustBase = Math.min(searchCount / 20, 1.0) * 80; // 0-80 Punkte für Durchläufe
+    const successBonus = successRate * 20; // 0-20 Bonus für Erfolgsrate
+    const splitPenalty = Math.max(0, (splitFactor - 1) * 10); // Penalty für Kombinationen
+    
+    return {
+        score: Math.min(Math.max(trustBase + successBonus - splitPenalty, 0), 100),
+        description: 'Durchlauf-Vertrauen',
+        details: `${searchCount} Durchläufe, ${(successRate*100).toFixed(1)}% Erfolg`
+    };
+}
+
+/**
+ * MODEL KONSOLIDIERUNG PHASE 1: Konsolidiert mehrere Vorkommen desselben Modells
+ * Löst das Problem: 3x "openrouter:deepseek-free" → 1x konsolidierte Card
+ */
+function consolidateModels(modelsList) {
+    console.log('🔄 [MODEL-CONSOLIDATION] Consolidating duplicate models...');
+    
+    if (!modelsList || modelsList.length === 0) {
+        console.warn('⚠️ [MODEL-CONSOLIDATION] No models to consolidate');
+        return [];
+    }
+    
+    // Group models by model_id with ENHANCED normalization
+    const modelGroups = {};
+    modelsList.forEach((model, index) => {
+        // Enhanced normalization for robust duplicate detection
+        const rawModelId = model.model_id || `unknown_${index}`;
+        
+        // ENHANCED NORMALIZATION ALGORITHM:
+        // 1. Trim whitespace
+        // 2. Convert to lowercase  
+        // 3. Remove special characters and normalize separators
+        // 4. Handle provider prefix variations
+        let normalizedModelId = rawModelId.trim().toLowerCase();
+        
+        // Normalize common variations
+        normalizedModelId = normalizedModelId
+            .replace(/[_\-\s]+/g, '-')  // Normalize separators to hyphens
+            .replace(/^(openrouter|perplexity|abacus|exa):/, '$1:')  // Ensure consistent provider format
+            .replace(/[\(\)\[\]\.]/g, '')  // Remove brackets and dots
+            .replace(/[0-9]+(\.[0-9]+)?[kmbt]?$/i, '')  // Remove version numbers at end
+            .replace(/(-free|-pro|-beta|-alpha|-v[0-9]+)$/i, '$1')  // Preserve important suffixes
+            .replace(/(-llama-3)(\w*)/, '$1')  // Normalize llama-3 variations
+            .replace(/(-glm-4)(\w*)/, '$1');  // Normalize glm-4 variations
+        
+        console.log(`🔍 [NORMALIZATION] "${rawModelId}" → "${normalizedModelId}"`);
+        
+        // Use normalized model_id as grouping key
+        const groupKey = normalizedModelId;
+        
+        if (!modelGroups[groupKey]) {
+            modelGroups[groupKey] = [];
+        }
+        modelGroups[groupKey].push({
+            ...model,
+            _normalized_id: normalizedModelId,
+            _original_id: rawModelId
+        });
+    });
+    
+    console.log(`📊 [MODEL-CONSOLIDATION] Found ${Object.keys(modelGroups).length} unique models from ${modelsList.length} entries`);
+    
+    // DEBUG: Log all model IDs and their sources
+    console.log('🔍 [DEBUG-CONSOLIDATION] All input models:');
+    modelsList.forEach((model, i) => {
+        console.log(`   ${i+1}: "${model.model_id}" (source: ${model._original_combination || 'individual'})`);
+    });
+    
+    // Consolidate each group
+    const consolidatedModels = [];
+    
+    Object.entries(modelGroups).forEach(([normalizedId, models]) => {
+        // Use original model_id from first model for display
+        const originalModelId = models[0]._original_id || normalizedId;
+        
+        if (models.length === 1) {
+            // Single model - no consolidation needed
+            consolidatedModels.push(models[0]);
+            console.log(`✅ [MODEL-CONSOLIDATION] ${originalModelId}: Single entry, no consolidation needed`);
+        } else {
+            // Multiple models - consolidate them
+            console.log(`🔄 [MODEL-CONSOLIDATION] ${originalModelId}: Consolidating ${models.length} entries`);
+            
+            // PHASE 2: AGGREGATION LOGIC
+            let totalSearches = 0;
+            let totalSuccessfulSearches = 0;
+            let allSources = new Set();
+            let firstModel = models[0]; // Use first model as base
+            
+            models.forEach(model => {
+                totalSearches += (model.total_searches || 0);
+                totalSuccessfulSearches += (model.successful_searches || 0);
+                
+                // Collect unique sources
+                if (model.sources) {
+                    if (Array.isArray(model.sources)) {
+                        model.sources.forEach(source => allSources.add(source));
+                    } else if (typeof model.sources === 'string') {
+                        allSources.add(model.sources);
+                    }
+                }
+            });
+            
+            // Calculate new success rate
+            const newSuccessRate = totalSearches > 0 ? totalSuccessfulSearches / totalSearches : 0;
+            
+            // Recalculate Revolutionary Score with consolidated data
+            const revolutionaryScore = calculateRevolutionary5ComponentScore({
+                model_id: originalModelId,
+                provider: firstModel.provider || (originalModelId.includes(':') ? originalModelId.split(':')[0] : 'unknown'),
+                total_searches: totalSearches,
+                successful_searches: totalSuccessfulSearches,
+                success_rate: newSuccessRate,
+                _split_factor: 1 // Reset split factor for consolidated models
+            });
+            
+            // Create consolidated model
+            const consolidatedModel = {
+                ...firstModel, // Use first model as base
+                model_id: originalModelId,
+                total_searches: totalSearches,
+                successful_searches: totalSuccessfulSearches,
+                success_rate: newSuccessRate,
+                success_rate_percent: newSuccessRate * 100,
+                // Updated revolutionary scores
+                overall_score: revolutionaryScore.totalScore,
+                score_breakdown: revolutionaryScore.breakdown,
+                confidence_level: revolutionaryScore.confidenceLevel,
+                confidence_percentage: revolutionaryScore.confidencePercentage,
+                // Consolidation metadata
+                sources: Array.from(allSources),
+                _consolidated: true,
+                _original_entries: models.length,
+                _consolidation_source: models.map(m => m._original_combination || 'individual').filter(Boolean)
+            };
+            
+            consolidatedModels.push(consolidatedModel);
+            
+            console.log(`✅ [MODEL-CONSOLIDATION] ${originalModelId}: ${models.length} entries → 1 consolidated (${totalSearches} searches, ${(newSuccessRate*100).toFixed(1)}% success)`);
+        }
+    });
+    
+    console.log(`🎉 [MODEL-CONSOLIDATION] Complete: ${modelsList.length} models → ${consolidatedModels.length} consolidated models`);
+    return consolidatedModels;
+}
+
+/**
+ * LOGIC-REVOLUTION PHASE 1.2: Spaltet kombinierte Model-IDs in Einzelmodelle auf
+ * Löst das Problem: "openrouter:deepseek-free_openrouter:mistral-small-free" → Einzelmodelle
+ */
+function splitCombinedModels(statisticsData) {
+    console.log('🔧 [MODEL-SPLITTING] Processing backend model combinations...');
+    
+    if (!statisticsData || !statisticsData.models) {
+        console.warn('⚠️ [MODEL-SPLITTING] No models data to process');
+        return statisticsData;
+    }
+    
+    const originalModels = statisticsData.models;
+    const splitModels = [];
+    let combinationsFound = 0;
+    let modelsCreated = 0;
+    
+    originalModels.forEach((modelData, index) => {
+        const originalModelId = modelData.model_id || '';
+        
+        // Check for underscore combinations
+        if (originalModelId.includes('_')) {
+            console.log(`🔍 [MODEL-SPLITTING] Found combination: ${originalModelId}`);
+            combinationsFound++;
+            
+            // Split by underscore and create individual models
+            const individualModelIds = originalModelId.split('_').map(id => id.trim());
+            console.log(`   📝 [MODEL-SPLITTING] Splitting into: ${individualModelIds.join(', ')}`);
+            
+            individualModelIds.forEach(modelId => {
+                if (modelId) { // Skip empty strings
+                    // Create individual model data with recalculated scores
+                    const adjustedTotalSearches = Math.round((modelData.total_searches || 0) / individualModelIds.length);
+                    const adjustedSuccessfulSearches = Math.round((modelData.successful_searches || 0) / individualModelIds.length);
+                    const adjustedSuccessRate = adjustedTotalSearches > 0 ? adjustedSuccessfulSearches / adjustedTotalSearches : 0;
+                    
+                    // 🚀 LOGIC-REVOLUTION PHASE 2.1: 5-Komponenten Score-Berechnung
+                    const revolutionaryScore = calculateRevolutionary5ComponentScore({
+                        model_id: modelId,
+                        provider: modelId.includes(':') ? modelId.split(':')[0] : 'unknown',
+                        total_searches: adjustedTotalSearches,
+                        successful_searches: adjustedSuccessfulSearches,
+                        success_rate: adjustedSuccessRate,
+                        _split_factor: individualModelIds.length
+                    });
+                    
+                    const individualModel = {
+                        ...modelData, // Copy all original data
+                        model_id: modelId,
+                        provider: modelId.includes(':') ? modelId.split(':')[0] : 'unknown',
+                        total_searches: adjustedTotalSearches,
+                        successful_searches: adjustedSuccessfulSearches,
+                        success_rate: adjustedSuccessRate,
+                        success_rate_percent: adjustedSuccessRate * 100, // For display
+                        // 🚀 REVOLUTIONARY SCORE: 5-Komponenten System
+                        overall_score: revolutionaryScore.totalScore,
+                        score_breakdown: revolutionaryScore.breakdown,
+                        confidence_level: revolutionaryScore.confidenceLevel,
+                        confidence_percentage: revolutionaryScore.confidencePercentage,
+                        _original_combination: originalModelId, // Track original for debugging
+                        _split_factor: individualModelIds.length // Track split factor
+                    };
+                    
+                    splitModels.push(individualModel);
+                    modelsCreated++;
+                }
+            });
+        } else {
+            // 🚀 LOGIC-REVOLUTION PHASE 2.2: Apply revolutionary scoring to ALL models
+            const revolutionaryScore = calculateRevolutionary5ComponentScore({
+                model_id: modelData.model_id,
+                provider: modelData.provider || (modelData.model_id?.includes(':') ? modelData.model_id.split(':')[0] : 'unknown'),
+                total_searches: modelData.total_searches || 0,
+                successful_searches: modelData.successful_searches || 0,
+                success_rate: modelData.success_rate || 0,
+                _split_factor: 1
+            });
+            
+            // Keep single models with revolutionary scores
+            splitModels.push({
+                ...modelData,
+                // 🚀 REVOLUTIONARY SCORE: Apply to ALL models
+                overall_score: revolutionaryScore.totalScore,
+                score_breakdown: revolutionaryScore.breakdown,
+                confidence_level: revolutionaryScore.confidenceLevel,
+                confidence_percentage: revolutionaryScore.confidencePercentage,
+                success_rate_percent: (modelData.success_rate || 0) * 100, // Ensure display format
+                _original_combination: 'individual', // Mark as individual model for consolidation tracking
+                _split_factor: 1
+            });
+            modelsCreated++;
+        }
+    });
+    
+    console.log(`✅ [MODEL-SPLITTING] Complete: ${combinationsFound} combinations → ${modelsCreated} individual models`);
+    console.log(`📊 [MODEL-SPLITTING] Original: ${originalModels.length} models, New: ${splitModels.length} models`);
+    
+    // Return processed data
+    return {
+        ...statisticsData,
+        models: splitModels,
+        _split_metadata: {
+            original_count: originalModels.length,
+            new_count: splitModels.length,
+            combinations_processed: combinationsFound,
+            models_created: modelsCreated
+        }
+    };
 }
 
 // ============================================

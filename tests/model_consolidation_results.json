@@ -1,0 +1,50 @@
+{
+  "consolidation_successful": false,
+  "total_cards": 15,
+  "unique_models": 13,
+  "duplicates_found": [
+    {
+      "modelName": "openrouter:llama-3",
+      "count": 2
+    },
+    {
+      "modelName": "openrouter:glm-4",
+      "count": 2
+    }
+  ],
+  "console_logs": [
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] Consolidating duplicate models...",
+    "log: \ud83d\udcca [MODEL-CONSOLIDATION] Found 15 unique models from 49 entries",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:deepseek-free: Consolidating 5 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:deepseek-free: 5 entries \u2192 1 consolidated (130 searches, 100.0% success)",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:mistral-small-free: Consolidating 5 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:mistral-small-free: 5 entries \u2192 1 consolidated (16 searches, 100.0% success)",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:kimi-k2: Consolidating 4 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:kimi-k2: 4 entries \u2192 1 consolidated (21 searches, 100.0% success)",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:deepseek-chimera-free: Consolidating 4 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:deepseek-chimera-free: 4 entries \u2192 1 consolidated (14 searches, 100.0% success)",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:horizon-beta: Consolidating 4 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:horizon-beta: 4 entries \u2192 1 consolidated (14 searches, 100.0% success)",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:minimax-m1: Consolidating 4 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:minimax-m1: 4 entries \u2192 1 consolidated (14 searches, 100.0% success)",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:llama-3.3-nemotron-super: Consolidating 4 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:llama-3.3-nemotron-super: 4 entries \u2192 1 consolidated (14 searches, 100.0% success)",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:llama-3.1-nemotron-ultra: Consolidating 4 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:llama-3.1-nemotron-ultra: 4 entries \u2192 1 consolidated (14 searches, 100.0% success)",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:glm-4.5-air-free: Consolidating 4 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:glm-4.5-air-free: 4 entries \u2192 1 consolidated (14 searches, 100.0% success)",
+    "log: \u2705 [MODEL-CONSOLIDATION] perplexity:sonar: Single entry, no consolidation needed",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:deepseek-chat: Consolidating 2 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:deepseek-chat: 2 entries \u2192 1 consolidated (1 searches, 100.0% success)",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:deepseek-reasoner: Consolidating 2 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:deepseek-reasoner: 2 entries \u2192 1 consolidated (1 searches, 100.0% success)",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:glm-4.5: Consolidating 2 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:glm-4.5: 2 entries \u2192 1 consolidated (1 searches, 100.0% success)",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:gpt-oss-20b: Consolidating 2 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:gpt-oss-20b: 2 entries \u2192 1 consolidated (1 searches, 100.0% success)",
+    "log: \ud83d\udd04 [MODEL-CONSOLIDATION] openrouter:gpt-oss-120b: Consolidating 2 entries",
+    "log: \u2705 [MODEL-CONSOLIDATION] openrouter:gpt-oss-120b: 2 entries \u2192 1 consolidated (1 searches, 100.0% success)",
+    "log: \ud83c\udf89 [MODEL-CONSOLIDATION] Complete: 49 models \u2192 15 consolidated models",
+    "log: \ud83d\udcca [CONSOLIDATION-ANALYSIS] 15 cards, 13 unique models, 2 duplicates"
+  ]
+}
