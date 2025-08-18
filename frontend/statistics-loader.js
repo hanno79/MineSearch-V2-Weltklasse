@@ -40,8 +40,8 @@ async function loadStatistics() {
             `;
         }
         
-        // Build API URL
-        let apiUrl = `${window.API_BASE_URL}/api/statistics/models`;
+        // Build API URL - CRITICAL FIX: Use comprehensive endpoint
+        let apiUrl = `${window.API_BASE_URL}/api/statistics/models/comprehensive`;
         const params = new URLSearchParams();
         
         if (daysFilter && daysFilter !== '0') {
@@ -58,39 +58,24 @@ async function loadStatistics() {
             apiUrl += `?${params.toString()}`;
         }
         
-        console.log('📊 [STATISTICS] API URL:', apiUrl);
+        console.log('📊 [STATISTICS] Using comprehensive API:', apiUrl);
         
-        // Try primary endpoint first, then fallback immediately
-        console.log('📊 [STATISTICS] Trying results endpoint directly...');
-        const altResponse = await fetch(`${window.API_BASE_URL}/api/results?exclude_exa=true&days_back=${daysFilter}&sort_by=mine_name`);
-        
-        if (altResponse.ok) {
-            const altData = await altResponse.json();
-            console.log('📊 [STATISTICS] Consolidated data received:', altData);
-            
-            if (altData.success && altData.data?.results) {
-                // altData.data.results is the array of results
-                const mockModelStats = generateMockModelStatsFromConsolidated(altData.data.results);
-                displayModelStatistics(mockModelStats);
-                return;
-            } else {
-                throw new Error('Keine Ergebnisse verfügbar - Structure: ' + JSON.stringify(Object.keys(altData.data || {})));
-            }
-        }
-        
-        // Fallback: Try original statistics endpoint
-        console.log('⚠️ [STATISTICS] Consolidated failed, trying original endpoint...');
+        // Use the correct comprehensive statistics endpoint directly
         const response = await fetch(apiUrl);
         
         if (!response.ok) {
-            throw new Error(`Beide Endpoints fehlgeschlagen. HTTP ${response.status}: ${response.statusText}`);
+            throw new Error(`Statistics API fehlgeschlagen. HTTP ${response.status}: ${response.statusText}`);
         }
         
         const data = await response.json();
         console.log('📊 [STATISTICS] API Response:', data);
         
         if (data.success && data.data) {
-            displayModelStatistics(data.data);
+            // CRITICAL FIX: data.data.models contains the actual model array
+            const models = data.data.models || data.data;
+            console.log('📊 [STATISTICS] Processing models:', models.length, 'models found');
+            
+            displayModelStatistics(models);
             
             // Update summary statistics
             updateStatisticsSummary(data.data);
@@ -687,10 +672,233 @@ function updateStatisticsSummary(statisticsData) {
     `;
 }
 
+/**
+ * NEUE FUNKTION: Model Performance aus Suchergebnissen für Statistik-Tab
+ */
+function displaySearchModelPerformance(searchResults) {
+    console.log('📊 [STATISTICS] Displaying search model performance...');
+    
+    if (!searchResults || !Array.isArray(searchResults)) {
+        console.log('⚠️ [STATISTICS] No search results provided for model performance');
+        return;
+    }
+    
+    // Extrahiere Model Performance Daten aus Suchergebnissen
+    const modelPerformanceData = searchResults.map(result => {
+        const analysis = result.data?.analysis || {};
+        const quality = result.data?.quality_metrics || {};
+        
+        return {
+            model_id: result.model_id,
+            provider: result.model_id.split(':')[0] || 'unknown',
+            data_completeness: quality.completion_percentage || 0,
+            confidence: result.confidence || 0,
+            response_time: result.metadata?.response_time || 0,
+            field_count: Object.keys(result.data?.structured_data || {}).length,
+            source_count: (result.data?.sources || []).length,
+            success: result.success || false
+        };
+    });
+    
+    // Erstelle Performance Matrix HTML für Statistik-Tab
+    const performanceHTML = generateModelPerformanceForStatistics(modelPerformanceData);
+    
+    // Füge neue Sektion im Statistik-Tab hinzu
+    const statisticsContent = document.getElementById('statistics-content');
+    if (statisticsContent) {
+        // Prüfe ob bereits vorhanden
+        let performanceSection = document.getElementById('search-model-performance-section');
+        if (!performanceSection) {
+            performanceSection = document.createElement('div');
+            performanceSection.id = 'search-model-performance-section';
+            // Füge nach der Zusammenfassung, aber vor der Haupttabelle ein
+            const summaryElement = document.getElementById('model-statistics-summary');
+            if (summaryElement && summaryElement.nextSibling) {
+                statisticsContent.insertBefore(performanceSection, summaryElement.nextSibling);
+            } else {
+                statisticsContent.appendChild(performanceSection);
+            }
+        }
+        
+        performanceSection.innerHTML = performanceHTML;
+        console.log('✅ [STATISTICS] Search model performance displayed in statistics tab');
+    } else {
+        console.error('❌ [STATISTICS] Statistics content container not found');
+    }
+}
+
+/**
+ * Generiert Model Performance Matrix HTML für Statistik-Tab
+ */
+function generateModelPerformanceForStatistics(modelData) {
+    const performanceRows = modelData.map(model => {
+        const overallScore = (
+            (model.data_completeness / 100) * 0.3 +
+            model.confidence * 0.25 +
+            (model.field_count / 20) * 0.2 +
+            (model.source_count / 10) * 0.15 +
+            (model.success ? 1 : 0) * 0.1
+        ) * 100;
+        
+        const responseClass = model.response_time < 2000 ? 'excellent' : 
+                             model.response_time < 5000 ? 'good' : 'poor';
+        
+        return `
+            <tr class="model-performance-row ${model.success ? 'success' : 'failed'}">
+                <td class="model-name">
+                    <strong>${model.model_id}</strong>
+                    <div class="model-provider">${model.provider}</div>
+                </td>
+                <td class="score-cell">
+                    <div class="score-value">${overallScore.toFixed(1)}%</div>
+                    <div class="score-bar">
+                        <div class="score-fill" style="width: ${overallScore}%"></div>
+                    </div>
+                </td>
+                <td class="completeness-cell">${model.data_completeness.toFixed(1)}%</td>
+                <td class="confidence-cell">${(model.confidence * 100).toFixed(1)}%</td>
+                <td class="fields-cell">${model.field_count}</td>
+                <td class="sources-cell">${model.source_count}</td>
+                <td class="response-time-cell ${responseClass}">
+                    ${model.response_time ? (model.response_time / 1000).toFixed(2) + 's' : 'N/A'}
+                </td>
+                <td class="status-cell">
+                    <span class="status-badge ${model.success ? 'success' : 'failed'}">
+                        ${model.success ? '✅ Erfolg' : '❌ Fehler'}
+                    </span>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    return `
+        <div class="search-model-performance-section">
+            <h3>🎯 Model Performance aus letzter Suche</h3>
+            <p class="section-description">
+                Performance-Analyse der Modelle aus der aktuellen/letzten Suchanfrage
+            </p>
+            
+            <div class="performance-table-container">
+                <table class="model-performance-table">
+                    <thead>
+                        <tr>
+                            <th>Modell</th>
+                            <th>Overall Score</th>
+                            <th>Datenvollständigkeit</th>
+                            <th>Konfidenz</th>
+                            <th>Gefundene Felder</th>
+                            <th>Quellen</th>
+                            <th>Response Zeit</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${performanceRows}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="performance-actions">
+                <button onclick="exportSearchModelPerformance()" class="export-btn">
+                    📊 Performance exportieren
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Export-Funktion für Search Model Performance
+ */
+function exportSearchModelPerformance() {
+    console.log('📤 [STATISTICS] Exporting search model performance...');
+    // Implementierung folgt...
+    showNotification('📊 Export-Funktion wird implementiert...', 'info');
+}
+
+/**
+ * AUTO-REFRESH FUNKTIONALITÄT für Live-Statistik-Updates nach Suchvorgängen
+ */
+function scheduleStatisticsRefresh(delayMs = 2000) {
+    console.log(`⏰ [STATS-REFRESH] Scheduling statistics refresh in ${delayMs}ms...`);
+    
+    setTimeout(() => {
+        // Prüfe ob wir aktuell im Statistik-Tab sind
+        const statisticsTab = document.querySelector('[data-tab="statistics"]');
+        const isStatisticsTabActive = statisticsTab && statisticsTab.classList.contains('active');
+        
+        if (isStatisticsTabActive) {
+            console.log('🔄 [STATS-REFRESH] Auto-refreshing statistics after search completion...');
+            loadStatistics();
+        } else {
+            console.log('💤 [STATS-REFRESH] Statistics tab not active, skipping auto-refresh');
+        }
+    }, delayMs);
+}
+
+function forceStatisticsRefresh() {
+    console.log('🚀 [STATS-REFRESH] Force refreshing statistics...');
+    loadStatistics();
+}
+
+/**
+ * Erweiterte Statistik-Aktualisierung mit Cache-Busting
+ */
+async function loadStatisticsWithCacheBuster() {
+    console.log('📊 [STATISTICS] Loading statistics with cache buster...');
+    
+    try {
+        // Cache-Buster Parameter hinzufügen
+        const cacheBuster = Date.now();
+        const daysFilter = document.getElementById('stats_days')?.value || '30';
+        
+        // Primärer API-Aufruf mit Cache-Buster
+        const apiUrl = `${window.API_BASE_URL}/api/statistics/models/comprehensive?_cache_bust=${cacheBuster}&days_back=${daysFilter}`;
+        
+        console.log('📊 [STATISTICS] API URL with cache buster:', apiUrl);
+        
+        const response = await fetch(apiUrl);
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('📊 [STATISTICS] Fresh data received:', data);
+            
+            if (data.success && data.data && data.data.models) {
+                displayModelStatistics(data.data.models);
+                updateStatisticsSummary(data.data.models);
+                
+                // Zeige Erfolgs-Notification
+                if (typeof showNotification === 'function') {
+                    showNotification(`📊 Statistiken aktualisiert: ${data.data.models.length} Modelle geladen`, 'success');
+                }
+                
+                console.log('✅ [STATISTICS] Statistics refreshed successfully');
+                return;
+            }
+        }
+        
+        // Fallback zur normalen Funktion
+        console.log('⚠️ [STATISTICS] Cache-busted call failed, falling back to normal load...');
+        await loadStatistics();
+        
+    } catch (error) {
+        console.error('❌ [STATISTICS] Error in cache-busted statistics load:', error);
+        // Fallback zur normalen Funktion
+        await loadStatistics();
+    }
+}
+
 // Global exports
 window.loadStatistics = loadStatistics;
 window.displayModelStatistics = displayModelStatistics;
 window.updateStatisticsSummary = updateStatisticsSummary;
 window.generateMockModelStatsFromConsolidated = generateMockModelStatsFromConsolidated;
+window.displaySearchModelPerformance = displaySearchModelPerformance;
+window.exportSearchModelPerformance = exportSearchModelPerformance;
+
+// NEW EXPORTS für Auto-Refresh
+window.scheduleStatisticsRefresh = scheduleStatisticsRefresh;
+window.forceStatisticsRefresh = forceStatisticsRefresh;
+window.loadStatisticsWithCacheBuster = loadStatisticsWithCacheBuster;
 
 console.log('✅ [STATISTICS-LOADER] Statistics Loader Module loaded successfully');
