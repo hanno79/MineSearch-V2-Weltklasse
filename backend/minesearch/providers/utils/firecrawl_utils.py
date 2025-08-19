@@ -151,7 +151,7 @@ class FirecrawlDataProcessor:
             'Eigentümer': extracted_data.get('owner', ''),
             'Betreiber': extracted_data.get('owner', ''),  # Oft gleich wie Eigentümer
             'Restaurationskosten': extracted_data.get('restoration_cost', ''),
-            'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': ', '.join(extracted_data.get('commodities', [])),
+            'Rohstoffabbau': ', '.join(extracted_data.get('commodities', [])),
             'Aktivitätsstatus': extracted_data.get('status', '')
         }
         

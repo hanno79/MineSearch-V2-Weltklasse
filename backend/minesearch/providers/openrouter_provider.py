@@ -337,13 +337,13 @@ ROHSTOFF: {commodity if commodity else 'Unbekannt'}
 KRITISCHE ANWEISUNGEN - KEINE DUMMY-WERTE:
 1. NIEMALS Standard-Werte wie "$1.0 million" oder "1 million" verwenden
 2. NIEMALS erfundene oder geschätzte Werte angeben
-3. Wenn keine Daten vorhanden: Feld LEER lassen oder "-" verwenden
+3. Wenn keine Daten vorhanden: Feld komplett weglassen (nicht erwähnen)
 4. Nur KONKRETE Werte aus deinem Fachwissen verwenden
 5. Bei Restaurationskosten: NUR wenn du tatsächliche Beträge kennst
 6. Bei Koordinaten: NUR echte GPS-Koordinaten, keine Platzhalter
 7. Bei Betreiber: NIEMALS "Koordinaten" als Betreiber angeben
 
-WICHTIG: Lieber ein leeres Feld als einen falschen Wert!
+WICHTIG: Lieber ein fehlendes Feld als einen falschen Wert!
 
 ANTWORTE IM STRUKTURIERTEN FORMAT wie im System-Prompt beschrieben."""
         
@@ -399,20 +399,20 @@ Antworte auf Deutsch mit STRUKTURIERTEN DATEN.
 - Name: [exakter Name] [Quelle: Fachwissen/Schätzung]
 - Country: [Land] [Quelle: Fachwissen/Schätzung]
 - Region: [Region/Provinz] [Quelle: Fachwissen/Schätzung]
-- Eigentümer: [Eigentümer oder LEER lassen] [Quelle: Fachwissen/Schätzung]
-- Betreiber: [Betreiber oder LEER lassen - NIEMALS Koordinaten hier angeben!] [Quelle: Fachwissen/Schätzung]
-- x-Koordinate: [Latitude in Dezimalgrad oder LEER lassen] [Quelle: Fachwissen/Schätzung]
-- y-Koordinate: [Longitude in Dezimalgrad oder LEER lassen] [Quelle: Fachwissen/Schätzung]
-- Aktivitätsstatus: [aktiv/geschlossen/geplant oder LEER lassen] [Quelle: Fachwissen/Schätzung]
-- Restaurationskosten: [NUR realistische Beträge in {currency}$ oder LEER] [Quelle: Fachwissen/Schätzung]
-- Jahr der Aufnahme der Kosten: [Jahr der Kostenschätzung oder LEER] [Quelle: Fachwissen/Schätzung]
-- Jahr der Erstellung des Dokumentes: [Jahr des Reports/Studies oder LEER] [Quelle: Fachwissen/Schätzung]
-- Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.): [Liste der Rohstoffe oder LEER] [Quelle: Fachwissen/Schätzung]
-- Minentyp (Untertage/ Open-Pit/ usw.): [Untertage/Open-Pit/etc oder LEER] [Quelle: Fachwissen/Schätzung]
-- Produktionsstart: [Jahr oder LEER lassen] [Quelle: Fachwissen/Schätzung]
-- Produktionsende: [Jahr oder 'aktiv' oder LEER] [Quelle: Fachwissen/Schätzung]
-- Fördermenge/Jahr: [Menge/Jahr mit Einheit oder LEER lassen] [Quelle: Fachwissen/Schätzung]
-- Fläche der Mine in qkm: [Fläche in km² oder LEER lassen] [Quelle: Fachwissen/Schätzung]
+- Eigentümer: [Eigentümer - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
+- Betreiber: [Betreiber - wenn unbekannt, Feld auslassen - NIEMALS Koordinaten hier angeben!] [Quelle: Fachwissen/Schätzung]
+- x-Koordinate: [Latitude in Dezimalgrad - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
+- y-Koordinate: [Longitude in Dezimalgrad - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
+- Aktivitätsstatus: [aktiv/geschlossen/geplant - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
+- Restaurationskosten: [NUR realistische Beträge in {currency}$ - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
+- Jahr der Aufnahme der Kosten: [Jahr der Kostenschätzung - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
+- Jahr der Erstellung des Dokumentes: [Jahr des Reports/Studies - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
+- Rohstoffabbau: [NUR spezifische Rohstoffe wie 'Gold', 'Kupfer', 'Eisenerz' - NIEMALS Template-Strukturen oder 'usw.' - wenn unbekannt, Feld komplett auslassen] [Quelle: Fachwissen/Schätzung]
+- Minentyp: [NUR spezifische Werte wie 'Untertage', 'Open-Pit', 'Hybrid' - NIEMALS Template-Strukturen - wenn unbekannt, Feld komplett auslassen] [Quelle: Fachwissen/Schätzung]
+- Produktionsstart: [Jahr - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
+- Produktionsende: [Jahr oder 'aktiv' - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
+- Fördermenge/Jahr: [Menge/Jahr mit Einheit - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
+- Fläche der Mine in qkm: [Fläche in km² - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
 - Quellenangaben: [Referenzen oder 'Allgemeines Fachwissen'] [Quelle: Fachwissen/Schätzung]
 
 **KRITISCHE REGELN FÜR RESTAURATIONSKOSTEN:**
@@ -421,12 +421,12 @@ Antworte auf Deutsch mit STRUKTURIERTEN DATEN.
   * Minentyp (Open-Pit: 50-500 Mio USD, Untertage: 20-200 Mio USD)
   * Größe der Mine und Umweltvorschriften
 - Mindestbetrag: $10,000 - darunter ist unrealistisch
-- Wenn unsicher: Feld LEER lassen, KEINE Minimalwerte!
+- Wenn unsicher: Feld komplett weglassen, KEINE Minimalwerte!
 
 **VERBOTENE PLATZHALTER:**
-- KEINE "k.A.", "n/a", "-", "unbekannt", "nicht gefunden"
+- KEINE "k.A.", "n/a", "-", "unbekannt", "nicht gefunden", "LEER"
 - KEINE Minimalwerte wie $1, $2, $3
-- Wenn keine Daten: Feld einfach LEER lassen
+- Wenn keine Daten: Feld komplett weglassen (nicht erwähnen)
 
 **QUELLEN-SEKTION:**
 [Da du keine Web-Suche durchführst, gib an:]

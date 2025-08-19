@@ -33,6 +33,7 @@ from datetime import datetime
 def _normalize_placeholder_value(value):
     """
     PHASE 15.2/15.3 FIX: Normalisiert ALLE Platzhalter-Werte (auch bestehende Datenbank-Werte!)
+    TEMPLATE-FIX 19.08.2025: Erweitert um Template-Pattern-Erkennung
     
     Behandelt sowohl neue als auch bereits in der DB gespeicherte LEER-Varianten
     """
@@ -40,9 +41,35 @@ def _normalize_placeholder_value(value):
         return value
     
     value_str = str(value).strip()
+    logger.error(f"[TEMPLATE-DEBUG] Processing value: '{value_str}'")
     
     # Import der Pattern aus extraction_processors für Konsistenz
     import re
+    
+    # TEMPLATE-FIX 19.08.2025: Template-Pattern-Erkennung ZUERST
+    # KRITISCH: Robuste Erkennung für "TEMPLATE: Untertage/ Open-P..." Format!
+    
+    # DIRECT STRING CHECK: Falls der Wert mit "TEMPLATE:" beginnt
+    if value_str.startswith('TEMPLATE:'):
+        logger.error(f"[TEMPLATE-FIX] ✅ DIREKTER MATCH: '{value_str}' -> 'Nichts gefunden'")
+        return 'Nichts gefunden'
+    
+    # Diese Werte sind Template-ähnliche Fallbacks und sollen zu "Nichts gefunden" werden
+    template_patterns = [
+        r'^TEMPLATE:\s*Untertage/\s*Open-Pit.*usw.*$',   # "TEMPLATE: Untertage/ Open-Pit/ usw.)" - KRITISCHES PATTERN!
+        r'^TEMPLATE:\s*Gold/\s*Kupfer.*usw.*$',          # "TEMPLATE: Gold/ Kupfer/ Kohle/ usw.)"
+        r'^TEMPLATE:\s*aktiv/\s*geplant.*sonstiges.*$',  # "TEMPLATE: aktiv/ geplant/ geschlossen/ sonstiges"
+        r'^Untertage/\s*Open-Pit/\s*usw\.\)?$',         # "Untertage/ Open-Pit/ usw.)"
+        r'^Gold/\s*Kupfer/\s*Kohle/\s*usw\.\)?$',       # "Gold/ Kupfer/ Kohle/ usw.)"
+        r'^aktiv/\s*geplant/\s*geschlossen/\s*sonstiges\)?$',  # "aktiv/ geplant/ geschlossen/ sonstiges"
+        r'^\([^)]*usw\.\)$',                            # "(beliebig usw.)"
+        r'^[^(]*\([^)]*usw\.\)[^)]*$'                   # "Text (beliebig usw.) Text"
+    ]
+    
+    for pattern in template_patterns:
+        if re.match(pattern, value_str, re.IGNORECASE):
+            logger.info(f"[TEMPLATE-FIX] Template-Pattern match '{value_str}' -> 'Nichts gefunden'")
+            return 'Nichts gefunden'
     
     # Exakte Platzhalter-Matches
     exact_placeholders = [
@@ -170,23 +197,12 @@ def _calculate_best_value(value_analysis, field_name=None):
         model_consensus_score = analysis['model_consensus'] * 1.0  # Verschiedene AI-Modelle
         quality_score = analysis['avg_data_quality'] * 0.01  # Datenqualität (0-100)
         
-        # ENHANCED BONUS SYSTEM 06.08.2025: Stärkere Präferenz für echte Daten
-        # TEMPLATE-PATTERN-PENALTY 06.08.2025: Starker Malus für Template-Strukturen
-        display_val = analysis['display_value'].strip().upper()
-        
-        # Import is_placeholder_value für Template-Pattern-Erkennung
+        # CONSENSUS FIX: Verwende robuste is_empty_value Funktion aus search_utils
+        from minesearch.search_utils import is_empty_value
         from minesearch.extraction_validators import is_placeholder_value
         
-        # PHASE 14.2 FIX: Erweiterte Platzhalter-Erkennung inkl. "Nichts gefunden"
-        placeholder_values = [
-            'X', 'N/A', 'UNBEKANNT', 'KEINE ANGABEN', 'NICHT VERFÜGBAR', '',
-            'UNKNOWN', 'NICHT GEFUNDEN', 'KEINE DATEN', 'NOT AVAILABLE',
-            'NOT FOUND', 'NO DATA', 'K.A.', 'K.A', 'N.A.', 'N.A',
-            'NICHTS GEFUNDEN', 'LEER'  # PHASE 14.2: Neue einheitliche Darstellung als Platzhalter
-        ]
-        
-        if display_val in placeholder_values:
-            non_x_bonus = -100.0  # DRASTISCHER Malus für alle Platzhalter-Werte
+        if is_empty_value(analysis['display_value']):
+            non_x_bonus = -100.0  # DRASTISCHER Malus für alle leeren/ungültigen Werte
         elif is_placeholder_value(analysis['display_value'], field_name):
             # TEMPLATE-PATTERN-PENALTY: Starker Malus für Template-Strukturen
             non_x_bonus = -50.0  # Starker Malus für Template-Werte wie "Untertage/ Open-Pit/ usw.)"

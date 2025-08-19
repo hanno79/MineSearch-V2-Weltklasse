@@ -38,11 +38,10 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
         logger.debug(f"[FIELD MARKER] 'X' ist korrektes 'nicht gefunden' Marker - KEIN Platzhalter")
         return False
     
-    # TEMPLATE-PATTERN-FIX 19.08.2025: NUR EXAKTE Template-Strukturen erkennen, nicht echte Antworten
-    # Diese Patterns sind zu aggressiv und filtern echte Antworten heraus!
-    # KRITISCH: "Untertage/ Open-Pit/ usw.)" kann eine echte Antwort sein, die alle Optionen zeigt
+    # TEMPLATE-PATTERN-FIX 19.08.2025: Erweiterte Template-Erkennung
+    # WICHTIG: Template-ähnliche Fallback-Werte sollen erkannt werden
     
-    # Nur noch EXAKTE CSV-Template-Strings - nicht Pattern-basiert
+    # Exakte CSV-Template-Strings
     exact_template_strings = [
         'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)',  # Exakter CSV-Header
         'Minentyp (Untertage/ Open-Pit/ usw.)',       # Exakter CSV-Header  
@@ -52,9 +51,22 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
         '(aktiv/ geplant/ geschlossen/ sonstiges)'    # Isolierter Template-Teil
     ]
     
-    # Nur exakte String-Matches - keine Pattern-Matches!
+    # Template-ähnliche Fallback-Werte (ohne Feldname-Präfix)
+    fallback_template_values = [
+        'Untertage/ Open-Pit/ usw.)',                 # Fallback-Wert ohne Feldname
+        'Gold/ Kupfer/ Kohle/ usw.)',                 # Fallback-Wert ohne Feldname
+        'aktiv/ geplant/ geschlossen/ sonstiges',     # Fallback-Wert ohne Feldname
+        'aktiv/ geplant/ geschlossen/ sonstiges)',    # Mit schließender Klammer
+    ]
+    
+    # Prüfe auf exakte Template-Strings
     if value_stripped in exact_template_strings:
         logger.debug(f"[TEMPLATE-PLACEHOLDER] '{value}' ist exakter CSV_COLUMNS Template-String")
+        return True
+    
+    # Prüfe auf Template-ähnliche Fallback-Werte
+    if value_stripped in fallback_template_values:
+        logger.debug(f"[TEMPLATE-PLACEHOLDER] '{value}' ist Template-ähnlicher Fallback-Wert")
         return True
     
     # Verbotene Platzhalter (aber NICHT "X" und nicht "-")
