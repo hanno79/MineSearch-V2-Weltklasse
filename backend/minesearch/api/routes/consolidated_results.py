@@ -22,19 +22,109 @@ from .consolidated_field_utils import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# CSV imports for Phase 16.3
+import csv
+import io
+from fastapi.responses import StreamingResponse
+from datetime import datetime
+
 # Field mappings are now imported from consolidated_field_utils.py
+
+def _normalize_placeholder_value(value):
+    """
+    PHASE 15.2/15.3 FIX: Normalisiert ALLE Platzhalter-Werte (auch bestehende Datenbank-Werte!)
+    TEMPLATE-FIX 19.08.2025: Erweitert um Template-Pattern-Erkennung
+    
+    Behandelt sowohl neue als auch bereits in der DB gespeicherte LEER-Varianten
+    """
+    if not value or not str(value).strip():
+        return value
+    
+    value_str = str(value).strip()
+    logger.error(f"[TEMPLATE-DEBUG] Processing value: '{value_str}'")
+    
+    # Import der Pattern aus extraction_processors für Konsistenz
+    import re
+    
+    # TEMPLATE-FIX 19.08.2025: Template-Pattern-Erkennung ZUERST
+    # KRITISCH: Robuste Erkennung für "TEMPLATE: Untertage/ Open-P..." Format!
+    
+    # DIRECT STRING CHECK: Falls der Wert mit "TEMPLATE:" beginnt
+    if value_str.startswith('TEMPLATE:'):
+        logger.error(f"[TEMPLATE-FIX] ✅ DIREKTER MATCH: '{value_str}' -> 'Nichts gefunden'")
+        return 'Nichts gefunden'
+    
+    # Diese Werte sind Template-ähnliche Fallbacks und sollen zu "Nichts gefunden" werden
+    template_patterns = [
+        r'^TEMPLATE:\s*Untertage/\s*Open-Pit.*usw.*$',   # "TEMPLATE: Untertage/ Open-Pit/ usw.)" - KRITISCHES PATTERN!
+        r'^TEMPLATE:\s*Gold/\s*Kupfer.*usw.*$',          # "TEMPLATE: Gold/ Kupfer/ Kohle/ usw.)"
+        r'^TEMPLATE:\s*aktiv/\s*geplant.*sonstiges.*$',  # "TEMPLATE: aktiv/ geplant/ geschlossen/ sonstiges"
+        r'^Untertage/\s*Open-Pit/\s*usw\.\)?$',         # "Untertage/ Open-Pit/ usw.)"
+        r'^Gold/\s*Kupfer/\s*Kohle/\s*usw\.\)?$',       # "Gold/ Kupfer/ Kohle/ usw.)"
+        r'^aktiv/\s*geplant/\s*geschlossen/\s*sonstiges\)?$',  # "aktiv/ geplant/ geschlossen/ sonstiges"
+        r'^\([^)]*usw\.\)$',                            # "(beliebig usw.)"
+        r'^[^(]*\([^)]*usw\.\)[^)]*$'                   # "Text (beliebig usw.) Text"
+    ]
+    
+    for pattern in template_patterns:
+        if re.match(pattern, value_str, re.IGNORECASE):
+            logger.info(f"[TEMPLATE-FIX] Template-Pattern match '{value_str}' -> 'Nichts gefunden'")
+            return 'Nichts gefunden'
+    
+    # Exakte Platzhalter-Matches
+    exact_placeholders = [
+        'LEER', 'Leer', 'leer', 'X', 'N/A', 'n/a', 'N.A.', 'n.a.',
+        'UNBEKANNT', 'UNKNOWN', 'NICHT GEFUNDEN', 'NOT FOUND',
+        'KEINE ANGABEN', 'NO DATA', 'K.A.', 'k.a.', 'K.A.', 
+        'NICHT VERFÜGBAR', 'NOT AVAILABLE', 'keine Daten',
+        'Keine Informationen gefunden', 'Nicht verfügbar', 'Unbekannt'
+    ]
+    
+    if value_str in exact_placeholders:
+        logger.debug(f"[PHASE 15.3] Exact match '{value_str}' -> 'Nichts gefunden'")
+        return 'Nichts gefunden'
+    
+    # PHASE 15.3 KRITISCH: Pattern für alle LEER-Varianten aus der Datenbank
+    leer_db_patterns = [
+        r'^LEER\s*-\s*.*',                    # "LEER - [beliebiger Text]"
+        r'^Leer\s*-\s*.*',                    # "Leer - [beliebiger Text]" 
+        r'^leer\s*-\s*.*',                    # "leer - [beliebiger Text]"
+        r'.*[Kk]eine spezifischen.*',         # "Keine/keine spezifischen [...]" (596x!)
+        r'.*[Kk]eine verlässlichen.*',        # "Keine verlässlichen [...]"
+        r'.*[Kk]eine öffentlichen.*',         # "Keine öffentlichen [...]"
+        r'.*[Kk]eine aktiven.*',              # "Keine aktiven [...]"
+        r'.*[Kk]eine spezifischen Daten.*',   # Spezifisch für DB-Varianten
+        r'.*[Nn]o specific.*',                # Englische Varianten
+        r'.*[Nn]ot available.*',              # "Not available"
+        r'.*dokumentiert$',                   # "spezifischen Quellen dokumentiert"
+    ]
+    
+    # Pattern-Matching für Datenbank-LEER-Varianten
+    for pattern in leer_db_patterns:
+        if re.match(pattern, value_str, re.IGNORECASE):
+            logger.debug(f"[PHASE 15.3] DB-Pattern match '{value_str[:50]}...' -> 'Nichts gefunden'")
+            return 'Nichts gefunden'
+    
+    # Echte Werte unverändert zurückgeben
+    return value_str
 
 def _analyze_field_values(value_details):
     """
     Analysiert alle Werte für ein Feld und gruppiert sie nach Eindeutigkeit
+    
+    PHASE 15.3 FIX: Normalisiert ALLE Werte BEVOR sie analysiert werden!
     
     Returns: Dict mit eindeutigen Werten und deren Metadaten
     """
     value_groups = {}
     
     for detail in value_details:
-        value = detail['value'].strip().lower()  # Normalisiert für Vergleich
-        display_value = detail['value'].strip()  # Original für Anzeige
+        # PHASE 15.3 KRITISCH: Normalisiere JEDEN Wert vor der Analyse!
+        original_value = detail['value'].strip()
+        normalized_display_value = _normalize_placeholder_value(original_value)
+        
+        value = normalized_display_value.strip().lower()  # Normalisiert für Vergleich
+        display_value = normalized_display_value  # Normalisiert für Anzeige
         
         if value not in value_groups:
             value_groups[value] = {
@@ -91,7 +181,7 @@ def _calculate_best_value(value_analysis, field_name=None):
     """
     if not value_analysis:
         return {
-            'display_value': 'Unbekannt',  # FIELD-CONSOLIDATION-FIX 06.08.2025: Bessere UX als X oder N/A
+            'display_value': 'Nichts gefunden',  # PHASE 14.2 FIX: Einheitliche User-gewünschte Darstellung
             'confidence_score': 0,
             'reason': 'Keine Daten verfügbar'
         }
@@ -100,26 +190,24 @@ def _calculate_best_value(value_analysis, field_name=None):
     best_score = -1
     
     for value, analysis in value_analysis.items():
-        # Gewichtete Score-Berechnung
-        frequency_score = analysis['frequency'] * 2.0  # Häufigkeit wichtigster Faktor
+        # PHASE 13.2 FIX: Überarbeitete Score-Berechnung - ECHTE DATEN haben Priorität!
+        # KRITISCH: Frequency darf nicht wichtigster Faktor sein, sonst gewinnt "Unbekannt" (9x) über echte Werte (1x)
+        frequency_score = analysis['frequency'] * 1.0  # REDUZIERT: von 2.0 auf 1.0
         source_diversity_score = analysis['source_diversity'] * 1.5  # Verschiedene Quellen
         model_consensus_score = analysis['model_consensus'] * 1.0  # Verschiedene AI-Modelle
         quality_score = analysis['avg_data_quality'] * 0.01  # Datenqualität (0-100)
         
-        # ENHANCED BONUS SYSTEM 06.08.2025: Stärkere Präferenz für echte Daten
-        # TEMPLATE-PATTERN-PENALTY 06.08.2025: Starker Malus für Template-Strukturen
-        display_val = analysis['display_value'].strip().upper()
-        
-        # Import is_placeholder_value für Template-Pattern-Erkennung
+        # CONSENSUS FIX: Verwende robuste is_empty_value Funktion aus search_utils
+        from minesearch.search_utils import is_empty_value
         from minesearch.extraction_validators import is_placeholder_value
         
-        if display_val in ['X', 'N/A', 'UNBEKANNT', 'KEINE ANGABEN', 'NICHT VERFÜGBAR', '']:
-            non_x_bonus = 0  # Keine Bonus für Platzhalter-Werte
+        if is_empty_value(analysis['display_value']):
+            non_x_bonus = -100.0  # DRASTISCHER Malus für alle leeren/ungültigen Werte
         elif is_placeholder_value(analysis['display_value'], field_name):
             # TEMPLATE-PATTERN-PENALTY: Starker Malus für Template-Strukturen
             non_x_bonus = -50.0  # Starker Malus für Template-Werte wie "Untertage/ Open-Pit/ usw.)"
         else:
-            non_x_bonus = 10.0  # Erhöhter Bonus für echte Daten (war 5.0)
+            non_x_bonus = 50.0  # PHASE 13.2 FIX: MASSIV erhöhter Bonus für echte Daten (war 10.0)
         
         # Malus für sehr kurze Suchzeiten (könnte auf Timeout hindeuten)
         duration_penalty = -2.0 if analysis['avg_search_duration'] < 1.0 else 0
@@ -134,15 +222,16 @@ def _calculate_best_value(value_analysis, field_name=None):
     
     if not best_value:
         return {
-            'display_value': 'Unbekannt',  # FIELD-CONSOLIDATION-FIX 06.08.2025: Konsistente UX
+            'display_value': 'Nichts gefunden',  # PHASE 14.2 FIX: Einheitliche User-gewünschte Darstellung  
             'confidence_score': 0,
             'reason': 'Keine gültigen Werte gefunden'
         }
     
-    # Normalisiere Konfidenz-Score zu 0-100 (realistischer)
-    # Base score: frequency=1 (2), no diversity (0), no consensus (0), no quality (0), non-X bonus (5) = 7
-    # Good score: frequency=3 (6), diversity=2 (3), consensus=3 (3), quality=50 (0.5), non-X (5) = 17.5
-    max_reasonable_score = 18.0
+    # PHASE 13.2 FIX: Normalisiere Konfidenz-Score zu 0-100 (neue Berechnung)
+    # Platzhalter: frequency=9 (9), no diversity (0), no consensus (0), no quality (0), Platzhalter-Malus (-100) = -91.0
+    # Echter Wert: frequency=1 (1), diversity=1 (1.5), consensus=1 (1), quality=0 (0), Echte-Daten-Bonus (+50) = 53.5
+    # ERGEBNIS: Echte Werte gewinnen IMMER gegen Platzhalter!
+    max_reasonable_score = 60.0  # Angepasst an neue Bonusse
     confidence_score = min(100, max(0, (best_score / max_reasonable_score) * 100))
     
     # Bestimme Begründung
@@ -177,6 +266,7 @@ async def get_consolidated_results(
     order: str = Query("asc", description="Order: asc or desc"),
     exclude_exa: bool = Query(True, description="Exa-Modelle ausblenden")
 ):
+    print(f"[DEBUG] API called with days_back={days_back}, exclude_exa={exclude_exa}")
     """
     Hole konsolidierte Suchergebnisse pro Mine mit allen Modell-Daten
     
@@ -209,6 +299,20 @@ async def get_consolidated_results(
         
         # Alle Ergebnisse holen
         all_results = query.all()
+        logger.info(f"[DEBUG] Query found {len(all_results)} results")
+        
+        # PHASE 1.2: GLOBAL SOURCE INDEX SYSTEM 14.08.2025
+        # Erstelle globales Quellennummerierungssystem für konsistente Referenzen
+        global_source_index = {}  # URL -> Nummer Mapping
+        global_source_counter = 1
+        
+        def get_or_assign_source_number(source_url):
+            """Gibt eindeutige Nummer für Quelle zurück oder erstellt neue"""
+            nonlocal global_source_counter
+            if source_url not in global_source_index:
+                global_source_index[source_url] = global_source_counter
+                global_source_counter += 1
+            return global_source_index[source_url]
         
         # Nach Mine gruppieren
         mines_data = defaultdict(lambda: {
@@ -220,7 +324,8 @@ async def get_consolidated_results(
             'model_count': 0,
             'last_updated': None,
             'total_sources': 0,
-            'source_mapping': {}  # Maps model names to source numbers
+            'source_mapping': {},  # Maps model names to source numbers (legacy)
+            'field_source_references': {}  # Maps field values to global source numbers
         })
         
         for result in all_results:
@@ -315,14 +420,22 @@ async def get_consolidated_results(
                                         logger.debug(f"Skipping duplicate consolidation: {original_field_name} -> {final_field_name} für Modell {result.model_used}")
                                         continue
                         
-                        # Extract real data sources (URLs) from sources list
+                        # PHASE 1.2: Extract real data sources mit globaler Nummerierung
                         real_sources = []
+                        global_source_numbers = []
                         if result.sources:
                             for source in result.sources:
+                                source_url = None
                                 if isinstance(source, str) and ('http' in source or 'www.' in source):
-                                    real_sources.append(source)
+                                    source_url = source
                                 elif isinstance(source, dict) and source.get('url'):
-                                    real_sources.append(source['url'])
+                                    source_url = source['url']
+                                
+                                if source_url:
+                                    real_sources.append(source_url)
+                                    # Globale Quellennummer zuweisen
+                                    source_number = get_or_assign_source_number(source_url)
+                                    global_source_numbers.append(source_number)
                         
                         # CRITICAL FIX: Für Quellenangaben Feld - zeige echte Quellen statt "Keine"
                         if final_field_name.lower() in ['quellenangaben', 'sources', 'quellen']:
@@ -349,7 +462,7 @@ async def get_consolidated_results(
                                 
                                 clean_value = f"{len(real_sources)} Quellen: " + ", ".join(source_summary)
                         
-                        # STEP 3: Add data to the already-created field structure
+                        # PHASE 1.2: Add data mit globalen Quellenreferenzen
                         mine_data['consolidated_fields'][final_field_name]['raw_values'].append(clean_value)
                         mine_data['consolidated_fields'][final_field_name]['ai_models'].append(result.model_used)
                         mine_data['consolidated_fields'][final_field_name]['real_sources'].append(real_sources)
@@ -357,10 +470,16 @@ async def get_consolidated_results(
                             'value': clean_value,
                             'ai_model': result.model_used,
                             'real_sources': real_sources,
+                            'global_source_numbers': global_source_numbers,  # PHASE 1.2: Globale Referenzen
                             'search_timestamp': result.search_timestamp,
                             'data_quality': result.data_quality or {},
                             'search_duration': result.search_duration or 0
                         })
+                        
+                        # PHASE 1.2: Store field-specific source references
+                        if final_field_name not in mine_data['field_source_references']:
+                            mine_data['field_source_references'][final_field_name] = set()
+                        mine_data['field_source_references'][final_field_name].update(global_source_numbers)
                     else:
                         # STEP 4: Even for X-values, ensure we have the field structure for future data
                         # This allows future non-X values to populate these renamed fields
@@ -375,6 +494,7 @@ async def get_consolidated_results(
         
         # Konvertiere zu Liste und implementiere "Best Value" Algorithmus
         consolidated_results = []
+        logger.info(f"[DEBUG] Processing {len(mines_data)} mines")
         for mine_name, mine_data in mines_data.items():
             # FIELD-CONSOLIDATION-FIX 06.08.2025: Erweiterte Field-Initialisierung mit Konsolidierungslogik
             from minesearch.config.base import CSV_COLUMNS
@@ -434,9 +554,11 @@ async def get_consolidated_results(
                 metadaten_felder = ['Mine', 'Land', 'Zuverlässigkeit', 'Modelle', 'Letzte Aktualisierung', 'Details']
                 if field_name not in metadaten_felder:  # Verhindere Duplikate in Frontend
                     display_value = best_value_info['display_value']
-                    # ENHANCED VALUE CLEANING 06.08.2025: Mehr Platzhalter-Werte erkennen
-                    if not display_value or display_value.strip().upper() in ['', 'X', 'N/A', 'KEINE ANGABEN', 'NICHT VERFÜGBAR']:
-                        display_value = 'Unbekannt'
+                    # PHASE 14.2 FIX: Einheitliche "Nichts gefunden" Darstellung für alle Platzhalter
+                    placeholder_indicators = ['', 'X', 'N/A', 'KEINE ANGABEN', 'NICHT VERFÜGBAR', 'UNBEKANNT', 
+                                            'LEER', 'UNKNOWN', 'NOT FOUND', 'NO DATA', 'K.A.', 'N.A.']
+                    if not display_value or display_value.strip().upper() in placeholder_indicators:
+                        display_value = 'Nichts gefunden'  # PHASE 14.2: Einheitliche User-gewünschte Darstellung
                     best_values[field_name] = display_value
                 
                 # Erstelle detaillierte Aufschlüsselung für Modal
@@ -466,27 +588,90 @@ async def get_consolidated_results(
                                if details['best_value']['confidence_score'] > 0]
             overall_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0
 
-            result_item = {
+            # PHASE 1.1: ENHANCED API RESPONSE STRUCTURE 14.08.2025
+            # Strukturierte Felder klar von Metadaten trennen für bessere Frontend-Integration
+            
+            # Separiere Metadatenfelder von Datenfeldern
+            metadata_fields = {
                 'mine_name': mine_name,
                 'country': mine_data['country'],
                 'region': mine_data['region'],
-                
-                # NEW UX DESIGN: Simplified main table data
-                'best_values': best_values,  # Only best value per field for main table
+                'model_count': mine_data['model_count'],
+                'last_updated': mine_data['last_updated'].isoformat() if mine_data['last_updated'] else None,
+                'total_sources': mine_data['total_sources']
+            }
+            
+            # PHASE 1.2: Strukturierte Datenfelder mit globalen Quellenreferenzen
+            structured_fields = {}
+            for field_name, field_breakdown in detailed_breakdown.items():
+                # Nur echte Datenfelder, keine Metadaten
+                metadaten_felder = ['Mine', 'Land', 'Zuverlässigkeit', 'Modelle', 'Letzte Aktualisierung', 'Details']
+                if field_name not in metadaten_felder:
+                    # Sammle alle globalen Quellenreferenzen für dieses Feld
+                    field_global_sources = []
+                    for detail in field_breakdown.get('all_values', {}).values():
+                        for value_detail in detail.get('search_timestamps', []):  # Fallback wenn structure anders
+                            pass
+                    
+                    # Alternative: Sammle von field_source_references
+                    field_source_refs = list(mine_data.get('field_source_references', {}).get(field_name, []))
+                    
+                    # PHASE 1.2: Erweiterte Feldstruktur mit globalen Referenzen
+                    supporting_sources = field_breakdown['best_value'].get('supporting_sources', [])
+                    
+                    # PHASE 2.1: Konvertiere URLs zu globalen Referenznummern (mit Error-Handling)
+                    global_source_numbers = []
+                    if supporting_sources and global_source_index:
+                        for source_url in supporting_sources[:3]:  # Nur erste 3 URLs
+                            try:
+                                for number, source_data in global_source_index.items():
+                                    if isinstance(source_data, dict) and source_data.get('url') == source_url:
+                                        global_source_numbers.append(int(number))
+                                        break
+                            except (ValueError, TypeError, AttributeError) as e:
+                                logger.warning(f"Error converting source URL {source_url} to global number: {e}")
+                                continue
+                    
+                    structured_fields[field_name] = {
+                        'value': best_values.get(field_name, 'Nichts gefunden'),  # PHASE 14.2: Konsistente Darstellung
+                        'confidence_score': field_breakdown['best_value']['confidence_score'],
+                        'consistency_score': field_breakdown['statistics'].get('confidence_score', 0),
+                        'source_count': field_breakdown['statistics']['total_sources'],
+                        'source_references': supporting_sources[:3],  # URLs der unterstützenden Quellen
+                        'global_source_numbers': sorted(global_source_numbers),  # PHASE 1.2: Globale Nummern für Frontend
+                        'model_consensus': field_breakdown['best_value'].get('model_consensus', 0),
+                        'frequency': field_breakdown['best_value'].get('frequency', 1)
+                    }
+
+            result_item = {
+                # PHASE 1.1: STRUCTURED RESPONSE FOR FRONTEND
+                'metadata': metadata_fields,
+                'structured_fields': structured_fields,
                 'overall_confidence': round(overall_confidence, 1),
                 
-                # NEW UX DESIGN: Complete breakdown for details modal
-                'detailed_breakdown': detailed_breakdown,
+                # ENHANCED FIELD SUMMARY für Card-Anzeige
+                'field_summary': {
+                    'total_fields': len(structured_fields),
+                    'fields_with_high_confidence': len([f for f in structured_fields.values() if f['confidence_score'] >= 70]),
+                    'fields_with_multiple_sources': len([f for f in structured_fields.values() if f['source_count'] > 1]),
+                    'avg_confidence': round(sum(f['confidence_score'] for f in structured_fields.values()) / len(structured_fields) if structured_fields else 0, 1),
+                    'avg_source_diversity': round(sum(f['source_count'] for f in structured_fields.values()) / len(structured_fields) if structured_fields else 0, 1)
+                },
                 
-                # Legacy compatibility (maintained for now)
-                'ai_model_legend': ai_model_legend,  # Maps model numbers to AI model names
+                # LEGACY COMPATIBILITY (für bestehende Frontend-Teile)
+                'mine_name': mine_name,
+                'country': mine_data['country'], 
+                'region': mine_data['region'],
+                'best_values': best_values,  # Maintained for backward compatibility
+                'detailed_breakdown': detailed_breakdown,  # Für Details-Modal
+                'ai_model_legend': ai_model_legend,
                 'model_results': mine_data['model_results'],
                 'model_count': mine_data['model_count'],
                 'last_updated': mine_data['last_updated'].isoformat() if mine_data['last_updated'] else None,
                 'total_sources': mine_data['total_sources'],
                 'total_fields_found': len(best_values),
                 
-                # NEW METRICS
+                # ENHANCED METRICS
                 'data_quality_metrics': {
                     'fields_with_high_confidence': len([d for d in detailed_breakdown.values() 
                                                       if d['best_value']['confidence_score'] >= 70]),
@@ -510,6 +695,9 @@ async def get_consolidated_results(
         elif sort_by == "last_updated":
             consolidated_results.sort(key=lambda x: x["last_updated"] or "", reverse=reverse_order)
         
+        # PHASE 1.2: Invertiere global_source_index für Frontend (Nummer -> URL)
+        source_index_for_frontend = {v: k for k, v in global_source_index.items()}
+        
         return {
             "success": True,
             "data": {
@@ -517,7 +705,10 @@ async def get_consolidated_results(
                 "total_mines": len(consolidated_results),
                 "total_results": len(all_results),
                 "sort_by": sort_by,
-                "order": order
+                "order": order,
+                # PHASE 1.2: GLOBAL SOURCE INDEX für Frontend-Referenzen
+                "global_source_index": source_index_for_frontend,  # {1: "url1.com", 2: "url2.com"}
+                "total_sources": len(global_source_index)
             }
         }
 
@@ -718,8 +909,11 @@ async def get_mine_consolidated_details(
             metadaten_felder = ['Mine', 'Land', 'Zuverlässigkeit', 'Modelle', 'Letzte Aktualisierung', 'Details']
             if field_name not in metadaten_felder:
                 display_value = best_value_info['display_value']
-                if not display_value or display_value.strip().upper() in ['', 'X', 'N/A', 'KEINE ANGABEN', 'NICHT VERFÜGBAR']:
-                    display_value = 'Unbekannt'
+                # PHASE 14.2 FIX: Einheitliche "Nichts gefunden" Darstellung (auch in mine detail route)
+                placeholder_indicators = ['', 'X', 'N/A', 'KEINE ANGABEN', 'NICHT VERFÜGBAR', 'UNBEKANNT', 
+                                        'LEER', 'UNKNOWN', 'NOT FOUND', 'NO DATA', 'K.A.', 'N.A.']
+                if not display_value or display_value.strip().upper() in placeholder_indicators:
+                    display_value = 'Nichts gefunden'
                 best_values[field_name] = display_value
             
             # Detaillierte Aufschlüsselung
@@ -850,6 +1044,11 @@ async def export_consolidated_csv(
     # Dann alle anderen Felder aus FIELD_ORDER (außer Metadaten und Details)
     excluded_field_keys = set(metadata_mapping.keys()) | {"Details"}
     remaining_fields = [f for f in FIELD_ORDER if f not in excluded_field_keys and f in all_fields]
+    
+    # CSV-FIX: Stelle sicher dass "Quellenangaben" immer in Header ist (auch wenn nicht in all_fields)
+    if "Quellenangaben" not in remaining_fields:
+        remaining_fields.append("Quellenangaben")
+    
     header.extend(remaining_fields)
     
     csv_lines.append("|".join(header))
@@ -873,12 +1072,32 @@ async def export_consolidated_csv(
             elif field_type == "last_updated":
                 row.append(result.get("last_updated", ""))
         
-        # Restliche Felder aus best_values
+        # Restliche Felder aus best_values - mit spezieller Quellenangaben-Behandlung
         for field in remaining_fields:
-            value = result["best_values"].get(field, "")
-            # Escape Pipe-Zeichen in Werten
-            escaped_value = str(value).replace("|", "\\|") if value else ""
-            row.append(escaped_value)
+            if field == "Quellenangaben":
+                # CSV-FIX Phase 2: Quellenangaben speziell behandeln
+                sources_value = result["best_values"].get("Quellenangaben", "")
+                
+                # Falls keine Quellenangaben in best_values, versuche aus source_mapping zu generieren
+                if not sources_value or sources_value == "Nichts gefunden":
+                    source_mapping = result.get("source_mapping", {})
+                    if source_mapping:
+                        # Generiere kurze Quellenangaben-Liste aus source_mapping
+                        source_count = len(source_mapping)
+                        sources_value = f"{source_count} Quellen verfügbar"
+                    else:
+                        sources_value = "Keine Quellen verfügbar"
+                
+                # CSV-FIX Phase 3: Zeilenschaltungen durch Semikolon ersetzen
+                normalized_sources = str(sources_value).replace("\n", "; ").replace("\r", "")
+                # Escape Pipe-Zeichen
+                escaped_sources = normalized_sources.replace("|", "\\|")
+                row.append(escaped_sources)
+            else:
+                value = result["best_values"].get(field, "")
+                # Escape Pipe-Zeichen in Werten
+                escaped_value = str(value).replace("|", "\\|") if value else ""
+                row.append(escaped_value)
         
         csv_lines.append("|".join(row))
     

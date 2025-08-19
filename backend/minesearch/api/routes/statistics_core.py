@@ -567,23 +567,92 @@ async def get_models_comprehensive_statistics(
                 await update_comprehensive_statistics()
                 model_stats = query.all()
             
-            # Konvertiere zu API-Response
+            # CRITICAL FIX: Hole alle verfügbaren Modelle aus Models API
+            import httpx
+            async with httpx.AsyncClient() as client:
+                models_response = await client.get("http://localhost:8000/api/models")
+                models_data = models_response.json()
+                
+            if models_data.get('success') and 'models' in models_data:
+                all_available_models = []
+                for model in models_data['models']:
+                    if isinstance(model, dict):
+                        model_id = model.get('model_id', str(model))
+                    else:
+                        model_id = str(model)
+                    all_available_models.append(model_id)
+            else:
+                all_available_models = []
+            tested_model_ids = {stat.model_id for stat in model_stats}
+            
+            logger.info(f"[STATS-CORE] Found {len(model_stats)} tested models, {len(all_available_models)} total available")
+            
+            # Konvertiere getestete Modelle zu API-Response
             models_data = [model.to_dict() for model in model_stats]
             
-            # Summary-Statistiken
+            # Füge ungetestete Modelle als "Verfügbar" hinzu
+            for model in all_available_models:
+                model_id = model if isinstance(model, str) else model.get('model_id', str(model))
+                if model_id not in tested_model_ids:
+                    # Erstelle Placeholder-Statistiken für ungetestete Modelle
+                    provider = model_id.split(':')[0] if ':' in model_id else 'unknown'
+                    model_name = model_id.split(':')[1] if ':' in model_id else model_id
+                    
+                    placeholder_model = {
+                        'model_id': model_id,
+                        'model_name': f"{provider.title()} - {model_name.title()}",
+                        'provider': provider,
+                        'total_searches': 0,
+                        'successful_searches': 0,
+                        'success_rate_percent': 0.0,
+                        'completeness_score': 0.0,
+                        'consistency_score': 0.0,
+                        'consistency_grade': 'Ungetestet',
+                        'source_diversity_score': 0.0,
+                        'avg_fields_found': 0.0,
+                        'avg_sources_per_search': 0.0,
+                        'unique_sources_total': 0,
+                        'performance_category': 'Verfügbar',
+                        'avg_search_duration_ms': 0.0,
+                        'overall_score': 0.0,
+                        'score_category': 'Verfügbar',
+                        'best_field_categories': [],
+                        'specialization_score': {},
+                        'cost_efficiency_score': 50.0,
+                        'estimated_cost_per_search': None,
+                        'first_search_at': None,
+                        'last_search_at': None,
+                        'last_updated': None,
+                        'status': 'available'  # Kennzeichnung für ungetestete Modelle
+                    }
+                    
+                    models_data.append(placeholder_model)
+            
+            # Sortiere erneut nach overall_score (getestete Modelle oben)
+            models_data.sort(key=lambda x: (x.get('status', 'tested') == 'available', -x['overall_score']))
+            
+            logger.info(f"[STATS-CORE] Expanded to {len(models_data)} models (tested + available)")
+            
+            # Summary-Statistiken mit getesteten und verfügbaren Modellen
             if models_data:
+                tested_models = [m for m in models_data if m.get('status') != 'available']
+                available_models = [m for m in models_data if m.get('status') == 'available']
+                
                 summary_stats = {
                     'total_models': len(models_data),
-                    'avg_overall_score': round(sum([m['overall_score'] for m in models_data]) / len(models_data), 1),
-                    'avg_completeness': round(sum([m['completeness_score'] for m in models_data]) / len(models_data), 1),
-                    'avg_consistency': round(sum([m['consistency_score'] for m in models_data]) / len(models_data), 1),
-                    'best_model': max(models_data, key=lambda x: x['overall_score']),
+                    'tested_models': len(tested_models),
+                    'available_models': len(available_models),
+                    'avg_overall_score': round(sum([m['overall_score'] for m in tested_models]) / len(tested_models), 1) if tested_models else 0,
+                    'avg_completeness': round(sum([m['completeness_score'] for m in tested_models]) / len(tested_models), 1) if tested_models else 0,
+                    'avg_consistency': round(sum([m['consistency_score'] for m in tested_models]) / len(tested_models), 1) if tested_models else 0,
+                    'best_model': max(tested_models, key=lambda x: x['overall_score']) if tested_models else None,
                     'score_distribution': {
-                        'exzellent': len([m for m in models_data if m['score_category'] == 'Exzellent']),
-                        'sehr_gut': len([m for m in models_data if m['score_category'] == 'Sehr Gut']),
-                        'gut': len([m for m in models_data if m['score_category'] == 'Gut']),
-                        'limitiert': len([m for m in models_data if m['score_category'] == 'Limitiert']),
-                        'ungeeignet': len([m for m in models_data if m['score_category'] == 'Ungeeignet'])
+                        'exzellent': len([m for m in tested_models if m['score_category'] == 'Exzellent']),
+                        'sehr_gut': len([m for m in tested_models if m['score_category'] == 'Sehr Gut']),
+                        'gut': len([m for m in tested_models if m['score_category'] == 'Gut']),
+                        'limitiert': len([m for m in tested_models if m['score_category'] == 'Limitiert']),
+                        'ungeeignet': len([m for m in tested_models if m['score_category'] == 'Ungeeignet']),
+                        'verfügbar': len(available_models)
                     }
                 }
             else:

@@ -633,8 +633,8 @@ function updateSettingsStatusDisplay() {
     // Update Models status
     const statusModels = document.getElementById('status-models');
     if (statusModels) {
-        // Count selected models from main page
-        const selectedModels = document.querySelectorAll('#model-selection input[type="checkbox"]:checked');
+        // Count selected models from main page (CONSISTENCY FIX: use name="model" selector)
+        const selectedModels = document.querySelectorAll('input[name="model"]:checked');
         const modelCount = selectedModels.length;
         
         if (modelCount > 0) {

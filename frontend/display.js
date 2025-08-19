@@ -1,7 +1,7 @@
 /**
  * Author: rahn
  * Datum: 10.08.2025
- * Version: 1.0
+ * Version: 2.7 - FIX: Model-ID Normalisierung für robuste Duplikat-Erkennung
  * Beschreibung: MineSearch 2.0 - Display & Data Loading Functions
  * 
  * ÄNDERUNG 10.08.2025: Extrahiert aus index.html (8343 → 500 Zeilen Regel)
@@ -88,6 +88,8 @@ async function loadSources(sortBy = 'count', order = 'desc') {
         loadSourcesAbortController = null;
     }
 }
+
+// ENTFERNT: Export wird am Ende der Datei gemacht
 
 /**
  * RESULTS LOADING: Lädt und zeigt Suchergebnisse
@@ -191,6 +193,8 @@ async function loadConsolidatedResults(sortBy = 'mine_name', order = 'asc') {
     }
 }
 
+// ENTFERNT: Export wird am Ende der Datei gemacht
+
 /**
  * DISPLAY COMPREHENSIVE MODEL STATISTICS: Zeigt detaillierte Modell-Statistiken
  */
@@ -293,10 +297,27 @@ window.loadModelStatistics = async function() {
         console.log('📋 [STATISTICS] Statistics data received:', data);
         
         if (data.success && data.data) {
-            displayComprehensiveModelStatistics(data.data);
+            // 🚀 LOGIC-REVOLUTION PHASE 1.2: Model-Splitting vor Display
+            const splitData = splitCombinedModels(data.data);
             
-            const totalModels = data.data.models ? data.data.models.length : 0;
-            showNotification(`✅ Modell-Statistiken geladen: ${totalModels} Modelle analysiert`, 'success');
+            // 🔄 MODEL KONSOLIDIERUNG PHASE 3: Konsolidiere Duplikate zu einer Card pro Modell
+            const consolidatedModels = consolidateModels(splitData.models);
+            const processedData = {
+                ...splitData,
+                models: consolidatedModels,
+                _consolidation_metadata: {
+                    split_count: splitData.models.length,
+                    consolidated_count: consolidatedModels.length,
+                    duplicates_removed: splitData.models.length - consolidatedModels.length
+                }
+            };
+            
+            displayComprehensiveModelStatistics(processedData);
+            
+            const originalModels = data.data.models ? data.data.models.length : 0;
+            const consolidatedCount = processedData._consolidation_metadata.consolidated_count;
+            const duplicatesRemoved = processedData._consolidation_metadata.duplicates_removed;
+            showNotification(`✅ Modell-Statistiken geladen: ${consolidatedCount} unique Modelle (${duplicatesRemoved} Duplikate konsolidiert)`, 'success');
         } else {
             throw new Error(data.error || 'Keine Statistik-Daten verfügbar');
         }
@@ -363,11 +384,18 @@ function displayResultsTable(results, sortBy, order) {
 /**
  * CONSOLIDATED RESULTS DISPLAY: Zeigt konsolidierte Ergebnisse
  */
+/**
+ * PHASE 2.1: KOMPLETT NEUE FELDANZEIGE-IMPLEMENTIERUNG 14.08.2025
+ * Zeigt strukturierte Felder statt nur Metadaten in Cards
+ */
 function displayConsolidatedResults(data, sortBy, order) {
-    console.log(`🎨 [DISPLAY] Rendering consolidated results with DATA-CARDS (${data.consolidated_results?.length || 0} mines)`);
+    console.log(`🎨 [PHASE 2.1] NEW FIELD-BASED DISPLAY: ${data.consolidated_results?.length || 0} mines with structured fields`);
     
     const container = document.getElementById('consolidated-table-container');
-    if (!container) return;
+    if (!container) {
+        console.error('[PHASE 2.1] Container not found: consolidated-table-container');
+        return;
+    }
     
     if (!data.consolidated_results || data.consolidated_results.length === 0) {
         container.innerHTML = createErrorHTML(
@@ -377,8 +405,361 @@ function displayConsolidatedResults(data, sortBy, order) {
         return;
     }
     
-    // 🚀 REVOLUTION: Verwende moderne Data-Cards statt hässlicher Tabelle
-    renderDataCardGrid(data.consolidated_results, container, 'consolidated');
+    // PHASE 2.1: Cache Global Source Index für Quellenreferenzen
+    window.globalSourceIndex = data.global_source_index || {};
+    console.log(`[PHASE 2.1] Cached ${Object.keys(window.globalSourceIndex).length} source references`);
+    
+    // PHASE 2.1: NEUE FIELD-BASED CARD GENERATION
+    const cards = data.consolidated_results.map(mine => generateFieldBasedCard(mine)).join('');
+    
+    // PHASE 2.1: Enhanced Container mit Field-Grid-System
+    container.innerHTML = `
+        <div class="field-display-container">
+            <div class="field-display-header">
+                <h3 class="field-display-title">
+                    📊 Mine-Ergebnisse mit strukturierten Feldern
+                    <span class="result-count">(${data.consolidated_results.length} Minen)</span>
+                </h3>
+                <div class="field-display-stats">
+                    <div class="stat-item">
+                        📈 ${data.total_sources || 0} Quellen gesamt
+                    </div>
+                    <div class="stat-item">  
+                        🎯 Durchschnittlich ${Math.round(data.consolidated_results.reduce((sum, mine) => sum + (mine.overall_confidence || 0), 0) / data.consolidated_results.length)} % Zuverlässigkeit
+                    </div>
+                </div>
+            </div>
+            <div class="field-display-grid">
+                ${cards}
+            </div>
+        </div>
+    `;
+    
+    console.log(`[PHASE 2.1] Successfully rendered ${data.consolidated_results.length} field-based cards`);
+}
+
+/**
+ * PHASE 2.1: FIELD-BASED CARD GENERATOR 14.08.2025
+ * Generiert Cards mit strukturierten Feldern statt nur Metadaten
+ */
+function generateFieldBasedCard(mine) {
+    if (!mine) return '';
+    
+    // PHASE 2.1: Extract structured fields (neue API-Struktur)
+    const structuredFields = mine.structured_fields || {};
+    const metadata = mine.metadata || {
+        mine_name: mine.mine_name,
+        country: mine.country,
+        region: mine.region
+    };
+    
+    // PHASE 2.1: Field Summary für Card-Header
+    const fieldSummary = mine.field_summary || {
+        total_fields: Object.keys(structuredFields).length,
+        fields_with_high_confidence: 0,
+        avg_confidence: mine.overall_confidence || 0
+    };
+    
+    console.log(`[PHASE 2.1] Generating field card for ${metadata.mine_name}: ${fieldSummary.total_fields} fields`);
+    
+    // PHASE 2.1: Prioritäts-basierte Feldanzeige (wichtigste Felder zuerst)
+    const priorityFields = [
+        'Betreiber', 'Eigentümer', 'Rohstoffe', 'Minentyp', 'Aktivitätsstatus',
+        'Produktionsstart', 'Produktionsende', 'Fördermenge/Jahr', 
+        'Minenfläche in qkm', 'x-Koordinate', 'y-Koordinate',
+        'Restaurationskosten', 'Kostenjahr', 'Dokumentenjahr'
+    ];
+    
+    // PHASE 2.1: Generiere Feldanzeige
+    const fieldHTML = generateFieldDisplayGrid(structuredFields, priorityFields);
+    
+    return `
+        <div class="field-based-card mine-card" data-mine="${metadata.mine_name}">
+            <!-- PHASE 2.1: ENHANCED CARD HEADER -->
+            <div class="field-card-header">
+                <div class="header-main">
+                    <h3 class="mine-title">⛏️ ${metadata.mine_name}</h3>
+                    <div class="mine-location">
+                        📍 ${metadata.country || 'Nichts gefunden'}${metadata.region ? `, ${metadata.region}` : ''}
+                    </div>
+                </div>
+                <div class="field-summary-badge">
+                    <div class="confidence-score ${getConfidenceClass(fieldSummary.avg_confidence)}">
+                        ${Math.round(fieldSummary.avg_confidence)}% Zuverlässigkeit
+                    </div>
+                    <div class="field-count">
+                        ${fieldSummary.total_fields} Felder | ${fieldSummary.fields_with_high_confidence} hochwertig
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PHASE 2.1: STRUCTURED FIELD DISPLAY -->
+            <div class="field-display-section">
+                ${fieldHTML}
+            </div>
+            
+            <!-- PHASE 2.1: ENHANCED CARD FOOTER -->
+            <div class="field-card-footer">
+                <div class="card-actions">
+                    <button class="btn-details" onclick="viewConsolidatedDetail('${metadata.mine_name}')">
+                        🔍 Alle Felder & Details
+                    </button>
+                    <button class="btn-sources" onclick="showMineSourceReferences('${metadata.mine_name}')">
+                        📚 Quellenreferenzen
+                    </button>
+                </div>
+                <div class="card-stats">
+                    <span class="stat">📊 ${mine.model_count || 0} AI-Modelle</span>
+                    <span class="stat">📈 ${mine.total_sources || 0} Quellen</span>
+                    <span class="stat">🕒 ${mine.last_updated ? new Date(mine.last_updated).toLocaleDateString('de-DE') : 'Nichts gefunden'}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * PHASE 2.1: FIELD DISPLAY GRID GENERATOR
+ * Erstellt das Raster für strukturierte Feldanzeige
+ */
+function generateFieldDisplayGrid(structuredFields, priorityOrder) {
+    if (!structuredFields || Object.keys(structuredFields).length === 0) {
+        return `<div class="no-fields-message">Keine strukturierten Felder verfügbar</div>`;
+    }
+    
+    // PHASE 2.1: Sortiere Felder nach Priorität
+    const sortedFields = sortFieldsByPriority(structuredFields, priorityOrder);
+    
+    // PHASE 2.1: Zeige max 8 Felder in der Card (wichtigste zuerst)
+    const displayFields = sortedFields.slice(0, 8);
+    const hiddenCount = sortedFields.length - 8;
+    
+    let fieldsHTML = displayFields.map(([fieldName, fieldData]) => 
+        generateSingleFieldDisplay(fieldName, fieldData)
+    ).join('');
+    
+    // PHASE 2.1: Zeige versteckte Felder-Indikator
+    if (hiddenCount > 0) {
+        fieldsHTML += `
+            <div class="hidden-fields-indicator">
+                <span class="hidden-count">+ ${hiddenCount} weitere Felder</span>
+                <small>Klicken Sie auf "Details" für alle Felder</small>
+            </div>
+        `;
+    }
+    
+    return `<div class="field-grid">${fieldsHTML}</div>`;
+}
+
+/**
+ * PHASE 2.1: SINGLE FIELD DISPLAY GENERATOR
+ * Erstellt Anzeige für ein einzelnes Feld mit Wert, Score und Quellenreferenzen
+ */
+function generateSingleFieldDisplay(fieldName, fieldData) {
+    const value = fieldData.value || 'Nichts gefunden';  // PHASE 14.3: Einheitliche Frontend-Darstellung
+    const confidenceScore = fieldData.confidence_score || 0;
+    const sourceNumbers = fieldData.global_source_numbers || [];
+    const sourceCount = fieldData.source_count || 0;
+    
+    // PHASE 2.1: Value Display (verkürzt falls zu lang)
+    let displayValue = value;
+    if (value.length > 30) {
+        displayValue = value.substring(0, 27) + '...';
+    }
+    
+    // PHASE 2.1: Source References String
+    let sourceRefsHTML = '';
+    if (sourceNumbers && sourceNumbers.length > 0) {
+        const refs = sourceNumbers.slice(0, 3).map(num => `[${num}]`).join('');
+        sourceRefsHTML = `<span class="source-refs">${refs}</span>`;
+    }
+    
+    return `
+        <div class="field-item" title="Vollständiger Wert: ${value}">
+            <div class="field-label">${fieldName}</div>
+            <div class="field-value-container">
+                <div class="field-value">${displayValue}</div>
+                ${sourceRefsHTML}
+            </div>
+            <div class="field-meta">
+                <div class="confidence-indicator ${getConfidenceClass(confidenceScore)}">
+                    ${Math.round(confidenceScore)}%
+                </div>
+                ${sourceCount > 1 ? `<span class="multi-source">✓${sourceCount}</span>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * PHASE 2.1: FIELD PRIORITY SORTER
+ * Sortiert Felder nach Prioritätsliste und alphabetisch für den Rest
+ */
+function sortFieldsByPriority(fields, priorityOrder) {
+    const fieldEntries = Object.entries(fields);
+    
+    return fieldEntries.sort(([nameA], [nameB]) => {
+        const priorityA = priorityOrder.indexOf(nameA);
+        const priorityB = priorityOrder.indexOf(nameB);
+        
+        // Beide in Prioritätsliste
+        if (priorityA !== -1 && priorityB !== -1) {
+            return priorityA - priorityB;
+        }
+        
+        // A in Priorität, B nicht
+        if (priorityA !== -1 && priorityB === -1) {
+            return -1;
+        }
+        
+        // B in Priorität, A nicht  
+        if (priorityA === -1 && priorityB !== -1) {
+            return 1;
+        }
+        
+        // Beide nicht in Priorität - alphabetisch sortieren
+        return nameA.localeCompare(nameB, 'de');
+    });
+}
+
+/**
+ * PHASE 2.1: CONFIDENCE CLASS HELPER
+ * Bestimmt CSS-Klasse basierend auf Zuverlässigkeits-Score
+ */
+function getConfidenceClass(score) {
+    if (score >= 80) return 'confidence-high';
+    if (score >= 60) return 'confidence-medium';  
+    if (score >= 30) return 'confidence-low';
+    return 'confidence-very-low';
+}
+
+/**
+ * PHASE 2.1: MINE SOURCE REFERENCES DISPLAY
+ * Zeigt Quellenreferenzen für eine spezifische Mine
+ */
+async function showMineSourceReferences(mineName) {
+    console.log(`[PHASE 2.1] Showing source references for mine: ${mineName}`);
+    
+    try {
+        // PHASE 2.1: Hole detaillierte Quelleninformationen
+        const response = await fetch(`${window.API_BASE_URL}/api/consolidated/mine/${encodeURIComponent(mineName)}?include_sources=true`);
+        
+        if (!response.ok) {
+            throw new Error(`Failed to load source references: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success || !data.data) {
+            throw new Error('No source reference data available');
+        }
+        
+        // PHASE 2.1: Erstelle Source-Reference-Modal
+        const sourceRefsHTML = generateSourceReferencesModal(mineName, data.data, window.globalSourceIndex || {});
+        
+        // PHASE 2.1: Zeige Modal
+        showModal('Quellenreferenzen', sourceRefsHTML, 'large');
+        
+    } catch (error) {
+        console.error(`[PHASE 2.1] Error showing source references:`, error);
+        showNotification(`❌ Fehler beim Laden der Quellenreferenzen: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * PHASE 2.1: SOURCE REFERENCES MODAL GENERATOR  
+ * Erstellt HTML für Quellenreferenzen-Modal
+ */
+function generateSourceReferencesModal(mineName, mineData, globalSourceIndex) {
+    // PHASE 2.1: Use new structured_fields structure
+    const structuredFields = mineData.structured_fields || {};
+    
+    if (Object.keys(structuredFields).length === 0) {
+        return '<div class="no-data">Keine Quellenreferenzen für ' + mineName + ' verfügbar.</div>';
+    }
+    
+    let referencesHTML = '';
+    
+    // PHASE 2.1: Gruppiere Quellenreferenzen nach Feld
+    Object.entries(structuredFields).forEach(function([fieldName, fieldData]) {
+        const sources = fieldData.source_references || [];
+        const globalNumbers = fieldData.global_source_numbers || [];
+        
+        if (sources.length > 0) {
+            const sourceItems = sources.map(function(sourceUrl, index) {
+                // Use global source number if available, otherwise find in index
+                let sourceNumber = globalNumbers[index] || '?';
+                if (sourceNumber === '?' && globalSourceIndex) {
+                    const entry = Object.entries(globalSourceIndex)
+                        .find(function([num, data]) { return data.url === sourceUrl; });
+                    sourceNumber = entry ? entry[0] : '?';
+                }
+                
+                // Get source metadata from global index
+                const sourceData = globalSourceIndex[sourceNumber] || {};
+                const reliability = sourceData.reliability_score || 0;
+                const successRate = sourceData.success_rate || 0;
+                const domain = sourceData.domain || sourceUrl;
+                
+                return '<div class="source-item" data-source-url="' + sourceUrl + '">' +
+                    '<div class="source-header">' +
+                        '<span class="source-number">[' + sourceNumber + ']</span>' +
+                        '<span class="source-domain">' + domain + '</span>' +
+                    '</div>' +
+                    '<div class="source-url">' + sourceUrl + '</div>' +
+                    '<div class="source-stats">' +
+                        '<span class="source-reliability">Zuverlässigkeit: ' + reliability + '%</span>' +
+                        '<span class="source-success">Erfolgsrate: ' + successRate + '%</span>' +
+                    '</div>' +
+                    '<button class="btn-small" onclick="openSourceInNewTab(\'' + sourceUrl + '\')">' +
+                        '🔗 Öffnen' +
+                    '</button>' +
+                '</div>';
+            }).join('');
+            
+            referencesHTML += '<div class="field-source-group">' +
+                '<h4 class="field-name">' + fieldName + '</h4>' +
+                '<div class="field-value">"' + fieldData.value + '"</div>' +
+                '<div class="source-confidence">Vertrauen: ' + fieldData.confidence_score + '% (' + fieldData.source_count + ' Quellen)</div>' +
+                '<div class="source-list">' +
+                    sourceItems +
+                '</div>' +
+            '</div>';
+        }
+    });
+    
+    if (!referencesHTML) {
+        return '<div class="no-data">Keine Quellenreferenzen für ' + mineName + ' verfügbar.</div>';
+    }
+    
+    return '<div class="source-references-container">' +
+        '<div class="mine-info">' +
+            '<h3>📚 Quellenreferenzen für ' + mineName + '</h3>' +
+            '<p>Diese Quellen wurden für die Datenextraktion verwendet:</p>' +
+        '</div>' +
+        '<div class="source-references-content">' +
+            referencesHTML +
+        '</div>' +
+    '</div>';
+}
+
+/**
+ * PHASE 2.1: OPEN SOURCE IN NEW TAB
+ * Öffnet Quelle in neuem Tab mit Tracking
+ */
+function openSourceInNewTab(sourceUrl) {
+    console.log(`[PHASE 2.1] Opening source: ${sourceUrl}`);
+    
+    if (!sourceUrl || !sourceUrl.startsWith('http')) {
+        showNotification('❌ Ungültige Quellen-URL', 'error');
+        return;
+    }
+    
+    // PHASE 2.1: Öffne in neuem Tab
+    window.open(sourceUrl, '_blank', 'noopener,noreferrer');
+    
+    // PHASE 2.1: Track source access (optional)
+    // trackSourceAccess(sourceUrl);
 }
 
 // ============================================
@@ -431,65 +812,80 @@ async function viewConsolidatedDetail(mineName) {
 function showConsolidatedDetailModal(mineName, mineData) {
     console.log(`📋 [MODAL] Displaying consolidated details for: ${mineName}`);
     
-    // Create modal content
+    // REINER Content ohne Modal-Wrapper - showDetailModal() kümmert sich um Modal-Struktur
     const modalContent = `
-        <div class="consolidated-detail-modal">
-            <div class="modal-header">
-                <h3>🏭 ${mineName} - Konsolidierte Details</h3>
-            </div>
-            
-            <div class="modal-body">
-                <div class="mine-summary">
-                    <h4>📊 Zusammenfassung</h4>
-                    <div class="summary-grid">
-                        <div class="summary-item">
-                            <strong>Land:</strong> ${mineData.best_values?.country || 'Nicht verfügbar'}
-                        </div>
-                        <div class="summary-item">
-                            <strong>Gefundene Felder:</strong> ${mineData.best_values ? Object.keys(mineData.best_values).length : 0}
-                        </div>
-                        <div class="summary-item">
-                            <strong>Quellen:</strong> ${mineData.source_summary?.total_unique_sources || 0}
-                        </div>
-                    </div>
+        <div class="mine-summary">
+            <h4>📊 Zusammenfassung</h4>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <strong>Land:</strong> ${mineData.country || 'Nicht verfügbar'}${mineData.region ? `, ${mineData.region}` : ''}
                 </div>
-                
-                ${mineData.best_values ? `
-                    <div class="mine-fields">
-                        <h4>📋 Beste Werte</h4>
-                        <div class="fields-data-grid">
-                            ${Object.entries(mineData.best_values).map(([field, value]) => `
-                                <div class="field-data-card">
-                                    <div class="field-header">
-                                        <span class="field-name">${field}</span>
-                                        <span class="source-badge">📊 Konsolidiert</span>
-                                    </div>
-                                    <div class="field-value">
-                                        ${value || '<span class="missing-value">Nicht verfügbar</span>'}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-                
-                ${mineData.source_summary ? `
-                    <div class="mine-sources">
-                        <h4>📚 Quellen-Übersicht</h4>
-                        <p><strong>Gesamte Quellen:</strong> ${mineData.source_summary.total_unique_sources}</p>
-                    </div>
-                ` : ''}
-            </div>
-            
-            <div class="modal-footer">
-                <button onclick="closeModal()" class="btn btn-primary">Schließen</button>
+                <div class="summary-item">
+                    <strong>Gefundene Felder:</strong> ${mineData.best_values ? Object.keys(mineData.best_values).length : 0}
+                </div>
+                <div class="summary-item">
+                    <strong>Quellen:</strong> ${mineData.source_summary?.total_unique_sources || 0}
+                </div>
             </div>
         </div>
+        
+        ${mineData.best_values ? `
+            <div class="mine-fields">
+                <h4>📋 Beste Werte</h4>
+                <div class="fields-data-grid">
+                    ${Object.entries(mineData.best_values)
+                        .filter(([field, value]) => !field.startsWith('_'))  // Filtere Meta-Felder wie _source_mapping
+                        .map(([field, value]) => {
+                            // PHASE 16.2: Hole Field-spezifische Source-Informationen
+                            const fieldData = mineData.structured_fields ? mineData.structured_fields[field] : null;
+                            const sourceCount = fieldData ? (fieldData.source_references?.length || 0) : 0;
+                            const confidenceScore = fieldData ? fieldData.confidence_score : null;
+                            
+                            return `
+                        <div class="field-data-card">
+                            <div class="field-header">
+                                <span class="field-name">${field}</span>
+                                <div class="field-source-info">
+                                    ${sourceCount > 0 ? `
+                                        <span class="source-count-badge" title="${sourceCount} Quellen verwendet">
+                                            📊 ${sourceCount} Quellen
+                                        </span>
+                                    ` : '<span class="source-badge">📊 Konsolidiert</span>'}
+                                    ${confidenceScore !== null ? `
+                                        <span class="confidence-badge" title="Vertrauens-Score basierend auf Quellenqualität">
+                                            🎯 ${confidenceScore}%
+                                        </span>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            <div class="field-value">
+                                ${value || '<span class="missing-value">Nicht verfügbar</span>'}
+                            </div>
+                            ${sourceCount > 0 ? `
+                                <div class="field-sources-preview">
+                                    <button class="btn-mini" onclick="showFieldSourceDetails('${mineName.replace(/'/g, "\\'")}', '${field.replace(/'/g, "\\'")}')">
+                                        📚 Quellen anzeigen
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                        }).join('')}
+                </div>
+            </div>
+        ` : ''}
+        
+        ${mineData.source_summary ? `
+            <div class="mine-sources">
+                <h4>📚 Quellen-Übersicht</h4>
+                <p><strong>Gesamte Quellen:</strong> ${mineData.source_summary.total_unique_sources}</p>
+            </div>
+        ` : ''}
     `;
     
-    // Show modal using existing modal system
+    // Show modal using existing modal system - KONSISTENT mit anderen Tabs
     if (typeof showDetailModal === 'function') {
-        showDetailModal('Konsolidierte Mine-Details', modalContent);
+        showDetailModal(`🏭 ${mineName} - Konsolidierte Details`, modalContent);
     } else {
         // Fallback: Simple alert if modal system not available
         alert(`Details für ${mineName}:\n\nFelder: ${mineData.best_values ? Object.keys(mineData.best_values).length : 0}\nQuellen: ${mineData.source_summary?.total_unique_sources || 0}`);
@@ -497,7 +893,7 @@ function showConsolidatedDetailModal(mineName, mineData) {
 }
 
 /**
- * SHOW DETAIL MODAL: Generic modal display function
+ * SHOW DETAIL MODAL: Generic modal display function - KONSISTENT mit anderen Tabs
  */
 function showDetailModal(title, content) {
     console.log(`📋 [MODAL] Showing detail modal: ${title}`);
@@ -518,20 +914,30 @@ function showDetailModal(title, content) {
         z-index: 1000;
     `;
     
-    // Create modal container
+    // Create modal container mit KONSISTENTEM Layout
     const modal = document.createElement('div');
-    modal.className = 'detail-modal';
+    modal.className = 'modal-content detail-modal';
     modal.style.cssText = `
         background: white;
         border-radius: 8px;
         max-width: 800px;
         max-height: 80vh;
-        overflow-y: auto;
-        padding: 20px;
+        overflow: hidden;
         box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        position: relative;
     `;
     
-    modal.innerHTML = content;
+    // KONSISTENTE Modal-Struktur wie andere Tabs
+    modal.innerHTML = `
+        <div class="modal-header">
+            <h3>${title}</h3>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body" style="max-height: calc(80vh - 60px); overflow-y: auto; padding: 20px;">
+            ${content}
+        </div>
+    `;
+    
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
     
@@ -542,29 +948,138 @@ function showDetailModal(title, content) {
         }
     });
     
+    // Close modal on ESC key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && window.currentModal) {
+            closeModal();
+        }
+    });
+    
     // Store reference for closing
     window.currentModal = overlay;
 }
 
 /**
- * CLOSE MODAL: Schließt das aktuelle Modal
+ * GENERIC SHOW MODAL: Universelle Modal-Funktion für alle Tabs - KONSISTENT
  */
-function closeModal() {
-    if (window.currentModal) {
-        document.body.removeChild(window.currentModal);
-        window.currentModal = null;
-    }
+function showModal(title, content, size = 'medium') {
+    console.log(`📋 [MODAL] Showing modal: ${title} (size: ${size})`);
+    
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    `;
+    
+    // Determine modal width based on size
+    const modalWidth = size === 'large' ? '900px' : size === 'small' ? '400px' : '700px';
+    
+    // Create modal container mit KONSISTENTEM Layout
+    const modal = document.createElement('div');
+    modal.className = 'modal-content';
+    modal.style.cssText = `
+        background: white;
+        border-radius: 8px;
+        max-width: ${modalWidth};
+        max-height: 80vh;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        position: relative;
+    `;
+    
+    // KONSISTENTE Modal-Struktur wie andere Tabs
+    modal.innerHTML = `
+        <div class="modal-header">
+            <h3>${title}</h3>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body" style="max-height: calc(80vh - 60px); overflow-y: auto; padding: 20px;">
+            ${content}
+        </div>
+    `;
+    
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    
+    // Close modal on overlay click
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            closeModal();
+        }
+    });
+    
+    // Close modal on ESC key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && window.currentModal) {
+            closeModal();
+        }
+    });
+    
+    // Store reference for closing
+    window.currentModal = overlay;
 }
 
-// Export display functions to global scope
-window.loadSources = loadSources;
-window.loadResults = loadResults;
-window.loadConsolidatedResults = loadConsolidatedResults;
-window.displayGroupedSources = displayGroupedSources;
-window.displayResultsTable = displayResultsTable;
-window.displayConsolidatedResults = displayConsolidatedResults;
-window.displayComprehensiveModelStatistics = displayComprehensiveModelStatistics;
-window.displayBasicModelStatistics = displayBasicModelStatistics;
+/**
+ * CLOSE MODAL: Schließt das aktuelle Modal - ROBUST mit Fallbacks
+ */
+function closeModal() {
+    console.log('🔴 [MODAL] closeModal() aufgerufen');
+    
+    // Methode 1: Verwende window.currentModal Reference
+    if (window.currentModal) {
+        console.log('🔴 [MODAL] Entferne Modal via currentModal Reference');
+        try {
+            document.body.removeChild(window.currentModal);
+            window.currentModal = null;
+            console.log('✅ [MODAL] Modal erfolgreich geschlossen via Reference');
+            return;
+        } catch (error) {
+            console.error('❌ [MODAL] Fehler beim Entfernen via Reference:', error);
+        }
+    }
+    
+    // Fallback 1: Suche alle Modal-Overlays
+    const overlays = document.querySelectorAll('.modal-overlay');
+    if (overlays.length > 0) {
+        console.log(`🔴 [MODAL] Gefunden ${overlays.length} Modal-Overlays - entferne alle`);
+        overlays.forEach((overlay, index) => {
+            try {
+                document.body.removeChild(overlay);
+                console.log(`✅ [MODAL] Overlay ${index + 1} entfernt`);
+            } catch (error) {
+                console.error(`❌ [MODAL] Fehler beim Entfernen von Overlay ${index + 1}:`, error);
+            }
+        });
+        window.currentModal = null;
+        return;
+    }
+    
+    // Fallback 2: Verstecke Modals via CSS
+    const hiddenOverlays = document.querySelectorAll('[style*="position: fixed"][style*="z-index"]');
+    if (hiddenOverlays.length > 0) {
+        console.log(`🔴 [MODAL] Verstecke ${hiddenOverlays.length} potentielle Modals via CSS`);
+        hiddenOverlays.forEach((el, index) => {
+            el.style.display = 'none';
+            console.log(`✅ [MODAL] Element ${index + 1} versteckt`);
+        });
+        window.currentModal = null;
+        return;
+    }
+    
+    console.log('⚠️ [MODAL] Kein Modal zum Schließen gefunden');
+}
+
+// BEREINIGTE EXPORTS ENTFERNT - Nur definitive Exports am Ende der Datei
 
 /**
  * LOAD ENHANCED SOURCE DETAILS: Lädt detaillierte Informationen für eine Domain
@@ -647,11 +1162,11 @@ function generateSourceDetailsHTML(domain, sources, statistics = {}) {
                     <div style="font-weight: 500; color: #374151;">Quelle ${index + 1}</div>
                     <div style="display: flex; gap: 12px; font-size: 11px;">
                         <span style="color: ${reliabilityColor}; font-weight: bold;">${reliability.toFixed(1)}%</span>
-                        <span style="color: ${statusColor}; font-weight: bold;">${source.status || 'unbekannt'}</span>
+                        <span style="color: ${statusColor}; font-weight: bold;">${source.status || 'nichts gefunden'}</span>
                     </div>
                 </div>
                 <div style="color: #6b7280; font-size: 11px;">
-                    Typ: ${source.type || 'general'} | Letzte Aktualisierung: ${source.last_updated ? new Date(source.last_updated).toLocaleDateString('de-DE') : 'Unbekannt'}
+                    Typ: ${source.type || 'general'} | Letzte Aktualisierung: ${source.last_updated ? new Date(source.last_updated).toLocaleDateString('de-DE') : 'Nichts gefunden'}
                 </div>
             </div>
         `;
@@ -723,20 +1238,707 @@ function generateFallbackDetailsHTML(domain, message) {
     `;
 }
 
-// Export display functions to global scope
+// BEREINIGTE EXPORTS ENTFERNT - Nur definitive Exports am Ende der Datei
+
+// loadModelStatistics ist bereits korrekt in Zeile 264 als window-Funktion definiert
+
+// Export detail view functions
+window.viewConsolidatedDetail = viewConsolidatedDetail;
+window.showDetailModal = showDetailModal;
+window.showModal = showModal;
+window.closeModal = closeModal;
+window.loadEnhancedSourceDetails = loadEnhancedSourceDetails;
+
+// ============================================
+// CSV EXPORT FUNCTIONS - PHASE 16.1
+// ============================================
+
+/**
+ * PHASE 16.1: CSV Export für Consolidated Results
+ * Exportiert alle konsolidierten Minen-Daten als CSV-Datei
+ */
+async function exportConsolidatedCSV() {
+    console.log('📊 [CSV-EXPORT] Starting CSV export for consolidated results...');
+    
+    try {
+        // Zeige Loading-Status
+        const exportBtn = document.getElementById('csv-export-btn') || document.querySelector('button[onclick="exportConsolidatedCSV()"]');
+        if (exportBtn) {
+            exportBtn.textContent = '⏳ Exportiere...';
+            exportBtn.disabled = true;
+        }
+        
+        // Hole die aktuellen Filter-Parameter
+        const country = document.getElementById('consolidated_country')?.value || '';
+        const region = document.getElementById('consolidated_region')?.value || '';
+        const daysBack = document.getElementById('consolidated_days')?.value || '30';
+        const sortBy = document.getElementById('consolidated_sort')?.value || 'mine_name';
+        
+        // PHASE 16.3: Verwende dedizierten CSV Export Endpunkt
+        const params = new URLSearchParams({
+            exclude_exa: 'true',
+            days_back: daysBack,
+            sort_by: sortBy
+        });
+        
+        if (country) params.append('country', country);
+        if (region) params.append('region', region);
+        
+        // PHASE 16.3 FIX: Korrekte API-Route für CSV Export
+        const csvUrl = `${window.API_BASE_URL}/api/consolidated/results/export/csv?${params.toString()}`;
+        
+        // Trigger download durch temporäres Link-Element
+        const downloadLink = document.createElement('a');
+        downloadLink.href = csvUrl;
+        downloadLink.style.display = 'none';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        
+        console.log(`✅ [CSV-EXPORT] CSV Export gestartet: ${csvUrl}`);
+        showNotification(`✅ CSV Export gestartet - Download beginnt automatisch`, 'success');
+        
+    } catch (error) {
+        console.error('❌ [CSV-EXPORT] Export error:', error);
+        showNotification(`❌ CSV Export fehlgeschlagen: ${error.message}`, 'error');
+    } finally {
+        // Button zurücksetzen
+        if (exportBtn) {
+            exportBtn.textContent = '📊 CSV Export (| separiert)';
+            exportBtn.disabled = false;
+        }
+    }
+}
+
+// PHASE 16.3: CSV-Generierungsfunktionen entfernt - Backend übernimmt CSV-Export vollständig
+// CSV Export erfolgt jetzt server-seitig über /api/consolidated/results/export/csv
+
+// ============================================
+// FIELD-SPECIFIC SOURCE DETAILS - PHASE 16.2
+// ============================================
+
+/**
+ * PHASE 16.2: Zeigt detaillierte Quelleninformationen für ein spezifisches Feld
+ */
+async function showFieldSourceDetails(mineName, fieldName) {
+    console.log(`📚 [FIELD-SOURCES] Loading source details for: ${mineName} -> ${fieldName}`);
+    
+    try {
+        // API call to get detailed field sources
+        const response = await fetch(`${window.API_BASE_URL}/api/consolidated/mine/${encodeURIComponent(mineName)}?include_sources=true`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success || !data.data || !data.data.structured_fields) {
+            throw new Error('Keine Feldquellen verfügbar');
+        }
+        
+        const fieldData = data.data.structured_fields[fieldName];
+        if (!fieldData) {
+            throw new Error(`Feld '${fieldName}' nicht gefunden`);
+        }
+        
+        // Generiere Field-Source-Details HTML
+        const sourceDetailsHTML = generateFieldSourceDetailsHTML(mineName, fieldName, fieldData);
+        
+        // Show modal using existing modal system
+        showModal(`📚 Quellen: ${fieldName}`, sourceDetailsHTML, 'medium');
+        
+    } catch (error) {
+        console.error(`❌ [FIELD-SOURCES] Error:`, error);
+        showNotification(`❌ Fehler beim Laden der Feldquellen: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * Generiert HTML für Field-spezifische Source-Details
+ */
+function generateFieldSourceDetailsHTML(mineName, fieldName, fieldData) {
+    const value = fieldData.value || 'Nicht verfügbar';
+    const confidenceScore = fieldData.confidence_score || 0;
+    const sourceReferences = fieldData.source_references || [];
+    const globalSourceNumbers = fieldData.global_source_numbers || [];
+    
+    let sourcesHTML = '';
+    
+    if (sourceReferences.length === 0) {
+        sourcesHTML = '<div class="no-sources">Keine spezifischen Quellen für dieses Feld verfügbar.</div>';
+    } else {
+        sourcesHTML = sourceReferences.map((sourceUrl, index) => {
+            const sourceNumber = globalSourceNumbers[index] || (index + 1);
+            const domain = sourceUrl ? new URL(sourceUrl).hostname : 'Unbekannt';
+            
+            return `
+                <div class="field-source-item">
+                    <div class="source-header">
+                        <span class="source-number">[${sourceNumber}]</span>
+                        <span class="source-domain">${domain}</span>
+                    </div>
+                    <div class="source-url" title="${sourceUrl}">
+                        ${sourceUrl.length > 80 ? sourceUrl.substring(0, 77) + '...' : sourceUrl}
+                    </div>
+                    <div class="source-actions">
+                        <button class="btn-small" onclick="openSourceInNewTab('${sourceUrl}')">
+                            🔗 Öffnen
+                        </button>
+                        <button class="btn-small" onclick="copyToClipboard('${sourceUrl}')">
+                            📋 Kopieren
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    return `
+        <div class="field-source-details">
+            <div class="field-summary">
+                <h4>📊 Feld-Zusammenfassung</h4>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <strong>Mine:</strong> ${mineName}
+                    </div>
+                    <div class="summary-item">
+                        <strong>Feld:</strong> ${fieldName}
+                    </div>
+                    <div class="summary-item">
+                        <strong>Wert:</strong> ${value}
+                    </div>
+                    <div class="summary-item">
+                        <strong>Vertrauen:</strong> ${confidenceScore}%
+                    </div>
+                    <div class="summary-item">
+                        <strong>Quellen:</strong> ${sourceReferences.length}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="field-sources-list">
+                <h4>📚 Quellendetails</h4>
+                ${sourcesHTML}
+            </div>
+            
+            <div class="source-legend">
+                <p><small>💡 <strong>Tipp:</strong> Klicken Sie auf "🔗 Öffnen" um die Original-Quelle zu besuchen.</small></p>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Öffnet eine Quelle in einem neuen Tab
+ */
+function openSourceInNewTab(url) {
+    if (url && url.startsWith('http')) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+        showNotification('❌ Ungültige URL', 'error');
+    }
+}
+
+/**
+ * Kopiert Text in die Zwischenablage
+ */
+async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        showNotification('✅ URL kopiert!', 'success');
+    } catch (error) {
+        console.error('Failed to copy to clipboard:', error);
+        showNotification('❌ Kopieren fehlgeschlagen', 'error');
+    }
+}
+
+// ============================================
+// LOGIC-REVOLUTION: MODEL-SPLITTING FUNCTION
+// ============================================
+
+/**
+ * LOGIC-REVOLUTION PHASE 2.1: Revolutionäre 5-Komponenten Score-Berechnung
+ * Neue Gewichtung: Feldqualität 25%, Konsistenz 25%, Geschwindigkeit 25%, Kosten 20%, Durchlauf-Vertrauen 5%
+ * STRICT RULE: Score = 0 bei 0% Erfolgsrate für ALLE Komponenten
+ */
+function calculateRevolutionary5ComponentScore(modelData) {
+    console.log(`🚀 [REVOLUTIONARY-SCORE] Calculating 5-component score for ${modelData.model_id}`);
+    
+    const successRate = modelData.success_rate || 0;
+    const searchCount = modelData.total_searches || 1;
+    const splitFactor = modelData._split_factor || 1;
+    
+    // STRICT RULE: Bei 0% Erfolgsrate alle Komponenten = 0
+    if (successRate === 0) {
+        console.log(`❌ [REVOLUTIONARY-SCORE] ${modelData.model_id}: 0% Erfolgsrate = 0 Gesamtscore`);
+        return {
+            totalScore: 0,
+            breakdown: {
+                fieldQuality: { score: 0, description: 'Feldqualität', details: 'Keine bei 0% Erfolgsrate' },
+                consistency: { score: 0, description: 'Konsistenz', details: 'Keine bei 0% Erfolgsrate' },
+                speed: { score: 0, description: 'Geschwindigkeit', details: 'Irrelevant bei 0% Erfolgsrate' },
+                cost: { score: 0, description: 'Kosteneffizienz', details: 'Irrelevant bei 0% Erfolgsrate' },
+                trustworthiness: { score: 0, description: 'Durchlauf-Vertrauen', details: 'Keine Vertrauenswürdigkeit bei 0% Erfolgsrate' }
+            },
+            confidenceLevel: 'Nicht verfügbar',
+            confidencePercentage: 0
+        };
+    }
+    
+    // === KOMPONENTE 1: FELDQUALITÄT (25%) ===
+    const fieldQualityScore = calculateRevolutionaryFieldQuality(modelData);
+    
+    // === KOMPONENTE 2: KONSISTENZ (25%) ===
+    const consistencyScore = calculateRevolutionaryConsistency(modelData);
+    
+    // === KOMPONENTE 3: GESCHWINDIGKEIT (25%) ===
+    const speedScore = calculateRevolutionarySpeed(modelData);
+    
+    // === KOMPONENTE 4: KOSTENEFFIZIENZ (20%) ===
+    const costScore = calculateRevolutionaryCost(modelData);
+    
+    // === KOMPONENTE 5: DURCHLAUF-VERTRAUEN (5%) ===
+    const trustworthinessScore = calculateRevolutionaryTrustworthiness(modelData);
+    
+    // Gewichtete Gesamtberechnung - NEUE GEWICHTUNG!
+    const totalScore = (
+        fieldQualityScore.score * 0.25 +
+        consistencyScore.score * 0.25 +
+        speedScore.score * 0.25 +
+        costScore.score * 0.20 +
+        trustworthinessScore.score * 0.05
+    );
+    
+    // Konfidenz basierend auf Durchläufen und Split-Faktor
+    const confidenceFactor = Math.min(searchCount / 10, 1.0) * (1 / Math.sqrt(splitFactor));
+    const confidencePercentage = Math.round(confidenceFactor * 100);
+    
+    let confidenceLevel = 'Niedrig';
+    if (confidencePercentage >= 80) confidenceLevel = 'Hoch';
+    else if (confidencePercentage >= 50) confidenceLevel = 'Mittel';
+    
+    console.log(`✅ [REVOLUTIONARY-SCORE] ${modelData.model_id}: Total=${totalScore.toFixed(1)}/100, Confidence=${confidencePercentage}%`);
+    
+    return {
+        totalScore: Math.min(Math.max(totalScore, 0), 100), // 0-100 Scale
+        breakdown: {
+            fieldQuality: fieldQualityScore,
+            consistency: consistencyScore,
+            speed: speedScore,
+            cost: costScore,
+            trustworthiness: trustworthinessScore
+        },
+        confidenceLevel: confidenceLevel,
+        confidencePercentage: confidencePercentage
+    };
+}
+
+/**
+ * KOMPONENTE 1: Revolutionäre Feldqualität (25%)
+ */
+function calculateRevolutionaryFieldQuality(modelData) {
+    const successRate = modelData.success_rate || 0;
+    if (successRate === 0) return { score: 0, description: 'Feldqualität', details: 'Keine bei 0% Erfolgsrate' };
+    
+    // FINAL OPTIMIZATION: Strenger Threshold - Niedrige Erfolgsrate = niedrige Scores
+    if (successRate < 0.3) {
+        // Unter 30% = Maximum 40 Punkte (4.0/10 auf Frontend-Scale)
+        const baseQuality = successRate * 40; // 0-12 Punkte bei unter 30%
+        return {
+            score: Math.min(baseQuality, 40),
+            description: 'Feldqualität', 
+            details: `${(successRate*100).toFixed(1)}% Erfolgsrate (niedrig)`
+        };
+    }
+    
+    // Ab 30% normale Berechnung
+    const baseQuality = successRate * 80; // 0-80 Punkte basierend auf Erfolgsrate
+    const qualityBonus = successRate >= 0.8 ? 20 : successRate >= 0.5 ? 10 : 0; // Bonus für hohe Erfolgsrate
+    
+    return {
+        score: Math.min(baseQuality + qualityBonus, 100),
+        description: 'Feldqualität',
+        details: `${(successRate*100).toFixed(1)}% Erfolgsrate`
+    };
+}
+
+/**
+ * KOMPONENTE 2: Revolutionäre Konsistenz (25%)
+ */
+function calculateRevolutionaryConsistency(modelData) {
+    const successRate = modelData.success_rate || 0;
+    if (successRate === 0) return { score: 0, description: 'Konsistenz', details: 'Keine bei 0% Erfolgsrate' };
+    
+    const searchCount = modelData.total_searches || 1;
+    const splitFactor = modelData._split_factor || 1;
+    
+    // FINAL OPTIMIZATION: Strenger Threshold auch für Konsistenz
+    if (successRate < 0.3) {
+        // Unter 30% = Reduzierte Konsistenz-Bewertung
+        const baseConsistency = successRate * 30; // 0-9 Punkte bei unter 30%
+        const trustBonus = Math.min(searchCount / 20, 0.5) * 10; // Reduzierter Bonus
+        return {
+            score: Math.min(baseConsistency + trustBonus, 40),
+            description: 'Konsistenz',
+            details: `${searchCount} Durchläufe, niedrige Rate: ${(successRate*100).toFixed(1)}%`
+        };
+    }
+    
+    // Ab 30% normale Berechnung
+    const baseConsistency = successRate * 70; // 0-70 Punkte
+    const trustBonus = Math.min(searchCount / 10, 1.0) * 20; // 0-20 Bonus für viele Durchläufe
+    const splitPenalty = Math.max(0, (splitFactor - 1) * 5); // Penalty für Split-Kombinationen
+    
+    return {
+        score: Math.min(Math.max(baseConsistency + trustBonus - splitPenalty, 0), 100),
+        description: 'Konsistenz',
+        details: `${searchCount} Durchläufe, Split-Faktor: ${splitFactor}`
+    };
+}
+
+/**
+ * KOMPONENTE 3: Revolutionäre Geschwindigkeit (25%)
+ */
+function calculateRevolutionarySpeed(modelData) {
+    const successRate = modelData.success_rate || 0;
+    if (successRate === 0) return { score: 0, description: 'Geschwindigkeit', details: 'Irrelevant bei 0% Erfolgsrate' };
+    
+    const provider = modelData.provider || 'unknown';
+    
+    // Provider-basierte Speed-Bewertung (da keine echten Timing-Daten verfügbar)
+    let baseSpeed = 50; // Default
+    if (['openrouter'].includes(provider)) baseSpeed = 75; // Schnell
+    else if (['perplexity'].includes(provider)) baseSpeed = 85; // Sehr schnell
+    else if (['abacus', 'exa'].includes(provider)) baseSpeed = 60; // Mittel
+    
+    // Erfolgsrate-Gewichtung
+    const speedScore = baseSpeed * successRate;
+    
+    return {
+        score: Math.min(speedScore, 100),
+        description: 'Geschwindigkeit',
+        details: `${provider} Provider`
+    };
+}
+
+/**
+ * KOMPONENTE 4: Revolutionäre Kosteneffizienz (20%)
+ */
+function calculateRevolutionaryCost(modelData) {
+    const successRate = modelData.success_rate || 0;
+    if (successRate === 0) return { score: 0, description: 'Kosteneffizienz', details: 'Irrelevant bei 0% Erfolgsrate' };
+    
+    const modelId = modelData.model_id || '';
+    const provider = modelData.provider || 'unknown';
+    
+    // Kosten-Tier basierend auf Model und Provider
+    let baseCost = 50; // Default
+    if (modelId.includes('free')) baseCost = 95; // Kostenlos = Sehr gut
+    else if (['openrouter', 'perplexity'].includes(provider)) baseCost = 80; // Günstig
+    else if (['openai', 'anthropic'].includes(provider)) baseCost = 30; // Teuer
+    else if (['abacus', 'exa'].includes(provider)) baseCost = 60; // Mittel
+    
+    // Erfolgsrate-Gewichtung
+    const costScore = baseCost * successRate;
+    
+    return {
+        score: Math.min(costScore, 100),
+        description: 'Kosteneffizienz',
+        details: modelId.includes('free') ? 'Kostenlos' : `${provider} Provider`
+    };
+}
+
+/**
+ * KOMPONENTE 5: Revolutionäres Durchlauf-Vertrauen (5%)
+ */
+function calculateRevolutionaryTrustworthiness(modelData) {
+    const successRate = modelData.success_rate || 0;
+    if (successRate === 0) return { score: 0, description: 'Durchlauf-Vertrauen', details: 'Keine Vertrauenswürdigkeit bei 0% Erfolgsrate' };
+    
+    const searchCount = modelData.total_searches || 1;
+    const splitFactor = modelData._split_factor || 1;
+    
+    // Vertrauen basierend auf Anzahl Durchläufe und Split-Penalty
+    const trustBase = Math.min(searchCount / 20, 1.0) * 80; // 0-80 Punkte für Durchläufe
+    const successBonus = successRate * 20; // 0-20 Bonus für Erfolgsrate
+    const splitPenalty = Math.max(0, (splitFactor - 1) * 10); // Penalty für Kombinationen
+    
+    return {
+        score: Math.min(Math.max(trustBase + successBonus - splitPenalty, 0), 100),
+        description: 'Durchlauf-Vertrauen',
+        details: `${searchCount} Durchläufe, ${(successRate*100).toFixed(1)}% Erfolg`
+    };
+}
+
+/**
+ * MODEL KONSOLIDIERUNG PHASE 1: Konsolidiert mehrere Vorkommen desselben Modells
+ * Löst das Problem: 3x "openrouter:deepseek-free" → 1x konsolidierte Card
+ */
+function consolidateModels(modelsList) {
+    console.log('🔄 [MODEL-CONSOLIDATION] Consolidating duplicate models...');
+    
+    if (!modelsList || modelsList.length === 0) {
+        console.warn('⚠️ [MODEL-CONSOLIDATION] No models to consolidate');
+        return [];
+    }
+    
+    // Group models by model_id with ENHANCED normalization
+    const modelGroups = {};
+    modelsList.forEach((model, index) => {
+        // Enhanced normalization for robust duplicate detection
+        const rawModelId = model.model_id || `unknown_${index}`;
+        
+        // ENHANCED NORMALIZATION ALGORITHM:
+        // 1. Trim whitespace
+        // 2. Convert to lowercase  
+        // 3. Remove special characters and normalize separators
+        // 4. Handle provider prefix variations
+        let normalizedModelId = rawModelId.trim().toLowerCase();
+        
+        // Normalize common variations
+        normalizedModelId = normalizedModelId
+            .replace(/[_\-\s]+/g, '-')  // Normalize separators to hyphens
+            .replace(/^(openrouter|perplexity|abacus|exa):/, '$1:')  // Ensure consistent provider format
+            .replace(/[\(\)\[\]\.]/g, '')  // Remove brackets and dots
+            .replace(/[0-9]+(\.[0-9]+)?[kmbt]?$/i, '')  // Remove version numbers at end
+            .replace(/(-free|-pro|-beta|-alpha|-v[0-9]+)$/i, '$1')  // Preserve important suffixes
+            .replace(/(-llama-3)(\w*)/, '$1')  // Normalize llama-3 variations
+            .replace(/(-glm-4)(\w*)/, '$1');  // Normalize glm-4 variations
+        
+        console.log(`🔍 [NORMALIZATION] "${rawModelId}" → "${normalizedModelId}"`);
+        
+        // Use normalized model_id as grouping key
+        const groupKey = normalizedModelId;
+        
+        if (!modelGroups[groupKey]) {
+            modelGroups[groupKey] = [];
+        }
+        modelGroups[groupKey].push({
+            ...model,
+            _normalized_id: normalizedModelId,
+            _original_id: rawModelId
+        });
+    });
+    
+    console.log(`📊 [MODEL-CONSOLIDATION] Found ${Object.keys(modelGroups).length} unique models from ${modelsList.length} entries`);
+    
+    // DEBUG: Log all model IDs and their sources
+    console.log('🔍 [DEBUG-CONSOLIDATION] All input models:');
+    modelsList.forEach((model, i) => {
+        console.log(`   ${i+1}: "${model.model_id}" (source: ${model._original_combination || 'individual'})`);
+    });
+    
+    // Consolidate each group
+    const consolidatedModels = [];
+    
+    Object.entries(modelGroups).forEach(([normalizedId, models]) => {
+        // Use original model_id from first model for display
+        const originalModelId = models[0]._original_id || normalizedId;
+        
+        if (models.length === 1) {
+            // Single model - no consolidation needed
+            consolidatedModels.push(models[0]);
+            console.log(`✅ [MODEL-CONSOLIDATION] ${originalModelId}: Single entry, no consolidation needed`);
+        } else {
+            // Multiple models - consolidate them
+            console.log(`🔄 [MODEL-CONSOLIDATION] ${originalModelId}: Consolidating ${models.length} entries`);
+            
+            // PHASE 2: AGGREGATION LOGIC
+            let totalSearches = 0;
+            let totalSuccessfulSearches = 0;
+            let allSources = new Set();
+            let firstModel = models[0]; // Use first model as base
+            
+            models.forEach(model => {
+                totalSearches += (model.total_searches || 0);
+                totalSuccessfulSearches += (model.successful_searches || 0);
+                
+                // Collect unique sources
+                if (model.sources) {
+                    if (Array.isArray(model.sources)) {
+                        model.sources.forEach(source => allSources.add(source));
+                    } else if (typeof model.sources === 'string') {
+                        allSources.add(model.sources);
+                    }
+                }
+            });
+            
+            // Calculate new success rate
+            const newSuccessRate = totalSearches > 0 ? totalSuccessfulSearches / totalSearches : 0;
+            
+            // Recalculate Revolutionary Score with consolidated data
+            const revolutionaryScore = calculateRevolutionary5ComponentScore({
+                model_id: originalModelId,
+                provider: firstModel.provider || (originalModelId.includes(':') ? originalModelId.split(':')[0] : 'unknown'),
+                total_searches: totalSearches,
+                successful_searches: totalSuccessfulSearches,
+                success_rate: newSuccessRate,
+                _split_factor: 1 // Reset split factor for consolidated models
+            });
+            
+            // Create consolidated model
+            const consolidatedModel = {
+                ...firstModel, // Use first model as base
+                model_id: originalModelId,
+                total_searches: totalSearches,
+                successful_searches: totalSuccessfulSearches,
+                success_rate: newSuccessRate,
+                success_rate_percent: newSuccessRate * 100,
+                // Updated revolutionary scores
+                overall_score: revolutionaryScore.totalScore,
+                score_breakdown: revolutionaryScore.breakdown,
+                confidence_level: revolutionaryScore.confidenceLevel,
+                confidence_percentage: revolutionaryScore.confidencePercentage,
+                // Consolidation metadata
+                sources: Array.from(allSources),
+                _consolidated: true,
+                _original_entries: models.length,
+                _consolidation_source: models.map(m => m._original_combination || 'individual').filter(Boolean)
+            };
+            
+            consolidatedModels.push(consolidatedModel);
+            
+            console.log(`✅ [MODEL-CONSOLIDATION] ${originalModelId}: ${models.length} entries → 1 consolidated (${totalSearches} searches, ${(newSuccessRate*100).toFixed(1)}% success)`);
+        }
+    });
+    
+    console.log(`🎉 [MODEL-CONSOLIDATION] Complete: ${modelsList.length} models → ${consolidatedModels.length} consolidated models`);
+    return consolidatedModels;
+}
+
+/**
+ * LOGIC-REVOLUTION PHASE 1.2: Spaltet kombinierte Model-IDs in Einzelmodelle auf
+ * Löst das Problem: "openrouter:deepseek-free_openrouter:mistral-small-free" → Einzelmodelle
+ */
+function splitCombinedModels(statisticsData) {
+    console.log('🔧 [MODEL-SPLITTING] Processing backend model combinations...');
+    
+    if (!statisticsData || !statisticsData.models) {
+        console.warn('⚠️ [MODEL-SPLITTING] No models data to process');
+        return statisticsData;
+    }
+    
+    const originalModels = statisticsData.models;
+    const splitModels = [];
+    let combinationsFound = 0;
+    let modelsCreated = 0;
+    
+    originalModels.forEach((modelData, index) => {
+        const originalModelId = modelData.model_id || '';
+        
+        // Check for underscore combinations
+        if (originalModelId.includes('_')) {
+            console.log(`🔍 [MODEL-SPLITTING] Found combination: ${originalModelId}`);
+            combinationsFound++;
+            
+            // Split by underscore and create individual models
+            const individualModelIds = originalModelId.split('_').map(id => id.trim());
+            console.log(`   📝 [MODEL-SPLITTING] Splitting into: ${individualModelIds.join(', ')}`);
+            
+            individualModelIds.forEach(modelId => {
+                if (modelId) { // Skip empty strings
+                    // Create individual model data with recalculated scores
+                    const adjustedTotalSearches = Math.round((modelData.total_searches || 0) / individualModelIds.length);
+                    const adjustedSuccessfulSearches = Math.round((modelData.successful_searches || 0) / individualModelIds.length);
+                    const adjustedSuccessRate = adjustedTotalSearches > 0 ? adjustedSuccessfulSearches / adjustedTotalSearches : 0;
+                    
+                    // 🚀 LOGIC-REVOLUTION PHASE 2.1: 5-Komponenten Score-Berechnung
+                    const revolutionaryScore = calculateRevolutionary5ComponentScore({
+                        model_id: modelId,
+                        provider: modelId.includes(':') ? modelId.split(':')[0] : 'unknown',
+                        total_searches: adjustedTotalSearches,
+                        successful_searches: adjustedSuccessfulSearches,
+                        success_rate: adjustedSuccessRate,
+                        _split_factor: individualModelIds.length
+                    });
+                    
+                    const individualModel = {
+                        ...modelData, // Copy all original data
+                        model_id: modelId,
+                        provider: modelId.includes(':') ? modelId.split(':')[0] : 'unknown',
+                        total_searches: adjustedTotalSearches,
+                        successful_searches: adjustedSuccessfulSearches,
+                        success_rate: adjustedSuccessRate,
+                        success_rate_percent: adjustedSuccessRate * 100, // For display
+                        // 🚀 REVOLUTIONARY SCORE: 5-Komponenten System
+                        overall_score: revolutionaryScore.totalScore,
+                        score_breakdown: revolutionaryScore.breakdown,
+                        confidence_level: revolutionaryScore.confidenceLevel,
+                        confidence_percentage: revolutionaryScore.confidencePercentage,
+                        _original_combination: originalModelId, // Track original for debugging
+                        _split_factor: individualModelIds.length // Track split factor
+                    };
+                    
+                    splitModels.push(individualModel);
+                    modelsCreated++;
+                }
+            });
+        } else {
+            // 🚀 LOGIC-REVOLUTION PHASE 2.2: Apply revolutionary scoring to ALL models
+            const revolutionaryScore = calculateRevolutionary5ComponentScore({
+                model_id: modelData.model_id,
+                provider: modelData.provider || (modelData.model_id?.includes(':') ? modelData.model_id.split(':')[0] : 'unknown'),
+                total_searches: modelData.total_searches || 0,
+                successful_searches: modelData.successful_searches || 0,
+                success_rate: modelData.success_rate || 0,
+                _split_factor: 1
+            });
+            
+            // Keep single models with revolutionary scores
+            splitModels.push({
+                ...modelData,
+                // 🚀 REVOLUTIONARY SCORE: Apply to ALL models
+                overall_score: revolutionaryScore.totalScore,
+                score_breakdown: revolutionaryScore.breakdown,
+                confidence_level: revolutionaryScore.confidenceLevel,
+                confidence_percentage: revolutionaryScore.confidencePercentage,
+                success_rate_percent: (modelData.success_rate || 0) * 100, // Ensure display format
+                _original_combination: 'individual', // Mark as individual model for consolidation tracking
+                _split_factor: 1
+            });
+            modelsCreated++;
+        }
+    });
+    
+    console.log(`✅ [MODEL-SPLITTING] Complete: ${combinationsFound} combinations → ${modelsCreated} individual models`);
+    console.log(`📊 [MODEL-SPLITTING] Original: ${originalModels.length} models, New: ${splitModels.length} models`);
+    
+    // Return processed data
+    return {
+        ...statisticsData,
+        models: splitModels,
+        _split_metadata: {
+            original_count: originalModels.length,
+            new_count: splitModels.length,
+            combinations_processed: combinationsFound,
+            models_created: modelsCreated
+        }
+    };
+}
+
+// ============================================
+// DEFINITIVE GLOBAL EXPORTS - NUR HIER!
+// ============================================
+// Alle wichtigen Tab-Loading-Funktionen exportieren
 window.loadSources = loadSources;
 window.loadResults = loadResults;
 window.loadConsolidatedResults = loadConsolidatedResults;
+
+// CSV Export Function - PHASE 16.1
+window.exportConsolidatedCSV = exportConsolidatedCSV;
+
+// PHASE 16.2: Field-specific Source Details Function
+window.showFieldSourceDetails = showFieldSourceDetails;
+
+// Display-Funktionen exportieren
 window.displayGroupedSources = displayGroupedSources;
 window.displayResultsTable = displayResultsTable;
 window.displayConsolidatedResults = displayConsolidatedResults;
 window.displayComprehensiveModelStatistics = displayComprehensiveModelStatistics;
 window.displayBasicModelStatistics = displayBasicModelStatistics;
 
-// Export detail view functions
-window.viewConsolidatedDetail = viewConsolidatedDetail;
-window.showDetailModal = showDetailModal;
-window.closeModal = closeModal;
-window.loadEnhancedSourceDetails = loadEnhancedSourceDetails;
+// loadModelStatistics ist bereits korrekt in Zeile 264 als window-Funktion definiert
 
 console.log('📊 MineSearch 2.0 - Display Functions loaded');
+console.log('✅ [EXPORT] All critical tab-loading functions exported to window scope');

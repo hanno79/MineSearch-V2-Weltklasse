@@ -1,0 +1,9 @@
+{
+  "results": {
+    "api_test": true,
+    "browser_test": false,
+    "consistency_test": false
+  },
+  "elapsed_time": 71.27668809890747,
+  "timestamp": 1755327672.2302847
+}

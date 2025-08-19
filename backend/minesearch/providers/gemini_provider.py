@@ -502,7 +502,7 @@ Deine Aufgabe ist die vollständige Analyse von Mining-Dokumenten ohne Einschrä
 - Koordinaten: [Latitude, Longitude] [Quelle: URL/Dokument]
 - Status: [aktiv/geschlossen/geplant] [Quelle: URL/Dokument]
 - Rohstoffe: [Liste der Rohstoffe] [Quelle: URL/Dokument]
-- Minentyp: [Untertage/Open-Pit/etc] [Quelle: URL/Dokument]
+- Minentyp: [NUR 'Untertage', 'Open-Pit', 'Hybrid' - NIEMALS 'etc' oder Templates] [Quelle: URL/Dokument]
 - Produktionsstart: [Jahr] [Quelle: URL/Dokument]
 - Produktionsende: [Jahr oder 'aktiv'] [Quelle: URL/Dokument]
 - Fördermenge: [Menge/Jahr mit Einheit] [Quelle: URL/Dokument]

@@ -12,8 +12,8 @@ import logging
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
-from minesearch.config.base import config
-from .models import Base, Source, SearchResult, ModelStatistics, FieldConsistency, ModelSummary, FieldStatistics
+from minesearch.config.base import config, CSV_COLUMNS
+from .models import Base, Source, SearchResult, ModelStatistics, FieldConsistency, ModelSummary, FieldStatistics, ModelStatisticsComprehensive
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +149,12 @@ class DatabaseManager:
     def save_search_result(self, mine_name: str, model_used: str, structured_data: Dict[str, Any],
                           sources: List[Dict[str, Any]], session_id: Optional[str] = None,
                           **kwargs) -> SearchResult:
-        """Speichere Suchergebnis in der Datenbank"""
+        """
+        Speichere Suchergebnis in der Datenbank und aktualisiere automatisch Statistiken
+        
+        STATISTICS INTEGRATION FIX: Nach jedem gespeicherten SearchResult werden die
+        ModelStatisticsComprehensive automatisch aktualisiert für Live-Statistik-Updates
+        """
         result = SearchResult(
             mine_name=mine_name,
             model_used=model_used,
@@ -163,6 +168,27 @@ class DatabaseManager:
             session.add(result)
             session.commit()
             session.refresh(result)
+            
+            # AUTO-UPDATE STATISTIKEN für Live-Updates im Statistik-Tab
+            try:
+                # Handle both single models and model combinations (split by underscore)
+                if '_' in model_used:
+                    # Multiple models combined with underscore - update each individually
+                    individual_models = model_used.split('_')
+                    logger.info(f"[AUTO-STATS] Updating statistics for combined models: {individual_models}")
+                    for individual_model in individual_models:
+                        individual_model = individual_model.strip()
+                        if individual_model:
+                            self.update_model_statistics_comprehensive(individual_model)
+                else:
+                    # Single model
+                    logger.info(f"[AUTO-STATS] Updating statistics for single model: {model_used}")
+                    self.update_model_statistics_comprehensive(model_used)
+                    
+            except Exception as e:
+                logger.warning(f"[AUTO-STATS] Failed to update statistics after search result save: {e}")
+                # Don't fail the search result save if statistics update fails
+                
             return result
 
     def get_search_results(self, mine_name: Optional[str] = None, limit: int = 100) -> List[SearchResult]:
@@ -408,3 +434,99 @@ class DatabaseManager:
                 }
             
             return stats
+    
+    def update_model_statistics_comprehensive(self, model_id: str):
+        """
+        🚀 CRITICAL FIX: Update ModelStatisticsComprehensive nach neuen Searches
+        Recalculates comprehensive statistics for specific model from SearchResult table
+        """
+        logger.info(f"[STATS-UPDATE] Updating comprehensive statistics for model: {model_id}")
+        
+        with self.get_session() as session:
+            try:
+                # Query all SearchResult records for this model
+                search_results = session.query(SearchResult).filter_by(model_used=model_id).all()
+                
+                if not search_results:
+                    logger.warning(f"[STATS-UPDATE] No search results found for model: {model_id}")
+                    return
+                
+                # Calculate comprehensive metrics
+                total_searches = len(search_results)
+                successful_searches = sum(1 for r in search_results if r.success)
+                success_rate = successful_searches / total_searches if total_searches > 0 else 0.0
+                
+                # Calculate average response time (skip None values)
+                response_times = [r.search_duration for r in search_results if r.search_duration is not None]
+                avg_response_time = sum(response_times) / len(response_times) if response_times else 0.0
+                
+                # Calculate data quality metrics
+                quality_scores = [r.data_quality for r in search_results if r.data_quality is not None]
+                avg_data_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0.0
+                
+                # Count unique sources across all searches
+                all_sources = []
+                for result in search_results:
+                    if result.sources:
+                        all_sources.extend([s.get('url', '') for s in result.sources if s.get('url')])
+                unique_sources = len(set(all_sources))
+                
+                # Extract provider from model_id
+                provider = model_id.split(':')[0] if ':' in model_id else 'unknown'
+                
+                # Calculate overall score (simplified version of revolutionary scoring)
+                field_quality_score = avg_data_quality * 100  # Convert to 0-100 scale
+                consistency_score = success_rate * 100  # Success rate as consistency
+                speed_score = max(0, 100 - (avg_response_time * 2)) if avg_response_time > 0 else 100  # Penalty for slow responses
+                cost_efficiency_score = 85  # Default good score, could be improved with actual cost data
+                trustworthiness_score = min(80 + (unique_sources * 2), 100)  # More sources = more trustworthy
+                
+                overall_score = (
+                    field_quality_score * 0.25 +
+                    consistency_score * 0.25 +
+                    speed_score * 0.25 +
+                    cost_efficiency_score * 0.20 +
+                    trustworthiness_score * 0.05
+                )
+                
+                # Update or create ModelStatisticsComprehensive record
+                existing = session.query(ModelStatisticsComprehensive).filter_by(model_id=model_id).first()
+                
+                if existing:
+                    # Update existing record
+                    existing.total_searches = total_searches
+                    existing.successful_searches = successful_searches
+                    existing.success_rate_percent = success_rate * 100  # Convert to percentage
+                    existing.avg_response_time_ms = avg_response_time * 1000 if avg_response_time else 0
+                    existing.avg_fields_found = avg_data_quality * len(CSV_COLUMNS) if avg_data_quality else 0
+                    existing.completeness_score = avg_data_quality * 100 if avg_data_quality else 0
+                    existing.unique_sources_total = unique_sources
+                    existing.overall_score = overall_score
+                    
+                    logger.info(f"[STATS-UPDATE] Updated existing record for {model_id}: "
+                              f"{total_searches} searches, {success_rate:.1%} success, score: {overall_score:.1f}")
+                else:
+                    # Create new record
+                    new_stats = ModelStatisticsComprehensive(
+                        model_id=model_id,
+                        total_searches=total_searches,
+                        successful_searches=successful_searches,
+                        success_rate_percent=success_rate * 100,  # Convert to percentage
+                        avg_response_time_ms=avg_response_time * 1000 if avg_response_time else 0,
+                        avg_fields_found=avg_data_quality * len(CSV_COLUMNS) if avg_data_quality else 0,
+                        completeness_score=avg_data_quality * 100 if avg_data_quality else 0,
+                        unique_sources_total=unique_sources,
+                        overall_score=overall_score
+                    )
+                    session.add(new_stats)
+                    
+                    logger.info(f"[STATS-UPDATE] Created new record for {model_id}: "
+                              f"{total_searches} searches, {success_rate:.1%} success, score: {overall_score:.1f}")
+                
+                session.commit()
+                logger.info(f"[STATS-UPDATE] Successfully updated comprehensive statistics for {model_id}")
+                
+            except Exception as e:
+                logger.error(f"[STATS-UPDATE] Error updating statistics for {model_id}: {e}")
+                session.rollback()
+                raise

@@ -434,8 +434,8 @@ async function loadModelsForFilter() {
                         <span style="background: var(--success-100); color: var(--success-700); padding: 4px 8px; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">Empfohlen</span>
                     </h4>
                     <div class="quick-selection-pills">
-                        <button type="button" class="quick-pill recommended" onclick="selectQuickPreset('recommended')" title="Beste Allround-Modelle für Mining-Recherche">
-                            🏆 Beste Auswahl (3 Modelle)
+                        <button type="button" class="quick-pill recommended" onclick="selectQuickPreset('recommended')" title="Automatisch beste Modelle basierend auf Performance-Statistiken">
+                            🏆 Dynamische Beste Auswahl
                         </button>
                         <button type="button" class="quick-pill web-focus" onclick="selectQuickPreset('webSearch')" title="Modelle mit Web-Zugriff für aktuelle Daten">
                             🌐 Web-Suche (6 Modelle)
@@ -798,8 +798,165 @@ function getModelMeta(modelInfo) {
     return { description, tags };
 }
 
-// Quick Preset Functions
+/**
+ * PHASE 2.1: Dynamic Model Selection based on Performance Statistics
+ * Ermittelt die besten Modelle basierend auf aktuellen Performance-Scores
+ */
+async function getBestPerformingModels() {
+    console.log('🏆 [DYNAMIC-SELECTION] Fetching best performing models from statistics...');
+    
+    try {
+        // Hole aktuelle Statistics
+        const response = await fetch(`${window.API_BASE_URL || 'http://localhost:8000'}/api/results?exclude_exa=true&days_back=30&sort_by=mine_name`);
+        
+        if (!response.ok) {
+            console.warn('⚠️ [DYNAMIC-SELECTION] Statistics API not available:', response.status);
+            return [];
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success || !data.data?.results) {
+            console.warn('⚠️ [DYNAMIC-SELECTION] No statistics data available');
+            return [];
+        }
+        
+        // Generiere Model-Stats wie in statistics-loader.js
+        const mockModelStats = generateMockModelStatsFromConsolidatedForSelection(data.data.results);
+        
+        if (mockModelStats.length === 0) {
+            console.warn('⚠️ [DYNAMIC-SELECTION] No model statistics generated');
+            return [];
+        }
+        
+        // KRITISCHE KORREKTUR: Filter 0% Erfolgsrate-Modelle KOMPLETT aus
+        const qualifiedModels = mockModelStats.filter(model => {
+            const isQualified = model.success_rate > 0 && model.overall_score > 0;
+            if (!isQualified) {
+                console.log(`❌ [DYNAMIC-SELECTION] Disqualified: ${model.model_id} (Success: ${(model.success_rate * 100).toFixed(1)}%, Score: ${model.overall_score?.toFixed(1) || 'N/A'})`);
+            }
+            return isQualified;
+        });
+        
+        if (qualifiedModels.length === 0) {
+            console.warn('⚠️ [DYNAMIC-SELECTION] No qualified models found - all have 0% success rate');
+            return [];
+        }
+        
+        // Sortiere nach overall_score (absteigend) - nur qualifizierte Modelle
+        const sortedModels = qualifiedModels.sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0));
+        
+        // Wähle Top 3 Modelle mit verschiedenen Providern für Diversität
+        const selectedModels = [];
+        const usedProviders = new Set();
+        
+        for (const model of sortedModels) {
+            if (selectedModels.length >= 3) break;
+            
+            const provider = model.model_id.split(':')[0];
+            
+            // Priorisiere Diversität: verschiedene Provider bevorzugen
+            if (!usedProviders.has(provider) || selectedModels.length < 2) {
+                selectedModels.push(model.model_id);
+                usedProviders.add(provider);
+                console.log(`✅ [DYNAMIC-SELECTION] Selected top performer: ${model.model_id} (Success: ${(model.success_rate * 100).toFixed(1)}%, Score: ${model.overall_score?.toFixed(1) || 'N/A'})`);
+            }
+        }
+        
+        // Falls weniger als 3 gefunden, fülle mit den nächstbesten auf
+        if (selectedModels.length < 3) {
+            for (const model of sortedModels) {
+                if (selectedModels.length >= 3) break;
+                if (!selectedModels.includes(model.model_id)) {
+                    selectedModels.push(model.model_id);
+                    console.log(`✅ [DYNAMIC-SELECTION] Added performer: ${model.model_id} (Score: ${model.overall_score?.toFixed(1) || 'N/A'})`);
+                }
+            }
+        }
+        
+        console.log(`🏆 [DYNAMIC-SELECTION] Selected ${selectedModels.length} best performers:`, selectedModels);
+        return selectedModels;
+        
+    } catch (error) {
+        console.error('❌ [DYNAMIC-SELECTION] Error fetching best performing models:', error);
+        return [];
+    }
+}
+
+/**
+ * Vereinfachte Version der Model-Stats-Generierung für Selection
+ */
+function generateMockModelStatsFromConsolidatedForSelection(results) {
+    const modelStats = new Map();
+    
+    results.forEach(result => {
+        const rawModelUsed = result.model_used || 'unknown';
+        const individualModels = rawModelUsed.includes('_') 
+            ? rawModelUsed.split('_').map(m => m.trim())
+            : [rawModelUsed];
+        
+        individualModels.forEach(modelId => {
+            if (!modelStats.has(modelId)) {
+                modelStats.set(modelId, {
+                    model_id: modelId,
+                    total_searches: 0,
+                    successful_searches: 0,
+                    success_rate: 0,
+                    overall_score: 0
+                });
+            }
+            
+            const modelData = modelStats.get(modelId);
+            modelData.total_searches += 1;
+            modelData.successful_searches += result.structured_data ? 1 : 0;
+        });
+    });
+    
+    // Berechne finale Scores (KORRIGIERT: Erfolgsrate-abhängig)
+    return Array.from(modelStats.values()).map(model => {
+        model.success_rate = model.total_searches > 0 
+            ? model.successful_searches / model.total_searches 
+            : 0.0;
+        
+        // KRITISCHE KORREKTUR: Usage-Bonus nur bei erfolgreichen Modellen
+        // Bei 0% Erfolgsrate gibt es KEINEN Bonus, egal wie oft verwendet
+        if (model.success_rate === 0) {
+            model.overall_score = 0; // Komplett disqualifiziert
+            model.disqualification_reason = 'Keine erfolgreichen Suchen';
+            return model;
+        }
+        
+        // Erfolgsrate als Hauptfaktor (70% Gewichtung)
+        const successComponent = model.success_rate * 7; // Max 7
+        
+        // Usage-Bonus nur für erfolgreiche Modelle (30% Gewichtung)
+        // Aber nur wenn mindestens 20% Erfolgsrate
+        const usageBonus = model.success_rate >= 0.2 
+            ? Math.min(model.total_searches / 10, 1.0) * 3 // Max 3
+            : 0;
+        
+        model.overall_score = successComponent + usageBonus; // Max 10
+        model.score_breakdown = {
+            success_component: successComponent.toFixed(1),
+            usage_bonus: usageBonus.toFixed(1),
+            total: model.overall_score.toFixed(1)
+        };
+        
+        return model;
+    });
+}
+
+// Wrapper für onclick-Handler
 function selectQuickPreset(presetType) {
+    selectQuickPresetAsync(presetType).catch(error => {
+        console.error('❌ [DYNAMIC-SELECTION] Preset selection failed:', error);
+        // Fallback to synchronous selection if async fails
+        selectQuickPresetSync(presetType);
+    });
+}
+
+// Quick Preset Functions (Async Version)
+async function selectQuickPresetAsync(presetType) {
     console.log(`🎯 [UI-REVOLUTION] Selecting preset: ${presetType}`);
     
     // Clear all selections first
@@ -816,11 +973,19 @@ function selectQuickPreset(presetType) {
     
     switch(presetType) {
         case 'recommended':
-            modelsToSelect = [
-                'perplexity:sonar-pro',
-                'openrouter:deepseek-free',
-                'abacus:deep-agent'
-            ];
+            // DYNAMIC SELECTION: Get best performing models from statistics
+            modelsToSelect = await getBestPerformingModels();
+            if (modelsToSelect.length === 0) {
+                // Fallback to static selection if no statistics available
+                modelsToSelect = [
+                    'perplexity:sonar-pro',
+                    'openrouter:deepseek-free',
+                    'abacus:deep-agent'
+                ];
+                console.log('⚠️ [DYNAMIC-SELECTION] Using fallback models - no statistics available');
+            } else {
+                console.log(`✅ [DYNAMIC-SELECTION] Using top ${modelsToSelect.length} performers from statistics`);
+            }
             break;
             
         case 'webSearch':
@@ -872,6 +1037,82 @@ function selectQuickPreset(presetType) {
     console.log(`✅ [UI-REVOLUTION] Selected ${modelsToSelect.length} models for preset: ${presetType}`);
 }
 
+// Synchrone Fallback-Version (ohne Dynamic Selection)
+function selectQuickPresetSync(presetType) {
+    console.log(`🎯 [UI-REVOLUTION] SYNC Selecting preset: ${presetType}`);
+    
+    // Clear all selections first
+    clearAllModels();
+    
+    const providerCategories = {
+        recommended: ['perplexity', 'openrouter', 'abacus'],
+        webSearch: ['tavily', 'exa', 'grok'],
+        premium: ['openai', 'anthropic', 'gemini'],
+        scraping: ['scrapingbee', 'firecrawl', 'brightdata']
+    };
+    
+    let modelsToSelect = [];
+    
+    switch(presetType) {
+        case 'recommended':
+            // Static fallback selection
+            modelsToSelect = [
+                'perplexity:sonar-pro',
+                'openrouter:deepseek-free',
+                'abacus:deep-agent'
+            ];
+            console.log('🔄 [SYNC-SELECTION] Using static recommended models');
+            break;
+            
+        case 'webSearch':
+            modelsToSelect = document.querySelectorAll('input[name="model"]');
+            modelsToSelect = Array.from(modelsToSelect)
+                .filter(input => {
+                    const provider = input.value.split(':')[0];
+                    return providerCategories.webSearch.includes(provider);
+                })
+                .map(input => input.value);
+            break;
+            
+        case 'premium':
+            modelsToSelect = document.querySelectorAll('input[name="model"]');
+            modelsToSelect = Array.from(modelsToSelect)
+                .filter(input => {
+                    const provider = input.value.split(':')[0];
+                    return providerCategories.premium.includes(provider);
+                })
+                .map(input => input.value);
+            break;
+            
+        case 'all':
+            modelsToSelect = Array.from(document.querySelectorAll('input[name="model"]'))
+                .map(input => input.value);
+            break;
+    }
+    
+    // Select the models
+    modelsToSelect.forEach(modelId => {
+        const checkbox = document.querySelector(`input[name="model"][value="${modelId}"]`);
+        if (checkbox) {
+            checkbox.checked = true;
+            // Update provider checkbox state
+            const provider = modelId.split(':')[0];
+            updateProviderCheckboxState(provider);
+        }
+    });
+    
+    // Update counter and highlight selected preset
+    updateSelectionCounter();
+    
+    // Highlight selected preset
+    document.querySelectorAll('.quick-pill').forEach(pill => {
+        pill.classList.remove('active');
+    });
+    document.querySelector(`.quick-pill.${presetType}`)?.classList.add('active');
+    
+    console.log(`✅ [UI-REVOLUTION] SYNC Selected ${modelsToSelect.length} models for preset: ${presetType}`);
+}
+
 function showAdvancedSelection() {
     document.querySelector('.advanced-selection-section').style.display = 'block';
     document.querySelector('.show-advanced-section').style.display = 'none';
@@ -921,7 +1162,123 @@ function initializeQuickPresets(providerGroups, models) {
         selectQuickPreset('recommended');
     }, 500);
     
-    console.log('🎨 [UI-REVOLUTION] Quick presets initialized with smart defaults');
+    // PHASE 2.2: Start auto-update for preset buttons
+    setTimeout(() => {
+        startQuickPresetAutoUpdate();
+    }, 1000);
+    
+    console.log('🎨 [UI-REVOLUTION] Quick presets initialized with smart defaults and auto-update');
+}
+
+/**
+ * PHASE 2.2: Auto-Update Quick-Presets mit Top-Performern
+ * Aktualisiert Button-Labels und Tooltips periodisch mit aktuellen Performance-Daten
+ */
+async function startQuickPresetAutoUpdate() {
+    console.log('🔄 [AUTO-UPDATE] Starting quick preset auto-update system...');
+    
+    // Initial update
+    await updateQuickPresetLabels();
+    
+    // Periodic updates every 5 minutes
+    setInterval(async () => {
+        try {
+            await updateQuickPresetLabels();
+        } catch (error) {
+            console.warn('⚠️ [AUTO-UPDATE] Periodic update failed:', error);
+        }
+    }, 5 * 60 * 1000); // 5 minutes
+    
+    console.log('✅ [AUTO-UPDATE] Quick preset auto-update system started');
+}
+
+/**
+ * Aktualisiert die Button-Labels mit aktuellen Top-Performer-Informationen
+ */
+async function updateQuickPresetLabels() {
+    console.log('🏆 [AUTO-UPDATE] Updating quick preset labels with current top performers...');
+    
+    try {
+        // Hole aktuelle Top-Performer
+        const topPerformers = await getBestPerformingModels();
+        
+        if (topPerformers.length === 0) {
+            console.log('⚠️ [AUTO-UPDATE] No top performers available - keeping static labels');
+            return;
+        }
+        
+        // Update "Beste Auswahl" Button
+        const recommendedButton = document.querySelector('.quick-pill.recommended');
+        if (recommendedButton) {
+            // Extrahiere Provider-Namen für bessere Darstellung
+            const providerNames = topPerformers.map(model => {
+                const provider = model.split(':')[0];
+                return provider.charAt(0).toUpperCase() + provider.slice(1);
+            }).slice(0, 3); // Maximal 3 Provider zeigen
+            
+            const newLabel = `🏆 Top Performers (${providerNames.join(', ')})`;
+            const newTooltip = `Automatisch beste Modelle: ${topPerformers.join(', ')}`;
+            
+            recommendedButton.innerHTML = newLabel;
+            recommendedButton.setAttribute('title', newTooltip);
+            
+            console.log(`✅ [AUTO-UPDATE] Updated recommended button: ${newLabel}`);
+        }
+        
+        // Update andere Preset-Buttons mit aktuellen Counts
+        await updatePresetCounts();
+        
+    } catch (error) {
+        console.error('❌ [AUTO-UPDATE] Failed to update preset labels:', error);
+    }
+}
+
+/**
+ * Aktualisiert die Model-Counts in anderen Preset-Buttons
+ */
+async function updatePresetCounts() {
+    const providerCategories = {
+        webSearch: ['tavily', 'exa', 'grok'],
+        premium: ['openai', 'anthropic', 'gemini'],
+        all: [] // Wird dynamisch berechnet
+    };
+    
+    // Zähle verfügbare Modelle pro Kategorie
+    const allModels = Array.from(document.querySelectorAll('input[name="model"]'));
+    
+    Object.entries(providerCategories).forEach(([category, providers]) => {
+        let count = 0;
+        
+        if (category === 'all') {
+            count = allModels.length;
+        } else {
+            count = allModels.filter(input => {
+                const provider = input.value.split(':')[0];
+                return providers.includes(provider);
+            }).length;
+        }
+        
+        // Update Button-Label
+        const button = document.querySelector(`.quick-pill.${category === 'webSearch' ? 'web-focus' : category}`);
+        if (button && count > 0) {
+            const currentText = button.innerHTML;
+            const updatedText = currentText.replace(/\(\d+\s+Modelle?\)/, `(${count} Modell${count === 1 ? '' : 'e'})`);
+            
+            if (updatedText !== currentText) {
+                button.innerHTML = updatedText;
+                console.log(`✅ [AUTO-UPDATE] Updated ${category} count: ${count} models`);
+            }
+        }
+    });
+}
+
+/**
+ * Manual refresh für Quick-Presets (kann von außen aufgerufen werden)
+ */
+async function refreshQuickPresets() {
+    console.log('🔄 [MANUAL-REFRESH] Manually refreshing quick presets...');
+    await updateQuickPresetLabels();
+    console.log('✅ [MANUAL-REFRESH] Quick presets refreshed');
 }
 
 // Export search functions to global scope
@@ -936,6 +1293,9 @@ window.SearchState = SearchState;
 
 // Export UI Revolution functions
 window.selectQuickPreset = selectQuickPreset;
+window.getBestPerformingModels = getBestPerformingModels;
+window.refreshQuickPresets = refreshQuickPresets;
+window.updateQuickPresetLabels = updateQuickPresetLabels;
 window.showAdvancedSelection = showAdvancedSelection;
 window.hideAdvancedSelection = hideAdvancedSelection;
 window.clearAllModels = clearAllModels;

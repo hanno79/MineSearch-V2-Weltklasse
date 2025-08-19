@@ -38,29 +38,47 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
         logger.debug(f"[FIELD MARKER] 'X' ist korrektes 'nicht gefunden' Marker - KEIN Platzhalter")
         return False
     
-    # TEMPLATE-PATTERN-FIX 06.08.2025: Erkenne CSV_COLUMNS Template-Strukturen
-    template_patterns = [
-        r'/ usw\.\)$',           # Endung "/ usw.)"
-        r'/ etc\.\)$',           # Endung "/ etc.)"
-        r'\(.*/ .* usw\.\)',     # Pattern "(X/ Y/ usw.)"
-        r'Gold/ Kupfer/ Kohle/ usw\.\)', # Spezifische Rohstoff-Template
-        r'Untertage/ Open-Pit/ usw\.\)', # Spezifische Minentyp-Template
-        r'\(.*/ .*/ .*\)$'       # Generisches "(A/ B/ C)" Pattern am Ende
+    # TEMPLATE-PATTERN-FIX 19.08.2025: Erweiterte Template-Erkennung
+    # WICHTIG: Template-ähnliche Fallback-Werte sollen erkannt werden
+    
+    # Exakte CSV-Template-Strings
+    exact_template_strings = [
+        'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)',  # Exakter CSV-Header
+        'Minentyp (Untertage/ Open-Pit/ usw.)',       # Exakter CSV-Header  
+        'Aktivitätsstatus (aktiv/ geplant/ geschlossen/ sonstiges)',  # Exakter CSV-Header
+        '(Gold/ Kupfer/ Kohle/ usw.)',                # Isolierter Template-Teil
+        '(Untertage/ Open-Pit/ usw.)',                # Isolierter Template-Teil
+        '(aktiv/ geplant/ geschlossen/ sonstiges)'    # Isolierter Template-Teil
     ]
     
-    for pattern in template_patterns:
-        if re.search(pattern, value):
-            logger.debug(f"[TEMPLATE-PLACEHOLDER] '{value}' ist CSV_COLUMNS Template-Struktur - wird zu 'Unbekannt' konvertiert")
-            return True
+    # Template-ähnliche Fallback-Werte (ohne Feldname-Präfix)
+    fallback_template_values = [
+        'Untertage/ Open-Pit/ usw.)',                 # Fallback-Wert ohne Feldname
+        'Gold/ Kupfer/ Kohle/ usw.)',                 # Fallback-Wert ohne Feldname
+        'aktiv/ geplant/ geschlossen/ sonstiges',     # Fallback-Wert ohne Feldname
+        'aktiv/ geplant/ geschlossen/ sonstiges)',    # Mit schließender Klammer
+    ]
     
-    # Verbotene Platzhalter (aber NICHT "X")
+    # Prüfe auf exakte Template-Strings
+    if value_stripped in exact_template_strings:
+        logger.debug(f"[TEMPLATE-PLACEHOLDER] '{value}' ist exakter CSV_COLUMNS Template-String")
+        return True
+    
+    # Prüfe auf Template-ähnliche Fallback-Werte
+    if value_stripped in fallback_template_values:
+        logger.debug(f"[TEMPLATE-PLACEHOLDER] '{value}' ist Template-ähnlicher Fallback-Wert")
+        return True
+    
+    # Verbotene Platzhalter (aber NICHT "X" und nicht "-")
+    # FIX 19.08.2025: Entferne "-" aus Placeholder-Liste
+    # Ein einzelner "-" ist ein legitimer leerer Wert, kein Template-Placeholder!
     general_placeholders = [
-        'k.a', 'k.a.', 'n/a', 'n.a.', '-', '--', '---',
+        'k.a', 'k.a.', 'n/a', 'n.a.', '--', '---',  # Entferne "-", behalte "--" und "---"
         'keine angabe', 'keine daten', 'nicht verfügbar',
         'no data', 'not found', 'not available'
     ]
     
-    # Dummy-Ausdrücke die entfernt werden sollen
+    # Dummy-Ausdrücke die entfernt werden sollen - NUR echte Platzhalter!
     dummy_expressions = [
         'unbekannt', 'unknown', 'nicht gefunden', 
         'keine spezifischen daten gefunden',
@@ -68,7 +86,9 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
         'not specified', 'nicht spezifiziert',
         'not found', 'nicht verfügbar',
         'no data', 'keine daten',
-        'information not available'
+        'information not available',
+        'daten nicht verfügbar',
+        'keine daten verfügbar'
     ]
     
     # Prüfe auf verbotene Ausdrücke
@@ -80,9 +100,11 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
         logger.debug(f"[PLACEHOLDER] '{value}' ist ein Platzhalter - wird zu X konvertiert")
         return True
     
-    # Grok-spezifische Probleme für alle Felder
-    if any(marker in value.upper() for marker in ['UPDATE', 'NEU', 'CHANGED', 'AKTUELL', 'BREAKING']):
-        logger.debug(f"[PLACEHOLDER] '{value}' enthält Grok UPDATE-Marker")
+    # Grok-spezifische Probleme für alle Felder - NUR exakte Matches!
+    # KRITISCH: Teilstring-Suche ist zu aggressiv und filtert echte Firmennamen heraus
+    grok_markers_exact = ['UPDATE', 'NEU', 'CHANGED', 'AKTUELL', 'BREAKING']
+    if value_stripped.upper() in grok_markers_exact:
+        logger.debug(f"[PLACEHOLDER] '{value}' ist exakter Grok UPDATE-Marker")
         return True
     
     # Feldspezifische Prüfungen
@@ -97,9 +119,10 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
             return True
     
     elif field == 'Eigentümer' or field == 'Betreiber':
-        # Grok-spezifische Eigentümer-Probleme
-        if value.upper() in ['UPDATE', 'CHANGED', 'UNKNOWN', 'AKTUELL']:
-            logger.debug(f"[PLACEHOLDER] Eigentümer/Betreiber '{value}' ist Grok-Marker")
+        # Grok-spezifische Eigentümer-Probleme - NUR exakte Matches
+        grok_owner_markers = ['UPDATE', 'CHANGED', 'UNKNOWN', 'AKTUELL', 'NEU']
+        if value_stripped.upper() in grok_owner_markers:
+            logger.debug(f"[PLACEHOLDER] Eigentümer/Betreiber '{value}' ist exakter Grok-Marker")
             return True
     
     logger.debug(f"[PLACEHOLDER] '{value}' ist KEIN Platzhalter für Feld '{field}'")

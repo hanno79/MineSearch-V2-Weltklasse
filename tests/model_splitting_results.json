@@ -1,0 +1,21 @@
+{
+  "splitting_successful": true,
+  "combinations_found": 0,
+  "individuals_found": 49,
+  "total_cards": 49,
+  "console_logs": [
+    "log: \ud83d\udd27 [MODEL-SPLITTING] Processing backend model combinations...",
+    "log: \ud83d\udd0d [MODEL-SPLITTING] Found combination: openrouter:deepseek-free_openrouter:mistral-small-free",
+    "log:    \ud83d\udcdd [MODEL-SPLITTING] Splitting into: openrouter:deepseek-free, openrouter:mistral-small-free",
+    "log: \ud83d\udd0d [MODEL-SPLITTING] Found combination: openrouter:deepseek-free_openrouter:deepseek-chimera-free_openrouter:mistral-small-free_openrouter:horizon-beta_openrouter:minimax-m1_openrouter:llama-3.3-nemotron-super_openrouter:llama-3.1-nemotron-ultra_openrouter:kimi-k2_openrouter:glm-4.5-air-free",
+    "log:    \ud83d\udcdd [MODEL-SPLITTING] Splitting into: openrouter:deepseek-free, openrouter:deepseek-chimera-free, openrouter:mistral-small-free, openrouter:horizon-beta, openrouter:minimax-m1, openrouter:llama-3.3-nemotron-super, openrouter:llama-3.1-nemotron-ultra, openrouter:kimi-k2, openrouter:glm-4.5-air-free",
+    "log: \ud83d\udd0d [MODEL-SPLITTING] Found combination: perplexity:sonar_openrouter:deepseek-free_openrouter:deepseek-chimera-free_openrouter:mistral-small-free_openrouter:horizon-beta_openrouter:minimax-m1_openrouter:llama-3.3-nemotron-super_openrouter:llama-3.1-nemotron-ultra_openrouter:kimi-k2_openrouter:glm-4.5-air-free",
+    "log:    \ud83d\udcdd [MODEL-SPLITTING] Splitting into: perplexity:sonar, openrouter:deepseek-free, openrouter:deepseek-chimera-free, openrouter:mistral-small-free, openrouter:horizon-beta, openrouter:minimax-m1, openrouter:llama-3.3-nemotron-super, openrouter:llama-3.1-nemotron-ultra, openrouter:kimi-k2, openrouter:glm-4.5-air-free",
+    "log: \ud83d\udd0d [MODEL-SPLITTING] Found combination: openrouter:deepseek-free_openrouter:deepseek-chat_openrouter:deepseek-reasoner_openrouter:deepseek-chimera-free_openrouter:mistral-small-free_openrouter:horizon-beta_openrouter:minimax-m1_openrouter:llama-3.3-nemotron-super_openrouter:llama-3.1-nemotron-ultra_openrouter:kimi-k2_openrouter:glm-4.5_openrouter:glm-4.5-air-free_openrouter:gpt-oss-20b_openrouter:gpt-oss-120b",
+    "log:    \ud83d\udcdd [MODEL-SPLITTING] Splitting into: openrouter:deepseek-free, openrouter:deepseek-chat, openrouter:deepseek-reasoner, openrouter:deepseek-chimera-free, openrouter:mistral-small-free, openrouter:horizon-beta, openrouter:minimax-m1, openrouter:llama-3.3-nemotron-super, openrouter:llama-3.1-nemotron-ultra, openrouter:kimi-k2, openrouter:glm-4.5, openrouter:glm-4.5-air-free, openrouter:gpt-oss-20b, openrouter:gpt-oss-120b",
+    "log: \u2705 [MODEL-SPLITTING] Complete: 4 combinations \u2192 49 individual models",
+    "log: \ud83d\udcca [MODEL-SPLITTING] Original: 18 models, New: 49 models",
+    "log: \ud83d\udd0d [MODEL-ANALYSIS] Analyzing model cards for splitting...",
+    "log: \ud83d\udcca [ANALYSIS] 0 combinations, 49 individual models"
+  ]
+}

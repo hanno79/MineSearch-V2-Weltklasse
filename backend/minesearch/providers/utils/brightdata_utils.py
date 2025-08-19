@@ -34,8 +34,8 @@ class BrightdataExtractor:
             'Restaurationskosten': '-',
             'Jahr der Aufnahme der Kosten': '-',
             'Jahr der Erstellung des Dokumentes': '-',
-            'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': options.get('commodity', '-'),
-            'Minentyp (Untertage/ Open-Pit/ usw.)': '-',
+            'Rohstoffabbau': options.get('commodity', '-'),
+            'Minentyp': '-',
             'Produktionsstart': '-',
             'Produktionsende': '-',
             'Fördermenge/Jahr': '-',
@@ -127,7 +127,7 @@ class BrightdataExtractor:
             match = re.search(pattern, content_lower)
             if match:
                 mine_type = match.group(1) if len(match.groups()) > 0 else match.group(0)
-                extracted_data['Minentyp (Untertage/ Open-Pit/ usw.)'] = mine_type.strip().title()
+                extracted_data['Minentyp'] = mine_type.strip().title()
                 break
         
         # Produktionsdaten
@@ -175,8 +175,8 @@ class BrightdataDataProcessor:
             'Restaurationskosten': '-',
             'Jahr der Aufnahme der Kosten': '-',
             'Jahr der Erstellung des Dokumentes': '-',
-            'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': options.get('commodity', '-'),
-            'Minentyp (Untertage/ Open-Pit/ usw.)': '-',
+            'Rohstoffabbau': options.get('commodity', '-'),
+            'Minentyp': '-',
             'Produktionsstart': '-',
             'Produktionsende': '-',
             'Fördermenge/Jahr': '-',

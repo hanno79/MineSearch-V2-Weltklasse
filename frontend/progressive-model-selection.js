@@ -194,12 +194,7 @@ class ProgressiveModelSelection {
                     </button>
                 </div>
                 
-                <!-- Legacy Compatibility - Hidden -->
-                <div style="display: none;" id="legacy-checkboxes">
-                    ${this.models.map(model => `
-                        <input type="checkbox" name="models" value="${model.model_id}" id="model-${model.model_id}">
-                    `).join('')}
-                </div>
+                <!-- REMOVED: Legacy Compatibility Checkboxes - Caused counter inconsistency (name="models" vs name="model") -->
             </div>
         `;
         
@@ -212,7 +207,7 @@ class ProgressiveModelSelection {
         
         return modelsToShow.map(model => `
             <div class="model-card" data-model-id="${model.model_id}">
-                <input type="checkbox" value="${model.model_id}" ${this.selectedModels.has(model.model_id) ? 'checked' : ''}>
+                <input type="checkbox" name="model" value="${model.model_id}" ${this.selectedModels.has(model.model_id) ? 'checked' : ''}>
                 <div class="model-provider">${this.getProviderDisplayName(model.provider_name)}</div>
                 <div class="model-name">${model.display_name || model.model_name}</div>
                 <div class="model-description">
@@ -363,17 +358,13 @@ class ProgressiveModelSelection {
     }
     
     syncWithExistingCheckboxes() {
-        // Sync with existing system checkboxes
-        const existingCheckboxes = document.querySelectorAll('#model-selection input[type="checkbox"][name="models"]');
+        // CONSISTENCY FIX: Sync with main system checkboxes (name="model")  
+        const existingCheckboxes = document.querySelectorAll('#model-selection input[type="checkbox"][name="model"]');
         existingCheckboxes.forEach(checkbox => {
             checkbox.checked = this.selectedModels.has(checkbox.value);
         });
         
-        // Also sync legacy checkboxes
-        const legacyCheckboxes = document.querySelectorAll('#legacy-checkboxes input[type="checkbox"]');
-        legacyCheckboxes.forEach(checkbox => {
-            checkbox.checked = this.selectedModels.has(checkbox.value);
-        });
+        // REMOVED: Legacy checkboxes sync - no longer needed after cleanup
     }
     
     updateSelectionSummary() {
