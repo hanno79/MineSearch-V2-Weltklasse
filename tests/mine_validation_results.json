@@ -1,0 +1,72 @@
+{
+  "validation_results": [
+    {
+      "mine_name": "Canadian Malartic",
+      "appears_real": true,
+      "meaningful_fields": 6,
+      "template_indicators": 0,
+      "sample_data": {
+        "Eigent\u00fcmer": "Agnico Eagle Mines Limited (50%) / Yamana Gold (50%)",
+        "Betreiber": "Canadian Malartic GP",
+        "y-Koordinate": "48.143600"
+      }
+    },
+    {
+      "mine_name": "Kidd Creek",
+      "appears_real": true,
+      "meaningful_fields": 6,
+      "template_indicators": 0,
+      "sample_data": {
+        "Eigent\u00fcmer": "Glencore",
+        "Betreiber": "Glencore",
+        "y-Koordinate": "48.533300"
+      }
+    },
+    {
+      "mine_name": "Highland Valley Copper",
+      "appears_real": true,
+      "meaningful_fields": 6,
+      "template_indicators": 0,
+      "sample_data": {
+        "Eigent\u00fcmer": "Teck Resources Limited",
+        "Betreiber": "Teck Resources Limited",
+        "y-Koordinate": "50.500000"
+      }
+    },
+    {
+      "mine_name": "Lac Expanse",
+      "appears_real": true,
+      "meaningful_fields": 3,
+      "template_indicators": 0,
+      "sample_data": {
+        "Eigent\u00fcmer": "Betreiber",
+        "Betreiber": "x-Koordinate",
+        "Aktivit\u00e4tsstatus": "Restaurationskosten"
+      }
+    },
+    {
+      "mine_name": "Fake Mine Test",
+      "appears_real": false,
+      "meaningful_fields": 2,
+      "template_indicators": 0,
+      "sample_data": {
+        "Aktivit\u00e4tsstatus": "Aktiv",
+        "Produktionsende": "noch aktiv"
+      }
+    },
+    {
+      "mine_name": "Nonexistent Gold Mine",
+      "appears_real": false,
+      "meaningful_fields": 2,
+      "template_indicators": 0,
+      "sample_data": {
+        "Aktivit\u00e4tsstatus": "Aktiv",
+        "Produktionsende": "noch aktiv"
+      }
+    }
+  ],
+  "real_mines_count": 4,
+  "fictional_mines_count": 2,
+  "lac_expanse_real": true,
+  "timestamp": "333961.66090529"
+}

@@ -416,7 +416,7 @@ class FirecrawlProvider(AbstractProvider):
             # Füge zusätzliche Optionen hinzu
             aggregated_data['Country'] = options.get('country', '')
             aggregated_data['Region'] = options.get('region', '-')
-            aggregated_data['Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)'] = options.get('commodity', '-')
+            aggregated_data['Rohstoffabbau'] = options.get('commodity', '-')
             return aggregated_data
         
         # Fallback: Verarbeite Markdown-Inhalte

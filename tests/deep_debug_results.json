@@ -1,0 +1,20 @@
+{
+  "lac_expanse": {
+    "success": true,
+    "raw_response_length": 0,
+    "raw_response_empty": true,
+    "filled_fields": 5,
+    "x_fields": 14,
+    "mining_terms_found": 0,
+    "has_source_mapping": true,
+    "structured_data_sample": {
+      "Name": "Lac Expanse",
+      "Country": "Canada",
+      "Region": "Quebec",
+      "Eigent\u00fcmer": "X",
+      "Betreiber": "X"
+    }
+  },
+  "comparison_mine_ok": false,
+  "timestamp": "333705.61809933"
+}

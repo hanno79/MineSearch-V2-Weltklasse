@@ -159,7 +159,8 @@ class ComparisonEngine {
         results.forEach(result => {
             if (result.data && result.data.structured_data) {
                 const value = result.data.structured_data[fieldName];
-                if (value && value !== 'X' && value !== 'N/A') {
+                // KORREKTUR: Verwende robuste isEmptyValue Funktion statt nur 'X' und 'N/A'
+                if (value && !this.isEmptyValue(value)) {
                     fieldData.values.push({
                         model: result.model_id,
                         value: value,
@@ -212,10 +213,40 @@ class ComparisonEngine {
         });
         
         // Berechne Feld-Confidence basierend auf Agreements
-        const maxAgreement = Math.max(...fieldData.agreements.map(a => a.count), 0);
-        fieldData.confidence = maxAgreement / fieldData.values.length;
+        // KORREKTUR: Für komplett leere Felder (keine gültigen Werte) = 0% Confidence
+        if (fieldData.values.length === 0) {
+            fieldData.confidence = 0;
+        } else {
+            const maxAgreement = Math.max(...fieldData.agreements.map(a => a.count), 0);
+            fieldData.confidence = maxAgreement / fieldData.values.length;
+        }
     }
     
+    /**
+     * EMPTY VALUE DETECTION: Prüft ob ein Wert als leer/ungültig gelten soll
+     */
+    isEmptyValue(value) {
+        if (!value) return true;
+        
+        const normalizedValue = String(value).toLowerCase().trim();
+        
+        // Liste der als leer geltenden Werte
+        // CRITICAL FIX 19.08.2025: "X" ist KEIN leerer Wert - es ist der korrekte "nicht gefunden" Marker
+        const emptyValues = [
+            '', 'n/a', 'na', 'null', 'undefined', 'none', 'keine', 'keiner', 'kein',
+            'unbekannt', 'unknown', 'nicht verfügbar', 'not available', 'no data',
+            'keine angabe', 'keine daten', 'nicht vorhanden', 'not found',
+            'leer', 'empty', '-', '--', '---', '?', '??', '???',
+            'tbd', 'to be determined', 'wird ermittelt', 'in arbeit',
+            'nicht angegeben', 'nicht ermittelt', 'k.a.', 'k.a', 'n.a.',
+            'fehlt', 'missing', 'no information', 'no info'
+        ];
+        
+        return emptyValues.includes(normalizedValue) || 
+               normalizedValue.length === 0 ||
+               /^[\s\-\?\.]*$/.test(normalizedValue); // Nur Leerzeichen, Striche, Fragezeichen
+    }
+
     /**
      * VALUE NORMALIZATION: Normalisiert Werte für besseren Vergleich
      */
@@ -456,7 +487,7 @@ class ComparisonUIGenerator {
             <div class="comparison-revolution-container" data-comparison-id="${comparison.id}">
                 ${this.generateComparisonHeader(comparison)}
                 ${this.generateConsensusOverview(comparison)}
-                ${this.generateModelPerformanceMatrix(comparison)}
+                <!-- PHASE 2: Model Performance Matrix nach Statistik-Tab verschoben -->
                 ${this.generateFieldByFieldComparison(comparison)}
                 ${this.generateDiscrepancyAnalysis(comparison)}
                 ${this.generateExportControls(comparison)}
@@ -645,61 +676,123 @@ class ComparisonUIGenerator {
      * FIELD BY FIELD: Detaillierter Feldvergleich
      */
     generateFieldByFieldComparison(comparison) {
-        const fieldRows = Object.entries(comparison.analysis.fieldAnalysis)
+        // PHASE 4: Responsives Card-Layout statt schmaler Tabelle
+        const fieldCards = Object.entries(comparison.analysis.fieldAnalysis)
             .filter(([fieldName, fieldData]) => fieldData.values.length > 0)
             .sort((a, b) => b[1].weight - a[1].weight) // Sortiere nach Wichtigkeit
             .map(([fieldName, fieldData]) => {
                 const hasConsensus = comparison.consensus.fields[fieldName];
                 const hasDiscrepancy = comparison.discrepancies.some(d => d.field === fieldName);
                 
-                const valuesCells = comparison.models.map(modelId => {
-                    const modelValue = fieldData.values.find(v => v.model === modelId);
-                    
-                    if (modelValue) {
-                        const isConsensus = hasConsensus && hasConsensus.models.includes(modelId);
-                        return `
-                            <td class="field-value ${isConsensus ? 'consensus' : ''} ${hasDiscrepancy ? 'discrepancy' : ''}">
-                                <div class="value-text">${modelValue.value}</div>
-                                <div class="value-confidence">${Math.round(modelValue.confidence * 100)}%</div>
-                            </td>
-                        `;
-                    } else {
-                        return '<td class="field-value empty">-</td>';
+                // Organisiere Werte nach Provider für bessere Übersicht
+                const valuesByProvider = {};
+                fieldData.values.forEach(value => {
+                    const provider = value.model.split(':')[0];
+                    if (!valuesByProvider[provider]) {
+                        valuesByProvider[provider] = [];
                     }
+                    valuesByProvider[provider].push(value);
+                });
+                
+                // Generiere Provider-Sektionen
+                const providerSections = Object.entries(valuesByProvider).map(([provider, values]) => {
+                    const providerValues = values.map(value => {
+                        const isConsensus = hasConsensus && hasConsensus.models.includes(value.model);
+                        const modelShortName = value.model.split(':')[1] || value.model;
+                        
+                        return `
+                            <div class="model-value ${isConsensus ? 'consensus' : ''} ${hasDiscrepancy ? 'discrepancy' : ''}">
+                                <div class="model-name">${modelShortName}</div>
+                                <div class="model-result">
+                                    <span class="value-text">${value.value}</span>
+                                    <span class="confidence-badge">${Math.round(value.confidence * 100)}%</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    return `
+                        <div class="provider-section">
+                            <div class="provider-header">${provider}</div>
+                            <div class="provider-values">
+                                ${providerValues}
+                            </div>
+                        </div>
+                    `;
                 }).join('');
                 
+                // Consensus Information
+                const consensusInfo = hasConsensus ? `
+                    <div class="consensus-info">
+                        <span class="consensus-badge">✓ Consensus</span>
+                        <span class="consensus-value">${hasConsensus.value}</span>
+                        <span class="consensus-strength">${Math.round(hasConsensus.strength * 100)}%</span>
+                    </div>
+                ` : '';
+                
+                // Discrepancy Information
+                const discrepancyInfo = hasDiscrepancy ? `
+                    <div class="discrepancy-info">
+                        <span class="discrepancy-badge">⚠ Konflikt</span>
+                        <span class="discrepancy-note">Widersprüchliche Werte gefunden</span>
+                    </div>
+                ` : '';
+                
                 return `
-                    <tr class="field-comparison-row" data-field="${fieldName}">
-                        <td class="field-name">
-                            <div class="field-title">${fieldName}</div>
-                            <div class="field-weight">Weight: ${Math.round(fieldData.weight * 100)}%</div>
-                            ${hasConsensus ? '<span class="consensus-badge">✓</span>' : ''}
-                            ${hasDiscrepancy ? '<span class="discrepancy-badge">⚠</span>' : ''}
-                        </td>
-                        ${valuesCells}
-                    </tr>
+                    <div class="field-comparison-card" data-field="${fieldName}">
+                        <div class="field-card-header">
+                            <h4 class="field-title">${fieldName}</h4>
+                            <div class="field-meta">
+                                <span class="field-weight">Gewichtung: ${Math.round(fieldData.weight * 100)}%</span>
+                                <span class="field-values-count">${fieldData.values.length} Werte</span>
+                            </div>
+                        </div>
+                        
+                        ${consensusInfo}
+                        ${discrepancyInfo}
+                        
+                        <div class="field-providers">
+                            ${providerSections}
+                        </div>
+                        
+                        <div class="field-summary">
+                            <div class="summary-stats">
+                                <span>📊 ${fieldData.agreements.length} Übereinstimmungen</span>
+                                <span>⚠️ ${fieldData.discrepancies.length} Konflikte</span>
+                                <span>🎯 ${Math.round(fieldData.confidence * 100)}% Vertrauen</span>
+                            </div>
+                        </div>
+                    </div>
                 `;
             }).join('');
         
-        const modelHeaders = comparison.models.map(modelId => 
-            `<th class="model-header">${modelId.split(':')[1] || modelId}</th>`
-        ).join('');
-        
         return `
-            <div class="field-comparison">
-                <h3>📋 Field-by-Field Comparison</h3>
-                <div class="comparison-table-container">
-                    <table class="field-comparison-table">
-                        <thead>
-                            <tr>
-                                <th class="field-column">Field</th>
-                                ${modelHeaders}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${fieldRows}
-                        </tbody>
-                    </table>
+            <div class="field-comparison-modern">
+                <div class="field-comparison-header">
+                    <h3>📋 Field-by-Field Analysis</h3>
+                    <div class="comparison-controls">
+                        <button class="toggle-view-btn" onclick="toggleFieldViewMode()" title="Zwischen Ansichten wechseln">
+                            🔄 Kompakt-Ansicht
+                        </button>
+                        <button class="expand-all-btn" onclick="expandAllFields()" title="Alle Felder erweitern">
+                            📖 Alle erweitern
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="field-cards-container">
+                    ${fieldCards}
+                </div>
+                
+                <div class="field-comparison-footer">
+                    <div class="legend">
+                        <h4>Legende</h4>
+                        <div class="legend-items">
+                            <span class="legend-item"><span class="consensus-badge">✓</span> Consensus-Wert</span>
+                            <span class="legend-item"><span class="discrepancy-badge">⚠</span> Konflikt erkannt</span>
+                            <span class="legend-item"><span class="confidence-badge">%</span> Konfidenz-Level</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -835,5 +928,107 @@ window.generateComparisonView = (comparison) => {
 setInterval(() => {
     window.comparisonEngine.cleanup();
 }, 30 * 60 * 1000);
+
+// ============================================
+// FIELD-BY-FIELD UI UTILITY FUNCTIONS
+// ============================================
+
+/**
+ * TOGGLE VIEW MODE: Wechselt zwischen Kompakt- und Ausführlicher Ansicht
+ */
+function toggleFieldViewMode() {
+    const container = document.querySelector('.field-cards-container');
+    const toggleBtn = document.querySelector('.toggle-view-btn');
+    
+    if (!container || !toggleBtn) return;
+    
+    const isCompact = container.classList.contains('compact-view');
+    
+    if (isCompact) {
+        // Wechsel zu Ausführlicher Ansicht
+        container.classList.remove('compact-view');
+        toggleBtn.innerHTML = '🔄 Kompakt-Ansicht';
+        toggleBtn.title = 'Zur Kompakt-Ansicht wechseln';
+        console.log('🎨 [COMPARISON-UI] Wechsel zu Ausführlicher Ansicht');
+    } else {
+        // Wechsel zu Kompakt-Ansicht
+        container.classList.add('compact-view');
+        toggleBtn.innerHTML = '🔄 Ausführlich';
+        toggleBtn.title = 'Zur Ausführlichen Ansicht wechseln';
+        console.log('🎨 [COMPARISON-UI] Wechsel zu Kompakt-Ansicht');
+    }
+}
+
+/**
+ * EXPAND ALL FIELDS: Erweitert/Kollabiert alle Feld-Karten
+ */
+function expandAllFields() {
+    const fieldCards = document.querySelectorAll('.field-comparison-card');
+    const expandBtn = document.querySelector('.expand-all-btn');
+    
+    if (!fieldCards.length || !expandBtn) return;
+    
+    const isExpanded = expandBtn.textContent.includes('Kollabieren');
+    
+    fieldCards.forEach(card => {
+        if (isExpanded) {
+            // Kollabiere alle Karten
+            card.classList.add('collapsed');
+            const providers = card.querySelector('.field-providers');
+            const summary = card.querySelector('.field-summary');
+            if (providers) providers.style.display = 'none';
+            if (summary) summary.style.display = 'none';
+        } else {
+            // Erweitere alle Karten
+            card.classList.remove('collapsed');
+            const providers = card.querySelector('.field-providers');
+            const summary = card.querySelector('.field-summary');
+            if (providers) providers.style.display = 'block';
+            if (summary) summary.style.display = 'block';
+        }
+    });
+    
+    // Update Button-Text
+    if (isExpanded) {
+        expandBtn.innerHTML = '📖 Alle erweitern';
+        expandBtn.title = 'Alle Felder erweitern';
+        console.log('🎨 [COMPARISON-UI] Alle Felder kollabiert');
+    } else {
+        expandBtn.innerHTML = '📕 Alle kollabieren';
+        expandBtn.title = 'Alle Felder kollabieren';
+        console.log('🎨 [COMPARISON-UI] Alle Felder erweitert');
+    }
+}
+
+/**
+ * FIELD CARD CLICK HANDLER: Toggle einzelne Feld-Karten
+ */
+function toggleSingleField(fieldName) {
+    const fieldCard = document.querySelector(`[data-field="${fieldName}"]`);
+    if (!fieldCard) return;
+    
+    const isCollapsed = fieldCard.classList.contains('collapsed');
+    const providers = fieldCard.querySelector('.field-providers');
+    const summary = fieldCard.querySelector('.field-summary');
+    
+    if (isCollapsed) {
+        // Erweitere diese Karte
+        fieldCard.classList.remove('collapsed');
+        if (providers) providers.style.display = 'block';
+        if (summary) summary.style.display = 'block';
+        console.log(`🎨 [COMPARISON-UI] Feld ${fieldName} erweitert`);
+    } else {
+        // Kollabiere diese Karte
+        fieldCard.classList.add('collapsed');
+        if (providers) providers.style.display = 'none';
+        if (summary) summary.style.display = 'none';
+        console.log(`🎨 [COMPARISON-UI] Feld ${fieldName} kollabiert`);
+    }
+}
+
+// Export utility functions to global scope
+window.toggleFieldViewMode = toggleFieldViewMode;
+window.expandAllFields = expandAllFields;
+window.toggleSingleField = toggleSingleField;
 
 console.log('🚀 [PHASE 4] Interactive Comparison Engine geladen');

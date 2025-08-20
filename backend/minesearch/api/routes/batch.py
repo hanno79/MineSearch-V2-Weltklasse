@@ -347,84 +347,90 @@ async def batch_search(
                 
                 # Standard-Suche nur wenn nicht comprehensive
                 if comprehensive_search != "true":
-                    # ECHTE PROVIDER-BASIERTE SUCHE (REGEL 10: Keine Mock-Daten)
+                    # 🚀 ARCHITECTURE REVOLUTION: Multi-Model Search Orchestrator
+                    from minesearch.multi_model_search_orchestrator import multi_model_orchestrator
+                    
+                    logger.info(f"[BATCH-ORCHESTRATOR] Processing {mine_name} with {len(models_to_use)} models via orchestrator")
+                    
+                    # Use orchestrator for efficient multi-model search
                     try:
-                        model_id = models_to_use[0]
-                        
-                        # Verwende MineSearchService für echte Suche
-                        from minesearch.search_service import MineSearchService
-                        search_service = MineSearchService()
-                        
-                        logger.info(f"[BATCH-REAL] Starte echte Suche für {mine_name} mit {model_id}")
-                        
-                        # Führe echte Suche durch
-                        real_result = await search_service.search_mine(
+                        orchestration_result = await multi_model_orchestrator.orchestrate_multi_model_search(
                             mine_name=mine_name,
-                            model=model_id,
+                            models=models_to_use,
                             country=country,
-                            commodity=commodity, 
-                            region=region
+                            region=region,
+                            commodity=commodity,
+                            session_id=session_id,
+                            max_concurrent_models=10  # Parallel execution
                         )
                         
-                        if real_result.get('success'):
-                            result = {
-                                'success': True,
-                                'data': real_result.get('data', {}),
-                                'model_used': model_id,
-                                'search_duration': real_result.get('data', {}).get('search_duration', 0)
-                            }
-                            logger.info(f"[BATCH-REAL] Echte Suche erfolgreich für {mine_name} mit {model_id}")
-                        else:
-                            result = {
-                                'success': False,
-                                'error': real_result.get('error', 'Unknown search error'),
-                                'data': {}
-                            }
-                            logger.warning(f"[BATCH-REAL] Echte Suche fehlgeschlagen für {mine_name}: {real_result.get('error')}")
+                        # Convert orchestration result to batch format
+                        individual_results = []
                         
-                    except Exception as search_error:
-                        logger.error(f"[BATCH-REAL] Echter Such-Service fehler für {mine_name}: {str(search_error)}")
-                        result = {
-                            'success': False,
-                            'error': f"Real search failed: {str(search_error)}",
-                            'data': {}
-                        }
+                        # Add successful models
+                        for model_result in orchestration_result.successful_models:
+                            individual_results.append({
+                                'model_id': model_result.model_id,
+                                'success': True,
+                                'data': model_result.data,
+                                'search_duration': model_result.search_duration
+                            })
+                        
+                        # Add failed models  
+                        for model_result in orchestration_result.failed_models:
+                            individual_results.append({
+                                'model_id': model_result.model_id,
+                                'success': False,
+                                'error': model_result.error
+                            })
+                        
+                        batch_success = len(orchestration_result.successful_models) > 0
+                        
+                        # Log orchestration statistics
+                        metadata = orchestration_result.orchestration_metadata
+                        logger.info(f"[BATCH-ORCHESTRATOR] Completed: {metadata['successful_models']}/{metadata['total_models_processed']} models, "
+                                  f"{metadata['sources_discovered']} sources, {orchestration_result.total_search_duration:.2f}s total")
+                        
+                    except Exception as orchestrator_error:
+                        logger.error(f"[BATCH-ORCHESTRATOR] Orchestration failed for {mine_name}: {str(orchestrator_error)}")
+                        # Fallback: Mark all models as failed
+                        individual_results = []
+                        for model_id in models_to_use:
+                            individual_results.append({
+                                'model_id': model_id,
+                                'success': False,
+                                'error': f"Orchestration failed: {str(orchestrator_error)}"
+                            })
+                        batch_success = False
                     
-                    # Erstelle Ergebnis
+                    # Create batch result summary
+                    successful_models = [r for r in individual_results if r['success']]
+                    failed_models = [r for r in individual_results if not r['success']]
+                    
                     result_data = {
                         "mine_name": mine_name,
                         "country": country,
                         "commodity": commodity,
                         "region": region,
-                        "success": result.get('success', False),
-                        "data": result.get('data', {}),
+                        "success": batch_success,
+                        "data": {
+                            "individual_results": individual_results,
+                            "successful_models": len(successful_models),
+                            "failed_models": len(failed_models),
+                            "total_models": len(models_to_use)
+                        },
                         "model_info": {
                             "models_used": models_to_use,
-                            "search_strategy": "standard"
+                            "search_strategy": "individual_batch",
+                            "processing_type": "individual_per_model"
                         }
                     }
-                    results.append(result_data)
                     
-                    # Speichere in Datenbank wenn erfolgreich
-                    if result_data["success"] and result_data.get("data"):
-                        try:
-                            structured_data = result.get('data', {}).get('structured_data', {})
-                            if structured_data:
-                                db_manager.save_search_result(
-                                    mine_name=mine_name,
-                                    model_used='_'.join(models_to_use) if len(models_to_use) > 1 else models_to_use[0],
-                                    structured_data=structured_data,
-                                    sources=result.get('data', {}).get('sources', []),
-                                    session_id=session_id,
-                                    country=country,
-                                    region=region,
-                                    commodity=commodity,
-                                    search_type='batch_standard',
-                                    success=True
-                                )
-                                logger.info(f"[BATCH-DB] Ergebnis für {mine_name} gespeichert")
-                        except Exception as db_error:
-                            logger.error(f"[BATCH-DB] Fehler beim Speichern: {str(db_error)}")
+                    if not batch_success:
+                        result_data["error"] = f"All {len(models_to_use)} models failed for {mine_name}"
+                    
+                    results.append(result_data)
+                    logger.info(f"[BATCH-INDIVIDUAL] Completed {mine_name}: {len(successful_models)}/{len(models_to_use)} models successful")
                 
             except Exception as e:
                 logger.error(f"Fehler bei Suche für {mine_name}: {str(e)}")
@@ -444,6 +450,15 @@ async def batch_search(
             logger.info(f"[BATCH-DEBUG] Erstes Ergebnis - Keys: {list(first_result.keys())}")
             if 'data' in first_result and first_result['data']:
                 logger.info(f"[BATCH-DEBUG] Data Keys: {list(first_result['data'].keys())}")
+        
+        # CRITICAL-FIX 19.08.2025: Validiere Batch-Ergebnisse gegen Regressionen
+        from minesearch.batch_validation import validate_batch_results, log_validation_summary
+        validation_result = validate_batch_results(results)
+        log_validation_summary(validation_result)
+        
+        # Bei kritischen Validierungsfehlern, warnen aber nicht blocken
+        if validation_result.critical_count > 0:
+            logger.error(f"[BATCH-VALIDATION] {validation_result.critical_count} kritische Probleme in Batch-Ergebnissen erkannt!")
         
         # Erstelle HTML-Antwort
         from minesearch.html_utils import create_batch_results_table

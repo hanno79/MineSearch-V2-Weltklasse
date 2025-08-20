@@ -29,38 +29,43 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'(?:located\s+in|liegt\s+in)\s+(Quebec|Québec|Ontario|British Columbia|Alberta)[\s,]'
         ],
         'Eigentümer': [
-            r'Eigentümer:\s*([^\n]+)',
-            r'Owner:\s*([^\n]+)',
-            r'Propriétaire:\s*([^\n]+)',
-            r'Propietario:\s*([^\n]+)',
-            r'Pemilik:\s*([^\n]+)',
-            r'gehört\s+(?:zu|der|dem)\s+([^\n]+)',
-            r'owned\s+by\s+([^\n]+)',
-            r'property\s+of\s+([^\n]+)',
-            r'belongs\s+to\s+([^\n]+)',
-            r'possession\s+of\s+([^\n]+)',
-            r'Eigentum\s+(?:von|der)\s+([^\n]+)',
+            # BUGFIX 17.08.2025: Extract value WITHOUT source references
+            r'Eigentümer:\s*([^\[\n]+?)(?:\s*\[|$)',
+            r'Owner:\s*([^\[\n]+?)(?:\s*\[|$)',
+            r'Propriétaire:\s*([^\[\n]+?)(?:\s*\[|$)',
+            r'Propietario:\s*([^\[\n]+?)(?:\s*\[|$)',
+            r'Pemilik:\s*([^\[\n]+?)(?:\s*\[|$)',
+            r'gehört\s+(?:zu|der|dem)\s+([^\[\n]+?)(?:\s*\[|$)',
+            r'owned\s+by\s+([^\[\n]+?)(?:\s*\[|$)',
+            r'property\s+of\s+([^\[\n]+?)(?:\s*\[|$)',
+            r'belongs\s+to\s+([^\[\n]+?)(?:\s*\[|$)',
+            r'possession\s+of\s+([^\[\n]+?)(?:\s*\[|$)',
+            r'Eigentum\s+(?:von|der)\s+([^\[\n]+?)(?:\s*\[|$)',
             # Französische Patterns (Quebec)
-            r'détenteur\s+(?:du\s+)?titre:\s*([^\n]+)',
-            r'société\s+(?:propriétaire|détentrice):\s*([^\n]+)',
-            r'appartient\s+à\s+([^\n]+)',
-            r'propriété\s+de\s+([^\n]+)'
+            r'détenteur\s+(?:du\s+)?titre:\s*([^\[\n]+?)(?:\s*\[|$)',
+            r'société\s+(?:propriétaire|détentrice):\s*([^\[\n]+?)(?:\s*\[|$)',
+            r'appartient\s+à\s+([^\[\n]+?)(?:\s*\[|$)',
+            r'propriété\s+de\s+([^\[\n]+?)(?:\s*\[|$)'
         ],
         'Betreiber': [
-            r'Betreiber:\s*([^\n]+)', 
-            r'Operator:\s*([^\n]+)', 
-            r'betrieben\s+von\s+([^\n,]+)', 
-            r'operated\s+by\s+([^\n,]+)',
-            r'opérateur:\s*([^\n]+)',
-            r'operador:\s*([^\n]+)',
-            r'dioperasikan\s+oleh\s+([^\n]+)',
+            # BUGFIX 17.08.2025: Extract value WITHOUT source references
+            r'Betreiber:\s*([^\[\n]+?)(?:\s*\[|$)', 
+            r'Operator:\s*([^\[\n]+?)(?:\s*\[|$)', 
+            r'betrieben\s+von\s+([^\[\n,]+?)(?:\s*\[|$)', 
+            r'operated\s+by\s+([^\[\n,]+?)(?:\s*\[|$)',
+            r'opérateur:\s*([^\[\n]+?)(?:\s*\[|$)',
+            r'operador:\s*([^\[\n]+?)(?:\s*\[|$)',
+            r'dioperasikan\s+oleh\s+([^\[\n]+?)(?:\s*\[|$)',
             # Französische Patterns (Quebec)
-            r'exploitant:\s*([^\n]+)',
-            r'exploité\s+par\s+([^\n,]+)',
-            r'société\s+exploitante:\s*([^\n]+)',
-            r'gestion\s+(?:de\s+la\s+mine\s+)?par\s+([^\n,]+)'
+            r'exploitant:\s*([^\[\n]+?)(?:\s*\[|$)',
+            r'exploité\s+par\s+([^\[\n,]+?)(?:\s*\[|$)',
+            r'société\s+exploitante:\s*([^\[\n]+?)(?:\s*\[|$)',
+            r'gestion\s+(?:de\s+la\s+mine\s+)?par\s+([^\[\n,]+?)(?:\s*\[|$)'
         ],
         'x-Koordinate': [
+            # BUGFIX 17.08.2025: Pattern für aktuelles API Response Format
+            r'-\s*x-Koordinate:\s*([-+]?\d+\.?\d+)',
+            r'x-Koordinate:\s*([-+]?\d+\.?\d+)',
             # Dezimalgrad-Formate
             r'Latitude:\s*([-+]?\d+\.?\d+)', 
             r'Lat\.?:\s*([-+]?\d+\.?\d+)', 
@@ -77,6 +82,9 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'(?:North|Nord|N)\s*[:=]\s*([-+]?\d+\.?\d+)'
         ],
         'y-Koordinate': [
+            # BUGFIX 17.08.2025: Pattern für aktuelles API Response Format
+            r'-\s*y-Koordinate:\s*([-+]?\d+\.?\d+)',
+            r'y-Koordinate:\s*([-+]?\d+\.?\d+)',
             # Dezimalgrad-Formate
             r'Longitude:\s*([-+]?\d+\.?\d+)', 
             r'Long?\.?:\s*([-+]?\d+\.?\d+)', 
@@ -93,8 +101,9 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'(?:East|West|Ost|West|E|W)\s*[:=]\s*([-+]?\d+\.?\d+)'
         ],
         'Aktivitätsstatus': [
-            r'Status:\s*([^\n]+)', 
-            r'Aktivitätsstatus:\s*([^\n]+)', 
+            # BUGFIX 17.08.2025: Extract value WITHOUT source references
+            r'Status:\s*([^\[\n]+?)(?:\s*\[|$)', 
+            r'Aktivitätsstatus:\s*([^\[\n]+?)(?:\s*\[|$)', 
             r'(?:ist\s+)?(?:derzeit\s+)?(aktiv|geschlossen|stillgelegt|in Betrieb|geplant)',
             r'(Geplant[^,\n]*)',
             r'(Akquisition\s+abgeschlossen[^,\n]*)',

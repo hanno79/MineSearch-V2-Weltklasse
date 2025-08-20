@@ -1,0 +1,34 @@
+{
+  "lac_expanse": {
+    "raw_response_length": 1202,
+    "raw_response_preview": "- Name: Lac Expanse [Quelle: Allgemeines Fachwissen]\n- Country: Canada [Quelle: Allgemeines Fachwissen]\n- Region: Quebec [Quelle: Allgemeines Fachwissen]\n- Eigent\u00fcmer: [Quelle: Allgemeines Fachwissen]\n- Betreiber: [Quelle: Allgemeines Fachwissen]\n- x-Koordinate: [Quelle: Allgemeines Fachwissen]\n- y-Koordinate: [Quelle: Allgemeines Fachwissen]\n- Aktivit\u00e4tsstatus: [Quelle: Allgemeines Fachwissen]\n- Restaurationskosten: [Quelle: Allgemeines Fachwissen]\n- Jahr der Aufnahme der Kosten: [Quelle: Allge",
+    "final_fields_count": 19,
+    "field_mapping_issues": []
+  },
+  "mine_test_results": [
+    {
+      "mine": "Canadian Malartic",
+      "raw_response_ok": true,
+      "field_count": 19,
+      "mapping_issues": []
+    },
+    {
+      "mine": "Eleonore",
+      "raw_response_ok": true,
+      "field_count": 19,
+      "mapping_issues": []
+    },
+    {
+      "mine": "Kidd Creek",
+      "raw_response_ok": true,
+      "field_count": 19,
+      "mapping_issues": []
+    }
+  ],
+  "summary": {
+    "raw_response_issues": 0,
+    "mapping_issues_count": 0,
+    "primary_issue": "field_mapping"
+  },
+  "timestamp": "334731.909307143"
+}

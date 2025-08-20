@@ -1,7 +1,11 @@
 {
-  "current_behavior": null,
-  "api_patterns": null,
-  "splitting_logic": null,
-  "rendering_logs": null,
-  "error": "Timeout 10000ms exceeded."
+  "timestamp": "2025-08-19 16:41:12",
+  "total_models_found": 0,
+  "selector_used": null,
+  "tested_models": 0,
+  "available_models": 6,
+  "non_zero_scores": 0,
+  "zero_scores": 0,
+  "table_headers": [],
+  "success": false
 }

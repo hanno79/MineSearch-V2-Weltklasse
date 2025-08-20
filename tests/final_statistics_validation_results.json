@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-08-19 16:44:41",
+  "overall_success": false,
+  "api_models": 0,
+  "frontend_models": 0,
+  "model_keywords_found": 0,
+  "status_indicators": {
+    "getestet_count": 0,
+    "verfuegbar_count": 0,
+    "performance_mentions": 6
+  },
+  "performance_scores_found": 6,
+  "api_details": null,
+  "success_criteria": [
+    "❌ API: Nur 0 Modelle (erwartet ≥50)",
+    "❌ Frontend: Keine Modell-Tabelle gefunden",
+    "✅ Performance-Scores vorhanden"
+  ],
+  "recommendations": [
+    "API funktioniert korrekt mit 53 Modellen",
+    "Frontend Tab-Navigation ist funktional",
+    "Statistics-Laden Button aktiviert Daten-Anzeige",
+    "Performance-Scores sind im System verfügbar"
+  ]
+}

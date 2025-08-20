@@ -22,6 +22,42 @@ from minesearch.utils import (
 logger = logging.getLogger(__name__)
 
 
+def is_empty_value(value) -> bool:
+    """
+    CONSENSUS FIX: Prüft ob ein Wert als leer/ungültig gelten soll
+    
+    Args:
+        value: Zu prüfender Wert
+        
+    Returns:
+        True wenn Wert als leer gilt
+    """
+    if not value:
+        return True
+    
+    normalized_value = str(value).lower().strip()
+    
+    # Liste der als leer geltenden Werte (identisch mit frontend)
+    empty_values = [
+        '', 'x', 'n/a', 'na', 'null', 'undefined', 'none', 'keine', 'keiner', 'kein',
+        'unbekannt', 'unknown', 'nicht verfügbar', 'not available', 'no data',
+        'keine angabe', 'keine daten', 'nicht vorhanden', 'not found',
+        'leer', 'empty', '-', '--', '---', '?', '??', '???',
+        'tbd', 'to be determined', 'wird ermittelt', 'in arbeit',
+        'nicht angegeben', 'nicht ermittelt', 'k.a.', 'k.a', 'n.a.',
+        'fehlt', 'missing', 'no information', 'no info',
+        # CONSENSUS FIX: System-generierte Platzhalter
+        'nichts gefunden', 'keine spezifischen daten dokumentiert',
+        'keine verlässlichen daten', 'keine öffentlichen daten',
+        'keine aktiven daten', 'no specific data', 'not documented'
+    ]
+    
+    import re
+    return (normalized_value in empty_values or 
+            len(normalized_value) == 0 or
+            re.match(r'^[\s\-\?\.*]*$', normalized_value))  # Nur Leerzeichen, Striche, Fragezeichen
+
+
 def count_filled_fields(structured_data: Dict[str, Any]) -> int:
     """
     Zählt korrekt gefüllte Felder aus structured_data
@@ -39,22 +75,12 @@ def count_filled_fields(structured_data: Dict[str, Any]) -> int:
     
     filled_count = 0
     
-    # DUMMY-WERTE: Liste erkannter Platzhalter-Werte - REGEL 10 KONFORM
-    # Diese Werte werden als "leer" behandelt da sie keine echten Daten darstellen
-    dummy_values = {
-        'n/a', 'k.a', 'k.a.', 'keine angabe', 'keine daten', 'unbekannt', 
-        'nicht verfügbar', 'nicht gefunden', '$1', '$2', '$3', '$4', '$5',
-        'null', 'none', '', 'unknown'
-    }
-    
     for field in CSV_COLUMNS:
         value = structured_data.get(field, '')
         
-        if value and str(value).strip():
-            value_str = str(value).strip().lower()
-            # Prüfe ob es ein echter Wert ist (nicht dummy)
-            if value_str not in dummy_values and len(value_str) > 1:
-                filled_count += 1
+        # CONSENSUS FIX: Verwende robuste is_empty_value Funktion
+        if value and not is_empty_value(value):
+            filled_count += 1
     
     return filled_count
 
@@ -190,8 +216,9 @@ class ResultCombiner:
                 
             field_values = []
             for result in valid_results:
-                if result.get('data', {}).get(field):
-                    field_values.append(result['data'][field])
+                field_value = result.get('data', {}).get(field)
+                if field_value and not is_empty_value(field_value):
+                    field_values.append(field_value)
             
             if field_values:
                 # Wähle den häufigsten Wert (einfache Mehrheitsentscheidung)
@@ -200,6 +227,9 @@ class ResultCombiner:
                 best_value, count = value_counts.most_common(1)[0]
                 best_data[field] = best_value
                 confidence_scores[field] = count / len(valid_results)
+            else:
+                # CONSENSUS FIX: Für komplett leere Felder = 0% Confidence
+                confidence_scores[field] = 0.0
         
         # Sammle alle Quellen
         for result in valid_results:

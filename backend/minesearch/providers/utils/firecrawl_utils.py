@@ -39,17 +39,35 @@ class FirecrawlExtractor:
                     extracted_data['coordinates'] = matches[0]
                 break
         
-        # Suche nach Eigentümern/Betreibern
+        # FIELD-MAPPING-FIX 20.08.2025: Separate Eigentümer and Betreiber extraction
+        # Suche nach Eigentümern (Owner)
         owner_patterns = [
-            rf'{mine_name}.*?(?:owned|operated|held)\s+by\s+([A-Z][^.]+?)(?:\.|,|\s+and)',
-            r'(?:owner|operator|company)[:\s]+([A-Z][^.\n]+)',
-            rf'([A-Z][^.]+?)\s+(?:owns|operates|holds)\s+{mine_name}'
+            rf'{mine_name}.*?(?:owned|held)\s+by\s+([A-Z][^.]+?)(?:\.|,|\s+and)',
+            r'(?:owner|ownership)[:\s]+([A-Z][^.\n]+)',
+            rf'([A-Z][^.]+?)\s+(?:owns|holds)\s+{mine_name}',
+            r'(?:propriétaire|eigentümer)[:\s]+([A-Z][^.\n]+)',
+            r'(?:property|eigentum)\s+of\s+([A-Z][^.\n]+)'
         ]
         
         for pattern in owner_patterns:
             match = re.search(pattern, content, re.IGNORECASE)
             if match:
                 extracted_data['owner'] = match.group(1).strip()
+                break
+        
+        # Suche nach Betreibern (Operator) - SEPARATE extraction
+        operator_patterns = [
+            rf'{mine_name}.*?(?:operated|managed)\s+by\s+([A-Z][^.]+?)(?:\.|,|\s+and)',
+            r'(?:operator|operating|management)[:\s]+([A-Z][^.\n]+)',
+            rf'([A-Z][^.]+?)\s+(?:operates|manages)\s+{mine_name}',
+            r'(?:exploitant|betreiber)[:\s]+([A-Z][^.\n]+)',
+            r'(?:operated|managed)\s+by\s+([A-Z][^.\n]+)'
+        ]
+        
+        for pattern in operator_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                extracted_data['operator'] = match.group(1).strip()
                 break
         
         # Suche nach Restoration/Closure Costs
@@ -145,11 +163,12 @@ class FirecrawlDataProcessor:
         extractor = FirecrawlExtractor()
         extracted_data = extractor.extract_mining_data(aggregated_content, mine_name)
         
+        # FIELD-MAPPING-FIX 20.08.2025: Corrected field mapping
         # Strukturiere Daten für MineSearch Format
         structured_data = {
             'Name': mine_name,
-            'Eigentümer': extracted_data.get('owner', ''),
-            'Betreiber': extracted_data.get('owner', ''),  # Oft gleich wie Eigentümer
+            'Eigentümer': extracted_data.get('owner', ''),          # Owner -> Eigentümer (correct)
+            'Betreiber': extracted_data.get('operator', ''),        # FIXED: Operator -> Betreiber
             'Restaurationskosten': extracted_data.get('restoration_cost', ''),
             'Rohstoffabbau': ', '.join(extracted_data.get('commodities', [])),
             'Aktivitätsstatus': extracted_data.get('status', '')

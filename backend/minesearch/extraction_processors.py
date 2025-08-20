@@ -13,82 +13,140 @@ from minesearch.utils import get_country_config
 logger = logging.getLogger(__name__)
 
 
+def is_template_or_dummy_value(value: str, field: str = None) -> bool:
+    """
+    CLEAN DATA AT SOURCE FIX 20.08.2025: Template/Dummy-Detection für Pre-Extraction Filtering
+    
+    Prüft ob ein AI-Response-Wert ein Template oder Dummy-Wert ist, bevor er in die DB gespeichert wird.
+    Diese Funktion ist die erste Verteidigungslinie gegen Template-Werte aus AI-Responses.
+    
+    Args:
+        value: Zu prüfender Wert aus AI-Response
+        field: Feldname für spezifische Prüfungen
+        
+    Returns:
+        True wenn Template/Dummy-Wert (soll abgelehnt werden), False wenn echter Wert
+    """
+    if not value or not str(value).strip():
+        return True  # Leere Werte sind Dummy-Werte
+        
+    value_str = str(value).strip()
+    value_lower = value_str.lower()
+    
+    # PHASE 1: DIREKTE TEMPLATE-MARKER - ABSOLUTE PRIORITÄT
+    if value_str.startswith('TEMPLATE:'):
+        logger.warning(f"[TEMPLATE DETECTION] Direkter TEMPLATE-Marker: '{value_str}'")
+        return True
+    
+    # PHASE 2: CSV-HEADER-ÄHNLICHE TEMPLATE-PATTERNS
+    template_patterns = [
+        # Exact CSV header patterns that AI models often return as "examples"
+        r'^Rohstoffabbau \(Gold[/\s]*Kupfer[/\s]*Kohle[/\s]*usw\.?\)$',
+        r'^Minentyp \(Untertage[/\s]*Open-Pit[/\s]*usw\.?\)$', 
+        r'^\(Gold[/\s]*Kupfer[/\s]*Kohle[/\s]*usw\.?\)$',
+        r'^\(Untertage[/\s]*Open-Pit[/\s]*usw\.?\)$',
+        r'^\(aktiv[/\s]*geplant[/\s]*geschlossen[/\s]*sonstiges\)$',
+        # Template lists/patterns that AI models generate
+        r'^(Gold|Kupfer|Kohle|Iron|Copper|Coal)[/\s]+(Kupfer|Gold|Iron|Copper)[/\s]+.*usw\.?$',
+        r'^(Untertage|Open-Pit|Underground|Surface)[/\s]+(Open-Pit|Untertage|Surface)[/\s]+.*usw\.?$',
+        r'^(aktiv|geplant|geschlossen|active|planned|closed)[/\s]+.*sonstiges$',
+        # ADDITIONAL: Common template patterns found in real data
+        r'^Gold[/\s]*Kupfer[/\s]*Kohle[/\s]*usw\.\)$',  # "Gold/ Kupfer/ Kohle/ usw.)"
+        r'^Untertage[/\s]*Open-Pit[/\s]*usw\.\)$',      # "Untertage/ Open-Pit/ usw.)"
+        r'^LEER \(keine verifizierte.*\)$',              # "LEER (keine verifizierte Information gefunden)"
+    ]
+    
+    import re
+    for pattern in template_patterns:
+        if re.match(pattern, value_str, re.IGNORECASE):
+            logger.warning(f"[TEMPLATE DETECTION] Template-Pattern erkannt: '{value_str}'")
+            return True
+    
+    # PHASE 3: "NOT SPECIFIED" VARIANTEN (User-reported Problem)
+    not_specified_patterns = [
+        r'^Not specified in available.*',
+        r'^No specific.*information.*',
+        r'^Keine spezifischen.*Daten.*',
+        r'^Not specified in the.*sources.*'
+    ]
+    
+    for pattern in not_specified_patterns:
+        if re.match(pattern, value_str, re.IGNORECASE):
+            logger.warning(f"[TEMPLATE DETECTION] 'Not specified' Pattern: '{value_str}'")
+            return True
+    
+    # PHASE 4: EXPLIZITE DUMMY-WERTE
+    explicit_dummies = [
+        'placeholder', 'dummy', 'example', 'template', 'sample', 'test',
+        'beispiel', 'muster', 'vorlage', 'beispieldaten',
+        'not found', 'not available', 'not specified', 'unknown', 'n/a', 'tbd',
+        'nicht gefunden', 'nicht verfügbar', 'unbekannt', 'k.a.', 'keine angabe'
+    ]
+    
+    if value_lower in explicit_dummies:
+        logger.warning(f"[TEMPLATE DETECTION] Expliziter Dummy-Wert: '{value_str}'")
+        return True
+    
+    # PHASE 5: FELD-SPEZIFISCHE DUMMY-DETECTION
+    if field == 'Restaurationskosten':
+        # Unrealistic low values that are obvious placeholders
+        if re.match(r'^\$?\s*[0-9]{1,2}(\.[0-9])?\s*(million|mio|usd|cad)?$', value_lower):
+            logger.warning(f"[TEMPLATE DETECTION] Unrealistische Restaurationskosten: '{value_str}'")
+            return True
+    elif field in ['Betreiber', 'Eigentümer']:
+        # Field labels appearing as values (AI model confusion)
+        if value_lower in ['betreiber', 'eigentümer', 'owner', 'operator', 'company', 'unternehmen']:
+            logger.warning(f"[TEMPLATE DETECTION] Field-Label als Wert: '{value_str}'")
+            return True
+    
+    # Value passed all template/dummy checks - it's a real data value
+    logger.debug(f"[TEMPLATE DETECTION] Echter Wert erkannt: '{value_str}'")
+    return False
+
+
 def normalize_field_value(value: str) -> str:
     """
     FELDANZEIGE-FIX 14.07.2025: Normalisiert Feldwerte für einheitliche Anzeige
+    CRITICAL-FIX 19.08.2025: Drastisch reduzierte Template-Pattern-Erkennung - verhindert Konvertierung echter Daten
     
     Args:
         value: Rohwert aus Provider
         
     Returns:
-        Normalisierter Wert: X für "nicht gefunden", leer für "nicht gesucht"
+        Normalisierter Wert: "nichts gefunden" für echte Nicht-Funde, echte Daten bleiben unverändert
     """
     if not value or value.strip() == '':
         # Komplett leer = nicht gesucht (bleibt leer)
         return ''
     
-    # PHASE 14.1 FIX: Vollständige "nicht gefunden" Werte-Erkennung mit Regex-Pattern-Unterstützung
+    value_cleaned = value.strip()
     
-    # Exakte String-Matches
-    not_found_values = [
-        'LEER', 'Leer', 'leer',
-        'LEER - keine verlässlichen Daten verfügbar',
-        'LEER - Keine verlässlichen Daten verfügbar', 
-        'Leer - status unklar',
-        'LEER - status unklar',
-        'LEER - Typ unbekannt',
-        'LEER - Minentyp unbekannt',
-        'LEER - Minentyp nicht verifiziert',
-        'LEER - Keine verlässlichen Daten verfügbar',
-        'LEER - Typ unklar',
-        'LEER',
-        'Keine spezifischen Quellen gefunden',
-        'Keine spezifischen Daten gefunden',
-        'Keine Informationen gefunden',
-        'Nicht verfügbar',
-        'Unbekannt',
+    # CRITICAL-FIX 19.08.2025 + 20.08.2025: Erweiterte Template-Placeholder-Liste
+    # Echte Template-Placeholder, die definitiv keine Daten enthalten
+    explicit_placeholders = [
         'N/A', 'n/a', 'N.A.', 'n.a.',
         '-', '—', '–',
         'k.A.', 'k.a.', 'K.A.',
-        'keine Daten',
-        'nicht gefunden',
-        'no data',
-        'unknown',
-        'not found',
-        'not available',
-        'keine Angaben',
-        'keine verlässlichen Daten'
+        'unknown', 'Unknown', 'UNKNOWN',
+        'not available', 'Not available', 'NOT AVAILABLE',
+        'not found', 'Not found', 'NOT FOUND',
+        'no data', 'No data', 'NO DATA',
+        # ZUSATZ 20.08.2025: User-reported Placeholder-Varianten
+        'not specified', 'Not specified', 'NOT SPECIFIED',
+        'not specified in available', 'Not specified in available ...',
+        'Not specified in available data', 'not specified in available data',
+        'nicht spezifiziert', 'Nicht spezifiziert',
+        'nicht angegeben', 'Nicht angegeben',
+        'unbekannt', 'Unbekannt', 'UNBEKANNT'
     ]
     
-    # PHASE 14.1 FIX: Pattern für alle LEER-Varianten die durchrutschen (verstärkt!)
-    leer_patterns = [
-        r'^LEER\s*-\s*.*',           # "LEER - [beliebiger Text]"
-        r'^Leer\s*-\s*.*',           # "Leer - [beliebiger Text]" 
-        r'^leer\s*-\s*.*',           # "leer - [beliebiger Text]"
-        r'^LEER\s*$',                # "LEER" allein
-        r'^Leer\s*$',                # "Leer" allein
-        r'^leer\s*$',                # "leer" allein
-        r'.*LEER.*',                 # VERSTÄRKT: Alle Texte mit LEER
-        r'.*Leer.*',                 # VERSTÄRKT: Alle Texte mit Leer
-        r'.*leer.*',                 # VERSTÄRKT: Alle Texte mit leer
-        r'Keine spezifischen.*',     # "Keine spezifischen [...]"
-        r'keine spezifischen.*',     # "keine spezifischen [...]"
-        r'^.*keine verlässlichen.*', # "[...] keine verlässlichen [...]"
-    ]
+    # CRITICAL-FIX 19.08.2025: Nur EXAKTE Matches - keine Pattern-Matching mehr
+    # Das verhindert dass echte Daten wie "Company Ltd." zu Template-Werten konvertiert werden
+    if value_cleaned in explicit_placeholders:
+        return 'nichts gefunden'  # User Request: "schreiben wir einfach nur überall 'nichts gefunden'"
     
-    value_cleaned = value.strip()
-    
-    # Exakte String-Matches prüfen
-    if value_cleaned in not_found_values:
-        return 'X'
-    
-    # PHASE 14.1 FIX: Pattern-Matching für LEER-Varianten die durchrutschen  
-    for pattern in leer_patterns:
-        if re.match(pattern, value_cleaned, re.IGNORECASE):
-            logger.debug(f"[PHASE 14.1] Pattern-Match '{value_cleaned}' -> X (Pattern: {pattern})")
-            return 'X'
-    
-    # Echte Daten unverändert
+    # CRITICAL-FIX 19.08.2025: Alle anderen Werte (inkl. echte Daten) bleiben UNVERÄNDERT
+    # Keine aggressive Pattern-Matching oder LEER-Konvertierung mehr
     return value
 
 

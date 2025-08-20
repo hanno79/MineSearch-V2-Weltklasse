@@ -1,0 +1,15 @@
+{
+  "validation_success": false,
+  "individual_success": false,
+  "stats_success": false,
+  "test_models": [
+    "openrouter:deepseek-free",
+    "perplexity:sonar",
+    "openrouter:kimi-k2"
+  ],
+  "found_models": [],
+  "baseline_count": 0,
+  "final_count": 0,
+  "new_entries": 0,
+  "test_mine_results": 0
+}

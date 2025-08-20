@@ -117,8 +117,8 @@ class MultiSearchValidator(BaseAPIRequest):
     model_ids: List[str] = Field(
         ..., 
         min_items=1, 
-        max_items=10,
-        description="Liste der Modell-IDs (1-10 Modelle)"
+        max_items=100,  # PHASE 3: Erhöht für alle 55+ verfügbaren Modelle
+        description="Liste der Modell-IDs (1-100 Modelle)"
     )
     
     @validator('model_ids')
@@ -127,8 +127,8 @@ class MultiSearchValidator(BaseAPIRequest):
         if not v:
             raise ValueError("Mindestens ein Modell muss angegeben werden")
         
-        if len(v) > 10:
-            raise ValueError("Maximal 10 Modelle pro Multi-Search erlaubt")
+        if len(v) > 100:  # PHASE 3: Erhöht für alle 55+ verfügbaren Modelle
+            raise ValueError("Maximal 100 Modelle pro Multi-Search erlaubt")
         
         # Validiere jede Modell-ID
         validated_ids = []

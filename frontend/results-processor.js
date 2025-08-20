@@ -13,6 +13,47 @@
 // ============================================
 
 /**
+ * FIELD VALUE FORMATTER: CLEAN DATA AT SOURCE FIX 20.08.2025
+ * Konsistente Anzeige für alle NULL/leeren Werte aus der bereinigten Datenbank
+ */
+function formatFieldValue(value) {
+    // CLEAN DATA AT SOURCE: Backend liefert bereits "Nichts gefunden" für NULL-Werte
+    if (value === 'Nichts gefunden') {
+        return '❌ nichts gefunden';  // Consistent Frontend-Styling für Backend-normalisierte Werte
+    }
+    
+    // FALLBACK: Direkte NULL/leere Werte (should not happen with new backend)
+    if (!value || value.trim() === '' || value === null || value === undefined) {
+        return '❌ nichts gefunden';  // Fallback für unerwartete leere Werte
+    }
+    
+    // Legacy X-Marker (falls noch vorhanden) → auch "nichts gefunden" 
+    if (value === 'X') {
+        return '❌ nichts gefunden';  // Vereinheitliche mit NULL-Behandlung
+    }
+    
+    // Status-Marker für logische Ausschlüsse (bleiben bestehen)
+    if (value === 'noch aktiv') {
+        return '🟢 noch aktiv';
+    }
+    if (value === 'Mine geschlossen') {
+        return '🔴 Mine geschlossen';
+    }
+    if (value === 'nur Exploration') {
+        return '🔍 nur Exploration';
+    }
+    if (value === 'noch geplant') {
+        return '📋 noch geplant';
+    }
+    if (value === 'in Entwicklung') {
+        return '🚧 in Entwicklung';
+    }
+    
+    // CLEAN DATA GUARANTEE: Alle anderen Werte sind echte Daten (Template bereits gefiltert)
+    return value;
+}
+
+/**
  * DISPLAY RESULTS: Zeigt Suchergebnisse an mit Phase 4 Multi-Model Support
  */
 function displayResults(data) {
@@ -52,10 +93,26 @@ function displayResults(data) {
             if (successfulResults.length >= 2) {
                 console.log(`🔬 [PHASE 4] Interactive comparison for ${successfulResults.length} models`);
                 displayMultiModelComparison(successfulResults, data.data);
+                
+                // PHASE 2: Model Performance in Statistik-Tab anzeigen
+                if (typeof window.displaySearchModelPerformance === 'function') {
+                    console.log('📊 [PHASE 2] Displaying model performance in statistics tab');
+                    window.displaySearchModelPerformance(successfulResults);
+                } else {
+                    console.warn('⚠️ [PHASE 2] displaySearchModelPerformance function not available');
+                }
+                
                 return;
             } else if (successfulResults.length === 1) {
                 console.log('📊 [PHASE 3] Single successful model from multi-search');
                 displaySingleModelFromMulti(successfulResults[0], data.data);
+                
+                // PHASE 2: Auch für Single-Model Performance in Statistik-Tab anzeigen
+                if (typeof window.displaySearchModelPerformance === 'function') {
+                    console.log('📊 [PHASE 2] Displaying single model performance in statistics tab');
+                    window.displaySearchModelPerformance(successfulResults);
+                }
+                
                 return;
             } else {
                 console.log('❌ [RESULTS] No successful models in multi-search');
@@ -931,6 +988,9 @@ window.processSearchResults = processSearchResults;
 window.displayBatchResults = displayBatchResults;
 window.generateBatchResultsTable = generateBatchResultsTable;
 
+// Export field formatting function (CRITICAL FIX for k.A. problem)
+window.formatFieldValue = formatFieldValue;
+
 // Export Results Revolution functions
 window.generateModernResultCard = generateModernResultCard;
 window.toggleSection = toggleSection;
@@ -1217,7 +1277,7 @@ function displaySimpleMultiModelResults(successfulResults, fullData) {
                         <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 8px; font-size: 0.9em;">
                             ${Object.entries(result.data.structured_data).slice(0, 8).map(([key, value]) => `
                                 <div style="font-weight: 600; color: #4b5563;">${key}:</div>
-                                <div style="color: #6b7280;">${value || 'k.A.'}</div>
+                                <div style="color: #6b7280;">${formatFieldValue(value)}</div>
                             `).join('')}
                         </div>
                     </div>

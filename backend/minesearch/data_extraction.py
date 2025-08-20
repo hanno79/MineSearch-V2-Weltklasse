@@ -21,7 +21,8 @@ from minesearch.extraction_validators import (
 from minesearch.extraction_processors import (
     process_restoration_costs, process_activity_status,
     split_country_region, find_region_from_content,
-    process_sources, post_process_data, clean_field_value
+    process_sources, post_process_data, clean_field_value,
+    is_template_or_dummy_value
 )
 from minesearch.source_manager import SourceManager
 
@@ -73,9 +74,87 @@ class DataExtractor:
         # FALLBACK: X-Marker für unbehandelte Status-Kombinationen - REGEL 10 KONFORM  
         return 'X'  # Fallback wenn kein spezifischer Status-Marker passt
     
+    def _should_set_status_marker(self, field: str, activity_status: str) -> bool:
+        """
+        CLEAN DATA AT SOURCE FIX 20.08.2025: Prüft ob ein Feld einen Status-Marker braucht
+        
+        Nur bei logischen Ausschlüssen (z.B. "Produktionsende" bei aktiver Mine) 
+        werden Status-Marker gesetzt. Normale "nicht gefunden" Felder bleiben leer.
+        
+        Args:
+            field: Feldname
+            activity_status: Aktivitätsstatus der Mine
+            
+        Returns:
+            True wenn Status-Marker gesetzt werden soll, False für normale leere Felder
+        """
+        if not activity_status:
+            return False  # Keine Status-Marker wenn Aktivitätsstatus unbekannt
+            
+        activity_lower = activity_status.lower()
+        
+        # Produktionsende bei aktiven Minen → "noch aktiv" 
+        if field == 'Produktionsende':
+            if any(status in activity_lower for status in ['aktiv', 'explorativ', 'geplant', 'entwicklung']):
+                return True
+                
+        # Fördermenge bei inaktiven Minen → spezifische Status-Marker
+        if field == 'Fördermenge/Jahr':
+            if any(status in activity_lower for status in ['geschlossen', 'explorativ', 'geplant', 'entwicklung']):
+                return True
+        
+        # Alle anderen Felder: keine Status-Marker, bleiben leer
+        return False
+    
+    def _is_valid_data_value(self, value: str, field: str) -> bool:
+        """
+        CLEAN DATA AT SOURCE - Data Quality Gate
+        
+        Prüft ob ein extrahierter Wert ein echter Datenwert ist oder ein Template/Dummy-Wert.
+        Template/Dummy-Werte werden abgelehnt und als NULL in die DB gespeichert.
+        
+        Args:
+            value: Zu prüfender Wert
+            field: Feldname für spezifische Validierung
+            
+        Returns:
+            True wenn echter Datenwert, False wenn Template/Dummy
+        """
+        if not value or not str(value).strip():
+            return False
+            
+        value_str = str(value).strip()
+        value_lower = value_str.lower()
+        
+        logger.debug(f"[DATA QUALITY GATE] Validiere Wert '{value_str}' für Feld '{field}'")
+        
+        # 1. PRE-EXTRACTION TEMPLATE/DUMMY DETECTION - ABSOLUTE PRIORITY
+        # Nutze die dedizierte Template-Detection aus extraction_processors.py
+        if is_template_or_dummy_value(value_str, field):
+            logger.warning(f"[DATA QUALITY GATE] Template/Dummy-Wert über extraction_processors erkannt: '{value_str}' → ABGELEHNT")
+            return False
+        
+        # 2. ADDITIONAL QUALITY CHECKS (nur noch spezifische Prüfungen nach Template-Detection)
+        
+        # Coordinates appearing in wrong fields 
+        if field in ['Betreiber', 'Eigentümer'] and re.match(r'^[\d\.\-\s,°\'\"]+$', value_str):
+            logger.warning(f"[DATA QUALITY GATE] Koordinaten in Betreiber/Eigentümer-Feld: '{value_str}' → ABGELEHNT")
+            return False
+        
+        # Very short values that are likely AI artifacts (but allow "-" as legitimate empty marker)
+        if len(value_str) <= 2 and value_str not in ['-']:
+            logger.warning(f"[DATA QUALITY GATE] Zu kurzer Wert: '{value_str}' → ABGELEHNT")
+            return False
+        
+        # Value passed all checks
+        logger.debug(f"[DATA QUALITY GATE] Wert '{value_str}' für Feld '{field}' → AKZEPTIERT")
+        return True
+    
     def extract_structured_data(self, content: str, mine_name: str, country: Optional[str] = None) -> Dict[str, Any]:
         """
         Extrahiere strukturierte Daten aus dem Perplexity-Response
+        
+        CLEAN DATA AT SOURCE FIX 20.08.2025: Keine Dummy-Werte in DB - nur echte Daten oder NULL
         
         Args:
             content: Perplexity API Antwort
@@ -109,11 +188,8 @@ class DataExtractor:
                     # QUELLENREFERENZEN-FIX 19.07.2025: Parse Quellen aus Feld-Text
                     clean_value, field_sources = self.source_manager.parse_field_with_sources(value)
                     
-                    # Platzhalter-Validierung
-                    if is_placeholder_value(clean_value, field):
-                        logger.info(f"[PLACEHOLDER REMOVED] Platzhalter '{clean_value}' für Feld '{field}' zu X konvertiert")
-                        data[field] = "X"  # Nicht gefunden markieren
-                    else:
+                    # CLEAN DATA AT SOURCE FIX 20.08.2025: Rigorose Data Quality Gate
+                    if self._is_valid_data_value(clean_value, field):
                         logger.debug(f"[EXTRACTION-POST] Feld '{field}' behalten: '{clean_value[:100]}...'")
                         data[field] = clean_value
                         
@@ -123,6 +199,10 @@ class DataExtractor:
                         elif response_sources and clean_value not in ['X', '']:
                             # Für alle Felder mit echten Daten: alle gefundenen Quellen zuordnen
                             self.source_manager.assign_field_sources(field, response_sources)
+                    else:
+                        # CLEAN DATA AT SOURCE FIX: Template/Dummy-Werte → NULL statt X
+                        logger.info(f"[DATA QUALITY GATE] Template/Dummy-Wert '{clean_value}' für Feld '{field}' abgelehnt - bleibt leer")
+                        data[field] = ""  # Leer lassen - wird später zu NULL in DB
             
             # Spezielle Behandlung für Koordinaten mit erweiterten Patterns
             data = self._extract_coordinates(content, data)
@@ -153,16 +233,21 @@ class DataExtractor:
                         logger.debug(f"[SOURCE] Feld '{field}' mit Quellen formatiert: '{formatted_value}'")
                         data[field] = formatted_value
             
-            # FELDMARKIERUNG-FIX 15.07.2025: Markiere leere Felder mit passenden Status-Markern
+            # CLEAN DATA AT SOURCE FIX 20.08.2025: Markiere nur logisch ausgeschlossene Felder
+            # Leere Felder bleiben leer (NULL) - keine X-Marker für einfache "nicht gefunden"
             activity_status = data.get('Aktivitätsstatus', '')
             
             for field in CSV_COLUMNS:
                 if field != 'Name' and field != 'Quellenangaben':  # Name und Quellenangaben ausschließen
                     if not data.get(field) or str(data[field]).strip() == '':
-                        # Prüfe auf logische Ausschlüsse
-                        status_marker = self._get_field_status_marker(field, activity_status)
-                        data[field] = status_marker
-                        logger.debug(f"[FIELD MARKER] Feld '{field}' als '{status_marker}' markiert")
+                        # NUR bei logischen Ausschlüssen Status-Marker setzen
+                        if self._should_set_status_marker(field, activity_status):
+                            status_marker = self._get_field_status_marker(field, activity_status)
+                            data[field] = status_marker
+                            logger.debug(f"[FIELD MARKER] Feld '{field}' als '{status_marker}' markiert (logischer Ausschluss)")
+                        else:
+                            # Feld bleibt leer - wird zu NULL in DB
+                            logger.debug(f"[CLEAN DATA] Feld '{field}' bleibt leer - nicht gefunden")
             
             # ÄNDERUNG 15.07.2025: Detailliertes Logging der extrahierten Felder
             filled_fields = [(k, v) for k, v in data.items() if v and str(v).strip() and str(v).strip() not in ['X', 'noch aktiv', 'Mine geschlossen', 'nur Exploration', 'noch geplant', 'in Entwicklung']]

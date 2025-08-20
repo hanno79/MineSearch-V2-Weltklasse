@@ -323,6 +323,14 @@ class MineSearchService:
             )
             logger.info(f"[DB] Legacy-Suchergebnis für {mine_name} gespeichert (ID: {search_result.id})")
             
+            # 🚀 CRITICAL FIX: Update ModelStatisticsComprehensive für Legacy Search auch
+            try:
+                self.db_manager.update_model_statistics_comprehensive(legacy_full_model_id)
+                logger.info(f"[STATS-TRIGGER-LEGACY] Model statistics updated for {legacy_full_model_id}")
+            except Exception as stats_error:
+                logger.error(f"[STATS-TRIGGER-LEGACY] Failed to update model statistics for {legacy_full_model_id}: {stats_error}")
+                # Don't fail the search if statistics update fails
+            
             # Aktualisiere Source-Statistiken in Database  
             for source in sources:
                 if source.get('url'):
@@ -397,7 +405,11 @@ class MineSearchService:
         # ÄNDERUNG 15.07.2025: Sources Usage Tracking implementieren
         await self._track_sources_usage(sources, success=True, model=model)
         
-        # DATABASE INTEGRATION: Speichere Suchergebnis in Database
+        # CLEAN DATA AT SOURCE FIX 20.08.2025: QUALITY GATE VOR DATABASE-SPEICHERUNG
+        # Letzte Verteidigungslinie gegen Template/Dummy-Werte in der Datenbank
+        clean_structured_data = self._apply_database_quality_gate(structured_data, mine_name)
+        
+        # DATABASE INTEGRATION: Speichere Suchergebnis in Database  
         # BUGFIX 20.07.2025: Verwende tatsächlich verwendetes Modell statt Request-Modell
         try:
             # Robuste Ermittlung der Laufzeit (Sekunden):
@@ -422,7 +434,7 @@ class MineSearchService:
             search_result = self.db_manager.save_search_result(
                 mine_name=mine_name,
                 model_used=actual_model_used,
-                structured_data=structured_data,
+                structured_data=clean_structured_data,  # CLEAN DATA AT SOURCE: Nur bereinigte Daten in DB
                 sources=[{
                     'url': s.get('url', ''),
                     'title': s.get('title', ''),
@@ -437,6 +449,14 @@ class MineSearchService:
                 search_type="provider"
             )
             logger.info(f"[DB] Suchergebnis für {mine_name} gespeichert (ID: {search_result.id})")
+            
+            # 🚀 CRITICAL FIX: Update ModelStatisticsComprehensive nach neuer Search
+            try:
+                self.db_manager.update_model_statistics_comprehensive(actual_model_used)
+                logger.info(f"[STATS-TRIGGER] Model statistics updated for {actual_model_used}")
+            except Exception as stats_error:
+                logger.error(f"[STATS-TRIGGER] Failed to update model statistics for {actual_model_used}: {stats_error}")
+                # Don't fail the search if statistics update fails
             
             # Aktualisiere Source-Statistiken in Database  
             for source in sources:
@@ -587,6 +607,61 @@ class MineSearchService:
         })
         
         return result
+    
+    def _apply_database_quality_gate(self, structured_data: Dict[str, Any], mine_name: str) -> Dict[str, Any]:
+        """
+        CLEAN DATA AT SOURCE FIX 20.08.2025: Quality Gate vor Database-Speicherung
+        
+        Letzte Verteidigungslinie gegen Template/Dummy-Werte in der Datenbank.
+        Konvertiert alle Template/Dummy-Werte zu NULL (leeren Strings) vor DB-Insert.
+        
+        Args:
+            structured_data: Extrahierte strukturierte Daten
+            mine_name: Mine-Name für Logging
+            
+        Returns:
+            Bereinigte strukturierte Daten ohne Template/Dummy-Werte
+        """
+        if not structured_data:
+            return structured_data
+            
+        logger.info(f"[DB QUALITY GATE] Validiere strukturierte Daten für {mine_name}")
+        
+        # Importiere Template-Detection aus extraction_processors
+        from minesearch.extraction_processors import is_template_or_dummy_value
+        
+        clean_data = {}
+        rejected_fields = []
+        accepted_fields = []
+        
+        for field, value in structured_data.items():
+            # Skip meta fields
+            if field.startswith('_') or field in ['sources']:
+                clean_data[field] = value
+                continue
+            
+            # Check if value is valid data
+            if value and str(value).strip():
+                if is_template_or_dummy_value(str(value).strip(), field):
+                    # Template/Dummy-Wert → NULL (leer)
+                    clean_data[field] = ""
+                    rejected_fields.append((field, str(value)[:50]))
+                    logger.warning(f"[DB QUALITY GATE] Template/Dummy-Wert abgelehnt: {field} = '{str(value)[:50]}...'")
+                else:
+                    # Echter Datenwert → behalten
+                    clean_data[field] = value
+                    accepted_fields.append((field, str(value)[:50]))
+                    logger.debug(f"[DB QUALITY GATE] Echter Wert akzeptiert: {field} = '{str(value)[:50]}...'")
+            else:
+                # Bereits leerer Wert → behalten
+                clean_data[field] = value
+        
+        # Logging Summary
+        logger.info(f"[DB QUALITY GATE] {mine_name}: {len(accepted_fields)} echte Werte, {len(rejected_fields)} Template/Dummy-Werte abgelehnt")
+        if rejected_fields:
+            logger.warning(f"[DB QUALITY GATE] Abgelehnte Felder: {[f[0] for f in rejected_fields]}")
+        
+        return clean_data
     
     async def _check_cache(self, mine_name: str, country: str, model: str, **kwargs) -> Optional[Dict]:
         """

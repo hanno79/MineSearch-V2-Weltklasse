@@ -77,8 +77,8 @@ async function loadStatistics() {
             
             displayModelStatistics(models);
             
-            // Update summary statistics
-            updateStatisticsSummary(data.data);
+            // Update summary statistics - FIXED: Pass models array, not data.data
+            updateStatisticsSummary(models);
             
         } else {
             throw new Error(data.message || 'Unbekannter Fehler beim Laden der Statistiken');

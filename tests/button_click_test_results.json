@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-08-19 16:46:05",
+  "button_found_and_clicked": true,
+  "api_models_available": 55,
+  "tables_found": 0,
+  "table_rows_found": 0,
+  "providers_in_content": [],
+  "console_messages": [
+    "log: Testing console",
+    "log: Testing API from frontend",
+    "log: API Response status: 200",
+    "log: API Data received: [success, models]"
+  ],
+  "success": true,
+  "summary": "API hat 55 Modelle, Frontend zeigt 0 Zeilen"
+}

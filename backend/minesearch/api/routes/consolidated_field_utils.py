@@ -216,6 +216,10 @@ def _process_field_value(field_value, field_name):
     
     # PHASE 1.3: Template-Pattern-Erkennung
     template_patterns = [
+        # TEMPLATE-FIX 19.08.2025: EXAKTE Template-Matches ZUERST!
+        r'^Untertage/\s*Open-Pit/\s*usw\.\)$',         # EXACT: "Untertage/ Open-Pit/ usw.)"  
+        r'^Gold/\s*Kupfer/\s*Kohle/\s*usw\.\)$',       # EXACT: "Gold/ Kupfer/ Kohle/ usw.)"
+        r'^aktiv/\s*geplant/\s*geschlossen/\s*sonstiges\)$',  # EXACT: "aktiv/ geplant/ geschlossen/ sonstiges)"
         # Häufige Template-Strukturen die AI-Modelle verwenden
         r'.*\(.*[/|]+.*\)',  # "(Gold/ Kupfer/ Kohle/ usw.)" pattern
         r'.*\(.*\s+or\s+.*\)',  # "(Underground or Open-Pit)" pattern  
@@ -224,16 +228,26 @@ def _process_field_value(field_value, field_name):
         r'.*\(beispielsweise.*\)',  # Template explanations
         r'.*\(such as.*\)',  # English template explanations
         r'.*(usw\.|etc\.)\)',  # Endings with "usw." or "etc."
-        r'^(Not specified|Not available|Unknown|TBD|N/A|-)$',  # Explicit placeholder values
-        r'^(Nicht angegeben|Nicht verfügbar|Unbekannt|k\.A\.|n\.a\.)$'  # German placeholders
+        # FIX 19.08.2025: Entferne einzelnen "-" aus Template-Detection
+        # Ein einzelner "-" ist ein gültiger leerer Wert, kein Template!
+        r'^(Not specified|Not available|Unknown|TBD|N/A)$',  # Explicit placeholder values (ohne "-")
+        r'^(Nicht angegeben|Nicht verfügbar|Unbekannt|k\.A\.|n\.a\.)$',  # German placeholders
+        # PHASE 3 FIX 20.08.2025: Field labels als Template-Pattern erkennen
+        r'^(Eigentümer|Betreiber|Owner|Operator|Company|Unternehmen)$'  # Field labels that appear as values
     ]
     
     import re
+    
+    # FIX 19.08.2025: Behandle einzelne "-" als normale leere Werte, nicht als Templates
+    if value_str == "-":
+        logger.debug(f"[FIELD-FIX] Field '{field_name}': '-' treated as empty value, not template")
+        return value_str  # Lass "-" als normalen Wert durch
+    
     for pattern in template_patterns:
         if re.match(pattern, value_str, re.IGNORECASE):
-            logger.debug(f"[PHASE 1.3] Template pattern detected in field '{field_name}': '{value_str}'")
-            # Mark as template but don't remove - let scoring system handle it
-            return f"TEMPLATE: {value_str}"
+            logger.info(f"[TEMPLATE-FIX] Template pattern detected in field '{field_name}': '{value_str}' -> 'Nichts gefunden'")
+            # TEMPLATE-FIX 19.08.2025: Template-Werte direkt zu "Nichts gefunden" konvertieren
+            return "Nichts gefunden"
     
     # PHASE 1.3: Spezielle Feldverarbeitung
     if field_name in ['x-Koordinate', 'y-Koordinate']:

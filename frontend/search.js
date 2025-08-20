@@ -85,6 +85,16 @@ function startSingleSearch() {
         if (data.success) {
             displayResults(data);  // CRITICAL FIX: Pass full data object, not just data.data
             showNotification(`✅ ${searchTypeText} erfolgreich abgeschlossen`, 'success');
+            
+            // 🚀 ENHANCED: Smart Auto-Refresh aller Tabs nach erfolgreicher Einzelsuche
+            if (typeof window.smartRefreshAfterSearch === 'function') {
+                window.smartRefreshAfterSearch('single');
+                console.log('📊 [SEARCH-SUCCESS] Scheduled smart tab refresh after successful single search');
+            } else if (typeof window.scheduleStatisticsRefresh === 'function') {
+                // Fallback: nur Statistics (Legacy)
+                window.scheduleStatisticsRefresh(3000);
+                console.log('📊 [SEARCH-SUCCESS] Scheduled statistics refresh after successful search (fallback)');
+            }
         } else {
             console.error(`❌ [SEARCH] API Error:`, data.error);
             resultsDiv.innerHTML = createErrorHTML('Suche fehlgeschlagen', data.error || 'Unbekannter Fehler');
@@ -261,6 +271,17 @@ async function startBatchSearch() {
         // Display results using safeSetHTML for proper HTML rendering
         safeSetHTML(resultsDiv, batchResultsHtml);
         showNotification(`✅ ${searchTypeText} erfolgreich abgeschlossen`, 'success');
+        
+        // 🚀 CRITICAL FIX: Auto-Refresh alle Tabs nach erfolgreicher Batch-Suche
+        if (typeof window.smartRefreshAfterSearch === 'function') {
+            window.smartRefreshAfterSearch('batch');
+            console.log('📊 [BATCH-SUCCESS] Scheduled comprehensive tab refresh after successful batch search');
+        } else if (typeof window.scheduleAllTabsRefresh === 'function') {
+            window.scheduleAllTabsRefresh('batch');
+            console.log('📊 [BATCH-SUCCESS] Scheduled fallback tab refresh after successful batch search');
+        } else {
+            console.warn('⚠️ [BATCH-SUCCESS] Post-search refresh functions not available');
+        }
         
     } catch (error) {
         // Handle abort vs other errors FIRST (consistent with Single Search)

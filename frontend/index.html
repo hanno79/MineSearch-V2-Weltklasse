@@ -36,6 +36,7 @@
     <script src="/static/charts.js?v=1.1.0"></script>
     <script src="/static/analytics.js?v=1.1.0"></script>
     <script src="/static/auto-refresh.js?v=1.1.0"></script>
+    <script src="/static/post-search-refresh.js?v=1.0.0"></script>
     <script src="/static/results-processor.js?v=1.2.0"></script>
     
     <!-- Phase 4: Interactive Comparison System -->
@@ -506,7 +507,7 @@ Canadian Malartic,Canada,Gold,Quebec</pre>
                             <p style="color: #6c757d; margin-bottom: 20px;">
                                 Klicken Sie auf "Filter anwenden" um die Modell-Statistiken zu laden.
                             </p>
-                            <button onclick="loadModelStatistics()" class="unified-search-button">
+                            <button onclick="loadStatistics()" class="unified-search-button">
                                 🔍 Statistiken laden
                             </button>
                         </div>
@@ -516,7 +517,7 @@ Canadian Malartic,Canada,Gold,Quebec</pre>
                     <div style="margin-top: 20px; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
                         <h3>📁 Export & Aktionen</h3>
                         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                            <button onclick="exportModelStatistics()" 
+                            <button onclick="exportSearchModelPerformance()" 
                                     style="background: #059669; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
                                 📊 Modell-Performance (CSV)
                             </button>

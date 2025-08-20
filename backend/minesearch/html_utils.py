@@ -122,18 +122,18 @@ def create_batch_results_table(results: List[Dict]) -> str:
             if column == "Name":
                 value = mine_name
             elif column == "Country":
-                value = result.get('country', 'k.A.')
+                value = result.get('country', 'nichts gefunden')
             elif column == "Region":
-                value = result.get('region', 'k.A.')
+                value = result.get('region', 'nichts gefunden')
             elif column == "Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)":
-                value = result.get('commodity', structured_data.get(column, 'k.A.'))
+                value = result.get('commodity', structured_data.get(column, 'nichts gefunden'))
             else:
                 # Alle anderen Felder aus structured_data
-                value = structured_data.get(column, 'k.A.')
+                value = structured_data.get(column, 'nichts gefunden')
             
-            # Leere Werte behandeln
-            if not value or str(value).strip() in ['', 'None', 'null']:
-                value = 'k.A.'
+            # CRITICAL-FIX 19.08.2025: Behalte echte Daten, normalisiere nur wirklich leere Werte
+            if not value or str(value).strip() in ['', 'None', 'null', 'undefined']:
+                value = 'nichts gefunden'  # User Request: statt "k.A." verwende "nichts gefunden"
             
             # Wert kürzen falls zu lang (für bessere Tabellendarstellung)
             if len(str(value)) > 80:

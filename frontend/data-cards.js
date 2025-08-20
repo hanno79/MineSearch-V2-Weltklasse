@@ -624,9 +624,9 @@ function generateModelStatsCard(modelData) {
     const modelName = modelData.model_id || 'Unbekanntes Modell';
     const provider = modelData.provider || 'Unbekannt';
     
-    // 🚨 SCORE-FIX: Backend sendet 0-100, Frontend zeigt 0-10 an - Korrekte Skalierung!
+    // 🚨 SCORE-FIX: Backend sendet bereits 0-10 Scores - keine Skalierung nötig!
     const rawScore = modelData.overall_score || 0;
-    const score = Math.min(Math.max((rawScore / 100) * 10, 0), 10);
+    const score = Math.min(Math.max(rawScore, 0), 10);
     
     // 🚨 PHASE 1.2: Mathematical Validation - Erfolgsrate auf 0-100% begrenzen
     const rawSuccessRate = modelData.success_rate || 0;

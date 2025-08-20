@@ -1,0 +1,18 @@
+{
+  "timestamp": "2025-08-19 17:13:08",
+  "test_name": "Statistics Tab - 55 Models Validation FIXED",
+  "success": false,
+  "details": {
+    "tab_activated": true,
+    "load_button_found": true,
+    "api_test": {
+      "success": true,
+      "total_models": 55,
+      "tested_models": 0,
+      "available_models": 0,
+      "first_model": "scrapingbee:ai-extract"
+    },
+    "table_found": false,
+    "table_rows": 0
+  }
+}

@@ -15,6 +15,7 @@ class MineSearchRequest(BaseModel):
     country: Optional[str] = None
     commodity: Optional[str] = None
     region: Optional[str] = None
+    model: str  # CRITICAL FIX: Missing model field for single search
 
 class MineSearchResponse(BaseModel):
     success: bool

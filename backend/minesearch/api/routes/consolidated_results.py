@@ -321,6 +321,8 @@ async def get_consolidated_results(
             'region': '',
             'consolidated_fields': {},
             'model_results': [],
+            'unique_models': set(),  # PHASE 3 FIX: Track unique model IDs to prevent overcounting
+            'unique_sources': set(),  # PHASE 2 FIX: Track unique source URLs to prevent overcounting
             'model_count': 0,
             'last_updated': None,
             'total_sources': 0,
@@ -336,18 +338,35 @@ async def get_consolidated_results(
             mine_data['mine_name'] = mine_name
             mine_data['country'] = result.country or ''
             mine_data['region'] = result.region or ''
+            
+            # PHASE 4 FIX: Count ALL model results, not just unique models
+            # The model_count should match the actual length of model_results array
             mine_data['model_count'] += 1
             
             # Letzte Aktualisierung
             if not mine_data['last_updated'] or result.search_timestamp > mine_data['last_updated']:
                 mine_data['last_updated'] = result.search_timestamp
             
-            # Quellen zählen
-            mine_data['total_sources'] += len(result.sources or [])
+            # PHASE 2 FIX: Count unique sources only, not duplicates across models
+            for source in (result.sources or []):
+                # Extract URL from source (could be string or dict)
+                if isinstance(source, str):
+                    source_url = source
+                elif isinstance(source, dict) and source.get('url'):
+                    source_url = source['url']
+                else:
+                    continue
+                
+                # Add to unique sources set
+                mine_data['unique_sources'].add(source_url)
+            
+            # Update total_sources with unique count
+            mine_data['total_sources'] = len(mine_data['unique_sources'])
             
             # Modell-spezifische Daten sammeln
             model_info = {
                 'id': result.id,
+                'model_id': result.model_used,  # CRITICAL FIX 20.08.2025: Add model_id field for frontend compatibility
                 'model_used': result.model_used,
                 'search_timestamp': result.search_timestamp.isoformat() if result.search_timestamp else None,
                 'structured_data': result.structured_data or {},
@@ -566,7 +585,7 @@ async def get_consolidated_results(
                     'best_value': best_value_info,
                     'all_values': value_analysis,
                     'statistics': {
-                        'total_sources': len(set([detail['ai_model'] for detail in field_info['value_details']])),
+                        'total_sources': sum(len(detail['real_sources']) for detail in field_info['value_details']),  # FIXED: Count actual sources, not AI models
                         'unique_values': len(value_analysis),
                         'confidence_score': best_value_info['confidence_score'],
                         'total_real_sources': sum(len(detail['real_sources']) for detail in field_info['value_details'])
@@ -587,6 +606,10 @@ async def get_consolidated_results(
                                for details in detailed_breakdown.values() 
                                if details['best_value']['confidence_score'] > 0]
             overall_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0
+
+            # PHASE 3 FIX: Clean up sets before JSON serialization
+            if 'unique_models' in mine_data:
+                del mine_data['unique_models']
 
             # PHASE 1.1: ENHANCED API RESPONSE STRUCTURE 14.08.2025
             # Strukturierte Felder klar von Metadaten trennen für bessere Frontend-Integration
@@ -833,6 +856,7 @@ async def get_mine_consolidated_details(
             'region': '',
             'consolidated_fields': {},
             'model_results': [],
+            'unique_models': set(),  # PHASE 3 FIX: Track unique model IDs
             'model_count': 0,
             'last_updated': None,
             'total_sources': 0,
@@ -844,14 +868,30 @@ async def get_mine_consolidated_details(
             # Basis-Informationen setzen
             mine_data['country'] = result.country or mine_data['country']
             mine_data['region'] = result.region or mine_data['region']
+            
+            # PHASE 4 FIX: Count ALL model results, not just unique models
+            # The model_count should match the actual length of model_results array
             mine_data['model_count'] += 1
             
             # Letzte Aktualisierung
             if not mine_data['last_updated'] or result.search_timestamp > mine_data['last_updated']:
                 mine_data['last_updated'] = result.search_timestamp
             
-            # Quellen zählen
-            mine_data['total_sources'] += len(result.sources or [])
+            # PHASE 2 FIX: Count unique sources only, not duplicates across models
+            for source in (result.sources or []):
+                # Extract URL from source (could be string or dict)
+                if isinstance(source, str):
+                    source_url = source
+                elif isinstance(source, dict) and source.get('url'):
+                    source_url = source['url']
+                else:
+                    continue
+                
+                # Add to unique sources set
+                mine_data['unique_sources'].add(source_url)
+            
+            # Update total_sources with unique count
+            mine_data['total_sources'] = len(mine_data['unique_sources'])
             
             # Felder konsolidieren
             if result.structured_data:
@@ -921,7 +961,7 @@ async def get_mine_consolidated_details(
                 'best_value': best_value_info,
                 'all_values': value_analysis,
                 'statistics': {
-                    'total_sources': len(set([detail['ai_model'] for detail in field_info['value_details']])),
+                    'total_sources': sum(len(detail['real_sources']) for detail in field_info['value_details']),  # FIXED: Count actual sources, not AI models
                     'unique_values': len(value_analysis),
                     'confidence_score': best_value_info['confidence_score'],
                     'total_real_sources': sum(len(detail['real_sources']) for detail in field_info['value_details'])
@@ -933,6 +973,10 @@ async def get_mine_consolidated_details(
                            for details in detailed_breakdown.values() 
                            if details['best_value']['confidence_score'] > 0]
         overall_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0
+        
+        # PHASE 3 FIX: Clean up sets before JSON serialization
+        if 'unique_models' in mine_data:
+            del mine_data['unique_models']
         
         # Source summary for compatibility with frontend modal
         source_summary = {

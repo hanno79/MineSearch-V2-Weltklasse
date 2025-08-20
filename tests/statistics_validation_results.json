@@ -1,0 +1,12 @@
+{
+  "timestamp": "2025-08-19 17:08:50",
+  "test_name": "Statistics Tab - 55 Models Validation",
+  "success": false,
+  "details": {
+    "api_success": true,
+    "api_total_models": 55,
+    "api_tested_models": 0,
+    "api_available_models": 0,
+    "table_found": false
+  }
+}

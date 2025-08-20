@@ -1,0 +1,25 @@
+{
+  "perplexity": {
+    "success": true,
+    "response_length": 0,
+    "filled_fields": 5,
+    "x_fields": 14,
+    "mining_terms": [],
+    "raw_response_sample": "",
+    "structured_data_sample": {
+      "Name": "Lac Expanse",
+      "Country": "Kanada",
+      "Region": "Keine verifizierte Angabe (keine eindeutige Zuordnung in Quebec oder Ontario gefunden)",
+      "Eigent\u00fcmer": "X",
+      "Betreiber": "X"
+    }
+  },
+  "openrouter": {
+    "success": true,
+    "response_length": 0,
+    "filled_fields": 5,
+    "raw_response_sample": ""
+  },
+  "test_mine": "Lac Expanse",
+  "timestamp": "333647.374002357"
+}

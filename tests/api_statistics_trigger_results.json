@@ -1,0 +1,9 @@
+{
+  "trigger_success": false,
+  "baseline_count": 0,
+  "final_count": 0,
+  "test_model": "openrouter:deepseek-free",
+  "model_found": false,
+  "model_stats": null,
+  "search_status": 200
+}

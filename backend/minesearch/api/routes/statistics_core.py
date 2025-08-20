@@ -523,8 +523,10 @@ async def get_models_comprehensive_statistics(
     Eine Zeile pro AI-Modell mit allen wichtigen Performance-Kennzahlen
     """
     try:
+        logger.info(f"[STATS-CORE] Starting comprehensive statistics with sort_by={sort_by}, order={order}")
         with db_manager.get_session() as session:
             # Hole alle Modell-Statistiken
+            logger.info("[STATS-CORE] Creating query for ModelStatisticsComprehensive")
             query = session.query(ModelStatisticsComprehensive)
             
             # Filter anwenden
@@ -559,23 +561,30 @@ async def get_models_comprehensive_statistics(
                 else:
                     query = query.order_by(ModelStatisticsComprehensive.model_id.asc())
             
+            logger.info("[STATS-CORE] Executing query to get model statistics")
             model_stats = query.all()
+            logger.info(f"[STATS-CORE] Found {len(model_stats)} model statistics from database")
             
             # Falls keine Daten vorhanden, aus SearchResults generieren
             if not model_stats:
                 logger.info("[STATS-CORE] Keine comprehensive statistics vorhanden, generiere aus SearchResults...")
                 await update_comprehensive_statistics()
                 model_stats = query.all()
+                logger.info(f"[STATS-CORE] After update: {len(model_stats)} model statistics")
             
-            # CRITICAL FIX: Hole alle verfügbaren Modelle aus Models API
+            # CRITICAL FIX 19.08.2025: Hole alle verfügbaren Modelle aus Models API
             import httpx
-            async with httpx.AsyncClient() as client:
-                models_response = await client.get("http://localhost:8000/api/models")
-                models_data = models_response.json()
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    models_response = await client.get("http://localhost:8000/api/models")
+                    models_api_data = models_response.json()
+            except Exception as e:
+                logger.warning(f"[STATS-CORE] Could not fetch models from API: {e}")
+                models_api_data = {'success': False}
                 
-            if models_data.get('success') and 'models' in models_data:
+            if models_api_data.get('success') and 'models' in models_api_data:
                 all_available_models = []
-                for model in models_data['models']:
+                for model in models_api_data['models']:
                     if isinstance(model, dict):
                         model_id = model.get('model_id', str(model))
                     else:
@@ -583,76 +592,87 @@ async def get_models_comprehensive_statistics(
                     all_available_models.append(model_id)
             else:
                 all_available_models = []
+                
             tested_model_ids = {stat.model_id for stat in model_stats}
             
             logger.info(f"[STATS-CORE] Found {len(model_stats)} tested models, {len(all_available_models)} total available")
             
-            # Konvertiere getestete Modelle zu API-Response
-            models_data = [model.to_dict() for model in model_stats]
+            # Konvertiere getestete Modelle zu API-Response  
+            logger.info("[STATS-CORE] Converting model statistics to dict format")
+            models_data = []
+            for i, model in enumerate(model_stats):
+                try:
+                    model_dict = model.to_dict()
+                    models_data.append(model_dict)
+                    if i < 3:  # Debug first 3 models
+                        logger.info(f"[STATS-CORE] Model {i}: {model_dict.get('model_id')} - keys: {list(model_dict.keys())}")
+                except Exception as model_error:
+                    logger.error(f"[STATS-CORE] Error converting model {i}: {model_error}")
+                    raise
             
-            # Füge ungetestete Modelle als "Verfügbar" hinzu
-            for model in all_available_models:
-                model_id = model if isinstance(model, str) else model.get('model_id', str(model))
+            # CRITICAL FIX 19.08.2025: Zeige ALLE Modelle mit korrektem Status (User Request: alle 55 Modelle anzeigen)
+            # Füge ungetestete Modelle mit Status "Verfügbar" hinzu
+            for model_id in all_available_models:
                 if model_id not in tested_model_ids:
-                    # Erstelle Placeholder-Statistiken für ungetestete Modelle
                     provider = model_id.split(':')[0] if ':' in model_id else 'unknown'
-                    model_name = model_id.split(':')[1] if ':' in model_id else model_id
-                    
-                    placeholder_model = {
+                    models_data.append({
                         'model_id': model_id,
-                        'model_name': f"{provider.title()} - {model_name.title()}",
                         'provider': provider,
-                        'total_searches': 0,
-                        'successful_searches': 0,
-                        'success_rate_percent': 0.0,
+                        'overall_score': 0.0,
                         'completeness_score': 0.0,
                         'consistency_score': 0.0,
-                        'consistency_grade': 'Ungetestet',
-                        'source_diversity_score': 0.0,
-                        'avg_fields_found': 0.0,
-                        'avg_sources_per_search': 0.0,
-                        'unique_sources_total': 0,
-                        'performance_category': 'Verfügbar',
-                        'avg_search_duration_ms': 0.0,
-                        'overall_score': 0.0,
-                        'score_category': 'Verfügbar',
-                        'best_field_categories': [],
-                        'specialization_score': {},
-                        'cost_efficiency_score': 50.0,
-                        'estimated_cost_per_search': None,
-                        'first_search_at': None,
-                        'last_search_at': None,
+                        'total_searches': 0,
+                        'successful_searches': 0,
+                        'score_category': 'Nicht getestet',
+                        'consistency_grade': 'N/A',
                         'last_updated': None,
-                        'status': 'available'  # Kennzeichnung für ungetestete Modelle
-                    }
-                    
-                    models_data.append(placeholder_model)
+                        'avg_search_duration_ms': 0,
+                        'unique_sources_total': 0,
+                        'note': 'Noch nicht in Batch-Suchen verwendet'
+                    })
             
-            # Sortiere erneut nach overall_score (getestete Modelle oben)
-            models_data.sort(key=lambda x: (x.get('status', 'tested') == 'available', -x['overall_score']))
+            # Sortiere: Getestete Modelle zuerst (nach Score), dann verfügbare (alphabetisch)
+            try:
+                models_data.sort(key=lambda x: (
+                    x.get('score_category') == 'Nicht getestet',  # FIXED: Nicht getestete nach hinten
+                    -x.get('overall_score', 0),  # BUGFIX: Use get() to prevent KeyError
+                    x.get('model_id', '')  # BUGFIX: Use get() to prevent KeyError
+                ))
+                logger.info(f"[STATS-CORE] Successfully sorted {len(models_data)} models")
+            except Exception as sort_error:
+                logger.error(f"[STATS-CORE] Sort error: {sort_error}")
+                # Debug first few models to identify issue
+                for i, model in enumerate(models_data[:3]):
+                    logger.info(f"[STATS-CORE] Model {i}: {model.keys()} - score_category: {model.get('score_category')} - overall_score: {model.get('overall_score')} - model_id: {model.get('model_id')}")
+                raise
             
-            logger.info(f"[STATS-CORE] Expanded to {len(models_data)} models (tested + available)")
+            logger.info(f"[STATS-CORE] Showing ALL {len(models_data)} models ({len(model_stats)} tested + {len(all_available_models) - len(tested_model_ids)} available)")
             
-            # Summary-Statistiken mit getesteten und verfügbaren Modellen
+            # Summary-Statistiken für alle Modelle  
+            tested_models = [m for m in models_data if m.get('score_category', 'Nicht getestet') != 'Nicht getestet']
+            available_models = [m for m in models_data if m.get('score_category', 'Nicht getestet') == 'Nicht getestet']
+            
             if models_data:
-                tested_models = [m for m in models_data if m.get('status') != 'available']
-                available_models = [m for m in models_data if m.get('status') == 'available']
-                
                 summary_stats = {
                     'total_models': len(models_data),
                     'tested_models': len(tested_models),
-                    'available_models': len(available_models),
+                    'available_untested_models': len(available_models),
+                    # Durchschnitte nur von getesteten Modellen berechnen
                     'avg_overall_score': round(sum([m['overall_score'] for m in tested_models]) / len(tested_models), 1) if tested_models else 0,
                     'avg_completeness': round(sum([m['completeness_score'] for m in tested_models]) / len(tested_models), 1) if tested_models else 0,
                     'avg_consistency': round(sum([m['consistency_score'] for m in tested_models]) / len(tested_models), 1) if tested_models else 0,
-                    'best_model': max(tested_models, key=lambda x: x['overall_score']) if tested_models else None,
+                    'best_model': max(tested_models, key=lambda x: x['overall_score'])['model_id'] if tested_models else None,
                     'score_distribution': {
-                        'exzellent': len([m for m in tested_models if m['score_category'] == 'Exzellent']),
-                        'sehr_gut': len([m for m in tested_models if m['score_category'] == 'Sehr Gut']),
-                        'gut': len([m for m in tested_models if m['score_category'] == 'Gut']),
-                        'limitiert': len([m for m in tested_models if m['score_category'] == 'Limitiert']),
-                        'ungeeignet': len([m for m in tested_models if m['score_category'] == 'Ungeeignet']),
-                        'verfügbar': len(available_models)
+                        'exzellent': len([m for m in tested_models if m.get('score_category') == 'Exzellent']),
+                        'sehr_gut': len([m for m in tested_models if m.get('score_category') == 'Sehr Gut']),
+                        'gut': len([m for m in tested_models if m.get('score_category') == 'Gut']),
+                        'limitiert': len([m for m in tested_models if m.get('score_category') == 'Limitiert']),
+                        'ungeeignet': len([m for m in tested_models if m.get('score_category') == 'Ungeeignet']),
+                        'nicht_getestet': len(available_models)
+                    },
+                    'model_status_info': {
+                        'tested_note': f"{len(tested_models)} Modelle wurden bereits in Batch-Suchen getestet",
+                        'available_note': f"{len(available_models)} Modelle sind verfügbar aber noch nicht getestet"
                     }
                 }
             else:
@@ -678,6 +698,8 @@ async def get_models_comprehensive_statistics(
             
     except Exception as e:
         logger.error(f"[STATS-CORE] Fehler bei comprehensive model statistics: {str(e)}")
+        import traceback
+        logger.error(f"[STATS-CORE] Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Comprehensive statistics Fehler: {str(e)}")
 
 @router.get("/models/{model_id}/field-consistency", response_model=Dict[str, Any])
@@ -855,34 +877,53 @@ async def update_comprehensive_statistics():
 async def calculate_model_consistency_score(search_results: List[SearchResult], model_id: str) -> float:
     """
     Hilfsfunktion: Berechne Konsistenz-Score für ein Modell über alle Felder
+    CRITICAL-FIX 19.08.2025: Repariere Division-by-Zero und bessere Konsistenz-Logik
     """
+    if not search_results:
+        return 0.0
+        
     field_values = {}  # field_name -> [value1, value2, ...]
     
-    # Sammle alle Feldwerte
+    # Sammle alle Feldwerte - jetzt mit besserer Filterung
     for result in search_results:
         if result.structured_data:
             for field_name, field_value in result.structured_data.items():
-                if field_value and str(field_value).strip() and str(field_value).strip().upper() != 'X':
+                # Verbesserte Validierung: echte Werte sammeln, keine Template-Placeholder
+                if (field_value and 
+                    str(field_value).strip() and 
+                    str(field_value).strip() not in ['X', 'nichts gefunden', 'k.A.', 'N/A', 'unknown']):
+                    
                     if field_name not in field_values:
                         field_values[field_name] = []
                     field_values[field_name].append(str(field_value).strip())
     
+    if not field_values:
+        return 0.0  # Keine validen Daten gefunden
+    
     # Berechne Konsistenz pro Feld
     field_consistencies = []
     for field_name, values in field_values.items():
-        if len(values) > 1:  # Nur Felder mit mehreren Werten
-            unique_values = len(set(values))
-            # BUGFIX 07.08.2025: NULL-Wert-Behandlung für leere Listen
-            value_counts = [values.count(val) for val in set(values)]
-            if value_counts:  # Prüfe ob Liste nicht leer ist
-                most_common_count = max(value_counts)
-                consistency = (most_common_count / len(values)) * 100
-                field_consistencies.append(consistency)
+        if len(values) >= 1:  # FIXED: Auch einzelne Werte sind "konsistent"
+            if len(values) == 1:
+                # Einzelne Werte sind perfekt konsistent
+                field_consistencies.append(100.0)
+            else:
+                # Multiple Werte: berechne Konsistenz
+                unique_values = set(values)
+                if unique_values:  # Sicherheitsprüfung
+                    value_counts = [values.count(val) for val in unique_values]
+                    if value_counts:  # Weitere Sicherheitsprüfung
+                        most_common_count = max(value_counts)
+                        consistency = (most_common_count / len(values)) * 100
+                        field_consistencies.append(consistency)
     
     # Overall Konsistenz-Score
     if field_consistencies:
-        return sum(field_consistencies) / len(field_consistencies)
+        avg_consistency = sum(field_consistencies) / len(field_consistencies)
+        logger.debug(f"[STATS-CORE] Model {model_id} consistency: {avg_consistency:.1f}% across {len(field_consistencies)} fields")
+        return avg_consistency
     else:
+        logger.debug(f"[STATS-CORE] Model {model_id} has no valid data for consistency calculation")
         return 0.0
 
 async def update_field_consistency_for_model(model_id: str):

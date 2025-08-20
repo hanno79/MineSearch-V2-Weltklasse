@@ -192,8 +192,8 @@ class MultiModelSearchRequest(BaseRequest):
     model_ids: List[str] = Field(
         ..., 
         min_items=2, 
-        max_items=10,
-        description="Liste der Modell-IDs (2-10 Modelle)"
+        max_items=100,  # PHASE 3: Erhöht für alle 55+ verfügbaren Modelle
+        description="Liste der Modell-IDs (2-100 Modelle)"
     )
     location: Optional[MineLocation] = Field(None)
     commodity: Optional[str] = Field(None, max_length=100)
