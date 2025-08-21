@@ -88,7 +88,11 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
         'no data', 'keine daten',
         'information not available',
         'daten nicht verfügbar',
-        'keine daten verfügbar'
+        'keine daten verfügbar',
+        # FIX 21.08.2025: AI-Meta-Anweisungen als Backup-Filter
+        'feld ausgelassen', 'feld komplett auslassen',
+        'field omitted', 'field skipped', 'omitted',
+        'auslassen', 'ausgelassen'
     ]
     
     # Prüfe auf verbotene Ausdrücke

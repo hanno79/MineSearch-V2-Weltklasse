@@ -75,7 +75,34 @@ def is_template_or_dummy_value(value: str, field: str = None) -> bool:
             logger.warning(f"[TEMPLATE DETECTION] 'Not specified' Pattern: '{value_str}'")
             return True
     
-    # PHASE 4: EXPLIZITE DUMMY-WERTE
+    # PHASE 4: AI-META-RESPONSES (User-reported Problem 21.08.2025)
+    # AI-generierte Template-Texte mit Meta-Anweisungen, die durch normale Filter rutschen
+    ai_meta_patterns = [
+        # Der spezifische gemeldete Fall
+        r'.*junior mining company.*without concrete data.*per.*rules.*',
+        r'.*But without concrete data.*should leave.*fields.*blank.*per.*rules.*',
+        # Generische AI-Meta-Response Pattern
+        r'.*should leave.*blank.*per.*rules.*',
+        r'.*I should.*blank.*rules.*',
+        r'.*As per.*rules.*fields.*blank.*',
+        r'.*without concrete data.*leave.*blank.*',
+        r'.*per the rules.*fields.*blank.*',
+        r'.*following the rules.*blank.*',
+        # Weitere AI-Meta-Anweisungen
+        r'.*cannot specify.*without.*evidence.*',
+        r'.*cannot specify.*without proper.*',
+        r'.*would be inappropriate.*without.*data.*',
+        r'.*should not provide.*without.*verification.*',
+        r'.*extraction rules.*should.*blank.*',
+        r'.*per.*extraction.*rules.*'
+    ]
+    
+    for pattern in ai_meta_patterns:
+        if re.search(pattern, value_str, re.IGNORECASE):
+            logger.warning(f"[TEMPLATE DETECTION] AI-Meta-Response erkannt: '{value_str}'")
+            return True
+    
+    # PHASE 5: EXPLIZITE DUMMY-WERTE
     explicit_dummies = [
         'placeholder', 'dummy', 'example', 'template', 'sample', 'test',
         'beispiel', 'muster', 'vorlage', 'beispieldaten',
@@ -87,7 +114,7 @@ def is_template_or_dummy_value(value: str, field: str = None) -> bool:
         logger.warning(f"[TEMPLATE DETECTION] Expliziter Dummy-Wert: '{value_str}'")
         return True
     
-    # PHASE 5: FELD-SPEZIFISCHE DUMMY-DETECTION
+    # PHASE 6: FELD-SPEZIFISCHE DUMMY-DETECTION
     if field == 'Restaurationskosten':
         # Unrealistic low values that are obvious placeholders
         if re.match(r'^\$?\s*[0-9]{1,2}(\.[0-9])?\s*(million|mio|usd|cad)?$', value_lower):

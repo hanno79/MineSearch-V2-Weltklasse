@@ -399,20 +399,20 @@ Antworte auf Deutsch mit STRUKTURIERTEN DATEN.
 - Name: [exakter Name] [Quelle: Fachwissen/Schätzung]
 - Country: [Land] [Quelle: Fachwissen/Schätzung]
 - Region: [Region/Provinz] [Quelle: Fachwissen/Schätzung]
-- Eigentümer: [Eigentümer - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
-- Betreiber: [Betreiber - wenn unbekannt, Feld auslassen - NIEMALS Koordinaten hier angeben!] [Quelle: Fachwissen/Schätzung]
-- x-Koordinate: [Latitude in Dezimalgrad - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
-- y-Koordinate: [Longitude in Dezimalgrad - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
-- Aktivitätsstatus: [aktiv/geschlossen/geplant - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
-- Restaurationskosten: [NUR realistische Beträge in {currency}$ - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
-- Jahr der Aufnahme der Kosten: [Jahr der Kostenschätzung - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
-- Jahr der Erstellung des Dokumentes: [Jahr des Reports/Studies - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
-- Rohstoffabbau: [NUR spezifische Rohstoffe wie 'Gold', 'Kupfer', 'Eisenerz' - NIEMALS Template-Strukturen oder 'usw.' - wenn unbekannt, Feld komplett auslassen] [Quelle: Fachwissen/Schätzung]
-- Minentyp: [NUR spezifische Werte wie 'Untertage', 'Open-Pit', 'Hybrid' - NIEMALS Template-Strukturen - wenn unbekannt, Feld komplett auslassen] [Quelle: Fachwissen/Schätzung]
-- Produktionsstart: [Jahr - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
-- Produktionsende: [Jahr oder 'aktiv' - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
-- Fördermenge/Jahr: [Menge/Jahr mit Einheit - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
-- Fläche der Mine in qkm: [Fläche in km² - wenn unbekannt, Feld auslassen] [Quelle: Fachwissen/Schätzung]
+- Eigentümer: [Eigentümer - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
+- Betreiber: [Betreiber - wenn unbekannt, leer lassen: "" - NIEMALS Koordinaten hier angeben!] [Quelle: Fachwissen/Schätzung]
+- x-Koordinate: [Latitude in Dezimalgrad - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
+- y-Koordinate: [Longitude in Dezimalgrad - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
+- Aktivitätsstatus: [aktiv/geschlossen/geplant - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
+- Restaurationskosten: [NUR realistische Beträge in {currency}$ - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
+- Jahr der Aufnahme der Kosten: [Jahr der Kostenschätzung - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
+- Jahr der Erstellung des Dokumentes: [Jahr des Reports/Studies - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
+- Rohstoffabbau: [NUR spezifische Rohstoffe wie 'Gold', 'Kupfer', 'Eisenerz' - NIEMALS Template-Strukturen oder 'usw.' - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
+- Minentyp: [NUR spezifische Werte wie 'Untertage', 'Open-Pit', 'Hybrid' - NIEMALS Template-Strukturen - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
+- Produktionsstart: [Jahr - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
+- Produktionsende: [Jahr oder 'aktiv' - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
+- Fördermenge/Jahr: [Menge/Jahr mit Einheit - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
+- Fläche der Mine in qkm: [Fläche in km² - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
 - Quellenangaben: [Referenzen oder 'Allgemeines Fachwissen'] [Quelle: Fachwissen/Schätzung]
 
 **KRITISCHE REGELN FÜR RESTAURATIONSKOSTEN:**
@@ -421,12 +421,18 @@ Antworte auf Deutsch mit STRUKTURIERTEN DATEN.
   * Minentyp (Open-Pit: 50-500 Mio USD, Untertage: 20-200 Mio USD)
   * Größe der Mine und Umweltvorschriften
 - Mindestbetrag: $10,000 - darunter ist unrealistisch
-- Wenn unsicher: Feld komplett weglassen, KEINE Minimalwerte!
+- Wenn unsicher: Feld leer lassen (""), KEINE Minimalwerte!
 
-**VERBOTENE PLATZHALTER:**
+**VERBOTENE PLATZHALTER UND META-TEXTE:**
 - KEINE "k.A.", "n/a", "-", "unbekannt", "nicht gefunden", "LEER"
 - KEINE Minimalwerte wie $1, $2, $3
-- Wenn keine Daten: Feld komplett weglassen (nicht erwähnen)
+- 🚫 NIEMALS META-ANWEISUNGEN SCHREIBEN:
+  * "Feld ausgelassen"
+  * "Feld komplett auslassen"
+  * "Field omitted" 
+  * "Field skipped"
+  * Jegliche Kommentare über das Feld selbst
+- Wenn keine Daten: Feld mit leerem String ("") ausfüllen
 
 **QUELLEN-SEKTION:**
 [Da du keine Web-Suche durchführst, gib an:]

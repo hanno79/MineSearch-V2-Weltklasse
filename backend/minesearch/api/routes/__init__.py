@@ -74,12 +74,15 @@ def get_api_router() -> APIRouter:
         except Exception as consolidated_err:
             logger.error(f"❌ consolidated_results Route Fehler: {consolidated_err}")
             
-        try:
-            from .benchmark import router as benchmark_router
-            router.include_router(benchmark_router, prefix="/api", tags=["benchmark"])
-            logger.info("✅ benchmark Route erfolgreich geladen")
-        except Exception as benchmark_err:
-            logger.error(f"❌ benchmark Route Fehler: {benchmark_err}")
+        # TEMPORÄR DEAKTIVIERT: Benchmark Route wegen Import-Problemen
+        # try:
+        #     from .benchmark import router as benchmark_router
+        #     router.include_router(benchmark_router, prefix="/api", tags=["benchmark"])
+        #     logger.info("✅ benchmark Route erfolgreich geladen")
+        # except Exception as benchmark_err:
+        #     logger.error(f"❌ benchmark Route Fehler: {benchmark_err}")
+        #     # Continue without benchmark route
+        logger.info("⚠️ benchmark Route temporär deaktiviert")
             
         # Registriere weitere wichtige Module
         try:
