@@ -106,7 +106,21 @@ def create_batch_results_table(results: List[Dict]) -> str:
             status_icon = "✅"
             status_color = "#4caf50"
             data = result.get('data', {})
+            
+            # FIX 21.08.2025: Robuster Zugriff auf structured_data für Batch-Results
             structured_data = data.get('structured_data', {})
+            
+            # FALLBACK: Wenn structured_data leer, nimm direkt aus data (häufiges Format)
+            if not structured_data and data:
+                structured_data = data
+                
+            # FINAL FALLBACK: Für Legacy-Format direkt aus result
+            if not structured_data:
+                structured_data = result
+                
+            # DEBUG 21.08.2025: Log verfügbare Daten für Debugging
+            field_count = len([k for k, v in structured_data.items() if v and str(v).strip() not in ['-', '', 'None']])
+            # print(f"[BATCH-DEBUG] {mine_name}: {field_count} non-empty fields available")
         else:
             status_icon = "❌"  
             status_color = "#f44336"
@@ -131,9 +145,12 @@ def create_batch_results_table(results: List[Dict]) -> str:
                 # Alle anderen Felder aus structured_data
                 value = structured_data.get(column, 'nichts gefunden')
             
-            # CRITICAL-FIX 19.08.2025: Behalte echte Daten, normalisiere nur wirklich leere Werte
-            if not value or str(value).strip() in ['', 'None', 'null', 'undefined']:
+            # CRITICAL-FIX 21.08.2025: Behalte echte Daten, normalisiere nur wirklich leere/Platzhalter-Werte
+            if not value or str(value).strip() in ['', 'None', 'null', 'undefined', '-']:
                 value = 'nichts gefunden'  # User Request: statt "k.A." verwende "nichts gefunden"
+            # Zusätzlich: Prüfe auf häufige Platzhalter
+            elif str(value).strip().lower() in ['k.a.', 'n/a', 'unknown', 'not available']:
+                value = 'nichts gefunden'
             
             # Wert kürzen falls zu lang (für bessere Tabellendarstellung)
             if len(str(value)) > 80:

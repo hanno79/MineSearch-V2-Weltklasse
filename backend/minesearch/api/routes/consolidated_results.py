@@ -166,11 +166,11 @@ def _analyze_field_values(value_details):
 def _calculate_best_value(value_analysis, field_name=None):
     """
     Implementiert "Best Value" Algorithmus basierend auf:
-    - Häufigkeit (frequency)
+    - Häufigkeit (frequency) 
     - Anzahl verschiedener Quellen (source_diversity)
     - Modell-Konsens (model_consensus)
     - Datenqualität (avg_data_quality)
-    - Zuverlässigkeit der Quellen
+    - KRITISCHER FIX 21.08.2025: Zeitstempel-Priorität - Neue Daten gewinnen!
     - TEMPLATE-PATTERN-PENALTY 06.08.2025: Malus für CSV_COLUMNS Template-Strukturen
     
     Args:
@@ -189,6 +189,32 @@ def _calculate_best_value(value_analysis, field_name=None):
     best_value = None
     best_score = -1
     
+    # KRITISCHER FIX 21.08.2025: Bestimme neuesten Zeitstempel über alle Werte hinweg
+    all_timestamps = []
+    for value, analysis in value_analysis.items():
+        all_timestamps.extend(analysis['search_timestamps'])
+    
+    # Parse alle Timestamps und finde neueste
+    from datetime import datetime, timedelta
+    parsed_timestamps = []
+    for ts in all_timestamps:
+        try:
+            if isinstance(ts, datetime):
+                parsed_timestamps.append(ts)
+            elif isinstance(ts, str):
+                # Verschiedene Formate unterstützen
+                for fmt in ['%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S']:
+                    try:
+                        parsed_timestamps.append(datetime.strptime(ts, fmt))
+                        break
+                    except ValueError:
+                        continue
+        except (ValueError, TypeError):
+            continue
+    
+    newest_timestamp = max(parsed_timestamps) if parsed_timestamps else datetime.min
+    logger.info(f"[TIMESTAMP-FIX] Neueste Daten vom: {newest_timestamp}")
+    
     for value, analysis in value_analysis.items():
         # PHASE 13.2 FIX: Überarbeitete Score-Berechnung - ECHTE DATEN haben Priorität!
         # KRITISCH: Frequency darf nicht wichtigster Faktor sein, sonst gewinnt "Unbekannt" (9x) über echte Werte (1x)
@@ -196,6 +222,48 @@ def _calculate_best_value(value_analysis, field_name=None):
         source_diversity_score = analysis['source_diversity'] * 1.5  # Verschiedene Quellen
         model_consensus_score = analysis['model_consensus'] * 1.0  # Verschiedene AI-Modelle
         quality_score = analysis['avg_data_quality'] * 0.01  # Datenqualität (0-100)
+        
+        # KRITISCHER FIX 21.08.2025: ZEITSTEMPEL-BONUS - Neue Daten bekommen massiven Vorteil!
+        recency_bonus = 0.0
+        value_newest_timestamp = datetime.min
+        for ts in analysis['search_timestamps']:
+            try:
+                if isinstance(ts, datetime):
+                    current_ts = ts
+                elif isinstance(ts, str):
+                    # Verschiedene Formate unterstützen
+                    for fmt in ['%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S']:
+                        try:
+                            current_ts = datetime.strptime(ts, fmt)
+                            break
+                        except ValueError:
+                            continue
+                    else:
+                        continue
+                else:
+                    continue
+                
+                if current_ts > value_newest_timestamp:
+                    value_newest_timestamp = current_ts
+            except (ValueError, TypeError):
+                continue
+        
+        # KRITISCHER BONUS: Wenn die Daten weniger als 2 Stunden alt sind = MASSIVER BONUS
+        now = datetime.now()
+        hours_old = (now - value_newest_timestamp).total_seconds() / 3600
+        
+        if hours_old < 2:  # Weniger als 2 Stunden alt = batch data von heute
+            recency_bonus = 150.0  # ULTRA-MASSIVER Bonus für sehr neue Daten (Batch-Daten!)
+            logger.info(f"[TIMESTAMP-FIX] ⚡ RECENCY BONUS: '{analysis['display_value'][:50]}' ist {hours_old:.1f}h alt -> +{recency_bonus} Punkte")
+        elif hours_old < 24:  # Weniger als 1 Tag alt
+            recency_bonus = 50.0  # Starker Bonus für neue Daten
+        elif hours_old < 48:  # Weniger als 2 Tage alt
+            recency_bonus = 20.0  # Moderater Bonus für relativ neue Daten
+        else:  # Älter als 2 Tage
+            recency_bonus = 0.0  # Kein Bonus für alte Daten
+            # ZUSÄTZLICH: Malus für sehr alte Daten
+            if hours_old > 72:  # Älter als 3 Tage
+                recency_bonus = -25.0  # Verstärkter Malus für alte Daten
         
         # CONSENSUS FIX: Verwende robuste is_empty_value Funktion aus search_utils
         from minesearch.search_utils import is_empty_value
@@ -214,7 +282,9 @@ def _calculate_best_value(value_analysis, field_name=None):
         
         total_score = (frequency_score + source_diversity_score + 
                       model_consensus_score + quality_score + 
-                      non_x_bonus + duration_penalty)
+                      non_x_bonus + duration_penalty + recency_bonus)
+        
+        logger.debug(f"[SCORE] '{analysis['display_value'][:30]}': freq={frequency_score:.1f} + diversity={source_diversity_score:.1f} + consensus={model_consensus_score:.1f} + quality={quality_score:.1f} + data_bonus={non_x_bonus:.1f} + duration={duration_penalty:.1f} + recency={recency_bonus:.1f} = TOTAL {total_score:.1f}")
         
         if total_score > best_score:
             best_score = total_score
@@ -857,6 +927,7 @@ async def get_mine_consolidated_details(
             'consolidated_fields': {},
             'model_results': [],
             'unique_models': set(),  # PHASE 3 FIX: Track unique model IDs
+            'unique_sources': set(),  # KRITISCHER FIX 20.08.2025: Fehlende unique_sources initialisieren
             'model_count': 0,
             'last_updated': None,
             'total_sources': 0,
