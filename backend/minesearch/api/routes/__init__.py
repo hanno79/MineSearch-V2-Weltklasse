@@ -45,12 +45,30 @@ def get_api_router() -> APIRouter:
         except Exception as search_err:
             logger.error(f"❌ search Route Fehler: {search_err}")
             
+        # NOTFALL 23.08.2025: Aktiviere ursprüngliche Batch-Route
         try:
             from .batch import router as batch_router
             router.include_router(batch_router, prefix="/api", tags=["batch"])
             logger.info("✅ batch Route erfolgreich geladen")
         except Exception as batch_err:
             logger.error(f"❌ batch Route Fehler: {batch_err}")
+        logger.info("✅ Ursprüngliche batch Route aktiviert für CSV-Upload")
+            
+        # DEAKTIVIERT 23.08.2025: Fixed batch route hat Syntaxfehler
+        # try:
+        #     import sys
+        #     import os
+        #     sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
+        #     from batch_route_fixed import create_fixed_batch_route
+        #     from minesearch.database import db_manager
+        #     from .batch import batch_results_cache  # Import cache from original batch module
+        #     
+        #     fixed_batch_router = create_fixed_batch_route(db_manager, batch_results_cache)
+        #     router.include_router(fixed_batch_router, prefix="/api", tags=["batch-fixed"])
+        #     logger.info("✅ FIXED batch Route erfolgreich geladen (DB-First)")
+        # except Exception as fixed_batch_err:
+        #     logger.error(f"❌ FIXED batch Route Fehler: {fixed_batch_err}")
+        logger.info("⚠️ Fixed batch Route temporär deaktiviert wegen Syntaxfehler")
             
         try:
             from .statistics import router as statistics_router
