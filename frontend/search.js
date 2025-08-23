@@ -1164,11 +1164,25 @@ function clearAllModels() {
 }
 
 function updateSelectionCounter() {
-    const selectedCount = document.querySelectorAll('input[name="model"]:checked').length;
+    // ÄNDERUNG 23.08.2025: Integration mit Progressive Model Selection System
+    // Prüfe ob Progressive Model Selection aktiv ist
+    let selectedCount = 0;
+    
+    if (window.progressiveModelSelection && window.progressiveModelSelection.selectedModels) {
+        // Nutze die moderne selectedModels Set-Struktur
+        selectedCount = window.progressiveModelSelection.selectedModels.size;
+        console.log(`🔢 [SEARCH-JS] Using Progressive Model Selection count: ${selectedCount}`);
+    } else {
+        // Fallback für Legacy-Kompatibilität
+        selectedCount = document.querySelectorAll('input[name="model"]:checked').length;
+        console.log(`🔢 [SEARCH-JS] Using DOM checkbox count: ${selectedCount}`);
+    }
+    
     const counterElement = document.getElementById('selected-models-count');
     const clearButton = document.querySelector('.clear-selection');
     
     if (counterElement) {
+        console.log(`🔢 [SEARCH-JS] Updating selected-models-count: ${counterElement.textContent} → ${selectedCount}`);
         counterElement.textContent = selectedCount;
     }
     

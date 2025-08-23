@@ -57,6 +57,9 @@
     <!-- PHASE 1: PROFESSIONAL HEADER NAVIGATION SYSTEM -->
     <script src="/static/header-navigation.js?v=1.0.0"></script>
     
+    <!-- ÄNDERUNG 22.08.2025: Progressive Model Selection System hinzufügen -->
+    <script src="/static/progressive-model-selection.js?v=1.0.0"></script>
+    
     <!-- Phase 4: Modern CSS Design System with Basic UI Revolution -->
     <link rel="stylesheet" href="/static/style.css?v=4.0.0">
 </head>
@@ -639,24 +642,9 @@ Canadian Malartic,Canada,Gold,Quebec</pre>
         document.addEventListener('DOMContentLoaded', function() {
             console.log('✅ [MAIN] DOM loaded - initializing modules...');
             
-            // KRITISCH: Lade Modelle sofort nach DOM-Ready
-            setTimeout(() => {
-                console.log('🔄 [MAIN] Initialisiere Modell-Loading...');
-                if (typeof loadModelsForFilter === 'function') {
-                    loadModelsForFilter();
-                    console.log('✅ [MAIN] loadModelsForFilter() aufgerufen');
-                } else {
-                    console.error('❌ [MAIN] loadModelsForFilter function nicht verfügbar - Retry in 2s');
-                    setTimeout(() => {
-                        if (typeof loadModelsForFilter === 'function') {
-                            loadModelsForFilter();
-                            console.log('✅ [MAIN] loadModelsForFilter() retry erfolgreich');
-                        } else {
-                            console.error('❌ [MAIN] loadModelsForFilter immer noch nicht verfügbar');
-                        }
-                    }, 2000);
-                }
-            }, 1000);
+            // ÄNDERUNG 23.08.2025: Legacy loadModelsForFilter DEAKTIVIERT
+            // Das Progressive Model Selection System übernimmt die Modell-UI
+            console.log('🎨 [MAIN] Progressive Model Selection System aktiv - Legacy loadModelsForFilter übersprungen');
             
             // Check if all modules are loaded
             const requiredModules = [
