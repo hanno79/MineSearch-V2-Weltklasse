@@ -1233,6 +1233,9 @@ async def export_consolidated_csv(
     
     header.extend(remaining_fields)
     
+    # EXAKTE-QUELLENANGABEN-FIX 24.08.2025: Zusätzliche Spalte für detaillierte Quellenangaben
+    header.append("Exakte Quellenangaben")
+    
     csv_lines.append("|".join(header))
     
     # Daten-Zeilen - genau wie UI-Struktur
@@ -1313,6 +1316,101 @@ async def export_consolidated_csv(
                 # Escape Pipe-Zeichen in Werten
                 escaped_value = str(normalized_value).replace("|", "\\|") if normalized_value else "nichts gefunden"
                 row.append(escaped_value)
+        
+        # EXAKTE-QUELLENANGABEN-FIX 24.08.2025: Füge detaillierte Quellenangaben hinzu
+        exact_sources = []
+        
+        # EXAKTE-QUELLENANGABEN-FIX: Suche Quellenangaben in der richtigen Struktur
+        source_mapping = None
+        
+        # 1. Primär: Aus result.best_values._source_mapping (aktuelle Struktur)
+        best_values = result.get("best_values", {})
+        if isinstance(best_values, dict) and "_source_mapping" in best_values:
+            source_mapping = best_values["_source_mapping"]
+        
+        # 2. Fallback: Aus result.structured_fields._source_mapping
+        elif "structured_fields" in result:
+            structured_fields = result["structured_fields"]
+            if isinstance(structured_fields, dict) and "_source_mapping" in structured_fields:
+                source_mapping = structured_fields["_source_mapping"]
+        
+        # 3. Fallback: Aus result.source_mapping (alte Struktur) 
+        elif "source_mapping" in result:
+            source_mapping = result["source_mapping"]
+            
+        if source_mapping and isinstance(source_mapping, dict):
+            sources_dict = source_mapping.get("sources", {})
+            if sources_dict:
+                # Sortiere nach Quellennummer
+                for source_num in sorted(sources_dict.keys(), key=lambda x: int(x) if x.isdigit() else 999):
+                    source_info = sources_dict[source_num]
+                    if isinstance(source_info, dict):
+                        title = source_info.get("title", f"Quelle {source_num}")
+                        url = source_info.get("url", "Keine URL")
+                        exact_sources.append(f"[{source_num}] {title}: {url}")
+        
+        # Fallback: Verwende model_results für detaillierte Quellenangaben
+        if not exact_sources:
+            model_results = result.get("model_results", [])
+            found_source_mapping = None
+            
+            # Suche in model_results nach aktuellstem Ergebnis mit _source_mapping
+            for model_result in model_results:
+                if isinstance(model_result, dict):
+                    structured_data = model_result.get("structured_data", {})
+                    if isinstance(structured_data, dict) and "_source_mapping" in structured_data:
+                        potential_mapping = structured_data["_source_mapping"]
+                        if isinstance(potential_mapping, dict):
+                            found_source_mapping = potential_mapping
+                            break
+            
+            if found_source_mapping:
+                sources_dict = found_source_mapping.get("sources", {})
+                if sources_dict:
+                    # Sortiere nach Quellennummer
+                    for source_num in sorted(sources_dict.keys(), key=lambda x: int(x) if x.isdigit() else 999):
+                        source_info = sources_dict[source_num]
+                        if isinstance(source_info, dict):
+                            title = source_info.get("title", f"Quelle {source_num}")
+                            url = source_info.get("url", "Keine URL")
+                            exact_sources.append(f"[{source_num}] {title}: {url}")
+        
+        # Final Fallback: Verwende sources Array aus model_results, falls vorhanden
+        if not exact_sources:
+            model_results = result.get("model_results", [])
+            
+            # Verwende das neueste model_result mit sources
+            for model_result in reversed(model_results):  # Neuestes zuerst
+                if isinstance(model_result, dict):
+                    sources_array = model_result.get("sources", [])
+                    if sources_array and len(sources_array) > 0:
+                        # Verwende die ersten 10 Quellen und erstelle nummerierte Liste
+                        for i, source in enumerate(sources_array[:10], 1):
+                            if isinstance(source, dict):
+                                url = source.get("url", "Keine URL")
+                                
+                                # Versuche besseren Titel zu finden
+                                title = source.get("title", "")
+                                if not title or title == url:
+                                    title = source.get("description", "")
+                                if not title:
+                                    # Generiere Titel aus URL
+                                    domain = url.split("/")[2] if len(url.split("/")) > 2 else "Unbekannte Quelle"
+                                    title = domain
+                                
+                                exact_sources.append(f"[{i}] {title}: {url}")
+                        break  # Verwende nur das erste gefundene model_result mit sources
+        
+        # Falls immer noch keine Quellen, zeige Platzhalter
+        if not exact_sources:
+            exact_sources.append("Keine detaillierten Quellenangaben verfügbar")
+        
+        # Kombiniere Quellen zu einem String (Semikolon-getrennt für CSV)
+        exact_sources_text = "; ".join(exact_sources)
+        
+        # Escape Pipe-Zeichen und füge zur Zeile hinzu
+        escaped_exact_sources = exact_sources_text.replace("|", "\\|")
+        row.append(escaped_exact_sources)
         
         csv_lines.append("|".join(row))
     
