@@ -71,17 +71,43 @@ def _normalize_placeholder_value(value):
             logger.info(f"[TEMPLATE-FIX] Template-Pattern match '{value_str}' -> 'Nichts gefunden'")
             return 'Nichts gefunden'
     
-    # Exakte Platzhalter-Matches
+    # NULL-VALUE-DISPLAY-FIX 24.08.2025: Erweiterte "nichts gefunden" Pattern
     exact_placeholders = [
         'LEER', 'Leer', 'leer', 'X', 'N/A', 'n/a', 'N.A.', 'n.a.',
         'UNBEKANNT', 'UNKNOWN', 'NICHT GEFUNDEN', 'NOT FOUND',
         'KEINE ANGABEN', 'NO DATA', 'K.A.', 'k.a.', 'K.A.', 
         'NICHT VERFÜGBAR', 'NOT AVAILABLE', 'keine Daten',
-        'Keine Informationen gefunden', 'Nicht verfügbar', 'Unbekannt'
+        'Keine Informationen gefunden', 'Nicht verfügbar', 'Unbekannt',
+        # NEU: Alle "nichts gefunden" Varianten
+        'unbekannt', 'unknown', 'nicht bekannt', 'nicht verfügbar',
+        'no data', 'no information', 'not found', 'not available',
+        'tbd', 'to be determined', 'keine angabe',
+        'keine angaben', 'nicht ermittelbar',
+        'nicht spezifiziert', 'not specified', 'not applicable',
+        'keine information', 'no info', 'nichts gefunden'
     ]
     
     if value_str in exact_placeholders:
         logger.debug(f"[PHASE 15.3] Exact match '{value_str}' -> 'Nichts gefunden'")
+        return 'Nichts gefunden'
+    
+    # NULL-VALUE-DISPLAY-FIX 24.08.2025: AI-Kommentare in bestehenden DB-Daten
+    ai_comment_patterns = [
+        'the user says',
+        'user says', 
+        'so that\'s straightforward',
+        'also unknown',
+        'no data, so leave blank',
+        'without specifics',
+        'can\'t provide numbers',
+        'since i can\'t access',
+        'i\'ll rely on general',
+        'typical values for'
+    ]
+    
+    # Wenn der Text AI-Kommentare enthält, ist es ein Template-Wert
+    if any(pattern in value_str.lower() for pattern in ai_comment_patterns):
+        logger.info(f"[TEMPLATE-FIX] AI-Kommentar in DB-Wert erkannt: '{value_str[:50]}...' -> 'Nichts gefunden'")
         return 'Nichts gefunden'
     
     # PHASE 15.3 KRITISCH: Pattern für alle LEER-Varianten aus der Datenbank
@@ -417,18 +443,16 @@ async def get_consolidated_results(
             if not mine_data['last_updated'] or result.search_timestamp > mine_data['last_updated']:
                 mine_data['last_updated'] = result.search_timestamp
             
-            # PHASE 2 FIX: Count unique sources only, not duplicates across models
-            for source in (result.sources or []):
-                # Extract URL from source (could be string or dict)
-                if isinstance(source, str):
-                    source_url = source
-                elif isinstance(source, dict) and source.get('url'):
-                    source_url = source['url']
-                else:
-                    continue
-                
-                # Add to unique sources set
-                mine_data['unique_sources'].add(source_url)
+            # QUELLENREFERENZEN-FIX 24.08.2025: Zähle nur tatsächlich verwendete Quellen, nicht Discovery-Quellen
+            # Sammle alle real_sources aus consolidated_fields (tatsächlich verwendete Quellen)
+            used_sources = set()
+            for field_info in mine_data['consolidated_fields'].values():
+                for real_source_list in field_info['real_sources']:
+                    for real_source_url in real_source_list:
+                        used_sources.add(real_source_url)
+            
+            # Aktualisiere unique_sources nur mit tatsächlich verwendeten Quellen
+            mine_data['unique_sources'].update(used_sources)
             
             # Update total_sources with unique count
             mine_data['total_sources'] = len(mine_data['unique_sources'])
@@ -526,30 +550,41 @@ async def get_consolidated_results(
                                     source_number = get_or_assign_source_number(source_url)
                                     global_source_numbers.append(source_number)
                         
-                        # CRITICAL FIX: Für Quellenangaben Feld - zeige echte Quellen statt "Keine"
+                        # QUELLENREFERENZEN-FIX 24.08.2025: Für Quellenangaben Feld - zeige nur tatsächlich genutzte Quellen
                         if final_field_name.lower() in ['quellenangaben', 'sources', 'quellen']:
                             if real_sources:
-                                # Erstelle zusammengefasste Quellenangabe
+                                # WICHTIG: Zähle nur real_sources (echte URLs), nicht discovery-sources
                                 source_types = {}
+                                actually_used_sources = []
+                                
                                 for source in result.sources:
-                                    if isinstance(source, dict):
+                                    if isinstance(source, dict) and source.get('url') in real_sources:
+                                        # Nur Quellen zählen, die auch echte URLs haben
                                         source_type = source.get('type', 'general')
                                         source_types[source_type] = source_types.get(source_type, 0) + 1
+                                        actually_used_sources.append(source)
                                 
-                                source_summary = []
-                                for stype, count in source_types.items():
-                                    if stype == 'government':
-                                        source_summary.append(f"{count} Behörden-Quellen")
-                                    elif stype == 'database':
-                                        source_summary.append(f"{count} Datenbank-Quellen")
-                                    elif stype == 'industry':
-                                        source_summary.append(f"{count} Industrie-Quellen")
-                                    elif stype == 'document':
-                                        source_summary.append(f"{count} Dokument-Quellen")
-                                    else:
-                                        source_summary.append(f"{count} {stype}-Quellen")
-                                
-                                clean_value = f"{len(real_sources)} Quellen: " + ", ".join(source_summary)
+                                # Verwende nur tatsächlich genutzte Quellen
+                                if actually_used_sources:
+                                    source_summary = []
+                                    for stype, count in source_types.items():
+                                        if stype == 'government':
+                                            source_summary.append(f"{count} Behörden-Quellen")
+                                        elif stype == 'database':
+                                            source_summary.append(f"{count} Datenbank-Quellen")
+                                        elif stype == 'industry':
+                                            source_summary.append(f"{count} Industrie-Quellen")
+                                        elif stype == 'document':
+                                            source_summary.append(f"{count} Dokument-Quellen")
+                                        elif stype == 'expert_knowledge':
+                                            source_summary.append(f"{count} Fachwissen-Quellen")
+                                        else:
+                                            source_summary.append(f"{count} {stype}-Quellen")
+                                    
+                                    clean_value = f"{len(actually_used_sources)} Quellen: " + ", ".join(source_summary)
+                                else:
+                                    # Fallback wenn keine echten Quellen: Zähle wenigstens real_sources
+                                    clean_value = f"{len(real_sources)} Quellen gefunden"
                         
                         # PHASE 1.2: Add data mit globalen Quellenreferenzen
                         mine_data['consolidated_fields'][final_field_name]['raw_values'].append(clean_value)
@@ -650,6 +685,21 @@ async def get_consolidated_results(
                         display_value = 'Nichts gefunden'  # PHASE 14.2: Einheitliche User-gewünschte Darstellung
                     best_values[field_name] = display_value
                 
+                # QUELLENREFERENZEN-FIX 24.08.2025: Sammle Quellenreferenzen für dieses Feld
+                field_global_source_numbers = []
+                supporting_sources = best_value_info.get('supporting_sources', [])
+                
+                if supporting_sources and global_source_index:
+                    for source_url in supporting_sources[:10]:  # Mehr URLs berücksichtigen für vollständige Referenzen
+                        try:
+                            for number, source_data in global_source_index.items():
+                                if isinstance(source_data, dict) and source_data.get('url') == source_url:
+                                    field_global_source_numbers.append(int(number))
+                                    break
+                        except (ValueError, TypeError, AttributeError) as e:
+                            logger.warning(f"Error converting source URL {source_url} to global number: {e}")
+                            continue
+                
                 # Erstelle detaillierte Aufschlüsselung für Modal
                 detailed_breakdown[field_name] = {
                     'best_value': best_value_info,
@@ -659,7 +709,9 @@ async def get_consolidated_results(
                         'unique_values': len(value_analysis),
                         'confidence_score': best_value_info['confidence_score'],
                         'total_real_sources': sum(len(detail['real_sources']) for detail in field_info['value_details'])
-                    }
+                    },
+                    # QUELLENREFERENZEN-FIX 24.08.2025: Füge globale Quellenreferenzen hinzu
+                    'global_source_numbers': sorted(list(set(field_global_source_numbers)))  # Eindeutige, sortierte Nummern
                 }
             
             # Sortiere Modell-Ergebnisse nach Timestamp
@@ -948,18 +1000,16 @@ async def get_mine_consolidated_details(
             if not mine_data['last_updated'] or result.search_timestamp > mine_data['last_updated']:
                 mine_data['last_updated'] = result.search_timestamp
             
-            # PHASE 2 FIX: Count unique sources only, not duplicates across models
-            for source in (result.sources or []):
-                # Extract URL from source (could be string or dict)
-                if isinstance(source, str):
-                    source_url = source
-                elif isinstance(source, dict) and source.get('url'):
-                    source_url = source['url']
-                else:
-                    continue
-                
-                # Add to unique sources set
-                mine_data['unique_sources'].add(source_url)
+            # QUELLENREFERENZEN-FIX 24.08.2025: Zähle nur tatsächlich verwendete Quellen, nicht Discovery-Quellen
+            # Sammle alle real_sources aus consolidated_fields (tatsächlich verwendete Quellen)
+            used_sources = set()
+            for field_info in mine_data['consolidated_fields'].values():
+                for real_source_list in field_info['real_sources']:
+                    for real_source_url in real_source_list:
+                        used_sources.add(real_source_url)
+            
+            # Aktualisiere unique_sources nur mit tatsächlich verwendeten Quellen
+            mine_data['unique_sources'].update(used_sources)
             
             # Update total_sources with unique count
             mine_data['total_sources'] = len(mine_data['unique_sources'])
@@ -1027,6 +1077,21 @@ async def get_mine_consolidated_details(
                     display_value = 'Nichts gefunden'
                 best_values[field_name] = display_value
             
+            # QUELLENREFERENZEN-FIX 24.08.2025: Sammle Quellenreferenzen für dieses Feld (auch für Einzelergebnisse)
+            field_global_source_numbers = []
+            supporting_sources = best_value_info.get('supporting_sources', [])
+            
+            if supporting_sources and global_source_index:
+                for source_url in supporting_sources[:10]:  # Mehr URLs berücksichtigen für vollständige Referenzen
+                    try:
+                        for number, source_data in global_source_index.items():
+                            if isinstance(source_data, dict) and source_data.get('url') == source_url:
+                                field_global_source_numbers.append(int(number))
+                                break
+                    except (ValueError, TypeError, AttributeError) as e:
+                        logger.warning(f"Error converting source URL {source_url} to global number: {e}")
+                        continue
+            
             # Detaillierte Aufschlüsselung
             detailed_breakdown[field_name] = {
                 'best_value': best_value_info,
@@ -1036,7 +1101,9 @@ async def get_mine_consolidated_details(
                     'unique_values': len(value_analysis),
                     'confidence_score': best_value_info['confidence_score'],
                     'total_real_sources': sum(len(detail['real_sources']) for detail in field_info['value_details'])
-                }
+                },
+                # QUELLENREFERENZEN-FIX 24.08.2025: Füge globale Quellenreferenzen hinzu (auch für Einzelergebnisse)
+                'global_source_numbers': sorted(list(set(field_global_source_numbers)))  # Eindeutige, sortierte Nummern
             }
         
         # Calculate overall confidence
@@ -1175,11 +1242,13 @@ async def export_consolidated_csv(
         # Metadaten-Felder
         for field_type in data_fields:
             if field_type == "mine_name":
-                row.append(result.get("mine_name", ""))
+                row.append(result.get("mine_name", "nichts gefunden"))
             elif field_type == "country": 
-                row.append(result.get("country", ""))
+                country_val = result.get("country", "")
+                row.append(_normalize_placeholder_value(country_val) if country_val else "nichts gefunden")
             elif field_type == "region":
-                row.append(result.get("region", ""))
+                region_val = result.get("region", "")
+                row.append(_normalize_placeholder_value(region_val) if region_val else "nichts gefunden")
             elif field_type == "overall_confidence":
                 row.append(str(result.get("overall_confidence", 0)) + "%")
             elif field_type == "model_count":
@@ -1210,8 +1279,39 @@ async def export_consolidated_csv(
                 row.append(escaped_sources)
             else:
                 value = result["best_values"].get(field, "")
+                # NULL-VALUE-DISPLAY-FIX 24.08.2025: Normalisiere NULL-Werte für CSV-Export
+                normalized_value = _normalize_placeholder_value(value) if value else "nichts gefunden"
+                
+                # QUELLENREFERENZEN-FIX 24.08.2025: Füge Quellenreferenzen hinzu (mit Fallback)
+                detailed_breakdown = result.get("detailed_breakdown", {})
+                source_ids = []
+                
+                if field in detailed_breakdown and normalized_value != "nichts gefunden":
+                    field_data = detailed_breakdown[field]
+                    # Primär: Verwende global_source_numbers
+                    source_ids = field_data.get('global_source_numbers', [])
+                    
+                    # Fallback: Wenn keine global_source_numbers, nutze structured_fields
+                    if not source_ids:
+                        structured_fields = result.get('structured_fields', {})
+                        if field in structured_fields:
+                            source_ids = structured_fields[field].get('global_source_numbers', [])
+                    
+                    # Fallback: Verwende best_value sources wenn verfügbar
+                    if not source_ids:
+                        best_value = field_data.get('best_value', {})
+                        supporting_sources = best_value.get('supporting_sources', [])
+                        if supporting_sources:
+                            # Erzeuge temporäre Nummern für unterstützende Quellen
+                            source_ids = list(range(1, min(len(supporting_sources) + 1, 11)))  # Max 10 Quellen
+                    
+                    if source_ids:
+                        # Füge Quellenreferenzen in eckigen Klammern hinzu
+                        source_refs = f"[{','.join(map(str, source_ids))}]"
+                        normalized_value = f"{normalized_value} {source_refs}"
+                
                 # Escape Pipe-Zeichen in Werten
-                escaped_value = str(value).replace("|", "\\|") if value else ""
+                escaped_value = str(normalized_value).replace("|", "\\|") if normalized_value else "nichts gefunden"
                 row.append(escaped_value)
         
         csv_lines.append("|".join(row))

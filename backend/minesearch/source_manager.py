@@ -95,27 +95,50 @@ class SourceManager:
         """
         found_sources = []
         
-        # Pattern für verschiedene URL-Formate
-        url_patterns = [
-            r'https?://[^\s\]]+',
-            r'www\.[^\s\]]+',
-            r'\[Quelle: ([^\]]+)\]',
-            r'Quelle: ([^\n\]]+)',
-            r'Source: ([^\n\]]+)',
-            r'\[(\d+)\]\s*(https?://[^\s\]]+)'
+        # Pattern für verschiedene URL-Formate und generische Quellen-Referenzen
+        source_patterns = [
+            # Echte URLs
+            (r'https?://[^\s\]]+', 'url'),
+            (r'www\.[^\s\]]+', 'url'),
+            (r'\[(\d+)\]\s*(https?://[^\s\]]+)', 'numbered_url'),
+            
+            # Generische Quellen-Referenzen (häufig in Provider-Responses)
+            (r'\[Quelle:\s*([^\]]+)\]', 'generic_source'),
+            (r'Quelle:\s*([^\n\]\.]+)', 'generic_source'),
+            (r'Source:\s*([^\n\]\.]+)', 'generic_source'),
+            (r'\[Source:\s*([^\]]+)\]', 'generic_source'),
+            
+            # Weitere mögliche Formate
+            (r'\[Ref:\s*([^\]]+)\]', 'reference'),
+            (r'Referenz:\s*([^\n\]\.]+)', 'reference'),
         ]
         
-        for pattern in url_patterns:
+        for pattern, source_type_hint in source_patterns:
             matches = re.finditer(pattern, response_text, re.IGNORECASE)
             for match in matches:
-                url = match.group(1) if len(match.groups()) > 0 else match.group(0)
+                if source_type_hint == 'numbered_url':
+                    url = match.group(2)
+                elif len(match.groups()) > 0:
+                    url = match.group(1)
+                else:
+                    url = match.group(0)
                 
-                # Bereinige URL
+                # Bereinige URL/Quelle
                 url = url.strip('.,;!? \n\r\t[])')
                 
-                # Validiere URL
-                if self._is_valid_url(url):
-                    # Klassifiziere Quelle
+                # Für generische Quellen: Behandle als "Quelle" auch wenn es keine URL ist
+                if source_type_hint in ['generic_source', 'reference']:
+                    # Generische Quelle hinzufügen (auch ohne gültige URL)
+                    source_type = self._classify_generic_source(url)
+                    reliability = self._calculate_generic_reliability(url, source_type)
+                    
+                    # Verwende beschreibenden "URL" für generische Quellen
+                    formatted_url = f"generic_source:{url}"
+                    source_id = self.add_source(formatted_url, url, source_type, reliability)
+                    if source_id not in found_sources:
+                        found_sources.append(source_id)
+                elif self._is_valid_url(url):
+                    # Echte URL
                     source_type = self._classify_source(url)
                     reliability = self._calculate_reliability(url, source_type)
                     
@@ -277,3 +300,36 @@ class SourceManager:
             base_score = min(1.0, base_score + 0.1)
         
         return base_score
+    
+    def _classify_generic_source(self, source_description: str) -> str:
+        """Klassifiziert generische Quellen-Beschreibungen"""
+        desc_lower = source_description.lower()
+        
+        if any(term in desc_lower for term in ['fachwissen', 'expert', 'knowledge', 'expertise']):
+            return 'expert_knowledge'
+        elif any(term in desc_lower for term in ['database', 'datenbank', 'data']):
+            return 'database'
+        elif any(term in desc_lower for term in ['company', 'unternehmen', 'corporate', 'reports']):
+            return 'corporate'
+        elif any(term in desc_lower for term in ['mining', 'bergbau', 'geological']):
+            return 'mining_industry'
+        elif any(term in desc_lower for term in ['government', 'regierung', 'official']):
+            return 'government'
+        elif any(term in desc_lower for term in ['research', 'forschung', 'study']):
+            return 'research'
+        else:
+            return 'general'
+    
+    def _calculate_generic_reliability(self, source_description: str, source_type: str) -> float:
+        """Berechnet Zuverlässigkeits-Score für generische Quellen"""
+        base_scores = {
+            'government': 0.9,
+            'research': 0.8,
+            'database': 0.7,
+            'expert_knowledge': 0.6,
+            'corporate': 0.5,
+            'mining_industry': 0.6,
+            'general': 0.4
+        }
+        
+        return base_scores.get(source_type, 0.4)
