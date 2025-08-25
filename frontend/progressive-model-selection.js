@@ -35,29 +35,82 @@ class ProgressiveModelSelection {
     
     async loadModels() {
         try {
+            // PROVIDER-STATUS 24.08.2025: Lade verfügbare und nicht verfügbare Modelle mit Grund
+            const availableResponse = await fetch(`${window.API_BASE_URL}/api/available-models`);
+            const availableData = await availableResponse.json();
+            
+            if (availableData.success && availableData.data) {
+                // Kombiniere verfügbare und nicht verfügbare Modelle
+                const availableModels = availableData.data.available_models || {};
+                const unavailableModels = availableData.data.unavailable_models || {};
+                
+                this.models = [
+                    // Verfügbare Modelle
+                    ...Object.entries(availableModels).map(([model_id, modelData]) => ({
+                        model_id: model_id,
+                        ...modelData,
+                        display_name: modelData.name || model_id,
+                        available: true,
+                        provider_status: 'healthy'
+                    })),
+                    // Nicht verfügbare Modelle
+                    ...Object.entries(unavailableModels).map(([model_id, modelData]) => ({
+                        model_id: model_id,
+                        ...modelData,
+                        display_name: modelData.name || model_id,
+                        available: false,
+                        provider_status: modelData.provider_status || 'error',
+                        error_reason: modelData.error || 'Provider nicht verfügbar'
+                    }))
+                ];
+                
+                this.organizeProviders();
+                
+                const availableCount = Object.keys(availableModels).length;
+                const unavailableCount = Object.keys(unavailableModels).length;
+                console.log(`📊 [MODEL-UX] Provider Status geladen: ${availableCount}✅ verfügbar, ${unavailableCount}❌ nicht verfügbar`);
+            } else {
+                console.log('📊 [MODEL-UX] Fallback zu legacy API...');
+                await this.loadLegacyModels();
+            }
+        } catch (error) {
+            console.error('❌ [MODEL-UX] Failed to load available models:', error);
+            // FALLBACK: Legacy API
+            await this.loadLegacyModels();
+        }
+    }
+
+    async loadLegacyModels() {
+        try {
             const response = await fetch(`${window.API_BASE_URL}/api/models`);
             const data = await response.json();
             
             if (data.success && data.models) {
                 // ÄNDERUNG 22.08.2025: Fix für API-Datenformat - Object zu Array konvertieren
                 if (Array.isArray(data.models)) {
-                    this.models = data.models;
+                    this.models = data.models.map(model => ({
+                        ...model,
+                        available: true,
+                        provider_status: 'unknown'
+                    }));
                 } else {
                     // Konvertiere Object zu Array mit model_id als Key
                     this.models = Object.entries(data.models).map(([model_id, modelData]) => ({
                         model_id: model_id,
                         ...modelData,
-                        display_name: modelData.name || model_id
+                        display_name: modelData.name || model_id,
+                        available: true,
+                        provider_status: 'unknown'
                     }));
                 }
                 this.organizeProviders();
-                console.log(`📊 [MODEL-UX] Loaded ${this.models.length} models from ${this.providers.size} providers`);
+                console.log(`📊 [MODEL-UX] Legacy: Loaded ${this.models.length} models from ${this.providers.size} providers`);
             } else {
                 console.log('📊 [MODEL-UX] No models in API response, extracting existing...');
                 this.extractExistingModels();
             }
         } catch (error) {
-            console.error('❌ [MODEL-UX] Failed to load models:', error);
+            console.error('❌ [MODEL-UX] Legacy API failed:', error);
             // FALLBACK: Use existing models if API fails
             this.extractExistingModels();
         }
@@ -89,8 +142,8 @@ class ProgressiveModelSelection {
         }
         
         this.models.forEach(model => {
-            // ÄNDERUNG 22.08.2025: Fix für API-Feld-Namen - provider statt provider_name
-            const provider = model.provider || model.provider_name || 'unknown';
+            // ÄNDERUNG 24.08.2025: Verwende provider_category für UI-Gruppierung statt technischen provider
+            const provider = model.provider_category || model.provider || model.provider_name || 'unknown';
             if (!this.providers.has(provider)) {
                 this.providers.set(provider, []);
             }
@@ -173,8 +226,13 @@ class ProgressiveModelSelection {
             displayName: this.getProviderDisplayName(name)
         })).sort((a, b) => b.count - a.count);
         
-        // Get free models count
-        const freeModels = this.models.filter(model => model.is_free === true);
+        // Get free models count - KOSTENLOS-FIX 24.08.2025: Multiple detection methods
+        const freeModels = this.models.filter(model => 
+            model.is_free === true || 
+            (model.display_name && model.display_name.toLowerCase().includes('kostenlos')) ||
+            (model.name && model.name.toLowerCase().includes('kostenlos')) ||
+            (model.model_id && model.model_id.toLowerCase().includes('free'))
+        );
         
         // Get top performance models (empirisch basiert auf bekannten starken Modellen)
         const topPerformanceModels = this.getTopPerformanceModels();
@@ -184,9 +242,12 @@ class ProgressiveModelSelection {
                 <h3 style="margin-bottom: var(--space-lg); color: var(--gray-800); display: flex; align-items: center; gap: var(--space-sm);">
                     🤖 Model Selection
                     <span style="background: var(--primary-100); color: var(--primary-700); padding: 4px 8px; border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: 600;">
-                        ${this.models.length} verfügbar
+                        ${this.models.filter(m => m.available !== false).length}✅ verfügbar, ${this.models.filter(m => m.available === false).length}❌ nicht verfügbar
                     </span>
                 </h3>
+                
+                <!-- PROVIDER STATUS OVERVIEW 24.08.2025 -->
+                ${this.renderProviderStatusOverview()}
                 
                 <!-- Smart Quick Selection Pills -->
                 <div class="quick-model-selection">
@@ -207,7 +268,7 @@ class ProgressiveModelSelection {
                     </div>
                     
                     <!-- Provider Groups -->
-                    ${providerStats.slice(0, 4).map(provider => `
+                    ${providerStats.map(provider => `
                         <div class="quick-model-pill provider-selection" data-provider="${provider.name}">
                             ${provider.displayName}
                             <span class="count">${provider.count}</span>
@@ -245,7 +306,7 @@ class ProgressiveModelSelection {
                 <!-- Selection Summary -->
                 <div class="selection-summary">
                     <div class="selected-models-count">
-                        <strong id="selected-count">0</strong> Modelle ausgewählt
+                        <strong data-selection-counter>0</strong> Modelle ausgewählt
                     </div>
                     <button class="clear-selection-btn" style="display: none;">
                         Alle abwählen
@@ -266,19 +327,85 @@ class ProgressiveModelSelection {
         this.updateSelectionSummary();
     }
     
+    renderProviderStatusOverview() {
+        // PROVIDER STATUS OVERVIEW 24.08.2025: Zeige Provider-Probleme auf einen Blick
+        const providerStats = new Map();
+        
+        this.models.forEach(model => {
+            const provider = model.provider || model.model_id?.split(':')[0] || 'unknown';
+            if (!providerStats.has(provider)) {
+                providerStats.set(provider, { available: 0, unavailable: 0, errors: [] });
+            }
+            
+            const stats = providerStats.get(provider);
+            if (model.available === false) {
+                stats.unavailable++;
+                if (model.error_reason && !stats.errors.includes(model.error_reason)) {
+                    stats.errors.push(model.error_reason);
+                }
+            } else {
+                stats.available++;
+            }
+        });
+        
+        const problemProviders = Array.from(providerStats.entries())
+            .filter(([provider, stats]) => stats.unavailable > 0)
+            .sort((a, b) => b[1].unavailable - a[1].unavailable);
+        
+        if (problemProviders.length === 0) {
+            return `
+                <div class="provider-status-overview" style="margin-bottom: var(--space-lg);">
+                    <div style="background: var(--success-50); color: var(--success-800); padding: var(--space-sm); border-radius: var(--radius-md); font-size: 0.9rem;">
+                        ✅ Alle Provider funktionsfähig
+                    </div>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="provider-status-overview" style="margin-bottom: var(--space-lg);">
+                <div class="provider-problems" style="background: var(--warning-50); border: 1px solid var(--warning-200); border-radius: var(--radius-md); padding: var(--space-sm);">
+                    <div style="color: var(--warning-800); font-weight: 600; margin-bottom: var(--space-xs); font-size: 0.9rem;">
+                        ⚠️ Provider mit Problemen:
+                    </div>
+                    ${problemProviders.map(([provider, stats]) => `
+                        <div style="font-size: 0.8rem; color: var(--warning-700); margin-bottom: 2px;">
+                            <strong>${this.getProviderDisplayName(provider)}:</strong> 
+                            ${stats.unavailable}/${stats.available + stats.unavailable} Modelle nicht verfügbar
+                            ${stats.errors.length > 0 ? `(${stats.errors.join(', ')})` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
     renderModelsGrid(provider) {
         const modelsToShow = provider === 'all' ? this.models : (this.providers.get(provider) || []);
         
-        return modelsToShow.map(model => `
-            <div class="model-card" data-model-id="${model.model_id || ''}">
-                <input type="checkbox" name="model" value="${model.model_id || ''}" ${this.selectedModels.has(model.model_id) ? 'checked' : ''}>
-                <div class="model-provider">${this.getProviderDisplayName(model.provider_name || model.model_id?.split(':')[0])}</div>
-                <div class="model-name">${model.display_name || model.model_name || model.model_id || 'Unknown Model'}</div>
-                <div class="model-description">
-                    ${this.getModelDescription(model)}
+        return modelsToShow.map(model => {
+            const isAvailable = model.available !== false;
+            const isDisabled = !isAvailable;
+            const statusClass = isAvailable ? 'model-available' : 'model-unavailable';
+            const statusIcon = isAvailable ? '✅' : '❌';
+            const statusText = isAvailable ? '' : `❌ ${model.error_reason || 'Nicht verfügbar'}`;
+            
+            return `
+                <div class="model-card ${statusClass}" data-model-id="${model.model_id || ''}">
+                    <input type="checkbox" name="model" value="${model.model_id || ''}" 
+                           ${this.selectedModels.has(model.model_id) ? 'checked' : ''} 
+                           ${isDisabled ? 'disabled' : ''}>
+                    <div class="model-provider">
+                        ${statusIcon} ${this.getProviderDisplayName(model.provider_category || model.provider_name || model.provider || model.model_id?.split(':')[0])}
+                    </div>
+                    <div class="model-name">${model.display_name || model.model_name || model.model_id || 'Unknown Model'}</div>
+                    <div class="model-description">
+                        ${isAvailable ? this.getModelDescription(model) : `<span class="error-message">${statusText}</span>`}
+                    </div>
+                    ${!isAvailable ? `<div class="model-status-details">Status: ${model.provider_status}</div>` : ''}
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
     
     getProviderDisplayName(provider) {
@@ -297,10 +424,10 @@ class ProgressiveModelSelection {
             'openai': 'OpenAI',
             'anthropic': 'Anthropic',
             'gemini': 'Google Gemini',
-            'grok': 'Grok (X.AI)',
+            'grok': 'xAI Grok',
             'scrapingbee': 'ScrapingBee',
             'firecrawl': 'Firecrawl',
-            'brightdata': 'Bright Data'
+            'brightdata': 'BrightData',
         };
         return displayNames[provider] || provider.charAt(0).toUpperCase() + provider.slice(1);
     }
@@ -356,18 +483,25 @@ class ProgressiveModelSelection {
         
         switch (selectionType) {
             case 'free':
-                modelsToToggle = this.models.filter(model => model.is_free === true);
-                console.log(`💰 [MODEL-UX] Free models found: ${modelsToToggle.length}`);
+                // KOSTENLOS-FIX 24.08.2025: Erweiterte kostenlos-Erkennung
+                modelsToToggle = this.models.filter(model => 
+                    (model.is_free === true || 
+                     (model.display_name && model.display_name.toLowerCase().includes('kostenlos')) ||
+                     (model.name && model.name.toLowerCase().includes('kostenlos')) ||
+                     (model.model_id && model.model_id.toLowerCase().includes('free'))) &&
+                    model.available !== false
+                );
+                console.log(`💰 [MODEL-UX] Available free models found: ${modelsToToggle.length}`);
                 break;
                 
             case 'top3':
-                modelsToToggle = this.getTopPerformanceModels();
-                console.log(`🏆 [MODEL-UX] Top 3 models found: ${modelsToToggle.length}`);
+                modelsToToggle = this.getTopPerformanceModels().filter(model => model.available !== false);
+                console.log(`🏆 [MODEL-UX] Available top 3 models found: ${modelsToToggle.length}`);
                 break;
                 
             case 'all':
-                modelsToToggle = this.models;
-                console.log(`🌟 [MODEL-UX] All models: ${modelsToToggle.length}`);
+                modelsToToggle = this.models.filter(model => model.available !== false);
+                console.log(`🌟 [MODEL-UX] All available models: ${modelsToToggle.length}`);
                 break;
                 
             default:
@@ -546,48 +680,21 @@ class ProgressiveModelSelection {
     updateSelectionSummary() {
         console.log(`🔢 [MODEL-UX] updateSelectionSummary called, selectedModels.size: ${this.selectedModels.size}`);
         
-        const countElement = document.getElementById('selected-count');
-        const countElement2 = document.getElementById('selected-models-count'); // Legacy compatibility
+        const count = this.selectedModels.size;
         const clearButton = document.querySelector('.clear-selection-btn');
         
-        // ÄNDERUNG 23.08.2025: Erweiterte Zähler-Aktualisierung für alle möglichen Elemente
-        
-        // Update Haupt-Zähler
-        if (countElement) {
-            console.log(`🔢 [MODEL-UX] Updating selected-count: ${countElement.textContent} → ${this.selectedModels.size}`);
-            countElement.textContent = this.selectedModels.size;
-        } else {
-            console.log(`❌ [MODEL-UX] selected-count element not found`);
-        }
-        
-        // Update Legacy-Zähler
-        if (countElement2) {
-            console.log(`🔢 [MODEL-UX] Updating selected-models-count: ${countElement2.textContent} → ${this.selectedModels.size}`);
-            countElement2.textContent = this.selectedModels.size;
-        } else {
-            console.log(`❌ [MODEL-UX] selected-models-count element not found`);
-        }
-        
-        // Update alle Zähler-Elemente die nur eine Zahl enthalten (spezifischer Selector)
-        const specificCounters = document.querySelectorAll('.selected-models-count strong, .selection-summary strong');
-        specificCounters.forEach((counter, index) => {
-            if (counter.textContent.trim().match(/^\d+$/) && counter.parentElement.textContent.includes('Modelle ausgewählt')) {
-                counter.textContent = this.selectedModels.size;
-            }
+        // Update all counter elements with data-selection-counter attribute
+        document.querySelectorAll('[data-selection-counter]').forEach(element => {
+            element.textContent = count;
         });
         
-        // FALLBACK: Direkte Textinhalt-Ersetzung für "X Modelle ausgewählt" Pattern
-        const textNodes = document.evaluate("//text()[contains(., 'Modelle ausgewählt') and string-length(.) < 50]", document, null, XPathResult.UNORDERED_NODE_SNAPSHOT_TYPE, null);
-        for (let i = 0; i < textNodes.snapshotLength; i++) {
-            const textNode = textNodes.snapshotItem(i);
-            if (textNode && textNode.textContent.match(/^\d+ Modelle ausgewählt$/)) {
-                textNode.textContent = `${this.selectedModels.size} Modelle ausgewählt`;
-            }
+        // Update clear button visibility
+        if (clearButton) {
+            clearButton.style.display = count > 0 ? 'block' : 'none';
         }
         
-        if (clearButton) {
-            clearButton.style.display = this.selectedModels.size > 0 ? 'block' : 'none';
-        }
+        // Update pill states (inline implementation)
+        this.updateProviderPillStates();
         
         // Update smart selection pills
         document.querySelectorAll('.smart-selection').forEach(pill => {
@@ -596,7 +703,13 @@ class ProgressiveModelSelection {
             
             switch (selectionType) {
                 case 'free':
-                    relevantModels = this.models.filter(model => model.is_free === true);
+                    // KOSTENLOS-FIX 24.08.2025: Erweiterte kostenlos-Erkennung
+                    relevantModels = this.models.filter(model => 
+                        model.is_free === true || 
+                        (model.display_name && model.display_name.toLowerCase().includes('kostenlos')) ||
+                        (model.name && model.name.toLowerCase().includes('kostenlos')) ||
+                        (model.model_id && model.model_id.toLowerCase().includes('free'))
+                    );
                     break;
                 case 'top3':
                     relevantModels = this.getTopPerformanceModels();
@@ -633,6 +746,23 @@ class ProgressiveModelSelection {
             ).length;
             
             pill.classList.toggle('selected', selectedFromProvider === providerModels.length && providerModels.length > 0);
+        });
+    }
+    
+    updateProviderPillStates() {
+        // Update provider-specific pill states
+        document.querySelectorAll('.provider-pill, .quick-model-pill[data-provider]').forEach(pill => {
+            const provider = pill.dataset.provider;
+            if (provider && this.providers.has(provider)) {
+                const providerModels = this.providers.get(provider);
+                const selectedFromProvider = providerModels.filter(model => 
+                    this.selectedModels.has(model.model_id)
+                ).length;
+                
+                // Update visual state based on selection
+                pill.classList.toggle('selected', selectedFromProvider === providerModels.length && providerModels.length > 0);
+                pill.classList.toggle('partial', selectedFromProvider > 0 && selectedFromProvider < providerModels.length);
+            }
         });
     }
     
