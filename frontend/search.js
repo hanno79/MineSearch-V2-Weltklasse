@@ -165,8 +165,8 @@ async function startBatchSearch() {
     const batchCount = batchCountElement ? parseInt(batchCountElement.value) : 3; // Default: 3
     
     // Validierung
-    if (batchMode === 'limited' && (isNaN(batchCount) || batchCount < 1 || batchCount > 100)) {
-        showNotification('Die Anzahl der Minen muss zwischen 1 und 100 liegen.', 'warning');
+    if (batchMode === 'limited' && (isNaN(batchCount) || batchCount < 1 || batchCount > 10000)) {
+        showNotification('Die Anzahl der Minen muss zwischen 1 und 10000 liegen.', 'warning');
         return;
     }
     
@@ -225,9 +225,22 @@ async function startBatchSearch() {
         const sessionId = sessionIdMatch[1];
         console.log(`🎯 [BATCH-STEP-1] Session ID extracted: ${sessionId}`);
         
-        // Update UI for batch search phase
+        // Extract mine count from HTML response for better user feedback
+        const mineCountMatch = uploadHtml.match(/<strong>(\d+) Minen<\/strong> wurden erkannt/);
+        const mineCount = mineCountMatch ? parseInt(mineCountMatch[1]) : 'unbekannt';
+        console.log(`📊 [BATCH-STEP-1] Mine count extracted: ${mineCount}`);
+        
+        // Calculate expected results based on batch mode
+        let expectedResults = '';
+        if (batchMode === 'all') {
+            expectedResults = `Verarbeitung aller ${mineCount} Minen`;
+        } else {
+            expectedResults = `Verarbeitung der ersten ${batchCount} von ${mineCount} Minen`;
+        }
+        
+        // Update UI for batch search phase with mine count feedback
         showLoadingMessage(resultsDiv, `${searchTypeText} läuft...`, 
-            `Session: ${sessionId.substring(0, 8)}... | Verarbeitung mit ${selectedModels.length} Modellen`, 
+            `✅ CSV verarbeitet: ${mineCount} Minen gefunden | ${expectedResults} mit ${selectedModels.length} Modellen`, 
             false, true, 'cancelBatchSearch()' // Don't restart timer, continue from upload phase, show cancel button
         );
         
@@ -541,7 +554,7 @@ async function loadModelsForFilter() {
                 <!-- Selection Summary -->
                 <div class="selection-summary">
                     <div class="selected-count">
-                        <strong id="selected-models-count">3</strong> Modelle ausgewählt
+                        <strong data-selection-counter>3</strong> Modelle ausgewählt
                     </div>
                     <button type="button" class="clear-selection" onclick="clearAllModels()" style="display: none;">
                         Alle abwählen
@@ -1178,13 +1191,13 @@ function updateSelectionCounter() {
         console.log(`🔢 [SEARCH-JS] Using DOM checkbox count: ${selectedCount}`);
     }
     
-    const counterElement = document.getElementById('selected-models-count');
     const clearButton = document.querySelector('.clear-selection');
     
-    if (counterElement) {
-        console.log(`🔢 [SEARCH-JS] Updating selected-models-count: ${counterElement.textContent} → ${selectedCount}`);
-        counterElement.textContent = selectedCount;
-    }
+    // Update all counter elements with data-selection-counter attribute
+    document.querySelectorAll('[data-selection-counter]').forEach(element => {
+        console.log(`🔢 [SEARCH-JS] Updating counter: ${element.textContent} → ${selectedCount}`);
+        element.textContent = selectedCount;
+    });
     
     if (clearButton) {
         clearButton.style.display = selectedCount > 0 ? 'block' : 'none';

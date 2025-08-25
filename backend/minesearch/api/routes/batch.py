@@ -244,10 +244,6 @@ async def upload_csv(csv_file: UploadFile = File(...)):
             if i == 0:
                 columns = list(row.keys())
             mines.append(row)
-            
-            # Limit für Demo
-            if i >= 100:
-                break
         
         # Erstelle Session
         import uuid
@@ -295,7 +291,7 @@ async def upload_csv(csv_file: UploadFile = File(...)):
                             <label><input type="radio" name="search_all" value="false" checked> Nur erste 5 Minen (schnell)</label>
                         </div>
                         <div style="margin: 10px 0;">
-                            <label><input type="radio" name="search_all" value="false"> Erste <input type="number" name="count" value="20" min="1" max="100" style="width: 60px;"> Minen</label>
+                            <label><input type="radio" name="search_all" value="false"> Erste <input type="number" name="count" value="20" min="1" max="10000" style="width: 60px;"> Minen</label>
                         </div>
                         <div style="margin: 10px 0;">
                             <label><input type="radio" name="search_all" value="true"> <strong>Alle {mine_count} Minen durchsuchen</strong></label>
