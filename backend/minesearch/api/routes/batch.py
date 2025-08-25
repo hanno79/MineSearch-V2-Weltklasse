@@ -11,6 +11,13 @@ import csv
 import io
 import logging
 import asyncio
+try:
+    import fcntl
+    HAS_FCNTL = True
+except ImportError:
+    fcntl = None
+    HAS_FCNTL = False
+import os
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -22,9 +29,78 @@ from minesearch.providers.registry import provider_registry
 from minesearch.database import db_manager
 from minesearch.extraction_validators import is_placeholder_value
 from minesearch.html_utils import create_batch_results_table
+# BATCH-FIX 23.08.2025: Import MultiModelSearchOrchestrator für Provider-Suche
+from minesearch.multi_model_search_orchestrator import MultiModelSearchOrchestrator
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+def safe_write_to_file(filepath: str, content: str, mode: str = 'a'):
+    """
+    Thread-safe file writing with fcntl locking
+    
+    Args:
+        filepath: Path to the file
+        content: Content to write
+        mode: File mode ('a' for append, 'w' for overwrite)
+    """
+    try:
+        with open(filepath, mode, encoding='utf-8') as f:
+            # Acquire exclusive lock if fcntl is available
+            if HAS_FCNTL:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            try:
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())  # Ensure data is written to disk
+            finally:
+                # Lock is automatically released when file is closed
+                pass
+    except (IOError, OSError) as e:
+        logger.error(f"Failed to write to {filepath}: {e}")
+        # Fallback to regular logging
+        logger.info(f"[DEBUG-FILE-FALLBACK] {content.strip()}")
+
+# Alternative: Use application logging infrastructure (recommended)
+def create_batch_debug_logger():
+    """
+    Creates a dedicated logger for batch debug information
+    Uses the application's thread-safe logging infrastructure
+    """
+    debug_logger = logging.getLogger(f"{__name__}.batch_debug")
+    
+    # Only add handler if not already configured
+    if not debug_logger.handlers:
+        try:
+            handler = logging.FileHandler("/tmp/batch_debug.log", mode='a', encoding='utf-8')
+            formatter = logging.Formatter(
+                '%(asctime)s - %(levelname)s - %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
+            )
+            handler.setFormatter(formatter)
+            debug_logger.addHandler(handler)
+            debug_logger.setLevel(logging.INFO)
+            debug_logger.propagate = False  # Don't propagate to parent loggers
+        except (IOError, OSError) as e:
+            # Fallback: If file logging fails, use console logging
+            logger.warning(f"Failed to create batch debug log file: {e}")
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('[BATCH-DEBUG] %(message)s')
+            handler.setFormatter(formatter)
+            debug_logger.addHandler(handler)
+            debug_logger.setLevel(logging.INFO)
+            debug_logger.propagate = False
+    
+    return debug_logger
+
+# Initialize the batch debug logger with error handling
+try:
+    batch_debug_logger = create_batch_debug_logger()
+except Exception as e:
+    logger.error(f"Failed to initialize batch debug logger: {e}")
+    # Create a minimal fallback logger
+    batch_debug_logger = logging.getLogger(f"{__name__}.batch_debug_fallback")
+    batch_debug_logger.addHandler(logging.NullHandler())  # Silent fallback
 
 def count_filled_fields(structured_data):
     """Zählt echte (nicht-leere) Felder in structured_data"""
@@ -291,12 +367,19 @@ async def batch_search(
         columns = session_data['columns']
         logger.info(f"Batch-Suche für Session {session_id} mit {len(mines)} Minen")
         
-        # Bestimme wie viele Minen gesucht werden
+        # Bestimme wie viele Minen gesucht werden - ERWEITERTE DEBUG-INFO 24.08.2025
+        logger.info(f"[BATCH-MINE-SELECTION] Parameters - search_all: '{search_all}', count: {count}")
+        logger.info(f"[BATCH-MINE-SELECTION] CSV enthält {len(mines)} Minen total")
+        
         if search_all == "true":
             mines_to_search = mines
+            logger.info(f"[BATCH-MINE-SELECTION] ✅ ALLE MINEN MODUS - verarbeite {len(mines_to_search)} Minen")
         else:
-            mines_to_search = mines[:count] if count else mines[:5]
-        logger.info(f"Anzahl zu durchsuchender Minen: {len(mines_to_search)}")
+            limit = count if count else 5
+            mines_to_search = mines[:limit]
+            logger.info(f"[BATCH-MINE-SELECTION] 🧪 BEGRENZT MODUS - verarbeite erste {limit} von {len(mines)} Minen")
+            
+        logger.info(f"[BATCH-MINE-SELECTION] 🎯 FINALE ENTSCHEIDUNG: {len(mines_to_search)} Minen werden durchsucht")
         
         # IMPROVED 19.07.2025: Vereinfachte und robuste Model-Auswahl
         models_to_use = []
@@ -304,7 +387,8 @@ async def batch_search(
         # 1. Priorität: selected_models (Frontend Liste)
         if selected_models and selected_models.strip():
             models_to_use = [m.strip() for m in selected_models.split(',') if m.strip()]
-            logger.info(f"[BATCH-MODELS] Frontend selection: {models_to_use}")
+            logger.info(f"[BATCH-MODELS] Frontend ausgewählt: {len(models_to_use)} Modelle")
+            logger.info(f"[BATCH-MODELS] User erwartete {len(models_to_use)} Modelle, prüfe Provider-Verfügbarkeit...")
         
         # 2. Fallback: einzelnes model Parameter (Legacy)
         elif model and model.strip():
@@ -356,10 +440,16 @@ async def batch_search(
         logger.info(f"[BATCH-DEBUG] mines_to_search count: {len(mines_to_search)}")
         logger.info(f"[BATCH-DEBUG] search_all: {search_all}, count: {count}")
         
-        # KRITISCHES DEBUG-LOGGING IN DATEI
-        with open("/tmp/batch_debug.log", "w") as f:
-            f.write(f"[BATCH-ROUTE] Batch-Route aufgerufen! mines_to_search: {len(mines_to_search)}\n")
-            f.write(f"[BATCH-ROUTE] Modelle: {models_to_use}\n")
+        # THREAD-SAFE DEBUG-LOGGING (using application logging infrastructure)
+        batch_debug_logger.info(f"[BATCH-ROUTE] Batch-Route aufgerufen! mines_to_search: {len(mines_to_search)}")
+        batch_debug_logger.info(f"[BATCH-ROUTE] Modelle: {models_to_use}")
+        
+        # Alternative: File locking approach (commented out - use logging above instead)
+        # debug_content = (
+        #     f"[BATCH-ROUTE] Batch-Route aufgerufen! mines_to_search: {len(mines_to_search)}\n"
+        #     f"[BATCH-ROUTE] Modelle: {models_to_use}\n"
+        # )
+        # safe_write_to_file("/tmp/batch_debug.log", debug_content, mode='w')
         
         for idx, mine in enumerate(mines_to_search):
             # ERWEITERTE FIELD-MAPPING für Quebec-CSV und internationale Formate
@@ -400,9 +490,8 @@ async def batch_search(
             # SUCCESS: Mine erfolgreich geparst
             logger.info(f"[BATCH-SUCCESS] Mine {idx+1}: '{mine_name}' in {country}, {region}")
             
-            # DEBUG-DATEI UPDATE
-            with open("/tmp/batch_debug.log", "a") as f:
-                f.write(f"[BATCH-MINE] Processing mine {idx+1}: '{mine_name}'\n")
+            # THREAD-SAFE DEBUG-LOGGING (using application logging infrastructure)
+            batch_debug_logger.info(f"[BATCH-MINE] Processing mine {idx+1}: '{mine_name}'")
                 
             logger.info(f"Suche {idx+1}/{len(mines_to_search)}: {mine_name}")
             
@@ -513,9 +602,45 @@ async def batch_search(
                         logger.info(f"[BATCH-FALLBACK] Keine ausreichenden DB-Ergebnisse - starte Provider-Suche für {mine_name}")
                         individual_results = []
                         
-                        # TEMPORÄR DEAKTIVIERT: Provider-Suche wegen Syntaxfehler
-                        logger.info(f"[BATCH-FALLBACK] Provider-Suche temporär deaktiviert - verwende Fallback-Daten")
-                        individual_results = [{"model_id": "fallback", "success": False, "error": "Provider search disabled"}]
+                        # BATCH-FIX 23.08.2025: Provider-Suche mit MultiModelSearchOrchestrator reaktiviert
+                        try:
+                            logger.info(f"[BATCH-ORCHESTRATOR] Starte Provider-Suche für {mine_name} mit {len(models_to_use)} Modellen")
+                            orchestrator = MultiModelSearchOrchestrator()
+                            
+                            orchestration_result = await orchestrator.orchestrate_multi_model_search(
+                                mine_name=mine_name,
+                                models=models_to_use,
+                                country=country,
+                                region=region,
+                                commodity=commodity
+                            )
+                            
+                            # Konvertiere Orchestration-Ergebnisse zu individual_results Format
+                            individual_results = []
+                            
+                            # Erfolgreiche Modelle
+                            for model_result in orchestration_result.successful_models:
+                                individual_results.append({
+                                    'model_id': model_result.model_id,
+                                    'success': True,
+                                    'data': model_result.data,
+                                    'sources': model_result.sources
+                                })
+                            
+                            # Fehlgeschlagene Modelle
+                            for model_result in orchestration_result.failed_models:
+                                individual_results.append({
+                                    'model_id': model_result.model_id,
+                                    'success': False,
+                                    'error': model_result.error or 'Search failed'
+                                })
+                            
+                            logger.info(f"[BATCH-ORCHESTRATOR] Orchestrierung erfolgreich: {len(orchestration_result.successful_models)} erfolgreich, {len(orchestration_result.failed_models)} fehlgeschlagen")
+                        
+                        except Exception as orchestrator_error:
+                            logger.error(f"[BATCH-ORCHESTRATOR] Orchestrator fehler für {mine_name}: {str(orchestrator_error)}")
+                            # Fallback: Verwende Fallback-Daten bei Orchestrator-Fehler
+                            individual_results = [{"model_id": "fallback", "success": False, "error": f"Orchestrator failed: {str(orchestrator_error)}"}]
                     
                     # Verarbeite direkte Provider-Ergebnisse
                     successful_models = [r for r in individual_results if r['success']]
@@ -641,10 +766,7 @@ async def batch_search(
         # OPTIMIERT: Fallback-Logik bereits in Hauptschleife integriert - keine doppelten Provider-Aufrufe mehr
         
         # Erstelle HTML-Antwort mit optimierten results (Fallback bereits in Hauptschleife integriert)
-        import importlib
-        import minesearch.html_utils
-        importlib.reload(minesearch.html_utils)
-        from minesearch.html_utils import create_batch_results_table
+        # Note: create_batch_results_table is imported at module scope (line 26)
         html_content = create_batch_results_table(results)
         
         # Speichere Ergebnisse im Cache für Download
@@ -681,8 +803,7 @@ async def get_batch_results(cache_key: str):
     if cache_key not in batch_results_cache:
         raise HTTPException(status_code=404, detail="Keine Ergebnisse gefunden")
     
-    from minesearch.html_utils import create_batch_results_table
-    
+    # Note: create_batch_results_table is imported at module scope (line 26)
     results = batch_results_cache[cache_key]
     html = create_batch_results_table(results)
     

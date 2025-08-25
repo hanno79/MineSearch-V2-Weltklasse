@@ -25,6 +25,7 @@ from minesearch.extraction_processors import (
     is_template_or_dummy_value
 )
 from minesearch.source_manager import SourceManager
+from minesearch.field_name_blacklist import is_field_name_value
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +50,8 @@ class DataExtractor:
             Passender Status-Marker für das Feld
         """
         if not activity_status:
-            # FALLBACK: X-Marker wenn Aktivitätsstatus unbekannt - REGEL 10 KONFORM
-            return 'X'  # Fallback für "nicht gefunden"
+            # REGEL 10 KONFORM: Leeres Feld lassen statt ausgedachten Marker
+            return ''  # Echte "nicht gefunden" - kein Dummy-Marker
             
         activity_lower = activity_status.lower()
         
@@ -71,8 +72,8 @@ class DataExtractor:
                 elif 'entwicklung' in activity_lower:
                     return 'in Entwicklung'
                     
-        # FALLBACK: X-Marker für unbehandelte Status-Kombinationen - REGEL 10 KONFORM  
-        return 'X'  # Fallback wenn kein spezifischer Status-Marker passt
+        # REGEL 10 KONFORM: Kein Fallback-Marker - leer lassen wenn unbekannt  
+        return ''  # Echte "nicht gefunden" - kein Dummy-Marker
     
     def _should_set_status_marker(self, field: str, activity_status: str) -> bool:
         """
@@ -108,17 +109,17 @@ class DataExtractor:
     
     def _is_valid_data_value(self, value: str, field: str) -> bool:
         """
-        CLEAN DATA AT SOURCE - Data Quality Gate
+        CLEAN DATA AT SOURCE - Enhanced Data Quality Gate (25.08.2025)
         
         Prüft ob ein extrahierter Wert ein echter Datenwert ist oder ein Template/Dummy-Wert.
-        Template/Dummy-Werte werden abgelehnt und als NULL in die DB gespeichert.
+        Template/Dummy-Werte und Feldnamen werden abgelehnt und als NULL in die DB gespeichert.
         
         Args:
             value: Zu prüfender Wert
             field: Feldname für spezifische Validierung
             
         Returns:
-            True wenn echter Datenwert, False wenn Template/Dummy
+            True wenn echter Datenwert, False wenn Template/Dummy/Feldname
         """
         if not value or not str(value).strip():
             return False
@@ -127,6 +128,12 @@ class DataExtractor:
         value_lower = value_str.lower()
         
         logger.debug(f"[DATA QUALITY GATE] Validiere Wert '{value_str}' für Feld '{field}'")
+        
+        # 0. KRITISCHER FELDNAMEN-CHECK (25.08.2025) - HÖCHSTE PRIORITÄT
+        # Verhindert dass Feldnamen als Werte gespeichert werden (111 Einträge mit "x-Koordinate" Problem)
+        if is_field_name_value(value_str, field):
+            logger.error(f"[CRITICAL FIELD-NAME-CHECK] Feldname als Wert erkannt: '{value_str}' für Feld '{field}' → BLOCKIERT")
+            return False
         
         # 1. PRE-EXTRACTION TEMPLATE/DUMMY DETECTION - ABSOLUTE PRIORITY
         # Nutze die dedizierte Template-Detection aus extraction_processors.py
@@ -454,11 +461,14 @@ class DataExtractor:
             elif 'CAD$10000' in resto or 'USD$10000' in resto:
                 logger.warning(f"Unrealistischer Restaurationskostenwert entfernt: {resto}")
                 data['Restaurationskosten'] = ""
-            # Prüfe auf Werte ohne Quellennachweis (wenn kein Jahr oder keine Details)
-            elif not any(year in resto for year in ['20', '19']) and 'million' in resto.lower():
-                # Wenn keine Jahreszahl (20xx oder 19xx) vorhanden ist, ist es wahrscheinlich ein Dummy
-                logger.warning(f"Restaurationskosten ohne Zeitangabe entfernt: {resto}")
+            # BUGFIX 23.08.2025: Verbesserte Validierung - echte Kosten nicht mehr entfernen  
+            # Prüfe nur auf offensichtliche Dummy-Patterns ohne Jahresangabe
+            elif (not any(year in resto for year in ['20', '19']) and 'million' in resto.lower() 
+                  and re.match(r'^[\$€£]?\s*[1-9]\.0+\s*(million|mio|millionen)\s*(USD|CAD|EUR|AUD)?$', resto, re.IGNORECASE)):
+                # Nur offensichtliche Dummy-Pattern wie "$1.0 million", "$2.0 million" ohne Jahresangabe
+                logger.warning(f"Dummy-Restaurationskosten-Pattern ohne Zeitangabe entfernt: {resto}")
                 data['Restaurationskosten'] = ""
+            # ERLAUBT: Echte Werte wie "150.0 Millionen CAD" werden NICHT mehr gefiltert
         
         return data
     
@@ -475,19 +485,49 @@ class DataExtractor:
         Returns:
             Dict mit extrahierten Daten und Quellenreferenzen
         """
-        # Basis-Extraktion
+        # QUELLENREFERENZEN-FIX 24.08.2025: Verwende SourceManager für konsistente Nummerierung
+        # Basis-Extraktion (bereits mit SourceManager-Integration)
         data = self.extract_structured_data(content, mine_name, country)
         
-        # Quellen extrahieren
-        all_sources = extract_sources_from_content(content)
+        # SourceManager wurde bereits in extract_structured_data verwendet
+        # Erstelle data_with_sources basierend auf den nummerierten Quellen
+        data_with_sources = {}
+        source_mapping = data.get('_source_mapping', {})
+        field_sources = source_mapping.get('field_sources', {})
         
-        # Quellen zu Daten zuordnen
-        data_with_sources = assign_sources_to_data(data, content, all_sources)
+        for field, value in data.items():
+            if field == '_source_mapping':  # Interne Datenstruktur überspringen
+                continue
+                
+            if not value or field in FIELDS_WITHOUT_SOURCES:
+                data_with_sources[field] = {'value': value, 'sources': []}
+                continue
+            
+            # Verwende die vom SourceManager zugeordneten Quellen
+            source_ids = field_sources.get(field, [])
+            
+            data_with_sources[field] = {
+                'value': value,
+                'sources': source_ids
+            }
+        
+        # Extrahiere Quellen-Index aus SourceManager
+        sources_dict = source_mapping.get('sources', {})
+        source_index = []
+        for source_id, source_data in sources_dict.items():
+            source_index.append({
+                'id': int(source_id),
+                'url': source_data['url'],
+                'title': source_data['title'],
+                'type': source_data['type'],
+                'reliability': source_data['reliability']
+            })
         
         return {
             'data': data,
             'data_with_sources': data_with_sources,
-            'source_index': all_sources
+            'source_index': source_index,
+            'source_mapping': source_mapping  # QUELLENREFERENZEN-FIX: Für DB-Speicherung
         }
 
 

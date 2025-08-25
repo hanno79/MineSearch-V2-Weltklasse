@@ -299,8 +299,11 @@ class MineSearchService:
             structured_data, content, sources
         )
         
+        # ENHANCED VALIDATION 25.08.2025: Wende Quality Gate auch auf Legacy-Suche an
+        clean_structured_data = self._apply_database_quality_gate(structured_data, mine_name)
+        
         # Berechne Datenqualität
-        quality_metrics = self._calculate_data_quality(structured_data)
+        quality_metrics = self._calculate_data_quality(clean_structured_data)
         
         # DATABASE INTEGRATION: Speichere Legacy-Suchergebnis in Database
         # BUGFIX 20.07.2025: Verwende tatsächlich verwendetes Modell
@@ -309,7 +312,7 @@ class MineSearchService:
             search_result = self.db_manager.save_search_result(
                 mine_name=mine_name,
                 model_used=legacy_full_model_id,
-                structured_data=structured_data,
+                structured_data=clean_structured_data,  # ENHANCED: Verwende bereinigte Daten
                 sources=[{
                     'url': s.get('url', ''),
                     'title': s.get('title', ''),
@@ -446,7 +449,11 @@ class MineSearchService:
                 data_quality=quality_metrics.get('completion_percentage', 0),
                 success=True,
                 country=country,
-                search_type="provider"
+                search_type="provider",
+                # QUELLENREFERENZEN-FIX 24.08.2025: Füge Quellen-Mapping hinzu
+                structured_data_with_sources=result.metadata.get('structured_data_with_sources'),
+                source_index=result.metadata.get('source_index'),
+                source_mapping=result.metadata.get('source_mapping')
             )
             logger.info(f"[DB] Suchergebnis für {mine_name} gespeichert (ID: {search_result.id})")
             
@@ -610,29 +617,31 @@ class MineSearchService:
     
     def _apply_database_quality_gate(self, structured_data: Dict[str, Any], mine_name: str) -> Dict[str, Any]:
         """
-        CLEAN DATA AT SOURCE FIX 20.08.2025: Quality Gate vor Database-Speicherung
+        ENHANCED DATA QUALITY GATE 25.08.2025: Umfassende Validierung vor Database-Speicherung
         
-        Letzte Verteidigungslinie gegen Template/Dummy-Werte in der Datenbank.
-        Konvertiert alle Template/Dummy-Werte zu NULL (leeren Strings) vor DB-Insert.
+        Letzte Verteidigungslinie gegen Template/Dummy-Werte und Feldkontamination in der Datenbank.
+        Verwendet sowohl Template-Detection als auch Feldnamen-Blacklist.
         
         Args:
             structured_data: Extrahierte strukturierte Daten
             mine_name: Mine-Name für Logging
             
         Returns:
-            Bereinigte strukturierte Daten ohne Template/Dummy-Werte
+            Bereinigte strukturierte Daten ohne Template/Dummy-Werte und Feldkontaminationen
         """
         if not structured_data:
             return structured_data
             
-        logger.info(f"[DB QUALITY GATE] Validiere strukturierte Daten für {mine_name}")
+        logger.info(f"[ENHANCED DB QUALITY GATE] Starte umfassende Validierung für {mine_name}")
         
-        # Importiere Template-Detection aus extraction_processors
+        # Importiere Validierungs-Module
         from minesearch.extraction_processors import is_template_or_dummy_value
+        from minesearch.field_name_blacklist import is_field_name_value, validate_extracted_fields
         
         clean_data = {}
         rejected_fields = []
         accepted_fields = []
+        field_contaminations = []
         
         for field, value in structured_data.items():
             # Skip meta fields
@@ -642,26 +651,44 @@ class MineSearchService:
             
             # Check if value is valid data
             if value and str(value).strip():
-                if is_template_or_dummy_value(str(value).strip(), field):
-                    # Template/Dummy-Wert → NULL (leer)
+                value_str = str(value).strip()
+                
+                # PHASE 1: Template/Dummy-Wert-Detection (bestehende Logik)
+                if is_template_or_dummy_value(value_str, field):
                     clean_data[field] = ""
-                    rejected_fields.append((field, str(value)[:50]))
-                    logger.warning(f"[DB QUALITY GATE] Template/Dummy-Wert abgelehnt: {field} = '{str(value)[:50]}...'")
+                    rejected_fields.append((field, value_str[:50]))
+                    logger.warning(f"[ENHANCED DB QUALITY GATE] Template/Dummy-Wert abgelehnt: {field} = '{value_str[:50]}...'")
+                
+                # PHASE 2: KRITISCHE FELDNAMEN-KONTAMINATION-DETECTION (25.08.2025)
+                elif is_field_name_value(value_str, field):
+                    clean_data[field] = ""  # NULL in DB
+                    field_contaminations.append((field, value_str[:50]))
+                    logger.error(f"[CRITICAL FIELD CONTAMINATION] Feldname als Wert blockiert: {field} = '{value_str[:50]}...'")
+                
                 else:
                     # Echter Datenwert → behalten
                     clean_data[field] = value
-                    accepted_fields.append((field, str(value)[:50]))
-                    logger.debug(f"[DB QUALITY GATE] Echter Wert akzeptiert: {field} = '{str(value)[:50]}...'")
+                    accepted_fields.append((field, value_str[:50]))
+                    logger.debug(f"[ENHANCED DB QUALITY GATE] Echter Wert akzeptiert: {field} = '{value_str[:50]}...'")
             else:
                 # Bereits leerer Wert → behalten
                 clean_data[field] = value
         
-        # Logging Summary
-        logger.info(f"[DB QUALITY GATE] {mine_name}: {len(accepted_fields)} echte Werte, {len(rejected_fields)} Template/Dummy-Werte abgelehnt")
-        if rejected_fields:
-            logger.warning(f"[DB QUALITY GATE] Abgelehnte Felder: {[f[0] for f in rejected_fields]}")
+        # PHASE 3: GESAMTVALIDIERUNG MIT FELDNAMEN-BLACKLIST (zusätzliche Sicherheitsebene)
+        final_clean_data = validate_extracted_fields(clean_data)
         
-        return clean_data
+        # Erweiterte Logging Summary
+        logger.info(f"[ENHANCED DB QUALITY GATE] {mine_name} Validierungsresultat:")
+        logger.info(f"  ✅ {len(accepted_fields)} echte Datenwerte akzeptiert")
+        logger.info(f"  ⚠️ {len(rejected_fields)} Template/Dummy-Werte abgelehnt")
+        logger.info(f"  🚨 {len(field_contaminations)} Feldkontaminationen blockiert")
+        
+        if field_contaminations:
+            logger.error(f"[CRITICAL] Feldkontamination verhindert für {mine_name}:")
+            for field, value in field_contaminations:
+                logger.error(f"  🚨 {field}: '{value}...'")
+        
+        return final_clean_data
     
     async def _check_cache(self, mine_name: str, country: str, model: str, **kwargs) -> Optional[Dict]:
         """

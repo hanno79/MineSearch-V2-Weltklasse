@@ -385,9 +385,9 @@ class ComprehensiveSearchOrchestrator:
                     status.success = True
                     best_sources = ['GESTIM_Quebec_Database']
             
-            # Markiere als X wenn gesucht aber nicht gefunden
+            # REGEL 10 KONFORM: Kein Dummy-Marker - echte "nicht gefunden"
             if not best_value and status.attempts >= self.completion_criteria['min_models_tried']:
-                best_value = 'X'  # Systematisch gesucht aber nicht gefunden
+                best_value = ''  # Systematisch gesucht aber nicht gefunden - kein X-Marker
             
             status.best_value = best_value
             status.sources_found = list(set(best_sources))

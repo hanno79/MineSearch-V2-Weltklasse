@@ -161,6 +161,146 @@ OPENROUTER_MODELS = {
         'description': 'OpenAI GPT OSS 120B - Größtes Open Source Modell für komplexe Mining-Dokumente',
         'supports_web_search': False,
         'is_free': False
+    },
+    
+    # ÄNDERUNG 24.08.2025: Premium-Modelle über OpenRouter - Anthropic Claude
+    'claude-3.5-sonnet': {
+        'id': 'anthropic/claude-3.5-sonnet-20241022',
+        'name': 'Claude 3.5 Sonnet',
+        'timeout': 180,
+        'max_tokens': 8000,
+        'description': 'Anthropic Claude 3.5 Sonnet - Top-Qualität für komplexe Mining-Analysen',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'anthropic'
+    },
+    'claude-3.5-haiku': {
+        'id': 'anthropic/claude-3.5-haiku-20241022',
+        'name': 'Claude 3.5 Haiku',
+        'timeout': 90,
+        'max_tokens': 6000,
+        'description': 'Anthropic Claude 3.5 Haiku - Schnell und effizient für Mining-Daten',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'anthropic'
+    },
+    'claude-3-opus': {
+        'id': 'anthropic/claude-3-opus',
+        'name': 'Claude 3 Opus',
+        'timeout': 240,
+        'max_tokens': 10000,
+        'description': 'Anthropic Claude 3 Opus - Höchste Qualität für komplexeste Mining-Dokumente',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'anthropic'
+    },
+    
+    # ÄNDERUNG 24.08.2025: Premium-Modelle über OpenRouter - Google Gemini
+    'gemini-2.0-flash': {
+        'id': 'google/gemini-2.0-flash-thinking-exp-1219',
+        'name': 'Gemini 2.0 Flash',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'Google Gemini 2.0 Flash - Neueste Generation mit verbesserter Mining-Datenextraktion',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'gemini'
+    },
+    'gemini-1.5-pro': {
+        'id': 'google/gemini-1.5-pro',
+        'name': 'Gemini 1.5 Pro',
+        'timeout': 180,
+        'max_tokens': 10000,
+        'description': 'Google Gemini 1.5 Pro - Hochleistungsmodell für umfassende Mining-Analysen',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'gemini'
+    },
+    'gemini-1.5-flash': {
+        'id': 'google/gemini-1.5-flash',
+        'name': 'Gemini 1.5 Flash',
+        'timeout': 90,
+        'max_tokens': 8000,
+        'description': 'Google Gemini 1.5 Flash - Schnelle und präzise Mining-Datenverarbeitung',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'gemini'
+    },
+    
+    # ÄNDERUNG 24.08.2025: Premium-Modelle über OpenRouter - OpenAI GPT
+    'gpt-4o': {
+        'id': 'openai/gpt-4o',
+        'name': 'GPT-4o',
+        'timeout': 180,
+        'max_tokens': 8000,
+        'description': 'OpenAI GPT-4o - Neuestes multimodales Modell für Mining-Dokumentenanalyse',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'openai'
+    },
+    'gpt-4o-mini': {
+        'id': 'openai/gpt-4o-mini',
+        'name': 'GPT-4o Mini',
+        'timeout': 90,
+        'max_tokens': 6000,
+        'description': 'OpenAI GPT-4o Mini - Kompakte Version für schnelle Mining-Datenextraktion',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'openai'
+    },
+    'gpt-4-turbo': {
+        'id': 'openai/gpt-4-turbo',
+        'name': 'GPT-4 Turbo',
+        'timeout': 180,
+        'max_tokens': 10000,
+        'description': 'OpenAI GPT-4 Turbo - Erweiterte Version für komplexe Mining-Berichte',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'openai'
+    },
+    
+    # ÄNDERUNG 24.08.2025: Premium-Modelle über OpenRouter - xAI Grok
+    'grok-2': {
+        'id': 'x-ai/grok-2',
+        'name': 'Grok 2',
+        'timeout': 180,
+        'max_tokens': 8000,
+        'description': 'xAI Grok 2 - Fortgeschrittenes Modell mit Echtzeitdaten für Mining-Analysen',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'grok'
+    },
+    'grok-beta': {
+        'id': 'x-ai/grok-beta',
+        'name': 'Grok Beta',
+        'timeout': 150,
+        'max_tokens': 6000,
+        'description': 'xAI Grok Beta - Experimentelles Modell mit erweiterten Fähigkeiten',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'grok'
+    },
+    
+    # ÄNDERUNG 24.08.2025: Premium-Modelle über OpenRouter - Perplexity
+    'perplexity-sonar-pro': {
+        'id': 'perplexity/sonar-pro',
+        'name': 'Perplexity Sonar Pro',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'Perplexity Sonar Pro - Web-basierte Mining-Recherche mit aktuellen Daten',
+        'supports_web_search': True,
+        'is_free': False,
+        'provider_category': 'perplexity'
+    },
+    'perplexity-sonar': {
+        'id': 'perplexity/sonar',
+        'name': 'Perplexity Sonar',
+        'timeout': 90,
+        'max_tokens': 6000,
+        'description': 'Perplexity Sonar - Schnelle web-basierte Mining-Suche',
+        'supports_web_search': True,
+        'is_free': False,
+        'provider_category': 'perplexity'
     }
 }
 

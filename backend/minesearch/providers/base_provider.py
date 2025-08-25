@@ -25,6 +25,8 @@ class ModelConfig:
     supports_web_search: bool = True
     supports_deep_research: bool = False
     is_free: bool = False
+    # ÄNDERUNG 24.08.2025: Provider-Kategorie für UI-Gruppierung hinzugefügt
+    provider_category: str = None
 
 
 @dataclass

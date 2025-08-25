@@ -42,7 +42,9 @@ class FirecrawlProvider(AbstractProvider):
                 provider='firecrawl',
                 supports_web_search=model_info.get('supports_web_search', True),
                 supports_deep_research=model_info.get('supports_deep_research', False),
-                is_free=False
+                is_free=False,
+                # ÄNDERUNG 24.08.2025: Provider-Kategorie für UI-Gruppierung
+                provider_category='firecrawl'
             )
             for model_id, model_info in self.models.items()
         }

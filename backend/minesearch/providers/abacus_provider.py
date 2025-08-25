@@ -51,7 +51,9 @@ class AbacusProvider(AbstractProvider):
                 provider='abacus',
                 supports_web_search=model_config.get('supports_web_search', True),
                 supports_deep_research=model_config.get('supports_deep_research', True),
-                is_free=model_config.get('is_free', False)
+                is_free=model_config.get('is_free', False),
+                # ÄNDERUNG 24.08.2025: Provider-Kategorie für UI-Gruppierung
+                provider_category='abacus'
             )
         
         return models

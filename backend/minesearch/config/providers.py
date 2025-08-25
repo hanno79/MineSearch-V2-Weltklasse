@@ -47,7 +47,8 @@ from minesearch.config.models import (
 # ÄNDERUNG 12.07.2025: Erweitert um Timeout-Konfigurationen und Retry-Mechanismus
 PROVIDERS_CONFIG = {
     'perplexity': {
-        'enabled': True,
+        # ÄNDERUNG 24.08.2025: Deaktiviert - Perplexity Modelle über OpenRouter geroutet
+        'enabled': False,
         'api_key': APIKeysConfig.PERPLEXITY_API_KEY,
         'models': PERPLEXITY_MODELS,
         'timeout': 90,  # Schnelle Web-Search Provider
@@ -68,7 +69,10 @@ PROVIDERS_CONFIG = {
         'enabled': True,
         'api_key': APIKeysConfig.ABACUS_API_KEY,
         'base_url': 'https://api.abacus.ai',
-        'models': ABACUS_MODELS
+        'models': ABACUS_MODELS,
+        'timeout': 180,
+        'retry_attempts': 2,
+        'retry_delay': 10
     },
     'tavily': {
         'enabled': True,  # Aktiviert für umfassende Tests
@@ -84,7 +88,10 @@ PROVIDERS_CONFIG = {
         'enabled': True,
         'api_key': APIKeysConfig.EXA_API_KEY,
         'base_url': 'https://api.exa.ai',
-        'models': EXA_MODELS
+        'models': EXA_MODELS,
+        'timeout': 120,
+        'retry_attempts': 2,
+        'retry_delay': 10
     },
     'scrapingbee': {
         'enabled': True,
@@ -114,7 +121,8 @@ PROVIDERS_CONFIG = {
         'retry_delay': 10
     },
     'openai': {
-        'enabled': True,
+        # ÄNDERUNG 24.08.2025: Deaktiviert - OpenAI Modelle über OpenRouter geroutet
+        'enabled': False,
         'api_key': APIKeysConfig.OPENAI_API_KEY,
         'base_url': 'https://api.openai.com/v1',
         'models': OPENAI_MODELS,
@@ -123,7 +131,8 @@ PROVIDERS_CONFIG = {
         'retry_delay': 12
     },
     'anthropic': {
-        'enabled': True,
+        # ÄNDERUNG 24.08.2025: Deaktiviert - Anthropic Modelle über OpenRouter geroutet
+        'enabled': False,
         'api_key': APIKeysConfig.ANTHROPIC_API_KEY,
         'base_url': 'https://api.anthropic.com/v1',
         'models': ANTHROPIC_MODELS,
@@ -132,7 +141,8 @@ PROVIDERS_CONFIG = {
         'retry_delay': 15
     },
     'gemini': {
-        'enabled': True,
+        # ÄNDERUNG 24.08.2025: Deaktiviert - Gemini Modelle über OpenRouter geroutet
+        'enabled': False,
         'api_key': APIKeysConfig.GEMINI_API_KEY,
         'base_url': 'https://generativelanguage.googleapis.com/v1',
         'models': GEMINI_MODELS,
@@ -141,7 +151,8 @@ PROVIDERS_CONFIG = {
         'retry_delay': 8
     },
     'grok': {
-        'enabled': True,
+        # ÄNDERUNG 24.08.2025: Deaktiviert - Grok Modelle über OpenRouter geroutet
+        'enabled': False,
         'api_key': APIKeysConfig.GROK_API_KEY,
         'base_url': 'https://api.x.ai/v1',
         'models': GROK_MODELS,

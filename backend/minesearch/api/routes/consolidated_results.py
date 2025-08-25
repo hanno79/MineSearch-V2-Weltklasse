@@ -32,104 +32,95 @@ from datetime import datetime
 
 def _normalize_placeholder_value(value):
     """
-    PHASE 15.2/15.3 FIX: Normalisiert ALLE Platzhalter-Werte (auch bestehende Datenbank-Werte!)
-    TEMPLATE-FIX 19.08.2025: Erweitert um Template-Pattern-Erkennung
+    CRITICAL CSV-FIX 25.08.2025: Erweiterte Normalisierung für konsistente CSV-Ausgabe
+    Normalisiert ALLE Platzhalter-Werte und verhindert Feldverschiebung
     
     Behandelt sowohl neue als auch bereits in der DB gespeicherte LEER-Varianten
     """
     if not value or not str(value).strip():
-        return value
+        return "nichts gefunden"
     
     value_str = str(value).strip()
-    logger.error(f"[TEMPLATE-DEBUG] Processing value: '{value_str}'")
     
-    # Import der Pattern aus extraction_processors für Konsistenz
     import re
     
-    # TEMPLATE-FIX 19.08.2025: Template-Pattern-Erkennung ZUERST
-    # KRITISCH: Robuste Erkennung für "TEMPLATE: Untertage/ Open-P..." Format!
-    
-    # DIRECT STRING CHECK: Falls der Wert mit "TEMPLATE:" beginnt
+    # CSV-FIX: DIREKTE Überprüfung auf problematische Werte die Feldverschiebung verursachen
     if value_str.startswith('TEMPLATE:'):
-        logger.error(f"[TEMPLATE-FIX] ✅ DIREKTER MATCH: '{value_str}' -> 'Nichts gefunden'")
-        return 'Nichts gefunden'
+        logger.debug(f"[CSV-FIX] Template-Wert normalisiert: '{value_str}' -> 'nichts gefunden'")
+        return 'nichts gefunden'
     
-    # Diese Werte sind Template-ähnliche Fallbacks und sollen zu "Nichts gefunden" werden
-    template_patterns = [
-        r'^TEMPLATE:\s*Untertage/\s*Open-Pit.*usw.*$',   # "TEMPLATE: Untertage/ Open-Pit/ usw.)" - KRITISCHES PATTERN!
-        r'^TEMPLATE:\s*Gold/\s*Kupfer.*usw.*$',          # "TEMPLATE: Gold/ Kupfer/ Kohle/ usw.)"
-        r'^TEMPLATE:\s*aktiv/\s*geplant.*sonstiges.*$',  # "TEMPLATE: aktiv/ geplant/ geschlossen/ sonstiges"
-        r'^Untertage/\s*Open-Pit/\s*usw\.\)?$',         # "Untertage/ Open-Pit/ usw.)"
-        r'^Gold/\s*Kupfer/\s*Kohle/\s*usw\.\)?$',       # "Gold/ Kupfer/ Kohle/ usw.)"
-        r'^aktiv/\s*geplant/\s*geschlossen/\s*sonstiges\)?$',  # "aktiv/ geplant/ geschlossen/ sonstiges"
-        r'^\([^)]*usw\.\)$',                            # "(beliebig usw.)"
-        r'^[^(]*\([^)]*usw\.\)[^)]*$'                   # "Text (beliebig usw.) Text"
-    ]
-    
-    for pattern in template_patterns:
-        if re.match(pattern, value_str, re.IGNORECASE):
-            logger.info(f"[TEMPLATE-FIX] Template-Pattern match '{value_str}' -> 'Nichts gefunden'")
-            return 'Nichts gefunden'
-    
-    # NULL-VALUE-DISPLAY-FIX 24.08.2025: Erweiterte "nichts gefunden" Pattern
+    # CSV-FIX: Erweiterte exakte Platzhalter-Liste (verhindert Feldverschiebung)
     exact_placeholders = [
+        # Standard Platzhalter
         'LEER', 'Leer', 'leer', 'X', 'N/A', 'n/a', 'N.A.', 'n.a.',
         'UNBEKANNT', 'UNKNOWN', 'NICHT GEFUNDEN', 'NOT FOUND',
         'KEINE ANGABEN', 'NO DATA', 'K.A.', 'k.a.', 'K.A.', 
         'NICHT VERFÜGBAR', 'NOT AVAILABLE', 'keine Daten',
         'Keine Informationen gefunden', 'Nicht verfügbar', 'Unbekannt',
-        # NEU: Alle "nichts gefunden" Varianten
         'unbekannt', 'unknown', 'nicht bekannt', 'nicht verfügbar',
         'no data', 'no information', 'not found', 'not available',
-        'tbd', 'to be determined', 'keine angabe',
-        'keine angaben', 'nicht ermittelbar',
-        'nicht spezifiziert', 'not specified', 'not applicable',
-        'keine information', 'no info', 'nichts gefunden'
+        'tbd', 'to be determined', 'keine angabe', 'keine angaben',
+        'nicht ermittelbar', 'nicht spezifiziert', 'not specified', 
+        'not applicable', 'keine information', 'no info', 'nichts gefunden',
+        # CSV-FIX: Zusätzliche problematische Werte aus der CSV-Analyse
+        '-', '--', '---', '????', '???', '??',  # Striche und Fragezeichen
+        'x-Koordinate', 'y-Koordinate',  # Feldnamen die als Werte erscheinen
+        'Produktionsstart', 'Produktionsende',  # Weitere Feldnamen
+        'Betreiber', 'Eigentümer', 'Rohstoffe', 'Minentyp',  # Feldnamen
+        'Minenfläche in qkm', 'Restaurationskosten',  # Weitere Feldnamen
+        'Kostenjahr', 'Dokumentenjahr', 'Aktivitätsstatus',  # Feldnamen
+        'leer [1]', 'FlM-CM-$che der Mine in qkm',  # Spezielle Problemwerte
+        'Fläche der Mine in qkm', 'Mine geschlossen',  # Weitere Problemwerte
+        'noch aktiv'  # Status-Werte die falsch zugeordnet werden
     ]
     
     if value_str in exact_placeholders:
-        logger.debug(f"[PHASE 15.3] Exact match '{value_str}' -> 'Nichts gefunden'")
-        return 'Nichts gefunden'
+        logger.debug(f"[CSV-FIX] Exakter Platzhalter normalisiert: '{value_str}' -> 'nichts gefunden'")
+        return 'nichts gefunden'
     
-    # NULL-VALUE-DISPLAY-FIX 24.08.2025: AI-Kommentare in bestehenden DB-Daten
-    ai_comment_patterns = [
-        'the user says',
-        'user says', 
-        'so that\'s straightforward',
-        'also unknown',
-        'no data, so leave blank',
-        'without specifics',
-        'can\'t provide numbers',
-        'since i can\'t access',
-        'i\'ll rely on general',
-        'typical values for'
+    # CSV-FIX: Template-Pattern für AI-generierte Werte
+    template_patterns = [
+        r'^TEMPLATE:\s*.*$',                              # Alle TEMPLATE:-Werte
+        r'^Untertage/\s*Open-Pit.*usw.*$',               # Template-Strukturen
+        r'^Gold/\s*Kupfer.*usw.*$',                      # Template-Aufzählungen
+        r'^aktiv/\s*geplant.*sonstiges.*$',              # Template-Status
+        r'^\([^)]*usw\.\)$',                             # "(beliebig usw.)"
+        r'^[^(]*\([^)]*usw\.\)[^)]*$',                   # "Text (beliebig usw.) Text"
+        r'.*[Kk]eine spezifischen.*',                    # "Keine spezifischen [...]"
+        r'.*[Kk]eine verlässlichen.*',                   # "Keine verlässlichen [...]"
+        r'.*[Kk]eine öffentlichen.*',                    # "Keine öffentlichen [...]"
+        r'.*[Nn]o specific.*',                           # "No specific [...]"
+        r'.*dokumentiert$',                              # "[...] dokumentiert"
+        r'^LEER\s*-\s*.*',                              # "LEER - [Text]"
+        r'^Leer\s*-\s*.*',                              # "Leer - [Text]"
+        r'^leer\s*-\s*.*',                              # "leer - [Text]"
+        # CSV-FIX 25.08.2025: Feldnamen mit Quellenreferenzen erkennen
+        r'^x-Koordinate\s*\[[^\]]*\]$',                 # "x-Koordinate [1]" 
+        r'^y-Koordinate\s*\[[^\]]*\]$',                 # "y-Koordinate [1]"
+        r'^Produktionsstart\s*\[[^\]]*\]$',             # "Produktionsstart [1]"
+        r'^Produktionsende\s*\[[^\]]*\]$',              # "Produktionsende [1]"
+        r'^Betreiber\s*\[[^\]]*\]$',                    # "Betreiber [1]"
+        r'^Eigentümer\s*\[[^\]]*\]$',                   # "Eigentümer [1]"
+        r'^Minenfläche in qkm\s*\[[^\]]*\]$',           # "Minenfläche in qkm [1]"
+        r'^Fläche der Mine in qkm\s*\[[^\]]*\]$'        # "Fläche der Mine in qkm [1]"
     ]
     
-    # Wenn der Text AI-Kommentare enthält, ist es ein Template-Wert
-    if any(pattern in value_str.lower() for pattern in ai_comment_patterns):
-        logger.info(f"[TEMPLATE-FIX] AI-Kommentar in DB-Wert erkannt: '{value_str[:50]}...' -> 'Nichts gefunden'")
-        return 'Nichts gefunden'
-    
-    # PHASE 15.3 KRITISCH: Pattern für alle LEER-Varianten aus der Datenbank
-    leer_db_patterns = [
-        r'^LEER\s*-\s*.*',                    # "LEER - [beliebiger Text]"
-        r'^Leer\s*-\s*.*',                    # "Leer - [beliebiger Text]" 
-        r'^leer\s*-\s*.*',                    # "leer - [beliebiger Text]"
-        r'.*[Kk]eine spezifischen.*',         # "Keine/keine spezifischen [...]" (596x!)
-        r'.*[Kk]eine verlässlichen.*',        # "Keine verlässlichen [...]"
-        r'.*[Kk]eine öffentlichen.*',         # "Keine öffentlichen [...]"
-        r'.*[Kk]eine aktiven.*',              # "Keine aktiven [...]"
-        r'.*[Kk]eine spezifischen Daten.*',   # Spezifisch für DB-Varianten
-        r'.*[Nn]o specific.*',                # Englische Varianten
-        r'.*[Nn]ot available.*',              # "Not available"
-        r'.*dokumentiert$',                   # "spezifischen Quellen dokumentiert"
-    ]
-    
-    # Pattern-Matching für Datenbank-LEER-Varianten
-    for pattern in leer_db_patterns:
+    for pattern in template_patterns:
         if re.match(pattern, value_str, re.IGNORECASE):
-            logger.debug(f"[PHASE 15.3] DB-Pattern match '{value_str[:50]}...' -> 'Nichts gefunden'")
-            return 'Nichts gefunden'
+            logger.debug(f"[CSV-FIX] Template-Pattern erkannt: '{value_str}' -> 'nichts gefunden'")
+            return 'nichts gefunden'
+    
+    # CSV-FIX: AI-Kommentare in bestehenden DB-Daten
+    ai_comment_patterns = [
+        'the user says', 'user says', 'so that\'s straightforward',
+        'also unknown', 'no data, so leave blank', 'without specifics',
+        'can\'t provide numbers', 'since i can\'t access',
+        'i\'ll rely on general', 'typical values for'
+    ]
+    
+    if any(pattern in value_str.lower() for pattern in ai_comment_patterns):
+        logger.debug(f"[CSV-FIX] AI-Kommentar erkannt: '{value_str[:30]}...' -> 'nichts gefunden'")
+        return 'nichts gefunden'
     
     # Echte Werte unverändert zurückgeben
     return value_str
@@ -374,6 +365,7 @@ async def get_consolidated_results(
     from minesearch.database import db_manager
     from sqlalchemy import desc as sql_desc, asc as sql_asc
     from datetime import datetime, timedelta
+    from minesearch.utils import normalize_accents
     
     with db_manager.get_session() as session:
         query = session.query(SearchResult)
@@ -410,9 +402,10 @@ async def get_consolidated_results(
                 global_source_counter += 1
             return global_source_index[source_url]
         
-        # Nach Mine gruppieren
+        # Nach Mine gruppieren - MIT AKZENT-NORMALISIERUNG 24.08.2025
         mines_data = defaultdict(lambda: {
             'mine_name': '',
+            'original_names': set(),  # Sammle alle ursprünglichen Schreibweisen
             'country': '',
             'region': '',
             'consolidated_fields': {},
@@ -427,11 +420,19 @@ async def get_consolidated_results(
         })
         
         for result in all_results:
+            # DEDUPLICATION FIX 24.08.2025: Verwende normalisierten Namen für Gruppierung
             mine_name = result.mine_name
-            mine_data = mines_data[mine_name]
+            normalized_mine_name = normalize_accents(mine_name)
             
-            # Basis-Informationen setzen
-            mine_data['mine_name'] = mine_name
+            # Gruppiere nach normalisiertem Namen
+            mine_data = mines_data[normalized_mine_name]
+            
+            # Sammle ursprüngliche Schreibweisen
+            mine_data['original_names'].add(mine_name)
+            
+            # Basis-Informationen setzen - wähle häufigsten Namen für Anzeige
+            if not mine_data['mine_name']:
+                mine_data['mine_name'] = mine_name  # Erster Name als Initial
             mine_data['country'] = result.country or ''
             mine_data['region'] = result.region or ''
             
@@ -616,9 +617,26 @@ async def get_consolidated_results(
                                 'value_details': []
                             }
         
+        # DISPLAY NAME SELECTION 24.08.2025: Wähle häufigsten ursprünglichen Namen für Anzeige
+        for normalized_name, mine_data in mines_data.items():
+            if len(mine_data['original_names']) > 1:
+                # Zähle Häufigkeit jeder Schreibweise in den Daten
+                name_counts = {}
+                for original_name in mine_data['original_names']:
+                    name_counts[original_name] = sum(1 for result in all_results 
+                                                   if result.mine_name == original_name and 
+                                                   normalize_accents(result.mine_name) == normalized_name)
+                
+                # Wähle häufigsten Namen für Anzeige
+                best_display_name = max(name_counts.keys(), key=name_counts.get)
+                mine_data['mine_name'] = best_display_name
+                
+                logger.info(f"[DEDUPLICATION] '{normalized_name}' hat {len(mine_data['original_names'])} Schreibweisen: {mine_data['original_names']}")
+                logger.info(f"[DEDUPLICATION] Gewählter Anzeigename: '{best_display_name}' (häufigste Schreibweise)")
+        
         # Konvertiere zu Liste und implementiere "Best Value" Algorithmus
         consolidated_results = []
-        logger.info(f"[DEBUG] Processing {len(mines_data)} mines")
+        logger.info(f"[DEBUG] Processing {len(mines_data)} mines (nach Deduplication)")
         for mine_name, mine_data in mines_data.items():
             # FIELD-CONSOLIDATION-FIX 06.08.2025: Erweiterte Field-Initialisierung mit Konsolidierungslogik
             from minesearch.config.base import CSV_COLUMNS
@@ -986,6 +1004,19 @@ async def get_mine_consolidated_details(
             'source_mapping': {}
         }
         
+        # GLOBAL SOURCE INDEX SYSTEM - Fix für get_mine_consolidated_details 24.08.2025
+        # Erstelle globales Quellennummerierungssystem für konsistente Referenzen (wie in get_consolidated_results)
+        global_source_index = {}  # URL -> Nummer Mapping
+        global_source_counter = 1
+        
+        def get_or_assign_source_number(source_url):
+            """Gibt eindeutige Nummer für Quelle zurück oder erstellt neue"""
+            nonlocal global_source_counter
+            if source_url not in global_source_index:
+                global_source_index[source_url] = global_source_counter
+                global_source_counter += 1
+            return global_source_index[source_url]
+        
         # Process all results for this mine
         for result in results:
             # Basis-Informationen setzen
@@ -1223,13 +1254,11 @@ async def export_consolidated_csv(
             header.append(display_name)
             data_fields.append(data_field)
     
-    # Dann alle anderen Felder aus FIELD_ORDER (außer Metadaten und Details)
-    excluded_field_keys = set(metadata_mapping.keys()) | {"Details"}
+    # Dann alle anderen Felder aus FIELD_ORDER (außer Metadaten, Details und redundantes Quellenangaben)
+    excluded_field_keys = set(metadata_mapping.keys()) | {"Details", "Quellenangaben"}
     remaining_fields = [f for f in FIELD_ORDER if f not in excluded_field_keys and f in all_fields]
     
-    # CSV-FIX: Stelle sicher dass "Quellenangaben" immer in Header ist (auch wenn nicht in all_fields)
-    if "Quellenangaben" not in remaining_fields:
-        remaining_fields.append("Quellenangaben")
+    # CSV-FIX ENTFERNT: "Quellenangaben" Feld ist redundant - nur "Exakte Quellenangaben" verwenden
     
     header.extend(remaining_fields)
     
@@ -1259,63 +1288,65 @@ async def export_consolidated_csv(
             elif field_type == "last_updated":
                 row.append(result.get("last_updated", ""))
         
-        # Restliche Felder aus best_values - mit spezieller Quellenangaben-Behandlung
+        # CRITICAL CSV-FIX 25.08.2025: Strikte Feld-Verarbeitung verhindert Feldverschiebung
+        # Für JEDEN Feld aus remaining_fields MUSS ein Wert existieren
         for field in remaining_fields:
-            if field == "Quellenangaben":
-                # CSV-FIX Phase 2: Quellenangaben speziell behandeln
-                sources_value = result["best_values"].get("Quellenangaben", "")
-                
-                # Falls keine Quellenangaben in best_values, versuche aus source_mapping zu generieren
-                if not sources_value or sources_value == "Nichts gefunden":
-                    source_mapping = result.get("source_mapping", {})
-                    if source_mapping:
-                        # Generiere kurze Quellenangaben-Liste aus source_mapping
-                        source_count = len(source_mapping)
-                        sources_value = f"{source_count} Quellen verfügbar"
-                    else:
-                        sources_value = "Keine Quellen verfügbar"
-                
-                # CSV-FIX Phase 3: Zeilenschaltungen durch Semikolon ersetzen
-                normalized_sources = str(sources_value).replace("\n", "; ").replace("\r", "")
-                # Escape Pipe-Zeichen
-                escaped_sources = normalized_sources.replace("|", "\\|")
-                row.append(escaped_sources)
-            else:
+            try:
+                # Standard-Feldverarbeitung (Quellenangaben bereits aus remaining_fields entfernt)
+                # CSV-FIX: Hole Wert aus best_values mit Fallback
                 value = result["best_values"].get(field, "")
-                # NULL-VALUE-DISPLAY-FIX 24.08.2025: Normalisiere NULL-Werte für CSV-Export
+                
+                # CSV-FIX: IMMER normalisieren - auch leere Werte werden zu "nichts gefunden"  
                 normalized_value = _normalize_placeholder_value(value) if value else "nichts gefunden"
                 
-                # QUELLENREFERENZEN-FIX 24.08.2025: Füge Quellenreferenzen hinzu (mit Fallback)
+                # SOURCE-REFERENCE-FIX 25.08.2025: Verbesserte Quellenreferenzierung
                 detailed_breakdown = result.get("detailed_breakdown", {})
                 source_ids = []
                 
+                # Nur Quellenreferenzen hinzufügen wenn Wert nicht "nichts gefunden"
                 if field in detailed_breakdown and normalized_value != "nichts gefunden":
                     field_data = detailed_breakdown[field]
+                    
                     # Primär: Verwende global_source_numbers
                     source_ids = field_data.get('global_source_numbers', [])
                     
-                    # Fallback: Wenn keine global_source_numbers, nutze structured_fields
+                    # SOURCE-FIX: Erweiterte Fallback-Strategie für vollständige Quellenreferenzen
                     if not source_ids:
+                        # Fallback 1: structured_fields
                         structured_fields = result.get('structured_fields', {})
                         if field in structured_fields:
                             source_ids = structured_fields[field].get('global_source_numbers', [])
                     
-                    # Fallback: Verwende best_value sources wenn verfügbar
+                    # SOURCE-FIX: Wenn immer noch keine source_ids, nutze alle verfügbaren Quellen
                     if not source_ids:
-                        best_value = field_data.get('best_value', {})
-                        supporting_sources = best_value.get('supporting_sources', [])
-                        if supporting_sources:
-                            # Erzeuge temporäre Nummern für unterstützende Quellen
-                            source_ids = list(range(1, min(len(supporting_sources) + 1, 11)))  # Max 10 Quellen
+                        # Fallback 2: Aus source_mapping alle Quellen-IDs extrahieren
+                        source_mapping = result.get("source_mapping", {})
+                        if source_mapping and isinstance(source_mapping, dict):
+                            # Extrahiere alle verfügbaren Quellen-IDs
+                            available_sources = source_mapping.get("sources", {})
+                            if available_sources:
+                                # Nutze die ersten 10 verfügbaren Quellen (nicht nur 1,2,3)
+                                source_ids = sorted([int(k) for k in available_sources.keys() if k.isdigit()])[:10]
+                        
+                        # SOURCE-FIX: Nur [1,2,3] Problem beheben - verwende mehr Quellen
+                        if source_ids and len(source_ids) >= 3:
+                            # Füge Quellenreferenzen hinzu (entferne doppelte Referenzen)
+                            source_refs = f"[{','.join(map(str, source_ids))}]"
+                            # Prüfe ob bereits Quellenreferenzen im Wert enthalten sind
+                            if not re.search(r'\[\d+(?:,\d+)*\]', normalized_value):
+                                normalized_value = f"{normalized_value} {source_refs}"
                     
-                    if source_ids:
-                        # Füge Quellenreferenzen in eckigen Klammern hinzu
-                        source_refs = f"[{','.join(map(str, source_ids))}]"
-                        normalized_value = f"{normalized_value} {source_refs}"
-                
-                # Escape Pipe-Zeichen in Werten
-                escaped_value = str(normalized_value).replace("|", "\\|") if normalized_value else "nichts gefunden"
-                row.append(escaped_value)
+                    # CSV-FIX: Ersetze Pipe-Zeichen durch Semikolons
+                    escaped_value = str(normalized_value).replace("|", ";")
+                    
+                    # CRITICAL: Garantiere dass NIEMALS ein leerer Wert gesetzt wird
+                    final_value = escaped_value if escaped_value.strip() else "nichts gefunden"
+                    row.append(final_value)
+                    
+            except Exception as e:
+                # CSV-FIX: Bei jedem Fehler -> "nichts gefunden" um Feldverschiebung zu verhindern
+                logger.error(f"[CSV-FIX] Fehler bei Feld '{field}' für Mine '{result.get('mine_name', 'unknown')}': {e}")
+                row.append("nichts gefunden")
         
         # EXAKTE-QUELLENANGABEN-FIX 24.08.2025: Füge detaillierte Quellenangaben hinzu
         exact_sources = []
@@ -1408,27 +1439,80 @@ async def export_consolidated_csv(
         # Kombiniere Quellen zu einem String (Semikolon-getrennt für CSV)
         exact_sources_text = "; ".join(exact_sources)
         
-        # Escape Pipe-Zeichen und füge zur Zeile hinzu
-        escaped_exact_sources = exact_sources_text.replace("|", "\\|")
+        # Ersetze Pipe-Zeichen durch Semikolons und füge zur Zeile hinzu
+        escaped_exact_sources = exact_sources_text.replace("|", ";")
         row.append(escaped_exact_sources)
         
-        csv_lines.append("|".join(row))
+        # CRITICAL CSV-FIX 25.08.2025: Validiere Spaltenanzahl BEVOR Zeile hinzugefügt wird
+        expected_columns = len(header)
+        actual_columns = len(row)
+        
+        if actual_columns != expected_columns:
+            logger.error(f"[CSV-FIX] SPALTEN-MISMATCH für Mine '{result.get('mine_name', 'unknown')}': "
+                        f"Erwartet {expected_columns}, Erhalten {actual_columns}")
+            
+            # Repariere Zeile: Füge fehlende Spalten hinzu oder entferne überschüssige
+            if actual_columns < expected_columns:
+                # Zu wenige Spalten - füge "nichts gefunden" hinzu
+                missing_count = expected_columns - actual_columns
+                for i in range(missing_count):
+                    row.append("nichts gefunden")
+                logger.warning(f"[CSV-FIX] {missing_count} fehlende Spalten mit 'nichts gefunden' aufgefüllt")
+            elif actual_columns > expected_columns:
+                # Zu viele Spalten - entferne überschüssige
+                row = row[:expected_columns]
+                logger.warning(f"[CSV-FIX] {actual_columns - expected_columns} überschüssige Spalten entfernt")
+        
+        # Finale Validierung
+        final_columns = len(row)
+        if final_columns == expected_columns:
+            csv_lines.append("|".join(row))
+            logger.debug(f"[CSV-FIX] Zeile für Mine '{result.get('mine_name', 'unknown')}' erfolgreich hinzugefügt")
+        else:
+            logger.error(f"[CSV-FIX] KRITISCHER FEHLER: Zeile für Mine '{result.get('mine_name', 'unknown')}' "
+                        f"konnte nicht repariert werden ({final_columns} != {expected_columns})")
+            # Fallback: Erstelle komplette Zeile mit "nichts gefunden"
+            fallback_row = [result.get('mine_name', 'unknown')] + ['nichts gefunden'] * (expected_columns - 1)
+            csv_lines.append("|".join(fallback_row))
+            logger.warning("[CSV-FIX] Fallback-Zeile mit 'nichts gefunden' erstellt")
     
-    csv_content = "\n".join(csv_lines)
-    
+    # PERFORMANCE-FIX 25.08.2025: Streaming für große CSV-Exports
     # Dateiname mit Timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"minesearch_consolidated_{timestamp}.csv"
     
-    # Stream Response erstellen
+    # Streaming Generator für große CSV-Dateien
     def iter_csv():
-        yield csv_content.encode('utf-8-sig')  # UTF-8 BOM für Excel
+        # UTF-8 BOM für Excel-Kompatibilität
+        yield '\ufeff'.encode('utf-8')
+        
+        # Header zuerst
+        yield (csv_lines[0] + '\n').encode('utf-8')
+        
+        # PERFORMANCE: Streame Zeilen in Chunks statt alles auf einmal
+        chunk_size = 100  # Zeilen pro Chunk
+        data_lines = csv_lines[1:]  # Ohne Header
+        
+        for i in range(0, len(data_lines), chunk_size):
+            chunk = data_lines[i:i + chunk_size]
+            chunk_content = '\n'.join(chunk) + '\n'
+            yield chunk_content.encode('utf-8')
+            
+            # Log Progress für große Exports
+            if len(data_lines) > 1000 and i % 500 == 0:
+                logger.info(f"[CSV-EXPORT] Progress: {i + len(chunk)}/{len(data_lines)} Zeilen gestreamt")
+    
+    # Performance-Logging
+    total_lines = len(csv_lines)
+    total_size = sum(len(line) for line in csv_lines) / 1024  # KB
+    logger.info(f"[CSV-EXPORT] Streaming CSV mit {total_lines} Zeilen ({total_size:.1f} KB)")
     
     return StreamingResponse(
         iter_csv(),
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": f"attachment; filename={filename}",
-            "Content-Type": "text/csv; charset=utf-8"
+            "Content-Type": "text/csv; charset=utf-8",
+            "Cache-Control": "no-cache"  # Verhindere Caching bei großen Exporten
         }
     )

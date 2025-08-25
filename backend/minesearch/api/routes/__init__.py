@@ -116,6 +116,14 @@ def get_api_router() -> APIRouter:
             logger.info("✅ progress Route erfolgreich geladen")
         except Exception as progress_err:
             logger.error(f"❌ progress Route Fehler: {progress_err}")
+            
+        # PROVIDER-STATUS 24.08.2025: API Key Validation und Provider Health Checks
+        try:
+            from .provider_status import router as provider_status_router
+            router.include_router(provider_status_router, prefix="/api", tags=["provider-status"])
+            logger.info("✅ provider_status Route erfolgreich geladen")
+        except Exception as provider_status_err:
+            logger.error(f"❌ provider_status Route Fehler: {provider_status_err}")
         
     except ImportError as e:
         logger.error(f"❌ CRITICAL: Route Import komplett fehlgeschlagen: {e}")

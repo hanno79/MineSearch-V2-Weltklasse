@@ -106,10 +106,16 @@ async def get_results(
 
 @router.get("/results/stats")
 async def get_result_statistics():
-    """Hole Statistiken über gespeicherte Ergebnisse"""
+    """Hole Statistiken über gespeicherte Ergebnisse inkl. Modell-Performance"""
     from minesearch.database import db_manager
     
+    # Basis-Statistiken
     stats = db_manager.get_statistics()
+    
+    # Erweitere um Modell-Statistiken für Frontend-Kompatibilität
+    models_data = db_manager.get_model_statistics_comprehensive()
+    stats['models'] = models_data
+    
     return {
         "success": True,
         "data": stats
@@ -179,9 +185,7 @@ async def export_results_csv(
     import io
     from typing import List
     
-    # CSV Service laden
-    from csv_service import CSVExportService
-    csv_service = CSVExportService()
+    # CSV-FIX 25.08.2025: Verwende einfache CSV-Generation statt externen Service
     
     with db_manager.get_session() as session:
         query = session.query(SearchResult)
@@ -222,8 +226,30 @@ async def export_results_csv(
         # Alle Ergebnisse laden
         results = query.all()
         
-        # CSV generieren
-        csv_content = csv_service.generate_csv_export(results)
+        # CSV-FIX: Einfache CSV-Generation
+        csv_lines = []
+        
+        # Header
+        header = ["Mine", "Land", "Session ID", "Modell", "Timestamp", "Dauer (s)", "Felder", "Strukturierte Daten"]
+        csv_lines.append("|".join(header))
+        
+        # Daten
+        for result in results:
+            row = [
+                result.mine_name or "nichts gefunden",
+                result.country or "nichts gefunden", 
+                result.session_id or "nichts gefunden",
+                result.model_used or "nichts gefunden",
+                str(result.search_timestamp) or "nichts gefunden",
+                str(result.search_duration) or "0",
+                str(len(result.structured_data) if result.structured_data else 0),
+                str(result.structured_data)[:100] + "..." if result.structured_data else "nichts gefunden"
+            ]
+            # Ersetze Pipe-Zeichen in Werten durch Semikolons
+            escaped_row = [str(cell).replace("|", ";") for cell in row]
+            csv_lines.append("|".join(escaped_row))
+        
+        csv_content = "\n".join(csv_lines)
         
         # Dateiname mit Timestamp
         from datetime import datetime

@@ -13,7 +13,9 @@ import json
 import csv
 import io
 import uuid
+from cachetools import TTLCache
 from datetime import datetime
+from minesearch.search_utils import count_filled_fields
 
 logger = logging.getLogger(__name__)
 
@@ -22,15 +24,90 @@ def create_fixed_batch_route(db_manager, batch_results_cache):
     
     router = APIRouter()
     
-    # Cache für hochgeladene CSV-Daten
-    mine_lists_cache = {}
+    # Cache für hochgeladene CSV-Daten (max 100 Sessions, 30min TTL)
+    mine_lists_cache = TTLCache(maxsize=100, ttl=1800)
     
-    def count_filled_fields(structured_data):
-        """Zählt echte (nicht-leere) Felder in structured_data"""
-        if not structured_data:
-            return 0
-        return len([v for v in structured_data.values() 
-                    if v and str(v).strip() and str(v).strip() not in ['', 'None', 'null', 'nichts gefunden']])
+    def get_cache_stats():
+        """Gibt Cache-Statistiken zurück für Monitoring"""
+        return {
+            'current_size': len(mine_lists_cache),
+            'max_size': mine_lists_cache.maxsize,
+            'ttl': mine_lists_cache.ttl
+        }
+
+    def detect_csv_delimiter(csv_content: str) -> tuple[str, str]:
+        """
+        Robust CSV delimiter detection with fallback strategies
+        
+        Returns:
+            tuple[str, str]: (delimiter, detection_method)
+        """
+        # Strip BOM if present
+        if csv_content.startswith('\ufeff'):
+            csv_content = csv_content[1:]
+            logger.debug("[CSV-DELIMITER] BOM detected and stripped")
+        
+        # Sample first N lines for detection (max 10 lines or 2KB)
+        lines = csv_content.split('\n')[:10]
+        sample_text = '\n'.join(lines)[:2048]
+        
+        # Strategy 1: Use csv.Sniffer
+        try:
+            sniffer = csv.Sniffer()
+            # Provide delimiters to try
+            dialect = sniffer.sniff(sample_text, delimiters=',;\t|')
+            delimiter = dialect.delimiter
+            logger.info(f"[CSV-DELIMITER] Sniffer detected: '{delimiter}'")
+            return delimiter, "sniffer"
+        except (csv.Error, Exception) as e:
+            logger.debug(f"[CSV-DELIMITER] Sniffer failed: {e}")
+        
+        # Strategy 2: Quote-aware delimiter counting
+        candidates = [',', ';', '\t', '|']
+        delimiter_counts = {}
+        
+        for delimiter in candidates:
+            count = 0
+            for line in lines[:5]:  # Count in first 5 lines only
+                if not line.strip():
+                    continue
+                    
+                # Use csv.reader to properly handle quotes
+                try:
+                    reader = csv.reader([line], delimiter=delimiter)
+                    row = next(reader)
+                    # Count successful splits (more than 1 field means delimiter found)
+                    if len(row) > 1:
+                        count += len(row) - 1  # Count delimiter occurrences
+                except csv.Error:
+                    continue
+            
+            delimiter_counts[delimiter] = count
+            logger.debug(f"[CSV-DELIMITER] Delimiter '{delimiter}' count: {count}")
+        
+        # Find delimiter with highest count
+        if delimiter_counts:
+            best_delimiter = max(delimiter_counts, key=delimiter_counts.get)
+            best_count = delimiter_counts[best_delimiter]
+            
+            if best_count > 0:
+                logger.info(f"[CSV-DELIMITER] Quote-aware counting detected: '{best_delimiter}' (count: {best_count})")
+                return best_delimiter, "quote_aware_counting"
+        
+        # Strategy 3: Simple character counting fallback
+        comma_count = sample_text.count(',')
+        semicolon_count = sample_text.count(';')
+        
+        if semicolon_count > comma_count:
+            logger.info(f"[CSV-DELIMITER] Fallback to ';' (count: {semicolon_count} vs {comma_count})")
+            return ';', "simple_counting"
+        elif comma_count > 0:
+            logger.info(f"[CSV-DELIMITER] Fallback to ',' (count: {comma_count})")
+            return ',', "simple_counting"
+        
+        # Strategy 4: Ultimate fallback
+        logger.warning("[CSV-DELIMITER] No delimiter detected, using default ','")
+        return ',', "default_fallback"
 
     @router.post("/upload-csv")
     async def upload_csv_fixed(csv_file: UploadFile = File(...)):
@@ -42,9 +119,9 @@ def create_fixed_batch_route(db_manager, batch_results_cache):
             contents = await csv_file.read()
             csv_content = contents.decode('utf-8-sig')
             
-            # Auto-detect CSV-Delimiter
-            delimiter = ';' if ';' in csv_content.split('\n')[0] else ','
-            logger.info(f"[FIXED-CSV] Detected delimiter: '{delimiter}'")
+            # Robust CSV-Delimiter Detection
+            delimiter, detection_method = detect_csv_delimiter(csv_content)
+            logger.info(f"[FIXED-CSV] Detected delimiter: '{delimiter}' via {detection_method}")
             
             # Parse CSV
             csv_reader = csv.DictReader(io.StringIO(csv_content), delimiter=delimiter)
@@ -61,15 +138,16 @@ def create_fixed_batch_route(db_manager, batch_results_cache):
             # Erstelle Session
             session_id = str(uuid.uuid4())
             
-            # Speichere in Cache
+            # Speichere in Cache (TTL automatisch verwaltet)
             mine_lists_cache[session_id] = {
                 'mines': mines,
-                'columns': columns,
-                'timestamp': datetime.now()
+                'columns': columns
             }
             
             mine_count = len(mines)
+            cache_stats = get_cache_stats()
             logger.info(f"[FIXED-CSV] Processed: {mine_count} mines, session: {session_id}")
+            logger.debug(f"[CACHE] Session stored. Cache size: {cache_stats['current_size']}/{cache_stats['max_size']}")
             
             # HTML Interface für Batch-Suche
             html_content = f"""
@@ -140,10 +218,13 @@ def create_fixed_batch_route(db_manager, batch_results_cache):
         try:
             # 1. HOLE MINES AUS SESSION CACHE
             if session_id not in mine_lists_cache:
-                raise HTTPException(status_code=400, detail="Session abgelaufen. Bitte CSV erneut hochladen.")
+                cache_stats = get_cache_stats()
+                logger.warning(f"[CACHE] Session {session_id} nicht gefunden. Cache size: {cache_stats['current_size']}")
+                raise HTTPException(status_code=400, detail="Session abgelaufen oder nicht gefunden. Bitte CSV erneut hochladen.")
             
             mines = mine_lists_cache[session_id]['mines']
             columns = mine_lists_cache[session_id]['columns']
+            logger.debug(f"[CACHE] Session {session_id} gefunden mit {len(mines)} Minen")
             
             # Bestimme welche Minen zu verarbeiten sind
             if search_all.lower() == "true":
@@ -275,5 +356,24 @@ def create_fixed_batch_route(db_manager, batch_results_cache):
         except Exception as e:
             logger.error(f"[FIXED-BATCH] ERROR: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
+    
+    @router.get("/cache/stats")
+    async def get_cache_statistics():
+        """Zeigt Cache-Statistiken für Monitoring"""
+        stats = get_cache_stats()
+        return {
+            "success": True,
+            "cache_stats": stats
+        }
+    
+    @router.post("/cache/clear")
+    async def clear_cache():
+        """Leert den gesamten Cache (für Admin/Debug-Zwecke)"""
+        mine_lists_cache.clear()
+        logger.info("[CACHE] Cache manuell geleert")
+        return {
+            "success": True,
+            "message": "Cache erfolgreich geleert"
+        }
     
     return router

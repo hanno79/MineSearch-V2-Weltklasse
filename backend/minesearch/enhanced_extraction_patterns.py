@@ -227,8 +227,8 @@ def extract_commodity_from_explanation(text: str) -> str:
             logger.warning(f"Regex error in commodity pattern: {e}")
             continue
     
-    # FALLBACK: X-Marker wenn Rohstoff nicht extrahierbar - REGEL 10 KONFORM
-    return "X"  # Fallback bei Regex-Extraktionsproblemen
+    # REGEL 10 KONFORM: Kein Dummy-Marker - echte "nicht gefunden"
+    return ''  # Echte "nicht gefunden" - kein ausgedachter X-Marker
 
 
 def extract_mine_type_from_complex_text(text: str) -> str:
@@ -255,8 +255,8 @@ def extract_mine_type_from_complex_text(text: str) -> str:
             logger.warning(f"Regex error in mine type pattern: {e}")
             continue
     
-    # FALLBACK: X-Marker wenn Minentyp nicht identifizierbar - REGEL 10 KONFORM
-    return "X"  # Fallback bei Minentyp-Extraktion
+    # REGEL 10 KONFORM: Kein Dummy-Marker - echte "nicht gefunden"
+    return ''  # Echte "nicht gefunden" - kein ausgedachter X-Marker
 
 
 def normalize_commodity_name(commodity: str) -> str:
@@ -270,8 +270,8 @@ def normalize_commodity_name(commodity: str) -> str:
         Normalisierter deutscher Rohstoffname
     """
     if not commodity:
-        # FALLBACK: X-Marker bei leerem Rohstoff-Input - REGEL 10 KONFORM
-        return "X"  # Fallback für leere/None Rohstoff-Werte
+        # REGEL 10 KONFORM: Kein Dummy-Marker - echte "nicht gefunden"
+        return None  # Echte "nicht gefunden" - kein ausgedachter X-Marker
     
     commodity_lower = commodity.lower().strip()
     
@@ -329,8 +329,8 @@ def normalize_mine_type(mine_type: str) -> str:
         Normalisierter deutscher Minentyp
     """
     if not mine_type:
-        # FALLBACK: X-Marker bei leerem Minentyp-Input - REGEL 10 KONFORM
-        return "X"  # Fallback für leere/None Minentyp-Werte
+        # REGEL 10 KONFORM: Kein Dummy-Marker - echte "nicht gefunden"
+        return None  # Echte "nicht gefunden" - kein ausgedachter X-Marker
     
     mine_type_lower = mine_type.lower().strip()
     
@@ -392,8 +392,8 @@ def apply_enhanced_patterns_to_field(value: str, field: str) -> str:
         Mit erweiterten Patterns verbesserter Wert
     """
     if not value or not value.strip():
-        # FALLBACK: X-Marker bei leerem Wert-Input - REGEL 10 KONFORM
-        return "X"  # Fallback für leere/None Eingabewerte
+        # REGEL 10 KONFORM: Kein Dummy-Marker - echte "nicht gefunden"
+        return None  # Echte "nicht gefunden" - kein ausgedachter X-Marker
     
     value = value.strip()
     

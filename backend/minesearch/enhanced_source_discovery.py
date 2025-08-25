@@ -90,9 +90,59 @@ class EnhancedSourceDiscovery(SourceDiscovery):
             for source in unique_sources:
                 self.session.add_discovered_source(source['url'])
         
+        # ÄNDERUNG 25.08.2025: Persistiere neue Quellen in Datenbank
+        self._persist_discovered_sources(unique_sources, mine_name, country, region)
+        
         logger.info(f"[ACTIVE DISCOVERY] Gesamt: {len(unique_sources)} unique Quellen entdeckt")
         
         return unique_sources
+    
+    def _persist_discovered_sources(self, sources: List[Dict[str, Any]], mine_name: str, 
+                                   country: Optional[str], region: Optional[str]) -> None:
+        """
+        Persistiere neu entdeckte Quellen in der Datenbank
+        
+        ÄNDERUNG 25.08.2025: Automatische Persistierung für bessere Quellenabdeckung
+        """
+        from minesearch.database import db_manager
+        from sqlalchemy import text
+        
+        persisted_count = 0
+        
+        for source in sources:
+            try:
+                # Prüfe ob Quelle bereits existiert
+                with db_manager.get_session() as session:
+                    existing = session.execute(
+                        text("SELECT id FROM sources WHERE url = :url"),
+                        {"url": source['url']}
+                    ).fetchone()
+                    
+                    if not existing:
+                        # Neue Quelle hinzufügen
+                        db_manager.add_or_update_source(
+                            url=source['url'],
+                            domain=source['domain'],
+                            country=country,
+                            region=region,
+                            source_type=source['type'],
+                            metadata={
+                                'discovered_for': mine_name,
+                                'discovery_method': 'enhanced_source_discovery',
+                                'priority': source.get('priority', 3),
+                                'description': source.get('description', ''),
+                                'auto_discovered': True
+                            }
+                        )
+                        persisted_count += 1
+                        
+            except Exception as e:
+                logger.warning(f"[SOURCE PERSIST] Fehler beim Speichern von {source['url']}: {e}")
+        
+        if persisted_count > 0:
+            logger.info(f"[SOURCE PERSIST] {persisted_count} neue Quellen in Datenbank gespeichert")
+        else:
+            logger.debug(f"[SOURCE PERSIST] Keine neuen Quellen zu speichern")
     
     def _get_country_specific_sources(self, mine_name: str, country: str, region: Optional[str]) -> List[Dict[str, Any]]:
         """Hole länderspezifische Quellen"""
@@ -126,16 +176,97 @@ class EnhancedSourceDiscovery(SourceDiscovery):
                 'search_pattern': f"'{mine_name}' GESTIM environmental guarantee filetype:pdf"
             })
         
-        # Andere Priority Domains
+        # Andere Priority Domains - GENERIERE SPEZIFISCHE URLS statt generische /search URLs
         for domain in priority_domains:
             if 'gestim' not in domain:  # GESTIM bereits hinzugefügt
-                sources.append({
-                    'url': f"https://{domain}/search?q={urllib.parse.quote(mine_name)}",
+                # Generiere verschiedene spezifische URLs für bessere Datenqualität
+                specific_searches = self._generate_specific_search_urls(mine_name, domain)
+                sources.extend(specific_searches)
+        
+        return sources
+    
+    def _generate_specific_search_urls(self, mine_name: str, domain: str) -> List[Dict[str, Any]]:
+        """
+        Generiere spezifische URLs für bessere Suchergebnisse statt generischer /search URLs
+        """
+        sources = []
+        mine_quoted = urllib.parse.quote(mine_name)
+        
+        # Domain-spezifische URL-Generierung
+        if 'mern.gouv.qc.ca' in domain:
+            # Quebec Mining Ministry - spezifische Bereiche
+            sources.extend([
+                {
+                    'url': f"https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/{mine_quoted}",
                     'domain': domain,
-                    'type': self._classify_domain(domain),
+                    'type': 'government',
                     'priority': 1,
-                    'description': f"Länderspezifische Quelle: {domain}"
-                })
+                    'description': f"Quebec Mining Publications: {mine_name}"
+                },
+                {
+                    'url': f"https://mern.gouv.qc.ca/mines/environnement/{mine_quoted}-restoration",
+                    'domain': domain,
+                    'type': 'government',
+                    'priority': 1,
+                    'description': f"Quebec Environmental Restoration Data: {mine_name}"
+                }
+            ])
+        elif 'nrcan.gc.ca' in domain:
+            # Natural Resources Canada - spezifische Sektionen
+            sources.extend([
+                {
+                    'url': f"https://nrcan.gc.ca/mining-materials/publications/{mine_quoted}",
+                    'domain': domain,
+                    'type': 'government',
+                    'priority': 1,
+                    'description': f"NRCan Mining Publications: {mine_name}"
+                },
+                {
+                    'url': f"https://nrcan.gc.ca/mining-materials/markets/{mine_quoted}-data",
+                    'domain': domain,
+                    'type': 'government',
+                    'priority': 1,
+                    'description': f"NRCan Mining Market Data: {mine_name}"
+                }
+            ])
+        elif 'usgs.gov' in domain:
+            # USGS - Mining Resource Data System
+            sources.extend([
+                {
+                    'url': f"https://mrdata.usgs.gov/mrds/show-mrds.php?dep_id={mine_quoted}",
+                    'domain': domain,
+                    'type': 'government',
+                    'priority': 1,
+                    'description': f"USGS MRDS Database: {mine_name}"
+                },
+                {
+                    'url': f"https://pubs.usgs.gov/search?q={mine_quoted}+mining+report",
+                    'domain': domain,
+                    'type': 'government',
+                    'priority': 1,
+                    'description': f"USGS Mining Reports: {mine_name}"
+                }
+            ])
+        elif 'sedar.com' in domain:
+            # SEDAR - spezifische Dokumenttypen
+            sources.extend([
+                {
+                    'url': f"https://sedar.com/search/search_form_pc.htm?search={mine_quoted}",
+                    'domain': domain,
+                    'type': 'exchange',
+                    'priority': 2,
+                    'description': f"SEDAR Financial Documents: {mine_name}"
+                }
+            ])
+        else:
+            # Fallback für andere Domains - aber immer noch spezifischer als nur /search
+            sources.append({
+                'url': f"https://{domain}/{mine_quoted}-mining-data",
+                'domain': domain,
+                'type': self._classify_domain(domain),
+                'priority': 2,
+                'description': f"Specialized search: {domain} - {mine_name}"
+            })
         
         return sources
     
@@ -174,15 +305,20 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         """Hole globale Mining-Quellen"""
         sources = []
         
-        # Tier 1 Domains
+        # Tier 1 Domains - SPEZIFISCHE URLs statt generische /search
         for domain in Config.PRIORITY_MINING_DOMAINS.get('tier1', []):
-            sources.append({
-                'url': f"https://{domain}/search?q={urllib.parse.quote(mine_name)}",
-                'domain': domain,
-                'type': 'government',
-                'priority': 1,
-                'description': f"Regierungsdatenbank: {domain}"
-            })
+            specific_sources = self._generate_specific_search_urls(mine_name, domain)
+            if specific_sources:
+                sources.extend(specific_sources)
+            else:
+                # Fallback nur wenn keine spezifischen URLs generiert werden konnten
+                sources.append({
+                    'url': f"https://{domain}/mining-database/{urllib.parse.quote(mine_name)}",
+                    'domain': domain,
+                    'type': 'government',
+                    'priority': 1,
+                    'description': f"Government Mining Database: {domain}"
+                })
         
         return sources
     
@@ -208,12 +344,52 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         exchanges = country_exchanges.get(country.lower(), [])
         
         for exchange in exchanges:
+            # ÄNDERUNG 25.08.2025: Spezifische URLs statt generic search
+            specific_sources = self._generate_specific_exchange_urls(mine_name, exchange)
+            sources.extend(specific_sources)
+        
+        return sources
+    
+    def _generate_specific_exchange_urls(self, mine_name: str, exchange: str) -> List[Dict[str, Any]]:
+        """Generiere spezifische Exchange-URLs für verschiedene Dokumenttypen"""
+        sources = []
+        mine_encoded = urllib.parse.quote(mine_name)
+        
+        # Börsenspezifische URL-Pattern
+        exchange_patterns = {
+            'sedar.com': [
+                f"https://sedar.com/companies/{mine_encoded.replace('%20', '-').lower()}-reports",
+                f"https://sedar.com/filings/ni-43-101/{mine_encoded.replace('%20', '-').lower()}",
+                f"https://sedar.com/annual-reports/{mine_encoded.replace('%20', '-').lower()}",
+                f"https://sedar.com/financial-statements/{mine_encoded.replace('%20', '-').lower()}"
+            ],
+            'tsx.com': [
+                f"https://tsx.com/listings/current-listings?symbol={mine_name.replace(' ', '')}",
+                f"https://tsx.com/company-directory?search={urllib.parse.quote(mine_name)}"
+            ],
+            'sec.gov': [
+                f"https://sec.gov/edgar/search/?q={urllib.parse.quote(mine_name)}+10-K",
+                f"https://sec.gov/edgar/search/?q={urllib.parse.quote(mine_name)}+10-Q",
+                f"https://sec.gov/edgar/search/?q={urllib.parse.quote(mine_name)}+8-K"
+            ],
+            'asx.com.au': [
+                f"https://asx.com.au/markets/company/{mine_name.replace(' ', '').lower()}",
+                f"https://asx.com.au/asxpdf/announcements/{mine_name.replace(' ', '')}"
+            ]
+        }
+        
+        urls = exchange_patterns.get(exchange, [
+            f"https://{exchange}/search?q={urllib.parse.quote(mine_name)}+annual+report",
+            f"https://{exchange}/search?q={urllib.parse.quote(mine_name)}+financial+statements"
+        ])
+        
+        for url in urls:
             sources.append({
-                'url': f"https://{exchange}/search?q={urllib.parse.quote(mine_name)}",
+                'url': url,
                 'domain': exchange,
                 'type': 'exchange',
                 'priority': 2,
-                'description': f"Börsendokumente: {exchange}"
+                'description': f"Börsendokumente: {exchange} - {url.split('/')[-1]}"
             })
         
         return sources
@@ -222,48 +398,99 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         """Suche nach technischen Dokumenten"""
         sources = []
         
-        # ÄNDERUNG 06.07.2025: Erweiterte PDF-Suchpatterns für Konzessionsdokumente und kleine Minen
-        # Basis-Suchbegriffe für technische Dokumente
-        doc_patterns = [
-            f'"{mine_name}" NI 43-101 technical report filetype:pdf',
-            f'"{mine_name}" feasibility study filetype:pdf',
-            f'"{mine_name}" closure plan filetype:pdf',
-            f'"{mine_name}" environmental assessment filetype:pdf',
-            f'"{mine_name}" annual report filetype:pdf',
-            # Neue Patterns für bessere Abdeckung
-            f'"{mine_name}" sustainability report filetype:pdf',
-            f'"{mine_name}" ESG report filetype:pdf',
-            f'"{mine_name}" environmental impact assessment filetype:pdf',
-            f'"{mine_name}" MD&A management discussion analysis filetype:pdf',
-            f'"{mine_name}" financial statements notes filetype:pdf',
-            f'"{mine_name}" asset retirement obligation filetype:pdf',
-            f'"{mine_name}" reclamation plan filetype:pdf',
-            f'"{mine_name}" rehabilitation plan filetype:pdf',
-            f'"{mine_name}" decommissioning plan filetype:pdf',
-            # NEUE Patterns für Konzessionsdokumente und Managementpläne
-            f'"{mine_name}" concession document filetype:pdf',
-            f'"{mine_name}" mining permit filetype:pdf',
-            f'"{mine_name}" environmental permit filetype:pdf',
-            f'"{mine_name}" management plan filetype:pdf',
-            f'"{mine_name}" mine management plan filetype:pdf',
-            f'"{mine_name}" exploration closure plan filetype:pdf',
-            f'"{mine_name}" GESTIM filetype:pdf',
-            f'"{mine_name}" mining title filetype:pdf',
-            f'"{mine_name}" licence application filetype:pdf',
-            f'"{mine_name}" financial guarantee filetype:pdf',
-            f'"{mine_name}" environmental bond filetype:pdf'
-        ]
+        # ÄNDERUNG 25.08.2025: Spezifische URLs für technische Dokumente statt generic search
+        specific_sources = self._generate_specific_document_urls(mine_name, country)
+        sources.extend(specific_sources)
         
-        # Erstelle Google-ähnliche Suchanfragen
-        for pattern in doc_patterns:
+        return sources
+    
+    def _generate_specific_document_urls(self, mine_name: str, country: Optional[str]) -> List[Dict[str, Any]]:
+        """Generiere spezifische URLs für verschiedene Dokumenttypen"""
+        sources = []
+        mine_encoded = urllib.parse.quote(mine_name)
+        
+        # Land-spezifische Dokumentquellen
+        if country and country.lower() in ['kanada', 'canada']:
+            # SEDAR - Kanadische Börsenregulierung
+            sources.extend([
+                {
+                    'url': f"https://sedar.com/documents/ni-43-101/{mine_encoded.replace('%20', '-').lower()}-technical-report.pdf",
+                    'domain': 'sedar.com',
+                    'type': 'document',
+                    'priority': 1,
+                    'description': f"SEDAR NI 43-101 Technical Report: {mine_name}"
+                },
+                {
+                    'url': f"https://sedar.com/documents/annual-info/{mine_encoded.replace('%20', '-').lower()}-aif.pdf",
+                    'domain': 'sedar.com', 
+                    'type': 'document',
+                    'priority': 1,
+                    'description': f"SEDAR Annual Information Form: {mine_name}"
+                }
+            ])
+            
+            # Natural Resources Canada
             sources.append({
-                'url': f"search:{pattern}",  # Spezieller Marker für Dokumentsuche
-                'domain': 'document_search',
+                'url': f"https://nrcan.gc.ca/mining-materials/mining/{mine_encoded.replace('%20', '-').lower()}",
+                'domain': 'nrcan.gc.ca',
+                'type': 'document',
+                'priority': 1,
+                'description': f"Natural Resources Canada: {mine_name}"
+            })
+        
+        elif country and country.lower() in ['usa', 'united states']:
+            # SEC Edgar Database
+            sources.extend([
+                {
+                    'url': f"https://sec.gov/edgar/search/?q={mine_encoded}+10-K+mining",
+                    'domain': 'sec.gov',
+                    'type': 'document',
+                    'priority': 1,
+                    'description': f"SEC 10-K Filing: {mine_name}"
+                },
+                {
+                    'url': f"https://sec.gov/edgar/search/?q={mine_encoded}+environmental+compliance",
+                    'domain': 'sec.gov',
+                    'type': 'document', 
+                    'priority': 1,
+                    'description': f"SEC Environmental Reports: {mine_name}"
+                }
+            ])
+        
+        elif country and country.lower() in ['australien', 'australia']:
+            # ASX Australian Securities Exchange
+            sources.append({
+                'url': f"https://asx.com.au/markets/research/announcements?q={mine_encoded}+mining+report",
+                'domain': 'asx.com.au',
+                'type': 'document',
+                'priority': 1,
+                'description': f"ASX Mining Reports: {mine_name}"
+            })
+        
+        # Allgemeine akademische und industrielle Quellen
+        sources.extend([
+            {
+                'url': f"https://pubmed.ncbi.nlm.nih.gov/?term={mine_encoded}+mining+environmental+impact",
+                'domain': 'pubmed.ncbi.nlm.nih.gov',
                 'type': 'document',
                 'priority': 2,
-                'description': f"Dokumentsuche: {pattern}",
-                'search_pattern': pattern
-            })
+                'description': f"PubMed Environmental Studies: {mine_name}"
+            },
+            {
+                'url': f"https://scholar.google.com/scholar?q={mine_encoded}+mining+closure+rehabilitation",
+                'domain': 'scholar.google.com',
+                'type': 'document',
+                'priority': 2,
+                'description': f"Google Scholar Research: {mine_name}"
+            },
+            {
+                'url': f"https://infomine.com/minesite/{mine_encoded.replace('%20', '-').lower()}",
+                'domain': 'infomine.com',
+                'type': 'document',
+                'priority': 2,
+                'description': f"InfoMine Database: {mine_name}"
+            }
+        ])
         
         return sources
     

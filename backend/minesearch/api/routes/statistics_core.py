@@ -610,26 +610,30 @@ async def get_models_comprehensive_statistics(
                     logger.error(f"[STATS-CORE] Error converting model {i}: {model_error}")
                     raise
             
-            # CRITICAL FIX 19.08.2025: Zeige ALLE Modelle mit korrektem Status (User Request: alle 55 Modelle anzeigen)
-            # Füge ungetestete Modelle mit Status "Verfügbar" hinzu
-            for model_id in all_available_models:
-                if model_id not in tested_model_ids:
-                    provider = model_id.split(':')[0] if ':' in model_id else 'unknown'
-                    models_data.append({
-                        'model_id': model_id,
-                        'provider': provider,
-                        'overall_score': 0.0,
-                        'completeness_score': 0.0,
-                        'consistency_score': 0.0,
-                        'total_searches': 0,
-                        'successful_searches': 0,
-                        'score_category': 'Nicht getestet',
-                        'consistency_grade': 'N/A',
-                        'last_updated': None,
-                        'avg_search_duration_ms': 0,
-                        'unique_sources_total': 0,
-                        'note': 'Noch nicht in Batch-Suchen verwendet'
-                    })
+            # ÄNDERUNG 23.08.2025: Nur Modelle mit tatsächlichen Daten zeigen (Nutzer-Request: Saubere Datenbank)
+            # DEAKTIVIERT: Zeige nicht alle verfügbaren Modelle wenn keine Daten vorhanden
+            # Grund: Bei leerer Datenbank sollen auch die Statistics leer sein
+            logger.info(f"[STATS-CORE] Showing only tested models ({len(models_data)}) - untested models hidden for clean database state")
+            
+            # LEGACY CODE (deaktiviert): Ungetestete Modelle hinzufügen
+            # for model_id in all_available_models:
+            #     if model_id not in tested_model_ids:
+            #         provider = model_id.split(':')[0] if ':' in model_id else 'unknown'
+            #         models_data.append({
+            #             'model_id': model_id,
+            #             'provider': provider,
+            #             'overall_score': 0.0,
+            #             'completeness_score': 0.0,
+            #             'consistency_score': 0.0,
+            #             'total_searches': 0,
+            #             'successful_searches': 0,
+            #             'score_category': 'Nicht getestet',
+            #             'consistency_grade': 'N/A',
+            #             'last_updated': None,
+            #             'avg_search_duration_ms': 0,
+            #             'unique_sources_total': 0,
+            #             'note': 'Noch nicht in Batch-Suchen verwendet'
+            #         })
             
             # Sortiere: Getestete Modelle zuerst (nach Score), dann verfügbare (alphabetisch)
             try:

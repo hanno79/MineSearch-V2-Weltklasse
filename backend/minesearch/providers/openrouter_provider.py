@@ -41,15 +41,19 @@ class OpenRouterProvider(AbstractProvider):
         
         # Konvertiere OpenRouter Modelle aus Config
         for model_key, model_config in self.config.get('models', {}).items():
+            # ÄNDERUNG 24.08.2025: Provider-Kategorie für UI-Darstellung berücksichtigen
+            provider_category = model_config.get('provider_category', 'openrouter')
+            
             models[model_key] = ModelConfig(
                 id=model_config['id'],
                 name=model_config['name'],
                 timeout=model_config['timeout'],
                 max_tokens=model_config['max_tokens'],
                 description=model_config['description'],
-                provider='openrouter',
+                provider='openrouter',  # Technischer Provider (für Routing)
+                provider_category=provider_category,  # UI-Kategorie
                 supports_web_search=model_config.get('supports_web_search', False),
-                supports_deep_research=False,
+                supports_deep_research=model_config.get('supports_deep_research', False),
                 is_free=model_config.get('is_free', True)
             )
         
@@ -182,9 +186,12 @@ class OpenRouterProvider(AbstractProvider):
                         if 'Betreiber' in extracted_data.get('data_with_sources', {}):
                             extracted_data['data_with_sources']['Betreiber'] = {"value": "", "sources": []}
                 
-                # ÄNDERUNG 07.07.2025: Validiere Restaurationskosten
+                # DEBUG 23.08.2025: Log alle Restaurationskosten für Debugging
                 if extracted_data['data'].get('Restaurationskosten'):
                     resto = extracted_data['data']['Restaurationskosten']
+                    logger.info(f"[OPENROUTER-DEBUG] Restaurationskosten extrahiert: '{resto}'")
+                    
+                    # ÄNDERUNG 07.07.2025: Validiere Restaurationskosten
                     # Prüfe auf verdächtige Werte
                     suspicious_values = ['USD$1.0 million', 'CAD$1.0 million', '$1.0 million', '1.0 million', 
                                        'USD$1 million', 'CAD$1 million', '$1 million', '1 million',
@@ -195,6 +202,10 @@ class OpenRouterProvider(AbstractProvider):
                         # Entferne auch aus data_with_sources
                         if 'Restaurationskosten' in extracted_data.get('data_with_sources', {}):
                             extracted_data['data_with_sources']['Restaurationskosten'] = {"value": "", "sources": []}
+                    else:
+                        logger.info(f"[OPENROUTER-DEBUG] Restaurationskosten BEHALTEN: '{resto}'")
+                else:
+                    logger.info(f"[OPENROUTER-DEBUG] Keine Restaurationskosten extrahiert")
                 
                 # KORRIGIERT: Keine Source Discovery bei LLM-Providern da keine echten Sources
                 
@@ -213,6 +224,7 @@ class OpenRouterProvider(AbstractProvider):
                         'provider': 'openrouter',
                         'structured_data_with_sources': extracted_data['data_with_sources'],
                         'source_index': extracted_data['source_index'],
+                        'source_mapping': extracted_data.get('source_mapping', {}),  # QUELLENREFERENZEN-FIX 24.08.2025
                         'usage': result.get('usage', {}),
                         'source_discovery_session': session_summary,
                         'discovered_sources_count': len(discovered_sources)

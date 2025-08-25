@@ -165,11 +165,11 @@ def validate_coordinate(value: str, coord_type: str) -> Optional[str]:
         # Versuche als Float zu parsen
         coord_float = float(cleaned)
         
-        # ÄNDERUNG 05.07.2025: Mindestens 4 Nachkommastellen für echte Koordinaten
-        # Prüfe ob genug Präzision vorhanden ist
+        # BUGFIX 23.08.2025: Reduzierte Präzisionsanforderung für echte Koordinaten
+        # Viele echte Koordinaten haben nur 1-2 Nachkommastellen, das ist legitim
         if '.' in str(value):
             decimal_places = len(str(value).split('.')[-1])
-            if decimal_places < 4:
+            if decimal_places < 1:  # Mindestens 1 Nachkommastelle statt 4
                 logger.warning(f"Koordinate hat zu wenig Präzision ({decimal_places} Nachkommastellen): {value}")
                 return None
         

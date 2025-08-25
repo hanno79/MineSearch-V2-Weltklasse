@@ -9,7 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Optional, Dict, List, Any
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 from minesearch.config.base import config, CSV_COLUMNS
@@ -346,7 +346,7 @@ class DatabaseManager:
                 'total_search_results': total_results,  # Backward compatibility
                 'sources_by_type': {},
                 'sources_by_country': {},
-                'model_performance': {},
+                # CLEANUP 24.08.2025: model_performance entfernt - ersetzt durch models array in results/stats
                 'field_statistics': {}
             }
             
@@ -365,59 +365,10 @@ class DatabaseManager:
             ).group_by(Source.country).all()
             stats['sources_by_country'] = {country: count for country, count in country_counts}
             
-            # Model-Performance aus aggregierten ModelStatistics + alle konfigurierten Modelle
-            from sqlalchemy import cast, Float
-            from minesearch.config.providers import PROVIDERS_CONFIG
-            
-            # Hole alle konfigurierten Modelle
-            all_configured_models = []
-            for provider_name, config in PROVIDERS_CONFIG.items():
-                if config.get('enabled', False):
-                    for model in config.get('models', []):
-                        all_configured_models.append(f'{provider_name}:{model}')
-            
-            # Hole getestete Modelle
-            model_stats_query = session.query(
-                ModelStatistics.model_id,
-                func.count(ModelStatistics.id).label('total_tests'),
-                func.avg(cast(ModelStatistics.success, Float)).label('success_rate'),
-                func.avg(ModelStatistics.fields_found).label('avg_fields'),
-                func.avg(ModelStatistics.response_time_ms).label('avg_response_time'),
-                func.max(ModelStatistics.timestamp).label('last_test')
-            ).group_by(ModelStatistics.model_id).all()
-            
-            # Erstelle Dict mit getesteten Modellen
-            tested_models = {}
-            for model_stat in model_stats_query:
-                # KORRIGIERT 15.07.2025: success_rate ist bereits 0.0-1.0, nicht nochmal * 100
-                success_rate_pct = (model_stat.success_rate or 0) * 100
-                reliability_score = success_rate_pct * 0.7 + (model_stat.avg_fields / 19.0 * 100) * 0.3
-                
-                tested_models[model_stat.model_id] = {
-                    'total_tests': model_stat.total_tests,
-                    'average_success_rate': round(success_rate_pct, 1),
-                    'average_fields_found': round(model_stat.avg_fields or 0, 1),
-                    'reliability_score': round(reliability_score, 1),
-                    'average_response_time': round((model_stat.avg_response_time or 0) / 1000, 2),
-                    'last_updated': model_stat.last_test.isoformat() if model_stat.last_test else None,
-                    'status': 'tested'
-                }
-            
-            # Füge alle konfigurierten Modelle hinzu (auch ungetestete)
-            for model_id in all_configured_models:
-                if model_id in tested_models:
-                    stats['model_performance'][model_id] = tested_models[model_id]
-                else:
-                    # Ungetestetes Modell
-                    stats['model_performance'][model_id] = {
-                        'total_tests': 0,
-                        'average_success_rate': 0.0,
-                        'average_fields_found': 0.0,
-                        'reliability_score': 0.0,
-                        'average_response_time': 0.0,
-                        'last_updated': None,
-                        'status': 'not_tested'
-                    }
+            # CLEANUP 24.08.2025: model_performance Generierung ENTFERNT
+            # Grund: Veraltete Struktur, ersetzt durch ModelStatisticsComprehensive in /api/results/stats
+            # Die neue Struktur liefert nur getestete Modelle mit echten Werten
+            # Alle 55 konfigurierten Modelle (inkl. ungetestete mit 0-Werten) sind nicht mehr nötig
             
             # Field-Statistiken
             field_stats = session.query(FieldStatistics).all()
@@ -434,6 +385,42 @@ class DatabaseManager:
                 }
             
             return stats
+
+    def get_model_statistics_comprehensive(self) -> List[Dict[str, Any]]:
+        """
+        Hole alle comprehensive model statistics aus der Datenbank
+        Kompatibel mit Frontend statistics-loader.js
+        """
+        with self.get_session() as session:
+            from minesearch.database.models import ModelStatisticsComprehensive
+            
+            # Hole alle comprehensive statistics
+            comprehensive_stats = session.query(ModelStatisticsComprehensive).all()
+            
+            models_data = []
+            for stat in comprehensive_stats:
+                models_data.append({
+                    'model_name': stat.model_id,  # Frontend erwartet model_name
+                    'model_id': stat.model_id,
+                    'total_searches': stat.total_searches,
+                    'successful_searches': stat.successful_searches,
+                    'success_rate': round(stat.success_rate_percent, 1),
+                    'avg_fields_filled': round(stat.avg_fields_found, 1),
+                    'completeness_score': round(stat.completeness_score, 1),
+                    'consistency_score': round(stat.consistency_score, 1),
+                    'consistency_grade': stat.consistency_grade,
+                    'performance_category': stat.performance_category,
+                    'overall_score': round(stat.overall_score, 1),
+                    'score_category': stat.score_category,
+                    'avg_response_time_ms': round(stat.avg_response_time_ms or 0, 1),
+                    'avg_search_duration_ms': round(stat.avg_search_duration_ms or 0, 1),
+                    'unique_sources_total': stat.unique_sources_total,
+                    'last_search_at': stat.last_search_at.isoformat() if stat.last_search_at else None,
+                    'last_updated': stat.last_updated.isoformat() if stat.last_updated else None
+                })
+            
+            logger.info(f"[STATS-DB] Retrieved {len(models_data)} comprehensive model statistics")
+            return models_data
     
     def update_model_statistics_comprehensive(self, model_id: str):
         """
@@ -464,6 +451,28 @@ class DatabaseManager:
                 quality_scores = [r.data_quality for r in search_results if r.data_quality is not None]
                 avg_data_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0.0
                 
+                # CRITICAL FIX 23.08.2025: Calculate avg_fields_found from structured_data directly
+                total_filled_fields = 0
+                valid_data_searches = 0
+                
+                for result in search_results:
+                    if result.structured_data:
+                        try:
+                            import json
+                            data = json.loads(result.structured_data) if isinstance(result.structured_data, str) else result.structured_data
+                            if isinstance(data, dict):
+                                # Count filled fields (exclude N/A, empty strings, null values)
+                                na_values = ['N/A', '', None, 'null', 'Unknown', 'Keine Angabe']
+                                filled_count = len([v for v in data.values() if v and str(v) not in na_values and not str(v).startswith('_')])
+                                total_filled_fields += filled_count
+                                valid_data_searches += 1
+                        except Exception as e:
+                            logger.warning(f"[STATS-UPDATE] Error parsing structured_data for search {result.id}: {e}")
+                
+                # Calculate actual average fields found
+                actual_avg_fields_found = total_filled_fields / valid_data_searches if valid_data_searches > 0 else 0.0
+                logger.info(f"[STATS-CALC] Model {model_id}: {total_filled_fields} total fields / {valid_data_searches} searches = {actual_avg_fields_found:.2f} avg_fields_found")
+                
                 # Count unique sources across all searches
                 all_sources = []
                 for result in search_results:
@@ -475,7 +484,11 @@ class DatabaseManager:
                 provider = model_id.split(':')[0] if ':' in model_id else 'unknown'
                 
                 # Calculate overall score (simplified version of revolutionary scoring)
-                field_quality_score = avg_data_quality * 100  # Convert to 0-100 scale
+                # CRITICAL FIX 23.08.2025: Use actual_avg_fields_found for completeness calculation
+                total_expected_fields = 19  # Based on CSV_COLUMNS structure
+                field_completeness = (actual_avg_fields_found / total_expected_fields) * 100 if total_expected_fields > 0 else 0
+                
+                field_quality_score = field_completeness  # Use actual field completeness
                 consistency_score = success_rate * 100  # Success rate as consistency
                 speed_score = max(0, 100 - (avg_response_time * 2)) if avg_response_time > 0 else 100  # Penalty for slow responses
                 cost_efficiency_score = 85  # Default good score, could be improved with actual cost data
@@ -498,8 +511,10 @@ class DatabaseManager:
                     existing.successful_searches = successful_searches
                     existing.success_rate_percent = success_rate * 100  # Convert to percentage
                     existing.avg_response_time_ms = avg_response_time * 1000 if avg_response_time else 0
-                    existing.avg_fields_found = avg_data_quality * len(CSV_COLUMNS) if avg_data_quality else 0
-                    existing.completeness_score = avg_data_quality * 100 if avg_data_quality else 0
+                    # CRITICAL FIX 23.08.2025: Use actual calculated avg_fields_found
+                    existing.avg_fields_found = actual_avg_fields_found
+                    existing.completeness_score = field_completeness
+                    existing.consistency_score = consistency_score  
                     existing.unique_sources_total = unique_sources
                     existing.overall_score = overall_score
                     
@@ -513,8 +528,10 @@ class DatabaseManager:
                         successful_searches=successful_searches,
                         success_rate_percent=success_rate * 100,  # Convert to percentage
                         avg_response_time_ms=avg_response_time * 1000 if avg_response_time else 0,
-                        avg_fields_found=avg_data_quality * len(CSV_COLUMNS) if avg_data_quality else 0,
-                        completeness_score=avg_data_quality * 100 if avg_data_quality else 0,
+                        # CRITICAL FIX 23.08.2025: Use actual calculated avg_fields_found
+                        avg_fields_found=actual_avg_fields_found,
+                        completeness_score=field_completeness,
+                        consistency_score=consistency_score,
                         unique_sources_total=unique_sources,
                         overall_score=overall_score
                     )
@@ -530,3 +547,35 @@ class DatabaseManager:
                 logger.error(f"[STATS-UPDATE] Error updating statistics for {model_id}: {e}")
                 session.rollback()
                 raise
+    
+    def get_recent_search_results(self, mine_name: str, hours_back: int = 24, limit: int = 10) -> List[SearchResult]:
+        """
+        KRITISCHER FIX 23.08.2025: Hole existierende Suchergebnisse aus der Datenbank
+        
+        Args:
+            mine_name: Name der Mine
+            hours_back: Anzahl Stunden zurück zu suchen
+            limit: Maximale Anzahl Ergebnisse
+            
+        Returns:
+            Liste von SearchResult-Objekten
+        """
+        with self.get_session() as session:
+            from sqlalchemy import and_
+            
+            # Use timezone-aware datetime and convert to naive for consistent DB comparison
+            cutoff_time = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours_back)
+            
+            results = session.query(SearchResult).filter(
+                and_(
+                    SearchResult.mine_name == mine_name,
+                    SearchResult.created_at >= cutoff_time,
+                    SearchResult.success == True,
+                    SearchResult.structured_data.isnot(None)
+                )
+            ).order_by(
+                SearchResult.created_at.desc()
+            ).limit(limit).all()
+            
+            logger.info(f"[DB-RECENT] Gefunden {len(results)} existierende Ergebnisse für {mine_name} in letzten {hours_back}h")
+            return results

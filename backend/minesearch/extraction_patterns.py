@@ -129,12 +129,18 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'(?:Report|Document|Bericht).*?\((\b(?:19|20)\d{2}\b)\)'
         ],
         'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [
+            # BUGFIX 23.08.2025: Verbesserte Patterns für Rohstoffabbau
+            r'Rohstoffabbau\s+\([^)]+\):\s*([^\n]+)',  # "Rohstoffabbau (Gold/...): Gold"
             r'Rohstoffe?:\s*([^\n]+)', 
             r'(?:produziert|fördert|abbaut)\s+([^\n]+(?:Gold|Kupfer|Silber|Zink|Blei|Nickel|Kohle|Eisenerz)[^\n]*)',
             r'Commodity:\s*([^\n]+)',
             r'Commodities:\s*([^\n]+)',
             r'Mineral(?:s|ien)?:\s*([^\n]+)',
-            r'(?:haupt|main)\s*(?:rohstoff|commodity):\s*([^\n]+)'
+            r'(?:haupt|main)\s*(?:rohstoff|commodity):\s*([^\n]+)',
+            # Weitere verbesserte Patterns
+            r'(?:abbaut|produces?|mines?)\s+([^.\n]+(?:Gold|Kupfer|Silver|Copper|Zinc|Lead|Nickel|Coal|Iron)[^.\n]*)',
+            r'(?:primary|main|haupt).*?(?:commodity|mineral|rohstoff):\s*([^\n]+)',
+            r'(Gold|Kupfer|Silver|Copper|Zinc|Lead|Nickel|Coal|Iron)(?:\s+(?:mine|mining|abbau))?'
         ],
         'Minentyp (Untertage/ Open-Pit/ usw.)': [
             r'Minentyp:\s*([^\n]+)', 
@@ -152,13 +158,19 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'geschlossen\s+(?:seit\s+)?(\d{4})'
         ],
         'Fördermenge/Jahr': [
+            # BUGFIX 23.08.2025: Verbesserte Patterns für Fördermenge
+            r'Fördermenge/Jahr:\s*([^\n]+)',
             r'Fördermenge:\s*([\d,]+(?:\.\d+)?)\s*([^\n]+)',
             r'Produktion:\s*([\d,]+(?:\.\d+)?)\s*([^\n]+)',
-            r'produziert\s+(?:jährlich\s+)?([\d,]+(?:\.\d+)?)\s*([^\n]+)'
+            r'produziert\s+(?:jährlich\s+)?([\d,]+(?:\.\d+)?)\s*([^\n]+)',
+            r'([\d,]+(?:\.\d+)?)\s*(oz|ounces|tonnes?|tons?|pounds?)\s*(?:Gold|Kupfer|Silver|Copper|annually|per year|jährlich)'
         ],
         'Fläche der Mine in qkm': [
+            # BUGFIX 23.08.2025: Verbesserte Patterns für Fläche
+            r'Fläche der Mine in qkm:\s*([\d,]+(?:\.\d+)?)',
             r'Fläche:\s*([\d,]+(?:\.\d+)?)\s*(?:km²|qkm|km2)', 
-            r'Area:\s*([\d,]+(?:\.\d+)?)\s*(?:km²|qkm|km2)'
+            r'Area:\s*([\d,]+(?:\.\d+)?)\s*(?:km²|qkm|km2)',
+            r'([\d,]+(?:\.\d+)?)\s*(?:km²|qkm|km2|square kilometers)'
         ]
     }
     

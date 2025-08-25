@@ -114,44 +114,20 @@ class DefensiveSearchWrapper:
             return self._create_fallback_result(mine_name, country, str(e))
     
     def _create_fallback_result(self, mine_name: str, country: str, error: str) -> Dict[str, Any]:
-        """Erstelle Fallback-Ergebnis bei Fehlern"""
-        logger.warning(f"[FALLBACK] Erstelle Fallback-Ergebnis für {mine_name}")
-        
-        # Minimale strukturierte Daten für Stabilität
-        fallback_data = {
-            "Name": mine_name,
-            "Country": country,
-            "Region": "X",
-            "Eigentümer": "X",
-            "Betreiber": "X",
-            "x-Koordinate": "X",
-            "y-Koordinate": "X",
-            "Aktivitätsstatus": "X",
-            "Restaurationskosten": "X",
-            "Jahr der Aufnahme der Kosten": "X",
-            "Jahr der Erstellung des Dokumentes": "X",
-            "Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)": "X",
-            "Minentyp (Untertage/ Open-Pit/ usw.)": "X",
-            "Produktionsstart": "X",
-            "Produktionsende": "X",
-            "Fördermenge/Jahr": "X",
-            "Fläche der Mine in qkm": "X",
-            "Quellenangaben": "Service-Fehler: Daten nicht verfügbar"
-        }
+        """REGEL 10 KONFORM: Kein Fallback-Ergebnis mit ausgedachten Daten - nur Fehler zurückgeben"""
+        logger.error(f"[NO-FALLBACK] Search Service Fehler für {mine_name}: {error}")
+        logger.error(f"[NO-FALLBACK] REGEL 10: Keine ausgedachten Fallback-Daten - Mine wird übersprungen")
         
         return {
             "success": False,
             "error": f"Search Service Fehler: {error}",
-            "data": {
-                "structured_data": fallback_data,
-                "source_mapping": {},
-                "mine_name": mine_name,
-                "country": country,
-                "model_used": "fallback",
-                "search_timestamp": datetime.now().isoformat(),
-                "search_duration": 0.0,
-                "fallback_mode": True
-            }
+            "data": None,  # REGEL 10: Keine ausgedachten Daten
+            "mine_name": mine_name,
+            "country": country,
+            "model_used": "none",
+            "search_timestamp": datetime.now().isoformat(),
+            "search_duration": 0.0,
+            "fallback_mode": False  # Kein Fallback mehr
         }
 
 # Global instance

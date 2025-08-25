@@ -33,9 +33,42 @@ def is_template_or_dummy_value(value: str, field: str = None) -> bool:
     value_str = str(value).strip()
     value_lower = value_str.lower()
     
-    # PHASE 1: DIREKTE TEMPLATE-MARKER - ABSOLUTE PRIORITÄT
+    # PHASE 1: DIREKTE TEMPLATE-MARKER UND "NICHTS GEFUNDEN" WERTE - ABSOLUTE PRIORITÄT
     if value_str.startswith('TEMPLATE:'):
         logger.warning(f"[TEMPLATE DETECTION] Direkter TEMPLATE-Marker: '{value_str}'")
+        return True
+    
+    # NEU: "Unbekannt" und ähnliche "nichts gefunden" Werte
+    unknown_patterns = [
+        'unbekannt', 'unknown', 'nicht bekannt', 'nicht verfügbar',
+        'no data', 'no information', 'not found', 'not available',
+        'n/a', 'na', 'tbd', 'to be determined', 'keine angabe',
+        'keine angaben', 'keine daten', 'nicht ermittelbar',
+        'nicht spezifiziert', 'not specified', 'not applicable',
+        'keine information', 'no info', 'nichts gefunden'
+    ]
+    
+    if value_lower in unknown_patterns:
+        logger.warning(f"[TEMPLATE DETECTION] 'Nichts gefunden' Wert: '{value_str}'")
+        return True
+    
+    # NEU: AI-Model-Comments und lange Erklärungstexte
+    ai_comment_patterns = [
+        'the user says',
+        'user says',
+        'so that\'s straightforward',
+        'also unknown',
+        'no data, so leave blank',
+        'without specifics',
+        'can\'t provide numbers',
+        'since i can\'t access',
+        'i\'ll rely on general',
+        'typical values for'
+    ]
+    
+    # Wenn der Text AI-Kommentare enthält, ist es ein Template-Wert
+    if any(pattern in value_lower for pattern in ai_comment_patterns):
+        logger.warning(f"[TEMPLATE DETECTION] AI-Kommentar erkannt: '{value_str[:100]}...'")
         return True
     
     # PHASE 2: CSV-HEADER-ÄHNLICHE TEMPLATE-PATTERNS
@@ -125,6 +158,52 @@ def is_template_or_dummy_value(value: str, field: str = None) -> bool:
         if value_lower in ['betreiber', 'eigentümer', 'owner', 'operator', 'company', 'unternehmen']:
             logger.warning(f"[TEMPLATE DETECTION] Field-Label als Wert: '{value_str}'")
             return True
+    
+    # PHASE 7: KRITISCHE FELDNAMEN-ALS-WERTE ERKENNUNG (25.08.2025)
+    # Verhindert systematische Feldverschiebung durch AI-Modell-Verwirrung
+    field_name_patterns = [
+        r'^x-Koordinate\s*(\[.*\])?$',              # "x-Koordinate" oder "x-Koordinate [1,2,3]"
+        r'^y-Koordinate\s*(\[.*\])?$',              # "y-Koordinate" oder "y-Koordinate [1,2,3]"
+        r'^Produktionsstart\s*(\[.*\])?$',          # "Produktionsstart" oder "Produktionsstart [1,2,3]"
+        r'^Produktionsende\s*(\[.*\])?$',           # "Produktionsende" oder "Produktionsende [1,2,3]"
+        r'^Restaurationskosten\s*(\[.*\])?$',       # "Restaurationskosten" oder "Restaurationskosten [1,2,3]"
+        r'^Minenfläche in qkm\s*(\[.*\])?$',        # "Minenfläche in qkm" oder "Minenfläche in qkm [1,2,3]"
+        r'^Fläche der Mine in qkm\s*(\[.*\])?$',    # "Fläche der Mine in qkm" oder "Fläche der Mine in qkm [1,2,3]"
+        r'^Kostenjahr\s*(\[.*\])?$',                # "Kostenjahr" oder "Kostenjahr [1,2,3]"
+        r'^Dokumentenjahr\s*(\[.*\])?$',            # "Dokumentenjahr" oder "Dokumentenjahr [1,2,3]"
+        r'^Minentyp\s*(\[.*\])?$',                  # "Minentyp" oder "Minentyp [1,2,3]"
+        r'^Aktivitätsstatus\s*(\[.*\])?$',          # "Aktivitätsstatus" oder "Aktivitätsstatus [1,2,3]"
+        r'^Betreiber\s*(\[.*\])?$',                 # "Betreiber" oder "Betreiber [1,2,3]"
+        r'^Eigentümer\s*(\[.*\])?$',                # "Eigentümer" oder "Eigentümer [1,2,3]"
+        r'^Rohstoffe?\s*(\[.*\])?$',                # "Rohstoffe" oder "Rohstoffe [1,2,3]"
+        r'^Fördermenge/?Jahr\s*(\[.*\])?$',         # "Fördermenge/Jahr" oder "Fördermenge/Jahr [1,2,3]"
+        r'^pdf\s*(\[.*\])?$',                       # "pdf" oder "pdf [1,2,3,4,5,6...]"
+        r'^leer\s*(\[.*\])?$',                      # "leer" oder "leer [1]"
+        r'^LEER\s*(\[.*\])?$',                      # "LEER" oder "LEER [1]"
+    ]
+    
+    for pattern in field_name_patterns:
+        if re.match(pattern, value_str, re.IGNORECASE):
+            logger.error(f"[CRITICAL DB PROTECTION] Feldname als Wert erkannt: '{value_str}' im Feld '{field}' → BLOCKIERT")
+            return True
+    
+    # PHASE 8: ZUSÄTZLICHE SCHUTZMANAHMEN
+    # Erkenne weitere problematische Muster die auf Feldverschiebung hindeuten
+    if len(value_str) < 50:  # Nur kurze Werte prüfen um Performance zu schonen
+        # Prüfe ob der Wert ein anderer Feldname ist (Cross-Field-Contamination)
+        all_field_names = [
+            'betreiber', 'eigentümer', 'rohstoffe', 'minentyp', 'aktivitätsstatus',
+            'produktionsstart', 'produktionsende', 'restaurationskosten', 'kostenjahr',
+            'dokumentenjahr', 'minenfläche', 'fläche', 'koordinate', 'quellenangaben'
+        ]
+        
+        # Entferne Quellenreferenzen für den Vergleich
+        clean_value = re.sub(r'\s*\[.*\]$', '', value_str).lower().strip()
+        
+        for field_name in all_field_names:
+            if field_name in clean_value and field_name not in field.lower():
+                logger.error(f"[CRITICAL DB PROTECTION] Cross-Field-Contamination: '{value_str}' enthält '{field_name}' → BLOCKIERT")
+                return True
     
     # Value passed all template/dummy checks - it's a real data value
     logger.debug(f"[TEMPLATE DETECTION] Echter Wert erkannt: '{value_str}'")

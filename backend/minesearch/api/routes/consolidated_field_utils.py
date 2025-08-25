@@ -185,11 +185,15 @@ FIELD_ORDER = [
 
 def consolidate_and_rename_field(field_name, field_value):
     """
-    PHASE 1.3: Enhanced field consolidation mit Template-Pattern-Erkennung
+    CSV-FIX 25.08.2025: Enhanced field consolidation mit Template-Pattern-Erkennung
     Konsolidiert doppelte Felder und benennt Felder um
     
     Returns: (final_field_name, processed_field_value)
     """
+    # CSV-FIX: Spezielle Felder nicht als Template behandeln
+    if field_name in ['_source_mapping', 'source_mapping', 'sources']:
+        return field_name, field_value  # Lass diese Felder unverändert
+    
     # Step 1: Check if field should be consolidated (removed)
     if field_name in FIELD_CONSOLIDATION_MAP:
         target_field = FIELD_CONSOLIDATION_MAP[field_name]
