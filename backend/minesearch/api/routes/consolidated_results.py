@@ -365,7 +365,7 @@ async def get_consolidated_results(
     from minesearch.database import db_manager
     from sqlalchemy import desc as sql_desc, asc as sql_asc
     from datetime import datetime, timedelta
-    from minesearch.utils import normalize_accents
+    from minesearch.utils import normalize_accents, normalize_mine_name_for_grouping
     
     with db_manager.get_session() as session:
         query = session.query(SearchResult)
@@ -420,9 +420,9 @@ async def get_consolidated_results(
         })
         
         for result in all_results:
-            # DEDUPLICATION FIX 24.08.2025: Verwende normalisierten Namen für Gruppierung
+            # DEDUPLICATION FIX 25.08.2025: Erweiterte Normalisierung für bessere Duplikat-Erkennung
             mine_name = result.mine_name
-            normalized_mine_name = normalize_accents(mine_name)
+            normalized_mine_name = normalize_mine_name_for_grouping(mine_name)
             
             # Gruppiere nach normalisiertem Namen
             mine_data = mines_data[normalized_mine_name]
@@ -617,7 +617,7 @@ async def get_consolidated_results(
                                 'value_details': []
                             }
         
-        # DISPLAY NAME SELECTION 24.08.2025: Wähle häufigsten ursprünglichen Namen für Anzeige
+        # DISPLAY NAME SELECTION 25.08.2025: Wähle besten ursprünglichen Namen für Anzeige
         for normalized_name, mine_data in mines_data.items():
             if len(mine_data['original_names']) > 1:
                 # Zähle Häufigkeit jeder Schreibweise in den Daten
@@ -625,14 +625,22 @@ async def get_consolidated_results(
                 for original_name in mine_data['original_names']:
                     name_counts[original_name] = sum(1 for result in all_results 
                                                    if result.mine_name == original_name and 
-                                                   normalize_accents(result.mine_name) == normalized_name)
+                                                   normalize_mine_name_for_grouping(result.mine_name) == normalized_name)
                 
-                # Wähle häufigsten Namen für Anzeige
-                best_display_name = max(name_counts.keys(), key=name_counts.get)
+                # Wähle besten Namen: Priorität für vollständige Namen (mit "Mine" etc.)
+                best_display_name = max(mine_data['original_names'], key=lambda name: (
+                    name_counts.get(name, 0),  # Häufigkeit
+                    len(name),  # Länge (längere Namen bevorzugt)
+                    ' mine' in name.lower() or ' project' in name.lower()  # Suffixe bevorzugt
+                ))
+                
                 mine_data['mine_name'] = best_display_name
                 
                 logger.info(f"[DEDUPLICATION] '{normalized_name}' hat {len(mine_data['original_names'])} Schreibweisen: {mine_data['original_names']}")
-                logger.info(f"[DEDUPLICATION] Gewählter Anzeigename: '{best_display_name}' (häufigste Schreibweise)")
+                logger.info(f"[DEDUPLICATION] Gewählter Anzeigename: '{best_display_name}' (beste Schreibweise)")
+            elif len(mine_data['original_names']) == 1:
+                # Nur eine Schreibweise - verwende diese
+                mine_data['mine_name'] = next(iter(mine_data['original_names']))
         
         # Konvertiere zu Liste und implementiere "Best Value" Algorithmus
         consolidated_results = []
@@ -756,7 +764,7 @@ async def get_consolidated_results(
             
             # Separiere Metadatenfelder von Datenfeldern
             metadata_fields = {
-                'mine_name': mine_name,
+                'mine_name': mine_data['mine_name'],  # Verwende Display-Name statt normalisierten Key
                 'country': mine_data['country'],
                 'region': mine_data['region'],
                 'model_count': mine_data['model_count'],
@@ -822,7 +830,7 @@ async def get_consolidated_results(
                 },
                 
                 # LEGACY COMPATIBILITY (für bestehende Frontend-Teile)
-                'mine_name': mine_name,
+                'mine_name': mine_data['mine_name'],  # Verwende Display-Name statt normalisierten Key
                 'country': mine_data['country'], 
                 'region': mine_data['region'],
                 'best_values': best_values,  # Maintained for backward compatibility

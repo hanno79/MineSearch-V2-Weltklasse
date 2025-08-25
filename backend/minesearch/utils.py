@@ -412,4 +412,59 @@ def sanitize_filename(filename: str) -> str:
     
     return filename
 
+
+def normalize_mine_name_for_grouping(mine_name: str) -> str:
+    """
+    Normalisiere Minennamen für Duplikat-Erkennung und Gruppierung
+    
+    Diese Funktion erweitert normalize_accents() um Suffix-Behandlung,
+    damit "Eleonore" und "Eleonore Mine" als dieselbe Mine erkannt werden.
+    
+    Args:
+        mine_name: Originalname der Mine
+        
+    Returns:
+        Normalisierter Name für Gruppierung (lowercase)
+    """
+    if not mine_name:
+        return ""
+    
+    # Schritt 1: Entferne Akzente
+    normalized = normalize_accents(mine_name.strip())
+    
+    # Schritt 2: Entferne gängige Mine-Suffixe (Case-insensitive)
+    suffixes = [
+        ' Mine', ' mine', ' MINE',
+        ' Project', ' project', ' PROJECT', 
+        ' Property', ' property', ' PROPERTY',
+        ' Deposit', ' deposit', ' DEPOSIT',
+        ' Operation', ' operation', ' OPERATION',
+        ' Site', ' site', ' SITE',
+        ' Mina', ' mina', ' MINA',  # Spanisch
+        ' Proyecto', ' proyecto', ' PROYECTO'  # Spanisch
+    ]
+    
+    for suffix in suffixes:
+        if normalized.endswith(suffix):
+            normalized = normalized[:-len(suffix)].strip()
+            break
+    
+    # Schritt 3: Entferne auch Präfixe falls vorhanden
+    prefixes = [
+        'Mine ', 'mine ', 'MINE ',
+        'Project ', 'project ', 'PROJECT ',
+        'Property ', 'property ', 'PROPERTY ',
+        'Mina ', 'mina ', 'MINA ',
+        'Proyecto ', 'proyecto ', 'PROYECTO '
+    ]
+    
+    for prefix in prefixes:
+        if normalized.startswith(prefix):
+            normalized = normalized[len(prefix):].strip()
+            break
+    
+    # Schritt 4: Lowercase für konsistente Gruppierung
+    return normalized.lower()
+
+
 # ÄNDERUNG 01.07.2025: Duplizierte Funktionen entfernt - diese existieren bereits in source_discovery.py und data_extraction.py  # Entferne Duplikate und sortiere
