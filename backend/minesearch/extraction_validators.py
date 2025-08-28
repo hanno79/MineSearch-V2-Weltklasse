@@ -135,7 +135,10 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
 
 def validate_coordinate(value: str, coord_type: str) -> Optional[str]:
     """
-    Validiert und formatiert Koordinaten
+    RULE 10 COMPLIANCE 26.08.2025: Validiert und formatiert Koordinaten mit verschärfter Template-Erkennung
+    
+    Verhindert AI-geschätzte oder gerundete Koordinaten in der Datenbank.
+    Nur echte, dokumentierte Koordinaten mit ausreichender Präzision werden akzeptiert.
     
     Args:
         value: Koordinatenwert
@@ -158,6 +161,20 @@ def validate_coordinate(value: str, coord_type: str) -> Optional[str]:
         logger.warning(f"Koordinate enthält Text statt Koordinate: {value}")
         return None
     
+    # RULE 10 COMPLIANCE 26.08.2025: Erkenne verdächtige Template-Koordinaten
+    # AI-Modelle neigen dazu, gerundete/geschätzte Koordinaten zu verwenden
+    str_value = str(value).strip()
+    
+    # Erkenne exakt gerundete Koordinaten (z.B. 49.000000, 70.000000)
+    if re.match(r'^-?\d+\.0+$', str_value):
+        logger.warning(f"[RULE 10] Gerundete Koordinate erkannt und blockiert: {value} (verdächtig exakt)")
+        return None
+    
+    # Erkenne typische "Zentrum von Regionen" Koordinaten (z.B. 50.0, 60.0)
+    if re.match(r'^-?\d+\.?0?$', str_value) and float(str_value) % 5 == 0:
+        logger.warning(f"[RULE 10] Region-Zentrum-Koordinate erkannt und blockiert: {value} (zu grob)")
+        return None
+    
     try:
         # Entferne Grad-Zeichen und Whitespace
         cleaned = re.sub(r'[°\s]+', '', str(value))
@@ -165,12 +182,38 @@ def validate_coordinate(value: str, coord_type: str) -> Optional[str]:
         # Versuche als Float zu parsen
         coord_float = float(cleaned)
         
-        # BUGFIX 23.08.2025: Reduzierte Präzisionsanforderung für echte Koordinaten
-        # Viele echte Koordinaten haben nur 1-2 Nachkommastellen, das ist legitim
+        # RULE 10 COMPLIANCE 26.08.2025: Verschärfte Präzisions-Prüfung
+        # Echte GPS-Koordinaten haben mindestens 4-6 Nachkommastellen
         if '.' in str(value):
             decimal_places = len(str(value).split('.')[-1])
-            if decimal_places < 1:  # Mindestens 1 Nachkommastelle statt 4
-                logger.warning(f"Koordinate hat zu wenig Präzision ({decimal_places} Nachkommastellen): {value}")
+            if decimal_places < 4:  # Mindestens 4 Nachkommastellen für echte GPS-Daten
+                logger.warning(f"[RULE 10] Koordinate hat zu wenig Präzision ({decimal_places} Nachkommastellen): {value}")
+                return None
+        else:
+            # Ganzzahl-Koordinaten sind verdächtig ungenau
+            logger.warning(f"[RULE 10] Ganzzahl-Koordinate blockiert (keine Nachkommastellen): {value}")
+            return None
+        
+        # RULE 10 COMPLIANCE 26.08.2025: Erkenne "Dummy-Koordinaten"
+        # Typische Patterns die AI-Modelle für unbekannte Standorte verwenden
+        dummy_patterns = [
+            # Null-Koordinaten
+            (0.0, 0.0),
+            # Typische "Mitte von Kontinenten"
+            (45.0, -100.0),  # Mitte Nordamerika
+            (50.0, 10.0),    # Mitte Europa
+            (-25.0, 135.0),  # Mitte Australien
+            # Gerundete "Hauptstadt-Nähe"
+            (49.0, -123.0),  # Vancouver-Nähe
+            (43.0, -79.0),   # Toronto-Nähe
+        ]
+        
+        for lat, lon in dummy_patterns:
+            if coord_type == 'x' and abs(coord_float - lat) < 0.01:
+                logger.warning(f"[RULE 10] Verdächtige Dummy-Koordinate erkannt: {value} (Pattern-Match)")
+                return None
+            elif coord_type == 'y' and abs(coord_float - lon) < 0.01:
+                logger.warning(f"[RULE 10] Verdächtige Dummy-Koordinate erkannt: {value} (Pattern-Match)")
                 return None
         
         # Validiere Bereiche

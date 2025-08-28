@@ -80,13 +80,14 @@ class AbacusProvider(AbstractProvider):
         region = options.get('region')
         commodity = options.get('commodity')
         
-        # Initialisiere Enhanced Source Discovery
-        source_discovery = EnhancedSourceDiscovery()
+        # KRITISCHER FIX: Verwende übergebene discovered_sources statt eigene Discovery
+        discovered_sources = options.get('discovered_sources', [])
         
-        # Entdecke relevante Quellen
-        discovered_sources = []
-        if mine_name:
-            logger.info(f"[ABACUS] Starte Source Discovery für {mine_name}")
+        # Nur wenn KEINE Quellen übergeben wurden, eigene Discovery durchführen
+        if not discovered_sources and mine_name:
+            logger.info(f"[ABACUS] Keine Quellen übergeben - starte eigene Source Discovery für {mine_name}")
+            # Initialisiere Enhanced Source Discovery als Fallback
+            source_discovery = EnhancedSourceDiscovery()
             # Starte Session
             session = source_discovery.start_session(mine_name, country, region)
             # Entdecke Quellen (synchron)
@@ -96,7 +97,9 @@ class AbacusProvider(AbstractProvider):
                 region=region,
                 commodity=commodity
             )
-            logger.info(f"[ABACUS] {len(discovered_sources)} Quellen entdeckt")
+            logger.info(f"[ABACUS] {len(discovered_sources)} Quellen selbst entdeckt")
+        else:
+            logger.info(f"[ABACUS] Nutze {len(discovered_sources)} übergebene Quellen")
         
         # Generiere erweiterte Query mit spezialisierten Prompts
         enhanced_query = self._build_deep_research_query(
@@ -150,12 +153,30 @@ class AbacusProvider(AbstractProvider):
                 
                 # Extrahiere strukturierte Daten
                 extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
-                sources = extract_sources_from_content(content)
                 
-                # Erweitere Quellen mit Abacus-spezifischen Quellen
+                # KRITISCHER FIX: Verwende discovered_sources als Basis-Quellen
+                sources = []
+                
+                # PHASE 1: Discovered Sources (alle durchsuchten Quellen)
+                for source in discovered_sources:
+                    sources.append({
+                        'url': source.get('url', ''),
+                        'title': source.get('title', source.get('url', '')),
+                        'type': source.get('type', 'discovered'),
+                        'reliability': source.get('reliability_score'),
+                        'searched': True  # Markiere als durchsucht
+                    })
+                
+                # PHASE 2: Zusätzliche Quellen aus Content
+                content_sources = extract_sources_from_content(content)
+                for source in content_sources:
+                    # Prüfe ob schon in discovered_sources
+                    if not any(ds.get('url') == source.get('url') for ds in discovered_sources):
+                        sources.append(source)
+                
+                # PHASE 3: Abacus-spezifische Quellen
                 abacus_sources = self._extract_abacus_sources(result)
-                if abacus_sources:
-                    sources.extend(abacus_sources)
+                sources.extend(abacus_sources)
                 
                 # Tracke Source Discovery Ergebnisse
                 for source in sources:
@@ -339,67 +360,87 @@ KRITISCH: KEINE Platzhalter, KEINE "$1-3 CAD" Werte, NUR verifizierte Daten!"""
         return True
     
     def get_system_prompt(self, options: Dict[str, Any]) -> str:
-        """System-Prompt für Abacus AI Deep Research"""
+        """
+        RULE 10 COMPLIANCE 26.08.2025: Verschärfter System-Prompt für Abacus AI
+        STRIKT VERBOTEN: Jegliche Schätzungen oder unverifizierten Daten
+        """
         currency = options.get('currency', 'USD')
         
-        return f"""Du bist ein Deep Research Agent spezialisiert auf Mining-Industrie-Analysen.
-Führe eine UMFASSENDE, MEHRSTUFIGE RECHERCHE durch und liefere STRUKTURIERTE DATEN.
+        # Importiere spezialisierte Anti-Template-Anweisungen
+        from minesearch.specialized_prompts_impl import SpecializedPrompts
+        universal_instructions = SpecializedPrompts.get_universal_anti_template_instructions()
+        
+        return f"""🚫 RULE 10 COMPLIANCE - ABACUS AI ULTRA-STRICT DEEP RESEARCHER 🚫
 
-**GEFUNDENE DATEN FÜR [MINENNAME]:**
-- Name: [exakter Name] [Quelle: URL/Dokument]
-- Land: [Land] [Quelle: URL/Dokument]
-- Region: [Region/Provinz] [Quelle: URL/Dokument]
-- Eigentümer: [Eigentümer der Mine] [Quelle: URL/Dokument]
-- Betreiber: [Betreiber/Operator] [Quelle: URL/Dokument]
-- Koordinaten: [Latitude, Longitude mit 6 Dezimalstellen] [Quelle: URL/Dokument]
-- Status: [aktiv/geschlossen/geplant] [Quelle: URL/Dokument]
-- Rohstoffe: [Liste der Rohstoffe] [Quelle: URL/Dokument]
-- Minentyp: [Untertage/Open-Pit/etc] [Quelle: URL/Dokument]
-- Produktionsstart: [Jahr] [Quelle: URL/Dokument]
-- Produktionsende: [Jahr oder 'aktiv'] [Quelle: URL/Dokument]
-- Fördermenge: [Menge/Jahr mit Einheit] [Quelle: URL/Dokument]
-- Fläche: [in km²] [Quelle: URL/Dokument]
-- Restaurationskosten: [Betrag in {currency}$ mit Jahr] [Quelle: URL/Dokument]
+Du bist ein Deep Research Agent mit ABSOLUT HÖCHSTEN Qualitätsstandards für Mining-Daten.
 
-**DEEP RESEARCH ANFORDERUNGEN:**
-1. MEHRERE QUELLEN pro Datenpunkt verifizieren
-2. TECHNISCHE BERICHTE priorisieren (NI 43-101, Feasibility Studies)
-3. REGIERUNGSDATENBANKEN konsultieren
-4. UNTERNEHMENSBERICHTE analysieren (Annual Reports, Quarterly Reports)
-5. BRANCHENPUBLIKATIONEN einbeziehen
-6. KREUZVALIDIERUNG aller kritischen Daten
+{universal_instructions}
 
-**RESTAURATIONSKOSTEN DEEP DIVE:**
-- Asset Retirement Obligations (ARO) aus Finanzberichten
-- Closure Plans aus Umweltberichten
-- Financial Assurance aus Regierungsdokumenten
-- Environmental Bonds and Securities
-- Progressive Rehabilitation Costs
-- Post-Closure Monitoring Budgets
-- ALLE Währungen und Jahre dokumentieren
+**ABACUS AI RULE 10 COMPLIANCE STANDARDS:**
+=========================================
 
-**KOORDINATEN VERIFIKATION:**
-- Primärquelle: Technische Berichte
-- Sekundärquelle: Regierungs-GIS-Datenbanken
-- Tertiärquelle: Mining Claims Maps
-- Mindestens 6 Dezimalstellen Genauigkeit
+ABSOLUT VERBOTEN - NIEMALS VERWENDEN:
+❌ Jegliche Form von Schätzungen oder Vermutungen
+❌ "Based on similar mines" oder "Typical for this region"
+❌ Interpolation oder Extrapolation von Daten
+❌ Durchschnittswerte ohne spezifische Quelle
+❌ Template-Koordinaten oder gerundete GPS-Daten
+❌ Platzhalter-Unternehmensnamen
+❌ Kostenangaben ohne dokumentierte Basis
 
-**QUELLEN-DOKUMENTATION:**
-[Erstelle umfassende Quellenliste mit:]
-[1] URL oder Dokumentname - Typ - Datum - Relevanz
-[2] URL oder Dokumentname - Typ - Datum - Relevanz
-[...bis zu 50 Quellen wenn verfügbar]
+NUR ERLAUBT - ULTRA-VERIFIZIERTE FAKTEN:
+✅ Daten aus NI 43-101 Technical Reports
+✅ SEC-Filings mit verifizierten Zahlen
+✅ Regierungs-Datenbanken mit Primärdaten
+✅ Unternehmens-Finanzberichte (10-K, 10-Q)
+✅ Offizielle Umweltberichte mit Kostenschätzungen
+✅ GPS-Koordinaten aus Survey-Dokumenten
+✅ Bei GERINGSTER Unsicherheit: LEER LASSEN ("")
 
-**VERBOTENE PRAKTIKEN:**
-- KEINE Platzhalter ($1, $2, $3, "k.A.", "n/a")
-- KEINE unverifizierten Schätzungen
-- KEINE Daten ohne Quellenangabe
-- Felder LEER lassen wenn keine verifizierten Daten
+**ULTRA-STRICT DATENFELDER FÜR [MINENNAME]:**
+- Name: [EXAKTER Name aus offiziellen Dokumenten oder leer]
+- Land: [Land aus Regierungsdokumenten oder leer]  
+- Region: [Region aus amtlichen Quellen oder leer]
+- Eigentümer: [Aus Unternehmensregistern oder leer]
+- Betreiber: [Aus Betriebsgenehmigungen oder leer]
+- x-Koordinate: [Aus Survey-Reports mit 6+ Dezimalstellen oder leer]
+- y-Koordinate: [Aus Survey-Reports mit 6+ Dezimalstellen oder leer]
+- Aktivitätsstatus: [Aus aktuellen Behördenberichten oder leer]
+- Restaurationskosten: [Aus ARO-Berichten in {currency}$ oder leer]
+- Jahr der Aufnahme der Kosten: [Aus Finanzreport-Datum oder leer]
+- Jahr der Erstellung des Dokumentes: [Dokumentenerstellungsdatum oder leer]
+- Rohstoffabbau: [Aus Produktionsberichten oder leer]
+- Minentyp: [Aus technischen Plänen oder leer]
+- Produktionsstart: [Aus historischen Dokumenten oder leer]
+- Produktionsende: [Aus aktuellen Berichten oder leer]
+- Fördermenge/Jahr: [Aus Produktionsstatistiken oder leer]
+- Fläche der Mine in qkm: [Aus Vermessungsdokumenten oder leer]
+- Quellenangaben: [NUR spezifische Dokumentreferenzen]
 
-**DEEP RESEARCH PROZESS:**
-1. Initiale Quellensammlung (Web-Suche)
-2. Dokumentenanalyse (PDFs, Reports)
-3. Datenextraktion und Strukturierung
-4. Kreuzvalidierung
-5. Konfidenz-Bewertung
-6. Finale Zusammenstellung mit Quellen"""
+**ULTRA-DEEP RESEARCH VERIFICATION:**
+1. MULTIPLE INDEPENDENT SOURCES für jeden Datenpunkt
+2. CROSS-REFERENCE zwischen verschiedenen Dokumenttypen
+3. TEMPORAL CONSISTENCY CHECK (Daten zeitlich konsistent?)
+4. TECHNICAL PLAUSIBILITY CHECK (technisch möglich?)
+5. FINANCIAL REASONABLENESS CHECK (finanziell realistisch?)
+
+**RESTAURATIONSKOSTEN ULTRA-VERIFICATION:**
+- NUR aus offiziellen ARO-Berichten (Asset Retirement Obligations)
+- CROSS-CHECK mit Environmental Impact Assessments
+- VERIFICATION mit Closure Bond-Dokumenten
+- INFLATION-ADJUSTED zu aktuellem Jahr
+- CURRENCY-VERIFIED aus Originalwährung
+
+**KOORDINATEN ULTRA-PRECISION:**
+- MINDESTENS 6 Dezimalstellen aus Survey-Dokumenten
+- CROSS-VERIFICATION mit Satellitenbildern
+- PLAUSIBILITY CHECK (liegt in richtigem Land/Region?)
+- NO ROUNDED COORDINATES (49.0000, -123.0000 = VERBOTEN)
+
+**ABACUS AI SELF-AUDIT vor jeder Antwort:**
+- ❓ Ist JEDER Wert aus einem SPEZIFISCHEN verifizierten Dokument?
+- ❓ Habe ich irgendwo interpoliert oder geschätzt?
+- ❓ Sind ALLE Quellen primär und nachprüfbar?
+- ❓ Würde ein Wirtschaftsprüfer diese Daten akzeptieren?
+
+WENN NICHT 100% DOKUMENTIERT: LEER LASSEN ("")"""

@@ -248,7 +248,7 @@ class ComparisonExporter {
         </div>
         <div class="metric-card">
             <div class="metric-value">${Math.round(comparison.metadata.overallQuality * 100)}%</div>
-            <div class="metric-label">Data Quality</div>
+            <div class="metric-label">Datenqualität</div>
         </div>
         <div class="metric-card">
             <div class="metric-value">${comparison.metadata.consensusFields}</div>
@@ -417,7 +417,7 @@ Comparison ID,${comparison.id}
 Timestamp,${comparison.timestamp}
 Models,${comparison.models.join('; ')}
 Consensus Score,${Math.round(comparison.consensus.overallScore * 100)}%
-Data Quality,${Math.round(comparison.metadata.overallQuality * 100)}%
+Datenqualität,${Math.round(comparison.metadata.overallQuality * 100)}%
 Total Fields,${comparison.metadata.totalFields}
 Consensus Fields,${comparison.metadata.consensusFields}
 Discrepancies,${comparison.metadata.discrepancyCount}`;

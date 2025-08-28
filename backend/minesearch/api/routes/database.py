@@ -1,0 +1,357 @@
+"""
+Author: rahn
+Datum: 27.08.2025  
+Version: 1.0
+Beschreibung: Datenbank-Viewer API für Read-Only Zugriff auf alle Tabellen
+"""
+
+from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy import text, inspect
+from typing import Dict, Any, List, Optional
+import logging
+from datetime import datetime
+import json
+
+from minesearch.database import db_manager
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+# Liste der wichtigen Tabellen für den Viewer
+IMPORTANT_TABLES = [
+    # Legacy System (JSON-basiert)
+    "search_results",
+    "sources", 
+    "model_statistics_comprehensive",
+    "constraint_log",
+    "monitoring_events",
+    "field_search_results",
+    "source_discovery_sessions",
+    "sequential_search_results",
+    "model_source_contributions",
+    
+    # Normalized System (27.08.2025)
+    "mines_normalized",
+    "companies", 
+    "search_results_normalized",
+    "mine_data_fields"
+]
+
+@router.get("/tables")
+async def get_all_tables():
+    """Gibt eine Liste aller verfügbaren Tabellen zurück"""
+    try:
+        with db_manager.get_session() as session:
+            # Alle Tabellen aus sqlite_master
+            result = session.execute(text("""
+                SELECT name, type FROM sqlite_master 
+                WHERE type='table' AND name NOT LIKE 'sqlite_%'
+                ORDER BY name
+            """))
+            all_tables = result.fetchall()
+            
+            # Zähle Einträge für jede Tabelle
+            table_info = []
+            for table_name, table_type in all_tables:
+                try:
+                    count_result = session.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
+                    count = count_result.fetchone()[0]
+                    
+                    # Kategorisiere Tabellen
+                    category = "Other"
+                    if table_name in IMPORTANT_TABLES:
+                        if table_name in ["mines_normalized", "companies", "search_results_normalized", "mine_data_fields"]:
+                            category = "Normalized (NEW)"
+                        else:
+                            category = "Legacy System"
+                    elif "statistics" in table_name:
+                        category = "Statistics"
+                    elif "log" in table_name:
+                        category = "Logs"
+                    elif "normalized" in table_name:
+                        category = "Normalized (NEW)"
+                        
+                    table_info.append({
+                        "name": table_name,
+                        "type": table_type,
+                        "row_count": count,
+                        "category": category,
+                        "is_important": table_name in IMPORTANT_TABLES
+                    })
+                except Exception as e:
+                    logger.warning(f"Fehler beim Zählen von Tabelle {table_name}: {e}")
+                    table_info.append({
+                        "name": table_name,
+                        "type": table_type, 
+                        "row_count": 0,
+                        "category": "Error",
+                        "is_important": False
+                    })
+            
+            return {
+                "success": True,
+                "tables": table_info,
+                "important_tables": IMPORTANT_TABLES,
+                "total_tables": len(table_info)
+            }
+            
+    except Exception as e:
+        logger.error(f"Fehler beim Laden der Tabellen: {e}")
+        raise HTTPException(status_code=500, detail=f"Fehler: {str(e)}")
+
+@router.get("/table/{table_name}")
+async def get_table_data(
+    table_name: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=500),
+    sort_by: Optional[str] = Query(None),
+    sort_order: str = Query("asc", regex="^(asc|desc)$"),
+    filter_column: Optional[str] = Query(None),
+    filter_value: Optional[str] = Query(None)
+):
+    """Gibt Daten einer spezifischen Tabelle zurück"""
+    try:
+        with db_manager.get_session() as session:
+            # Validiere Tabelle existiert
+            check_table = session.execute(text("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name = :table_name
+            """), {"table_name": table_name})
+            
+            if not check_table.fetchone():
+                raise HTTPException(status_code=404, detail=f"Tabelle '{table_name}' nicht gefunden")
+            
+            # Hole Spalten-Info
+            column_result = session.execute(text(f"PRAGMA table_info({table_name})"))
+            columns_info = column_result.fetchall()
+            columns = [col[1] for col in columns_info]  # col[1] ist der Name
+            column_types = {col[1]: col[2] for col in columns_info}  # col[2] ist der Typ
+            
+            # Baue Query
+            base_query = f"SELECT * FROM {table_name}"
+            count_query = f"SELECT COUNT(*) FROM {table_name}"
+            
+            # Filter hinzufügen
+            where_clause = ""
+            params = {}
+            if filter_column and filter_value and filter_column in columns:
+                where_clause = f" WHERE {filter_column} LIKE :filter_value"
+                params["filter_value"] = f"%{filter_value}%"
+                base_query += where_clause
+                count_query += where_clause
+            
+            # Sortierung hinzufügen
+            if sort_by and sort_by in columns:
+                base_query += f" ORDER BY {sort_by} {sort_order.upper()}"
+            elif "id" in columns:
+                base_query += f" ORDER BY id {sort_order.upper()}"
+            elif "created_at" in columns:
+                base_query += f" ORDER BY created_at {sort_order.upper()}"
+            
+            # Pagination
+            offset = (page - 1) * limit
+            base_query += f" LIMIT {limit} OFFSET {offset}"
+            
+            # Führe Queries aus
+            total_result = session.execute(text(count_query), params)
+            total_count = total_result.fetchone()[0]
+            
+            data_result = session.execute(text(base_query), params)
+            rows = data_result.fetchall()
+            
+            # Konvertiere zu Dictionary und formatiere Daten
+            formatted_rows = []
+            for row in rows:
+                row_dict = {}
+                for i, column in enumerate(columns):
+                    value = row[i] if i < len(row) else None
+                    
+                    # Formatiere spezielle Datentypen
+                    if value is None:
+                        formatted_value = None
+                    elif column_types.get(column, '').lower() in ['json', 'text'] and isinstance(value, str):
+                        # Versuche JSON zu parsen
+                        try:
+                            json_data = json.loads(value)
+                            formatted_value = {
+                                "type": "json",
+                                "raw": value,
+                                "parsed": json_data
+                            }
+                        except:
+                            formatted_value = value
+                    elif isinstance(value, datetime):
+                        formatted_value = value.isoformat()
+                    else:
+                        formatted_value = value
+                    
+                    row_dict[column] = formatted_value
+                
+                formatted_rows.append(row_dict)
+            
+            return {
+                "success": True,
+                "data": {
+                    "table_name": table_name,
+                    "columns": columns,
+                    "column_types": column_types,
+                    "rows": formatted_rows,
+                    "pagination": {
+                        "total_count": total_count,
+                        "page": page,
+                        "limit": limit,
+                        "total_pages": (total_count + limit - 1) // limit,
+                        "has_next": page * limit < total_count,
+                        "has_prev": page > 1
+                    },
+                    "filters": {
+                        "sort_by": sort_by,
+                        "sort_order": sort_order,
+                        "filter_column": filter_column,
+                        "filter_value": filter_value
+                    }
+                }
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Fehler beim Laden von Tabelle {table_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Fehler: {str(e)}")
+
+@router.get("/schema/{table_name}")
+async def get_table_schema(table_name: str):
+    """Gibt das Schema einer Tabelle zurück"""
+    try:
+        with db_manager.get_session() as session:
+            # Table Info
+            result = session.execute(text(f"PRAGMA table_info({table_name})"))
+            columns = result.fetchall()
+            
+            if not columns:
+                raise HTTPException(status_code=404, detail=f"Tabelle '{table_name}' nicht gefunden")
+            
+            # Foreign Keys
+            fk_result = session.execute(text(f"PRAGMA foreign_key_list({table_name})"))
+            foreign_keys = fk_result.fetchall()
+            
+            # Indices
+            idx_result = session.execute(text(f"PRAGMA index_list({table_name})"))
+            indices = idx_result.fetchall()
+            
+            schema_info = {
+                "table_name": table_name,
+                "columns": [
+                    {
+                        "id": col[0],
+                        "name": col[1], 
+                        "type": col[2],
+                        "not_null": bool(col[3]),
+                        "default_value": col[4],
+                        "primary_key": bool(col[5])
+                    } for col in columns
+                ],
+                "foreign_keys": [
+                    {
+                        "id": fk[0],
+                        "seq": fk[1], 
+                        "table": fk[2],
+                        "from": fk[3],
+                        "to": fk[4]
+                    } for fk in foreign_keys
+                ],
+                "indices": [
+                    {
+                        "seq": idx[0],
+                        "name": idx[1],
+                        "unique": bool(idx[2])
+                    } for idx in indices
+                ]
+            }
+            
+            return {
+                "success": True,
+                "schema": schema_info
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Fehler beim Laden des Schemas für {table_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Fehler: {str(e)}")
+
+@router.get("/export/{table_name}/csv")
+async def export_table_csv(
+    table_name: str,
+    filter_column: Optional[str] = Query(None),
+    filter_value: Optional[str] = Query(None)
+):
+    """Exportiert Tabellen-Daten als CSV"""
+    try:
+        from io import StringIO
+        import csv
+        
+        with db_manager.get_session() as session:
+            # Validiere Tabelle
+            check_table = session.execute(text("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name = :table_name
+            """), {"table_name": table_name})
+            
+            if not check_table.fetchone():
+                raise HTTPException(status_code=404, detail=f"Tabelle '{table_name}' nicht gefunden")
+            
+            # Hole Spalten
+            column_result = session.execute(text(f"PRAGMA table_info({table_name})"))
+            columns = [col[1] for col in column_result.fetchall()]
+            
+            # Baue Query mit optionalem Filter
+            query = f"SELECT * FROM {table_name}"
+            params = {}
+            if filter_column and filter_value and filter_column in columns:
+                query += f" WHERE {filter_column} LIKE :filter_value"
+                params["filter_value"] = f"%{filter_value}%"
+            
+            # Daten laden (max 10000 Einträge für CSV)
+            query += " LIMIT 10000"
+            result = session.execute(text(query), params)
+            rows = result.fetchall()
+            
+            # CSV generieren
+            output = StringIO()
+            writer = csv.writer(output)
+            
+            # Header
+            writer.writerow(columns)
+            
+            # Daten
+            for row in rows:
+                # Konvertiere alle Werte zu Strings
+                formatted_row = []
+                for value in row:
+                    if value is None:
+                        formatted_row.append("")
+                    elif isinstance(value, datetime):
+                        formatted_row.append(value.isoformat())
+                    else:
+                        formatted_row.append(str(value))
+                writer.writerow(formatted_row)
+            
+            csv_content = output.getvalue()
+            output.close()
+            
+            from fastapi.responses import Response
+            
+            return Response(
+                content=csv_content,
+                media_type="text/csv",
+                headers={
+                    "Content-Disposition": f"attachment; filename={table_name}_export.csv"
+                }
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Fehler beim CSV-Export von {table_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Fehler: {str(e)}")

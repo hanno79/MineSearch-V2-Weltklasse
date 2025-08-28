@@ -1,13 +1,62 @@
 /**
  * Author: rahn
- * Datum: 16.08.2025
- * Version: 1.2.1 - SCORE-TRANSFORMATION-FIX
+ * Datum: 24.08.2025
+ * Version: 1.2.2 - NULL-VALUE-DISPLAY-FIX
  * Beschreibung: MineSearch 2.0 - Data-Card-System mit Source-Attribution
  * 
  * PHASE 3: TABELLEN-REVOLUTION
  * Ersetzt hässliche HTML-Tabellen durch moderne, interaktive Data-Cards
- * ÄNDERUNG 16.08.2025: Score-Breakdown-Anzeige für detaillierte Performance-Analyse
+ * ÄNDERUNG 24.08.2025: Einheitliche "nichts gefunden" Anzeige für NULL-Werte
  */
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
+/**
+ * Konvertiert NULL/leere Werte zu einheitlicher "nichts gefunden" Anzeige
+ * @param {any} value - Der zu anzeigende Wert
+ * @param {string} defaultText - Alternative Anzeige (default: "nichts gefunden")
+ * @returns {string} Formatierter Anzeigewert
+ */
+function formatDisplayValue(value, defaultText = 'nichts gefunden') {
+    // NULL, undefined, leere Strings, oder "Unbekannt" → "nichts gefunden"
+    if (value === null || value === undefined || value === '' || 
+        value === 'Unbekannt' || value === 'unbekannt' || value === 'Unknown' ||
+        value === 'N/A' || value === 'n/a' || value === 'TBD') {
+        return `<span class="no-data">${defaultText}</span>`;
+    }
+    
+    // Normale Werte werden unverändert zurückgegeben
+    return value;
+}
+
+/**
+ * QUELLENREFERENZEN-FIX 24.08.2025: Formatiert Feldwerte mit Quellenreferenzen
+ * @param {string} value - Der Feldwert
+ * @param {string} fieldName - Name des Feldes  
+ * @param {object} detailedBreakdown - Detailed breakdown mit Quellenreferenzen
+ * @returns {string} Formatierter Wert mit Quellen [1,2,3]
+ */
+function formatFieldValueWithSources(value, fieldName, detailedBreakdown) {
+    if (!value || !detailedBreakdown || !detailedBreakdown[fieldName]) {
+        return formatDisplayValue(value);
+    }
+    
+    const fieldData = detailedBreakdown[fieldName];
+    const sourceIds = fieldData.global_source_numbers || [];
+    
+    // Formatiere Grundwert
+    let formattedValue = formatDisplayValue(value);
+    
+    // Füge Quellenreferenzen hinzu wenn vorhanden
+    if (sourceIds.length > 0) {
+        const sourceReferences = `[${sourceIds.join(',')}]`;
+        formattedValue += ` <span class="source-refs" style="color: #6b7280; font-size: 0.8em;">${sourceReferences}</span>`;
+    }
+    
+    return formattedValue;
+}
 
 // ============================================
 // MINE DATA-CARD GENERATION SYSTEM
@@ -18,7 +67,7 @@
  */
 function generateMineDataCard(mineData, cardType = 'consolidated') {
     const mineName = mineData.mine_name || 'Unbekannte Mine';
-    const country = mineData.best_values?.country || mineData.country || 'Unbekannt';
+    const country = formatDisplayValue(mineData.best_values?.country || mineData.country, 'nichts gefunden');
     const mineType = getMineTypeFromData(mineData);
     const sources = extractSourcesFromMine(mineData);
     
@@ -77,7 +126,7 @@ function generateKeyMetrics(mineData, cardType) {
         if (values.mine_type) {
             metrics.push({
                 label: '⚖️ Typ',
-                value: values.mine_type
+                value: formatDisplayValue(values.mine_type)
             });
         }
         
@@ -569,9 +618,16 @@ function extractDomainFromUrl(url) {
 
 /**
  * Rendert Data-Card-Grid statt hässlicher HTML-Tabelle
+ * ULTRAFIX: Deaktiviert für model_stats - verwendet ULTRAFIX stattdessen
  */
 function renderDataCardGrid(data, container, cardType = 'consolidated') {
     if (!container) return;
+    
+    // ULTRAFIX PROTECTION: Verhindere Überschreibung der ULTRAFIX Statistics
+    if (cardType === 'model_stats') {
+        console.log('🛡️ [ULTRAFIX-PROTECTION] renderDataCardGrid für model_stats blockiert - ULTRAFIX wird verwendet');
+        return;
+    }
     
     if (!data || data.length === 0) {
         container.innerHTML = `
@@ -1060,7 +1116,7 @@ function generateDetailedModalContent(mineName, mineData) {
                     📋 Detaillierte Daten
                 </h3>
                 <div class="data-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
-                    ${generateDataFieldCards(bestValues)}
+                    ${generateDataFieldCards(bestValues, mineData.detailed_breakdown)}
                 </div>
             </div>
             
@@ -2228,7 +2284,7 @@ function calculateDataQualityScore(bestValues) {
 /**
  * Generiert Data-Field-Cards für Modal-Details
  */
-function generateDataFieldCards(bestValues) {
+function generateDataFieldCards(bestValues, detailedBreakdown = null) {
     if (!bestValues || Object.keys(bestValues).length === 0) {
         return '<div style="text-align: center; color: #6b7280; padding: 32px;">Keine detaillierten Daten verfügbar</div>';
     }
@@ -2258,7 +2314,7 @@ function generateDataFieldCards(bestValues) {
                         <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f3f4f6;">
                             <span style="color: #6b7280; font-size: 13px;">${formatFieldName(field)}</span>
                             <span style="color: #111827; font-size: 13px; font-weight: 500; text-align: right; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
-                                ${bestValues[field]}
+                                ${formatFieldValueWithSources(bestValues[field], field, detailedBreakdown)}
                             </span>
                         </div>
                     `).join('')}

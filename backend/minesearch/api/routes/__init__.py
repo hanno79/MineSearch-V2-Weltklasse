@@ -125,6 +125,22 @@ def get_api_router() -> APIRouter:
         except Exception as provider_status_err:
             logger.error(f"❌ provider_status Route Fehler: {provider_status_err}")
         
+        # TEMPLATE-MONITORING 26.08.2025: REGEL 10 Compliance Monitoring
+        try:
+            from .template_monitor import router as template_monitor_router
+            router.include_router(template_monitor_router, tags=["template-monitor"])
+            logger.info("✅ template_monitor Route erfolgreich geladen")
+        except Exception as template_monitor_err:
+            logger.error(f"❌ template_monitor Route Fehler: {template_monitor_err}")
+        
+        # DATABASE-VIEWER 27.08.2025: Read-Only Zugriff auf alle DB-Tabellen
+        try:
+            from .database import router as database_router
+            router.include_router(database_router, prefix="/api/database", tags=["database"])
+            logger.info("✅ database Route erfolgreich geladen")
+        except Exception as database_err:
+            logger.error(f"❌ database Route Fehler: {database_err}")
+        
     except ImportError as e:
         logger.error(f"❌ CRITICAL: Route Import komplett fehlgeschlagen: {e}")
         import traceback

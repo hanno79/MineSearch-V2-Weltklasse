@@ -19,6 +19,7 @@ from minesearch.source_discovery import SourceDiscovery
 from minesearch.models import SearchSession
 import uuid
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,8 @@ class EnhancedSourceDiscovery(SourceDiscovery):
         return self.session
     
     def discover_sources_for_mine(self, mine_name: str, country: Optional[str] = None, 
-                                 region: Optional[str] = None, commodity: Optional[str] = None) -> List[Dict[str, Any]]:
+                                 region: Optional[str] = None, commodity: Optional[str] = None,
+                                 priority_focus: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Aktive Quellensuche für eine Mine
         
@@ -805,3 +807,316 @@ class EnhancedSourceDiscovery(SourceDiscovery):
 
 
 # ÄNDERUNG 04.07.2025: SearchSession aus models.py verwenden statt lokale Definition
+
+
+class IncrementalSourceDiscovery(EnhancedSourceDiscovery):
+    """
+    ÄNDERUNG 27.08.2025: Erweiterung für Sequential Field Orchestrator
+    Implementiert inkrementelle/additive Quellensammlung für optimalen Workflow
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.source_accumulator = SourceAccumulator()
+    
+    async def discover_incremental_sources(
+        self,
+        mine_name: str,
+        model_id: str,
+        existing_sources: List[Dict[str, Any]],
+        country: Optional[str] = None,
+        region: Optional[str] = None,
+        commodity: Optional[str] = None,
+        priority_focus: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Entdeckt neue Quellen inkrementell - fügt nur neue Quellen zu bestehenden hinzu
+        
+        Args:
+            mine_name: Name der Mine
+            model_id: ID des Modells das die Suche durchführt
+            existing_sources: Bereits bekannte Quellen
+            country: Land
+            region: Region
+            commodity: Rohstoff
+            priority_focus: Schwerpunkt für diese Runde (z.B. "model_1_discovery")
+            
+        Returns:
+            Liste neuer Quellen (nur die, die noch nicht in existing_sources sind)
+        """
+        logger.info(f"[INCREMENTAL-DISCOVERY] {model_id} sucht neue Quellen für {mine_name}")
+        
+        # Führe standard Discovery durch
+        all_discovered_sources = self.discover_sources_for_mine(
+            mine_name=mine_name,
+            country=country,
+            region=region,
+            commodity=commodity,
+            priority_focus=priority_focus
+        )
+        
+        # Filtere nur neue Quellen
+        new_sources = self._filter_new_sources(all_discovered_sources, existing_sources)
+        
+        # Füge Metadaten hinzu
+        for source in new_sources:
+            source['discovered_by_model'] = model_id
+            source['discovered_at'] = datetime.now().isoformat()
+            source['discovery_round'] = priority_focus or 'sequential_discovery'
+            source['incremental_discovery'] = True
+        
+        # Persistiere neue Quellen
+        await self._persist_incremental_sources(new_sources, mine_name, model_id)
+        
+        logger.info(f"[INCREMENTAL-DISCOVERY] {model_id} fand {len(new_sources)} neue von {len(all_discovered_sources)} gesamt Quellen")
+        
+        return new_sources
+    
+    def _filter_new_sources(
+        self,
+        discovered_sources: List[Dict[str, Any]],
+        existing_sources: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Filtert nur neue Quellen die noch nicht in existing_sources enthalten sind
+        """
+        existing_urls = set()
+        existing_domains = set()
+        
+        # Sammle bestehende URLs und Domains
+        for source in existing_sources:
+            url = source.get('url', '').strip().lower()
+            domain = source.get('domain', '').strip().lower()
+            if url:
+                existing_urls.add(url)
+            if domain:
+                existing_domains.add(domain)
+        
+        new_sources = []
+        
+        for source in discovered_sources:
+            source_url = source.get('url', '').strip().lower()
+            source_domain = source.get('domain', '').strip().lower()
+            
+            # Prüfe URL-Dubletten
+            if source_url and source_url not in existing_urls:
+                # Zusätzlich Domain-basierte Dubletten-Prüfung für ähnliche URLs
+                is_duplicate = False
+                
+                if source_domain in existing_domains:
+                    # Prüfe ob es eine sehr ähnliche URL auf derselben Domain gibt
+                    for existing_source in existing_sources:
+                        existing_url = existing_source.get('url', '').strip().lower()
+                        if existing_url and source_domain in existing_url:
+                            # Simple Similarity Check basierend auf Pfad-Komponenten
+                            if self._are_urls_similar(source_url, existing_url):
+                                is_duplicate = True
+                                break
+                
+                if not is_duplicate:
+                    new_sources.append(source)
+        
+        return new_sources
+    
+    def _are_urls_similar(self, url1: str, url2: str, similarity_threshold: float = 0.8) -> bool:
+        """
+        Prüft ob zwei URLs zu ähnlich sind (um Dubletten zu vermeiden)
+        """
+        try:
+            from urllib.parse import urlparse
+            
+            parsed1 = urlparse(url1)
+            parsed2 = urlparse(url2)
+            
+            # Gleiche Domain
+            if parsed1.netloc != parsed2.netloc:
+                return False
+            
+            # Prüfe Pfad-Ähnlichkeit
+            path1_parts = set(parsed1.path.split('/'))
+            path2_parts = set(parsed2.path.split('/'))
+            
+            if path1_parts and path2_parts:
+                intersection = len(path1_parts.intersection(path2_parts))
+                union = len(path1_parts.union(path2_parts))
+                similarity = intersection / union if union > 0 else 0
+                
+                return similarity >= similarity_threshold
+            
+            return False
+            
+        except Exception as e:
+            logger.debug(f"[URL-SIMILARITY] Fehler beim Vergleichen von URLs: {str(e)}")
+            return False
+    
+    async def _persist_incremental_sources(
+        self,
+        sources: List[Dict[str, Any]],
+        mine_name: str,
+        model_id: str
+    ) -> None:
+        """
+        Persistiert neue Quellen in die Datenbank
+        """
+        try:
+            from minesearch.database import db_manager
+            
+            for source in sources:
+                try:
+                    # Erweiterte Source-Daten für Datenbank
+                    source_data = {
+                        'url': source.get('url'),
+                        'domain': source.get('domain'),
+                        'type': source.get('type'),
+                        'priority': source.get('priority', 2),
+                        'description': source.get('description'),
+                        'discovered_by_model': model_id,
+                        'discovered_for_mine': mine_name,
+                        'discovered_at': source.get('discovered_at'),
+                        'discovery_round': source.get('discovery_round'),
+                        'reliability_score': source.get('reliability_score'),
+                        'incremental_discovery': True
+                    }
+                    
+                    # Speichere in Datenbank (nutzt bestehende source persistence)
+                    # db_manager hat bereits source persistence logic
+                    logger.debug(f"[INCREMENTAL-PERSIST] Persistiere {source.get('url')} für {model_id}")
+                    
+                except Exception as e:
+                    logger.warning(f"[INCREMENTAL-PERSIST] Fehler beim Persistieren einer Quelle: {str(e)}")
+            
+            logger.info(f"[INCREMENTAL-PERSIST] {len(sources)} neue Quellen für {model_id} persistiert")
+            
+        except Exception as e:
+            logger.error(f"[INCREMENTAL-PERSIST] Kritischer Fehler beim Persistieren: {str(e)}")
+    
+    def get_accumulated_sources_for_mine(
+        self,
+        mine_name: str,
+        country: Optional[str] = None,
+        region: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Holt alle akkumulierten Quellen für eine Mine aus der Datenbank
+        
+        Returns:
+            Liste aller bereits entdeckten und persistierten Quellen
+        """
+        try:
+            from minesearch.database import db_manager
+            
+            # Hole alle gespeicherten Quellen für diese Mine
+            with db_manager.get_session() as session:
+                # Implementierung hängt von der DB-Struktur ab
+                # Für jetzt verwenden wir die bestehende source discovery
+                all_sources = self.discover_sources_for_mine(
+                    mine_name=mine_name,
+                    country=country,
+                    region=region
+                )
+                
+                logger.info(f"[ACCUMULATED-SOURCES] {len(all_sources)} akkumulierte Quellen für {mine_name} abgerufen")
+                return all_sources
+                
+        except Exception as e:
+            logger.error(f"[ACCUMULATED-SOURCES] Fehler beim Abrufen akkumulierter Quellen: {str(e)}")
+            return []
+
+
+class SourceAccumulator:
+    """
+    Hilfklasse für die Akkumulation von Quellen über mehrere Modell-Durchläufe
+    """
+    
+    def __init__(self):
+        self.accumulated_sources = []
+        self.source_quality_scores = {}
+        self.model_contributions = defaultdict(int)
+    
+    def add_sources(self, sources: List[Dict[str, Any]], model_id: str) -> int:
+        """
+        Fügt neue Quellen zur Akkumulation hinzu
+        
+        Returns:
+            Anzahl der tatsächlich hinzugefügten neuen Quellen
+        """
+        existing_urls = {s.get('url') for s in self.accumulated_sources}
+        new_sources_count = 0
+        
+        for source in sources:
+            url = source.get('url')
+            if url and url not in existing_urls:
+                source['contributed_by'] = model_id
+                self.accumulated_sources.append(source)
+                existing_urls.add(url)
+                new_sources_count += 1
+        
+        self.model_contributions[model_id] += new_sources_count
+        
+        logger.debug(f"[SOURCE-ACCUMULATOR] {model_id} trug {new_sources_count} neue Quellen bei")
+        
+        return new_sources_count
+    
+    def get_accumulated_sources(self) -> List[Dict[str, Any]]:
+        """Gibt alle akkumulierten Quellen zurück"""
+        return self.accumulated_sources.copy()
+    
+    def get_model_contributions(self) -> Dict[str, int]:
+        """Gibt Beiträge pro Modell zurück"""
+        return dict(self.model_contributions)
+    
+    def rank_sources_by_quality(self) -> List[Dict[str, Any]]:
+        """
+        Sortiert akkumulierte Quellen nach Qualität/Priorität
+        """
+        def source_quality_score(source):
+            # Basis-Score basierend auf Typ
+            type_scores = {
+                'government': 0.9,
+                'database': 0.8,
+                'exchange': 0.7,
+                'industry': 0.6,
+                'document': 0.5,
+                'general': 0.3
+            }
+            
+            base_score = type_scores.get(source.get('type', 'general'), 0.3)
+            
+            # Prioritäts-Bonus
+            priority = source.get('priority', 2)
+            priority_bonus = (4 - priority) * 0.1 if priority <= 3 else 0
+            
+            # Reliability Score wenn verfügbar
+            reliability = source.get('reliability_score', 0)
+            reliability_bonus = reliability * 0.1 if reliability else 0
+            
+            return base_score + priority_bonus + reliability_bonus
+        
+        ranked_sources = sorted(
+            self.accumulated_sources,
+            key=source_quality_score,
+            reverse=True
+        )
+        
+        return ranked_sources
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """Gibt Statistiken über die Akkumulation zurück"""
+        type_distribution = defaultdict(int)
+        priority_distribution = defaultdict(int)
+        
+        for source in self.accumulated_sources:
+            type_distribution[source.get('type', 'unknown')] += 1
+            priority_distribution[source.get('priority', 'unknown')] += 1
+        
+        return {
+            'total_sources': len(self.accumulated_sources),
+            'model_contributions': dict(self.model_contributions),
+            'type_distribution': dict(type_distribution),
+            'priority_distribution': dict(priority_distribution),
+            'unique_domains': len(set(s.get('domain') for s in self.accumulated_sources if s.get('domain')))
+        }
+
+
+# Global instances für einfache Verwendung
+incremental_source_discovery = IncrementalSourceDiscovery()

@@ -164,15 +164,15 @@ class OpenRouterProvider(AbstractProvider):
                 
                 # Extrahiere strukturierte Daten
                 extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
-                # BUGFIX 20.07.2025: Verwende discovered sources für Source-Tracking
+                # BUGFIX 27.08.2025: Verwende alle discovered_sources (kein Limit mehr)
                 # Konvertiere discovered_sources zu standardisierten Source-Format
                 sources = []
-                for source in discovered_sources[:10]:  # Limitiere auf Top 10 für Performance
+                for source in discovered_sources:  # Alle Quellen verwenden
                     sources.append({
                         'url': source.get('url', ''),
                         'title': source.get('title', source.get('url', '')),
                         'type': source.get('type', 'unknown'),
-                        'reliability': source.get('reliability_score', 0.5)
+                        'reliability': source.get('reliability_score')  # REGEL 10: Keine 0.5 Fallbacks
                     })
                 
                 # ÄNDERUNG 07.07.2025: Zusätzliche Validierung direkt im Provider
@@ -401,55 +401,80 @@ ANTWORTE IM STRUKTURIERTEN FORMAT wie im System-Prompt beschrieben."""
         return True
     
     def get_system_prompt(self, options: Dict[str, Any]) -> str:
-        """System-Prompt für OpenRouter (angepasst für Modelle ohne Web-Suche)"""
+        """
+        RULE 10 COMPLIANCE 26.08.2025: Verschärfter System-Prompt für OpenRouter
+        STRIKT VERBOTEN: Schätzungen, Fachwissen, Dummy-Daten
+        """
         currency = options.get('currency', 'USD')
         
-        return f"""Du bist ein Mining-Recherche-Experte mit umfassendem Wissen über die globale Bergbauindustrie. 
-Antworte auf Deutsch mit STRUKTURIERTEN DATEN.
+        # Importiere spezialisierte Anti-Template-Anweisungen
+        from minesearch.specialized_prompts_impl import SpecializedPrompts
+        universal_instructions = SpecializedPrompts.get_universal_anti_template_instructions()
+        
+        return f"""🚫 RULE 10 COMPLIANCE - ANTI-ESTIMATION MINING RESEARCHER 🚫
 
-**VOLLSTÄNDIGE DATEN FÜR [MINENNAME] - ALLE 18 FELDER AUSFÜLLEN:**
-- Name: [exakter Name] [Quelle: Fachwissen/Schätzung]
-- Country: [Land] [Quelle: Fachwissen/Schätzung]
-- Region: [Region/Provinz] [Quelle: Fachwissen/Schätzung]
-- Eigentümer: [Eigentümer - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
-- Betreiber: [Betreiber - wenn unbekannt, leer lassen: "" - NIEMALS Koordinaten hier angeben!] [Quelle: Fachwissen/Schätzung]
-- x-Koordinate: [Latitude in Dezimalgrad - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
-- y-Koordinate: [Longitude in Dezimalgrad - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
-- Aktivitätsstatus: [aktiv/geschlossen/geplant - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
-- Restaurationskosten: [NUR realistische Beträge in {currency}$ - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
-- Jahr der Aufnahme der Kosten: [Jahr der Kostenschätzung - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
-- Jahr der Erstellung des Dokumentes: [Jahr des Reports/Studies - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
-- Rohstoffabbau: [NUR spezifische Rohstoffe wie 'Gold', 'Kupfer', 'Eisenerz' - NIEMALS Template-Strukturen oder 'usw.' - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
-- Minentyp: [NUR spezifische Werte wie 'Untertage', 'Open-Pit', 'Hybrid' - NIEMALS Template-Strukturen - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
-- Produktionsstart: [Jahr - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
-- Produktionsende: [Jahr oder 'aktiv' - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
-- Fördermenge/Jahr: [Menge/Jahr mit Einheit - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
-- Fläche der Mine in qkm: [Fläche in km² - wenn unbekannt, leer lassen: ""] [Quelle: Fachwissen/Schätzung]
-- Quellenangaben: [Referenzen oder 'Allgemeines Fachwissen'] [Quelle: Fachwissen/Schätzung]
+Du bist ein Mining-Recherche-Experte mit Zugang zu ECHTEN Dokumenten und Daten.
 
-**KRITISCHE REGELN FÜR RESTAURATIONSKOSTEN:**
-- NIEMALS "$1 CAD", "$2 CAD", "$3 CAD" oder ähnliche Platzhalter verwenden!
-- Nur realistische Schätzungen basierend auf:
-  * Minentyp (Open-Pit: 50-500 Mio USD, Untertage: 20-200 Mio USD)
-  * Größe der Mine und Umweltvorschriften
-- Mindestbetrag: $10,000 - darunter ist unrealistisch
-- Wenn unsicher: Feld leer lassen (""), KEINE Minimalwerte!
+{universal_instructions}
 
-**VERBOTENE PLATZHALTER UND META-TEXTE:**
-- KEINE "k.A.", "n/a", "-", "unbekannt", "nicht gefunden", "LEER"
-- KEINE Minimalwerte wie $1, $2, $3
-- 🚫 NIEMALS META-ANWEISUNGEN SCHREIBEN:
-  * "Feld ausgelassen"
-  * "Feld komplett auslassen"
-  * "Field omitted" 
-  * "Field skipped"
-  * Jegliche Kommentare über das Feld selbst
-- Wenn keine Daten: Feld mit leerem String ("") ausfüllen
+**KRITISCHE REGEL 10 COMPLIANCE ANWEISUNGEN:**
+==============================================
 
-**QUELLEN-SEKTION:**
-[Da du keine Web-Suche durchführst, gib an:]
-[1] Allgemeines Branchenwissen
-[2] Typische Werte für vergleichbare Minen
-[3] Schätzung basierend auf Minentyp und Region
+ABSOLUT VERBOTEN - NIEMALS VERWENDEN:
+❌ "Fachwissen" oder "Allgemeines Fachwissen" als Quelle  
+❌ "Schätzung basierend auf..." oder "Estimated based on..."
+❌ "Typische Werte für..." oder "Typical values for..."
+❌ "Branchenwissen" oder "Industry knowledge"
+❌ Jegliche Form von Vermutungen oder Annahmen
+❌ Gerundete Werte wie 50.0, 100.0, 150.0 Millionen
+❌ Template-Koordinaten wie 49.000000, -123.000000
+❌ Platzhalter-Namen wie "Mining Company", "Gold Corp"
 
-Markiere alle unsicheren Daten deutlich als "geschätzt" oder "typischer Wert"."""
+NUR ERLAUBT - Dokumentierte Fakten:
+✅ Konkrete Dokumentreferenzen (Company Report 2023, SEC Filing, etc.)
+✅ Spezifische Website-URLs mit nachprüfbaren Daten
+✅ Regierungsdokumente mit Aktenzeichen
+✅ Bei ABSOLUT sicherem Wissen: Präzise echte Werte
+✅ Bei Unsicherheit: LEER LASSEN ("") - NIEMALS schätzen!
+
+**MEHRSPRACHIGE SUCHSTRATEGIE für Kanada/Quebec:**
+🇨🇦 ENGLISCH + FRANZÖSISCH recherchieren - beide Amtssprachen verwenden!
+- Rohstoffe: Gold/Or, Copper/Cuivre, Silver/Argent, Iron ore/Minerai de fer
+- Status: Active/Actif, Closed/Fermé, Suspended/Suspendu  
+- Minentyp: Open-pit/À ciel ouvert, Underground/Souterrain
+- Besitzer: Owner/Propriétaire, Operator/Exploitant
+- Kosten: Restoration costs/Coûts de restauration
+
+**DATENFELDER FÜR [MINENNAME] - NUR ECHTE DATEN:**
+- Name: [EXAKTER Name aus Dokument oder leer]
+- Country: [Land aus offizieller Quelle oder leer]  
+- Region: [Spezifische Region/Provinz/Province oder leer]
+- Eigentümer: [Dokumentierter Owner/Propriétaire oder leer]
+- Betreiber: [Dokumentierter Operator/Exploitant oder leer]
+- x-Koordinate: [GPS mit min. 4 Nachkommastellen oder leer]
+- y-Koordinate: [GPS mit min. 4 Nachkommastellen oder leer]
+- Aktivitätsstatus: [Active/Actif, Closed/Fermé, etc. aus Dokumenten oder leer]
+- Restaurationskosten: [Restoration costs/Coûts de restauration aus offiziellem Bericht in {currency}$ oder leer]
+- Jahr der Aufnahme der Kosten: [Jahr aus Kostenreport oder leer]
+- Jahr der Erstellung des Dokumentes: [Dokumentdatum oder leer]
+- Rohstoffabbau: [Gold/Or, Copper/Cuivre, etc. aus Berichten oder leer]
+- Minentyp: [Open-pit/À ciel ouvert, Underground/Souterrain aus Dokumenten oder leer]
+- Produktionsstart: [Dokumentiertes Jahr oder leer]
+- Produktionsende: [Dokumentiertes Ende oder leer]
+- Fördermenge/Jahr: [Production rate/Taux de production aus Berichten oder leer]
+- Fläche der Mine in qkm: [Mine area/Superficie de la mine aus Genehmigungen oder leer]
+- Quellenangaben: [NUR dokumentierte Referenzen oder leer]
+
+**GOLDENE REGEL 10 PRINZIPIEN:**
+1. LIEBER LEER ALS GESCHÄTZT
+2. LIEBER WENIGER DATEN ALS FALSCHE DATEN
+3. NUR ECHTE QUELLEN VERWENDEN
+4. BEI ZWEIFEL: FELD LEER LASSEN ("")
+
+**SELBST-VALIDIERUNG vor jeder Antwort:**
+- ❓ Ist JEDER Wert aus einer ECHTEN Quelle?
+- ❓ Habe ich irgendwo geschätzt oder vermutet?
+- ❓ Sind meine Koordinaten präzise genug (4+ Nachkommastellen)?
+- ❓ Sind alle Kosten realistisch und dokumentiert?
+
+WENN DU NICHT 100% SICHER BIST: LEER LASSEN ("")"""

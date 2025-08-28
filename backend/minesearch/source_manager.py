@@ -20,7 +20,7 @@ class SourceReference:
     url: str
     title: str = ""
     type: str = "unknown"
-    reliability: float = 0.5
+    reliability: float = None  # REGEL 10: Keine Fallback-Werte - nur echte Zuverlässigkeit oder None
 
 
 class SourceManager:
@@ -39,7 +39,7 @@ class SourceManager:
         self.next_id = 1
         self.field_sources: Dict[str, List[int]] = {}
     
-    def add_source(self, url: str, title: str = "", source_type: str = "unknown", reliability: float = 0.5) -> int:
+    def add_source(self, url: str, title: str = "", source_type: str = "unknown", reliability: float = None) -> int:
         """
         Fügt eine neue Quelle hinzu oder gibt existierende ID zurück
         
@@ -305,7 +305,10 @@ class SourceManager:
         """Klassifiziert generische Quellen-Beschreibungen"""
         desc_lower = source_description.lower()
         
-        if any(term in desc_lower for term in ['fachwissen', 'expert', 'knowledge', 'expertise']):
+        # KRITISCHE VERBESSERUNG 26.08.2025: Erkenne Schätzungs-Quellen für niedrigen Reliability Score
+        if any(term in desc_lower for term in ['fachwissen', 'allgemeines fachwissen', 'schätzung', 'geschätzt', 'typisch', 'estimated', 'generic_source']):
+            return 'unreliable_estimate'  # NEUE KATEGORIE für Schätzungen
+        elif any(term in desc_lower for term in ['expert', 'knowledge', 'expertise']):
             return 'expert_knowledge'
         elif any(term in desc_lower for term in ['database', 'datenbank', 'data']):
             return 'database'
@@ -329,6 +332,7 @@ class SourceManager:
             'expert_knowledge': 0.6,
             'corporate': 0.5,
             'mining_industry': 0.6,
+            'unreliable_estimate': 0.1,  # KRITISCHE VERBESSERUNG 26.08.2025: Niedrigster Score für Schätzungen
             'general': 0.4
         }
         

@@ -190,8 +190,10 @@ def extract_cross_field_data(text: str) -> Dict[str, str]:
                     else:
                         production_formatted = f"{amount} {unit}/Jahr"
                     
-                    result['commodity'] = commodity_normalized
-                    result['production'] = production_formatted
+                    # Setze Ergebnisse nur wenn Normalisierung erfolgreich war
+                    if commodity_normalized is not None:
+                        result['commodity'] = commodity_normalized
+                        result['production'] = production_formatted
                     
                     logger.debug(f"Cross-field extraction: '{commodity_normalized}' + '{production_formatted}' from pattern {pattern[:50]}")
                     break
@@ -203,7 +205,7 @@ def extract_cross_field_data(text: str) -> Dict[str, str]:
     return result
 
 
-def extract_commodity_from_explanation(text: str) -> str:
+def extract_commodity_from_explanation(text: str) -> Optional[str]:
     """
     EXPLANATION PATTERN 31.07.2025: Extrahiert Rohstoff aus Erklärungstexten
     
@@ -211,7 +213,7 @@ def extract_commodity_from_explanation(text: str) -> str:
         text: Text mit Format "[ROHSTOFF]. [Erklärung]..."
         
     Returns:
-        Extrahierter Rohstoff oder "X" wenn nicht gefunden
+        Extrahierter Rohstoff oder None wenn nicht gefunden
     """
     commodity_patterns = get_enhanced_commodity_extraction_patterns()
     
@@ -221,17 +223,18 @@ def extract_commodity_from_explanation(text: str) -> str:
             if match:
                 commodity = match.group(1)
                 normalized = normalize_commodity_name(commodity)
-                logger.debug(f"Commodity from explanation: '{normalized}' from pattern {pattern[:50]}")
-                return normalized
+                if normalized is not None:
+                    logger.debug(f"Commodity from explanation: '{normalized}' from pattern {pattern[:50]}")
+                    return normalized
         except re.error as e:
             logger.warning(f"Regex error in commodity pattern: {e}")
             continue
     
     # REGEL 10 KONFORM: Kein Dummy-Marker - echte "nicht gefunden"
-    return ''  # Echte "nicht gefunden" - kein ausgedachter X-Marker
+    return None  # Echte "nicht gefunden" - kein ausgedachter X-Marker
 
 
-def extract_mine_type_from_complex_text(text: str) -> str:
+def extract_mine_type_from_complex_text(text: str) -> Optional[str]:
     """
     MINE TYPE PATTERN 31.07.2025: Extrahiert Minentyp aus komplexen Auflistungen
     
@@ -239,7 +242,7 @@ def extract_mine_type_from_complex_text(text: str) -> str:
         text: Text mit Minentyp-Informationen
         
     Returns:
-        Bereinigter Minentyp oder "X" wenn nicht gefunden
+        Bereinigter Minentyp oder None wenn nicht gefunden
     """
     mine_type_patterns = get_enhanced_mine_type_patterns()
     
@@ -249,17 +252,18 @@ def extract_mine_type_from_complex_text(text: str) -> str:
             if match:
                 mine_type = match.group(1)
                 normalized = normalize_mine_type(mine_type)
-                logger.debug(f"Mine type extracted: '{normalized}' from pattern {pattern[:50]}")
-                return normalized
+                if normalized is not None:
+                    logger.debug(f"Mine type extracted: '{normalized}' from pattern {pattern[:50]}")
+                    return normalized
         except re.error as e:
             logger.warning(f"Regex error in mine type pattern: {e}")
             continue
     
     # REGEL 10 KONFORM: Kein Dummy-Marker - echte "nicht gefunden"
-    return ''  # Echte "nicht gefunden" - kein ausgedachter X-Marker
+    return None  # Echte "nicht gefunden" - kein ausgedachter X-Marker
 
 
-def normalize_commodity_name(commodity: str) -> str:
+def normalize_commodity_name(commodity: str) -> Optional[str]:
     """
     NORMALISIERUNG 31.07.2025: Normalisiert Rohstoffnamen zu Standard-Format
     
@@ -267,9 +271,9 @@ def normalize_commodity_name(commodity: str) -> str:
         commodity: Rohstoffname in beliebiger Sprache
         
     Returns:
-        Normalisierter deutscher Rohstoffname
+        Normalisierter deutscher Rohstoffname oder None wenn leer/ungültig
     """
-    if not commodity:
+    if not commodity or not commodity.strip():
         # REGEL 10 KONFORM: Kein Dummy-Marker - echte "nicht gefunden"
         return None  # Echte "nicht gefunden" - kein ausgedachter X-Marker
     
@@ -318,7 +322,7 @@ def normalize_commodity_name(commodity: str) -> str:
     return commodity.strip().title()
 
 
-def normalize_mine_type(mine_type: str) -> str:
+def normalize_mine_type(mine_type: str) -> Optional[str]:
     """
     NORMALISIERUNG 31.07.2025: Normalisiert Minentyp zu Standard-Format
     
@@ -326,9 +330,9 @@ def normalize_mine_type(mine_type: str) -> str:
         mine_type: Minentyp in beliebiger Sprache
         
     Returns:
-        Normalisierter deutscher Minentyp
+        Normalisierter deutscher Minentyp oder None wenn leer/ungültig
     """
-    if not mine_type:
+    if not mine_type or not mine_type.strip():
         # REGEL 10 KONFORM: Kein Dummy-Marker - echte "nicht gefunden"
         return None  # Echte "nicht gefunden" - kein ausgedachter X-Marker
     
@@ -401,7 +405,7 @@ def apply_enhanced_patterns_to_field(value: str, field: str) -> str:
     if field in ['Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)', 'Rohstoffe']:
         # 1. Prüfe auf Erklärungsformat "[ROHSTOFF]. [Beschreibung]..."
         commodity_from_explanation = extract_commodity_from_explanation(value)
-        if commodity_from_explanation != "X":
+        if commodity_from_explanation is not None:
             return commodity_from_explanation
         
         # 2. Prüfe auf Cross-Field-Daten (Rohstoff + Produktion)
@@ -418,7 +422,7 @@ def apply_enhanced_patterns_to_field(value: str, field: str) -> str:
     elif field in ['Minentyp (Untertage/ Open-Pit/ usw.)', 'Minentyp']:
         # Erweiterte Minentyp-Extraktion
         mine_type_extracted = extract_mine_type_from_complex_text(value)
-        if mine_type_extracted != "X":
+        if mine_type_extracted is not None:
             return mine_type_extracted
     
     # Keine Verbesserung gefunden

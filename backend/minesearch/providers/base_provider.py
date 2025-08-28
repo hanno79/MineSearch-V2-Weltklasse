@@ -97,6 +97,195 @@ class AbstractProvider(ABC):
         """
         pass
     
+    async def search_single_field(
+        self,
+        field_name: str,
+        mine_name: str,
+        model_id: str,
+        sources: List[Dict[str, Any]],
+        options: Dict[str, Any]
+    ) -> SearchResult:
+        """
+        ÄNDERUNG 27.08.2025: Erweiterte Methode für Sequential Field Orchestrator
+        Sucht fokussiert nach einem einzelnen Feld mit allen verfügbaren Quellen
+        
+        Diese Methode implementiert eine optimierte Suche, die sich auf ein spezifisches
+        Datenfeld konzentriert und alle verfügbaren Quellen systematisch durchsucht.
+        
+        Args:
+            field_name: Name des spezifischen Feldes (z.B. "Restaurationskosten")
+            mine_name: Name der Mine
+            model_id: ID des zu verwendenden Modells
+            sources: Liste aller verfügbaren Quellen die durchsucht werden sollen
+            options: Erweiterte Optionen mit field-spezifischen Parametern
+            
+        Returns:
+            SearchResult mit fokussiertem Ergebnis für das spezifische Feld
+        """
+        # Erstelle field-fokussierte Query
+        focused_query = self._build_single_field_query(field_name, mine_name, sources, options)
+        
+        # Erweitere Optionen für field-fokussierte Suche
+        field_options = options.copy()
+        field_options.update({
+            'focus_field': field_name,
+            'search_mode': 'single_field',
+            'discovered_sources': sources,
+            'skip_source_discovery': True,
+            'field_specific_optimization': True
+        })
+        
+        # Führe fokussierte Suche durch
+        result = await self.search(focused_query, model_id, field_options)
+        
+        # Post-processing: Extrahiere nur das relevante Feld
+        if result.success and result.structured_data:
+            filtered_data = {}
+            
+            # Suche das spezifische Feld in verschiedenen Varianten
+            field_variants = self._get_field_variants(field_name)
+            
+            for variant in field_variants:
+                if variant in result.structured_data:
+                    value = result.structured_data[variant]
+                    if value and str(value).strip() and str(value) not in ['None', 'null', '', '-']:
+                        filtered_data[field_name] = str(value).strip()
+                        break
+            
+            # Update structured_data to contain only the focused field
+            result.structured_data = filtered_data
+            
+            # Add field-specific metadata
+            if not result.metadata:
+                result.metadata = {}
+            result.metadata.update({
+                'focused_field': field_name,
+                'sources_searched': len(sources),
+                'search_mode': 'single_field',
+                'field_found': field_name in filtered_data
+            })
+        
+        return result
+    
+    def _build_single_field_query(
+        self,
+        field_name: str,
+        mine_name: str,
+        sources: List[Dict[str, Any]],
+        options: Dict[str, Any]
+    ) -> str:
+        """
+        Erstellt eine fokussierte Query für ein einzelnes Feld
+        """
+        country = options.get('country', '')
+        commodity = options.get('commodity', '')
+        
+        # Basis Query
+        query = f"Suche AUSSCHLIESSLICH nach '{field_name}' für die Mine '{mine_name}'"
+        
+        if country:
+            query += f" in {country}"
+        if commodity:
+            query += f" ({commodity} Mine)"
+        
+        # Field-spezifische Suchstrategie
+        field_strategies = {
+            'Restaurationskosten': """
+Konzentriere dich NUR auf Kosten für:
+- Mine Closure / Decommissioning 
+- Environmental Restoration
+- Rehabilitation Costs
+- Site Remediation
+- Reclamation Expenses
+Gib den EXAKTEN Betrag zurück wenn gefunden.""",
+            
+            'Eigentümer': """
+Suche NUR nach dem aktuellen Eigentümer/Owner:
+- Company Name
+- Corporation
+- Mining Company
+- Parent Company
+Gib den EXAKTEN Firmennamen zurück.""",
+            
+            'Betreiber': """
+Suche NUR nach dem aktuellen Betreiber/Operator:
+- Operating Company
+- Mine Operator
+- Management Company
+Gib den EXAKTEN Betreiber-Namen zurück.""",
+            
+            'Aktivitätsstatus': """
+Suche NUR nach dem aktuellen Status:
+- Active/Operational
+- Inactive/Closed
+- Under Development
+- Suspended
+- Care & Maintenance
+Gib den EXAKTEN Status zurück.""",
+            
+            'Rohstoffabbau': """
+Suche NUR nach den abgebauten Rohstoffen:
+- Gold, Kupfer, Silber, etc.
+- Primary/Secondary Commodities
+- Resource Type
+Gib die EXAKTEN Rohstoffe zurück.""",
+            
+            'Fördermenge/Jahr': """
+Suche NUR nach der jährlichen Produktion:
+- Annual Production
+- Yearly Output
+- Production Rate
+- Mining Volume per Year
+Gib die EXAKTE Menge mit Einheit zurück."""
+        }
+        
+        # Füge field-spezifische Strategie hinzu
+        for key, strategy in field_strategies.items():
+            if key.lower() in field_name.lower():
+                query += f"\n\n{strategy}"
+                break
+        
+        # Quellenkontext
+        if sources:
+            high_priority_sources = [s for s in sources[:10] if s.get('priority', 3) <= 2]
+            if high_priority_sources:
+                query += f"\n\nPRIORITÄT auf diese {len(high_priority_sources)} vertrauenswürdigen Quellen:"
+                for source in high_priority_sources:
+                    query += f"\n• {source.get('domain', 'Unknown')} - {source.get('description', 'Specialized source')}"
+        
+        query += f"\n\n⚠️ WICHTIG: Gib AUSSCHLIESSLICH Informationen zu '{field_name}' zurück!"
+        query += f"\nAlle anderen Datenfelder sind für diese Suche IRRELEVANT."
+        query += f"\nWenn '{field_name}' nicht gefunden wird, gib explizit 'Nicht gefunden' zurück."
+        
+        return query
+    
+    def _get_field_variants(self, field_name: str) -> List[str]:
+        """
+        Gibt verschiedene Varianten eines Feldnamens zurück
+        """
+        variants = [field_name]
+        
+        # Standard-Varianten
+        field_mapping = {
+            'Restaurationskosten': ['Restaurationskosten', 'Mine Closure Cost', 'Decommissioning Cost', 'Restoration Cost'],
+            'Eigentümer': ['Eigentümer', 'Owner', 'Company', 'Corporation'],
+            'Betreiber': ['Betreiber', 'Operator', 'Operating Company', 'Manager'],
+            'Aktivitätsstatus': ['Aktivitätsstatus', 'Status', 'Operational Status', 'Mine Status'],
+            'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': ['Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)', 'Commodity', 'Resource', 'Mineral'],
+            'Fördermenge/Jahr': ['Fördermenge/Jahr', 'Annual Production', 'Production Rate', 'Yearly Output'],
+            'x-Koordinate': ['x-Koordinate', 'Latitude', 'Lat', 'X-Coordinate'],
+            'y-Koordinate': ['y-Koordinate', 'Longitude', 'Lon', 'Long', 'Y-Coordinate'],
+            'Country': ['Country', 'Land', 'Nation'],
+            'Region': ['Region', 'Province', 'State', 'Territory']
+        }
+        
+        for key, mapped_variants in field_mapping.items():
+            if key.lower() in field_name.lower() or field_name.lower() in key.lower():
+                variants.extend(mapped_variants)
+                break
+        
+        return list(set(variants))  # Remove duplicates
+    
     def format_search_query(self, mine_name: str, country: Optional[str], 
                           commodity: Optional[str], options: Dict[str, Any]) -> str:
         """

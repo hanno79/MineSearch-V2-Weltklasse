@@ -37,6 +37,25 @@ class ProgressiveModelSelection {
         try {
             // PROVIDER-STATUS 24.08.2025: Lade verfügbare und nicht verfügbare Modelle mit Grund
             const availableResponse = await fetch(`${window.API_BASE_URL}/api/available-models`);
+            
+            // Check HTTP status before parsing JSON
+            if (!availableResponse.ok) {
+                let errorMessage;
+                try {
+                    // Try to get JSON error details
+                    const errorData = await availableResponse.json();
+                    errorMessage = errorData.message || errorData.error || `HTTP ${availableResponse.status}`;
+                } catch (jsonError) {
+                    // Fall back to text if JSON parsing fails
+                    try {
+                        errorMessage = await availableResponse.text();
+                    } catch (textError) {
+                        errorMessage = `HTTP ${availableResponse.status} ${availableResponse.statusText}`;
+                    }
+                }
+                throw new Error(`Available models API request failed (${availableResponse.status}): ${errorMessage}`);
+            }
+            
             const availableData = await availableResponse.json();
             
             if (availableData.success && availableData.data) {
@@ -76,13 +95,38 @@ class ProgressiveModelSelection {
         } catch (error) {
             console.error('❌ [MODEL-UX] Failed to load available models:', error);
             // FALLBACK: Legacy API
-            await this.loadLegacyModels();
+            try {
+                await this.loadLegacyModels();
+            } catch (legacyError) {
+                console.error('❌ [MODEL-UX] Legacy API also failed:', legacyError);
+                // Final fallback: extract existing models from DOM
+                this.extractExistingModels();
+            }
         }
     }
 
     async loadLegacyModels() {
         try {
             const response = await fetch(`${window.API_BASE_URL}/api/models`);
+            
+            // Check HTTP status before parsing JSON
+            if (!response.ok) {
+                let errorMessage;
+                try {
+                    // Try to get JSON error details
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`;
+                } catch (jsonError) {
+                    // Fall back to text if JSON parsing fails
+                    try {
+                        errorMessage = await response.text();
+                    } catch (textError) {
+                        errorMessage = `HTTP ${response.status} ${response.statusText}`;
+                    }
+                }
+                throw new Error(`API request failed (${response.status}): ${errorMessage}`);
+            }
+            
             const data = await response.json();
             
             if (data.success && data.models) {

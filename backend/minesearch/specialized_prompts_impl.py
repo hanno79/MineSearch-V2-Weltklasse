@@ -190,75 +190,89 @@ GOLDENE REGEL: LIEBER 50% ECHTE DATEN ALS 100% TEMPLATE-KONTAMINIERTE DATEN!
         
         return f"""{anti_template_instructions}
 
+🚫 KRITISCHE ANTI-SCHÄTZUNGS-REGEL FÜR RESTAURATIONSKOSTEN:
+==========================================================
+
+ABSOLUT VERBOTEN - NIEMALS VERWENDEN:
+❌ "Fachwissen" oder "Allgemeines Fachwissen" als Quelle
+❌ "Schätzung basierend auf..." oder "Estimated based on..."
+❌ "Typische Werte für..." oder "Typical values for..."
+❌ "Generic_source:" oder ähnliche generische Quellen
+❌ Runde Beträge wie "50.0 Millionen", "150.0 Millionen", "20.0 Millionen"
+❌ Geschätzte Werte ohne konkrete Dokumentenquelle
+
+🎯 NUR ECHTE DOKUMENTIERTE KOSTEN AKZEPTIERT:
+- Aus Jahresberichten mit Seitenzahl
+- Aus NI 43-101 Reports mit Abschnitt
+- Aus Feasibility Studies mit Kapitel
+- Aus Umweltgenehmigungen mit Referenznummer
+- Aus GESTIM-Datenbank mit Titel-Nummer
+
 FOKUS: RESTAURATIONSKOSTEN für {mine_name} in {country}
 
-SUCHE GEZIELT NACH:
-1. Asset Retirement Obligation (ARO)
-2. Closure costs / Mine closure costs
-3. Environmental liabilities
-4. Restoration provision / Rehabilitation provision
-5. Decommissioning costs
-6. Financial assurance / Closure bonds
-7. Post-closure monitoring costs
-8. Progressive rehabilitation costs
+SUCHE GEZIELT NACH DOKUMENTIERTEN BETRÄGEN:
+1. Asset Retirement Obligation (ARO) in Jahresberichten
+2. Closure costs / Mine closure costs in Technical Reports
+3. Environmental liabilities in Securities Filings
+4. Restoration provision / Rehabilitation provision in Financial Statements
+5. Decommissioning costs in Feasibility Studies
+6. Financial assurance / Closure bonds in Permit Documents
+7. Post-closure monitoring costs in Environmental Assessments
+8. Progressive rehabilitation costs in Management Plans
 
-QUELLEN PRIORISIERUNG:
-- Jahresberichte (Annual Reports) der letzten 5 Jahre
-- NI 43-101 Technical Reports
-- Feasibility Studies
-- Environmental Impact Assessments
-- Securities Filings (SEDAR, EDGAR)
-- Regierungsdokumente zu Umweltauflagen
-- Konzessionsdokumente und Genehmigungen
-- Managementpläne (Mine Management Plans)
-- GESTIM Datenbank (für Quebec)
-- Umweltgenehmigungen (Environmental Permits)
-- Exploration Closure Plans
+QUELLEN PRIORISIERUNG (NUR ECHTE DOKUMENTE):
+- Jahresberichte (Annual Reports) mit Jahr und Seitenzahl
+- NI 43-101 Technical Reports mit Datum und Abschnitt
+- Feasibility Studies mit Titel und Kapitel
+- Environmental Impact Assessments mit Referenznummer
+- Securities Filings (SEDAR, EDGAR) mit Filing-Datum
+- Regierungsdokumente zu Umweltauflagen mit Aktenzeichen
+- Konzessionsdokumente und Genehmigungen mit Titel-Nummer
+- GESTIM Datenbank-Einträge mit spezifischer Titel-Nr.
+- Umweltgenehmigungen mit Permit-Nummer
+- Mine Closure Plans mit Dokumentennummer
 
-WICHTIGE SUCHBEGRIFFE:
-- "{mine_name} closure costs"
-- "{mine_name} ARO"
-- "{mine_name} environmental liability"
-- "{mine_name} restoration provision"
-- "{mine_name} financial assurance"
-- "{mine_name} mine closure plan"
-- "{mine_name} exploration closure"
-- "{mine_name} initial restoration"
-- "{mine_name} konzession" (für Konzessionsdokumente)
-- "{mine_name} management plan"
-- "{mine_name} GESTIM" (für Quebec)
-- "{mine_name} environmental permit"
+WICHTIGE SUCHBEGRIFFE MIT DOKUMENTENFOKUS:
+- "{mine_name} closure costs" site:sedar.com
+- "{mine_name} ARO annual report" filetype:pdf
+- "{mine_name} environmental liability 43-101" 
+- "{mine_name} restoration provision feasibility"
+- "{mine_name} financial assurance permit"
+- "{mine_name} mine closure plan" filetype:pdf
+- "{mine_name} GESTIM titre minier"
+- "{mine_name} environmental permit restoration"
 
-BETRAGSERMITTLUNG:
-- Suche nach ALLEN konkreten Dollarbeträgen (auch kleine Beträge ab $1,000)
-- WICHTIG: Auch Beträge unter $100,000 sind relevant!
-- Explorationsminen können Restaurationskosten von nur $5,000 - $50,000 haben
+BETRAGSERMITTLUNG - NUR DOKUMENTIERTE WERTE:
+- Suche nach konkreten Dollarbeträgen MIT Quellennachweis
+- Jeder Betrag MUSS aus einem spezifischen Dokument stammen
 - Berücksichtige unterschiedliche Währungen (CAD, USD, AUD, etc.)
-- Achte auf Bezeichnungen wie "thousand", "k", "tausend"
-- Notiere das Jahr der Schätzung/Berechnung
+- Notiere IMMER: Jahr, Dokument, Seitenzahl/Abschnitt
 - Unterscheide zwischen bereits gezahlten und geplanten Kosten
 
-BEISPIELE VALIDER BETRÄGE:
-- "$5,000 CAD" (Exploration)
-- "$25k USD" (kleine Mine)
-- "$150,000 AUD" (Teilsanierung)
-- "$2.5 million" (mittlere Mine)
-- "$45 million" (große Mine)
+BEISPIELE VALIDER DOKUMENTIERTER BETRÄGE:
+- "$45.2 Millionen CAD (Annual Report 2023, S. 78)"
+- "$12.8 Millionen USD (NI 43-101 Report Sept 2023, Abschnitt 21.1)"
+- "€8.5 Millionen (Feasibility Study März 2022, Kapitel 17)"
+- "$125,000 CAD (GESTIM Titre 2489652, Financial Guarantee)"
 
-VERBOTEN:
-- KEINE Platzhalter wie $1, $2, $3
-- KEINE "k.A.", "n/a", "unbekannt"  
-- KEINE Template-Beträge wie "$1.0 million", "$2.0 million"
-- KEINE unrealistischen runden Beträge ohne Begründung
-- Wenn keine Daten: Feld LEER lassen
+ABSOLUT VERBOTEN - DIESE FÜHREN ZUR ABLEHNUNG:
+❌ "50.0 Millionen CAD [Fachwissen]"
+❌ "Geschätzt: 150.0 Millionen CAD"
+❌ "Typisch für diese Mine: 20.0 Millionen CAD"
+❌ "Basierend auf Erfahrung: ..."
+❌ "Generic_source: Allgemeines Fachwissen"
+❌ Jeder Betrag ohne ECHTE Dokumentenquelle
 
-🔍 SELF-CHECK vor Antwort:
-- Ist dieser Betrag konkret und belegbar?
-- Stammt er aus einer echten Quelle?
-- Ist er realistisch für diese Mine?
-- Enthält er keine Template-Pattern?
+🔍 RESTAURANT-KOSTEN VALIDATION CHECKLIST:
+□ Stammt der Betrag aus einem ECHTEN, namentlich genannten Dokument?
+□ Ist Dokumentenname, Jahr und Seitenzahl/Abschnitt angegeben?
+□ Ist der Betrag NICHT rund (50.0, 150.0, 20.0 etc.)?
+□ Ist die Quelle NICHT "Fachwissen", "Schätzung" oder "Typisch"?
+□ Kann der Nutzer das Dokument theoretisch finden und verifizieren?
 
-LIEBER LEER ALS TEMPLATE-KONTAMINIERT!"""
+GOLDENE REGEL: NUR ECHTE DOKUMENTE ODER LEER!
+Wenn keine dokumentierten Restaurationskosten gefunden werden, 
+ist das Feld LEER zu lassen - KEINE Schätzungen!"""
     
     @staticmethod
     def get_coordinates_prompt(mine_name: str, region: str = None) -> str:
@@ -614,7 +628,7 @@ VERBOTEN:
 - Sind die Informationen aktuell (< 2 Jahre)?
 - Enthalten sie keine Template-Pattern?
 
-NUR ECHTE UNTERNEHMEN ODER LEER!
+NUR ECHTE UNTERNEHMEN ODER LEER!"""
     
     @staticmethod
     def get_production_data_prompt(mine_name: str, commodity: str = None) -> str:

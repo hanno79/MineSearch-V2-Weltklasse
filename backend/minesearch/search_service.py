@@ -8,6 +8,7 @@ Beschreibung: Refactored MineSearchService (CLAUDE.md konform)
 import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
+from .fallback_detector import validate_data, clean_fallback_values
 
 from minesearch.config.base import config, Config, CSV_COLUMNS, FIELDS_WITHOUT_SOURCES
 from minesearch.utils import (
@@ -26,6 +27,7 @@ from minesearch.cache_service import get_cache_service, cached_search
 # from search_service_legacy import LegacySearchFunctions
 from minesearch.cost_monitor import cost_monitor
 from minesearch.database.manager import DatabaseManager
+from minesearch.database.normalized_manager import NormalizedDatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +40,9 @@ class MineSearchService:
         provider_registry.initialize(config.PROVIDERS)
         self.registry = provider_registry
         self.enhanced_discovery = EnhancedSourceDiscovery()
-        # Database Manager für Persistierung
+        # Database Manager für Persistierung (beide Versionen)
         self.db_manager = DatabaseManager()
+        self.normalized_db_manager = NormalizedDatabaseManager()
         # Data Extractor für strukturierte Datenextraktion
         self.data_extractor = DataExtractor()
     
@@ -309,6 +312,7 @@ class MineSearchService:
         # BUGFIX 20.07.2025: Verwende tatsächlich verwendetes Modell
         try:
             logger.info(f"[DB LEGACY] Speichere mit model_used: {legacy_full_model_id} (original request: {model})")
+            # Legacy-System (für Rückwärts-Kompatibilität)
             search_result = self.db_manager.save_search_result(
                 mine_name=mine_name,
                 model_used=legacy_full_model_id,
@@ -317,7 +321,7 @@ class MineSearchService:
                     'url': s.get('url', ''),
                     'title': s.get('title', ''),
                     'type': s.get('type', 'unknown'),
-                    'reliability': s.get('reliability', 0.5)
+                    'reliability': s.get('reliability')  # REGEL 10: Keine 0.5 Fallbacks
                 } for s in sources],
                 data_quality=quality_metrics.get('completion_percentage', 0),
                 success=True,
@@ -325,6 +329,23 @@ class MineSearchService:
                 search_type="legacy"
             )
             logger.info(f"[DB] Legacy-Suchergebnis für {mine_name} gespeichert (ID: {search_result.id})")
+            
+            # 🆕 NORMALISIERTES SYSTEM: Parallele Speicherung
+            try:
+                logger.info(f"[DB NORMALIZED] Speichere normalisiert: {mine_name} → {legacy_full_model_id}")
+                normalized_result_id = self.normalized_db_manager.save_search_result_normalized(
+                    mine_name=mine_name,
+                    model_used=legacy_full_model_id,
+                    structured_data=clean_structured_data,
+                    sources=sources,
+                    session_id=None,  # FIX: session_id war nicht definiert
+                    country=country,
+                    search_duration=result.search_duration
+                )
+                logger.info(f"✅ DUAL SAVE SUCCESS: Legacy ID={search_result.id}, Normalized ID={normalized_result_id}")
+            except Exception as norm_error:
+                logger.error(f"❌ Normalized save failed: {norm_error}")
+                # Continue with legacy system if normalized fails
             
             # 🚀 CRITICAL FIX: Update ModelStatisticsComprehensive für Legacy Search auch
             try:
@@ -344,7 +365,7 @@ class MineSearchService:
                         source_type=source.get('type', 'unknown'),
                         metadata={
                             'title': source.get('title', ''),
-                            'reliability': source.get('reliability', 0.5)
+                            'reliability': source.get('reliability')  # REGEL 10: Keine 0.5 Fallbacks
                         }
                     )
                     
@@ -434,6 +455,7 @@ class MineSearchService:
             actual_model_used = result.metadata.get('model_used') or model
             logger.info(f"[DB] Speichere mit model_used: {actual_model_used} (original request: {model})")
             
+            # Legacy-System (für Rückwärts-Kompatibilität)
             search_result = self.db_manager.save_search_result(
                 mine_name=mine_name,
                 model_used=actual_model_used,
@@ -442,7 +464,7 @@ class MineSearchService:
                     'url': s.get('url', ''),
                     'title': s.get('title', ''),
                     'type': s.get('type', 'unknown'),
-                    'reliability': s.get('reliability', 0.5)
+                    'reliability': s.get('reliability')  # REGEL 10: Keine 0.5 Fallbacks
                 } for s in sources],
                 # Speichere nur, wenn messbar (> 0). None bleibt NULL in DB
                 search_duration=search_duration if (search_duration is not None and search_duration > 0) else None,
@@ -456,6 +478,23 @@ class MineSearchService:
                 source_mapping=result.metadata.get('source_mapping')
             )
             logger.info(f"[DB] Suchergebnis für {mine_name} gespeichert (ID: {search_result.id})")
+            
+            # 🆕 NORMALISIERTES SYSTEM: Parallele Speicherung
+            try:
+                logger.info(f"[DB NORMALIZED] Speichere normalisiert: {mine_name} → {actual_model_used}")
+                normalized_result_id = self.normalized_db_manager.save_search_result_normalized(
+                    mine_name=mine_name,
+                    model_used=actual_model_used,
+                    structured_data=clean_structured_data,
+                    sources=sources,
+                    session_id=None,  # FIX: session_id war nicht definiert
+                    country=country,
+                    search_duration=result.search_duration
+                )
+                logger.info(f"✅ DUAL SAVE SUCCESS: Legacy ID={search_result.id}, Normalized ID={normalized_result_id}")
+            except Exception as norm_error:
+                logger.error(f"❌ Normalized save failed: {norm_error}")
+                # Continue with legacy system if normalized fails
             
             # 🚀 CRITICAL FIX: Update ModelStatisticsComprehensive nach neuer Search
             try:
@@ -475,7 +514,7 @@ class MineSearchService:
                         source_type=source.get('type', 'unknown'),
                         metadata={
                             'title': source.get('title', ''),
-                            'reliability': source.get('reliability', 0.5)
+                            'reliability': source.get('reliability')  # REGEL 10: Keine 0.5 Fallbacks
                         }
                     )
                     

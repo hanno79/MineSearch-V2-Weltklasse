@@ -22,7 +22,7 @@ from minesearch.extraction_processors import (
     process_restoration_costs, process_activity_status,
     split_country_region, find_region_from_content,
     process_sources, post_process_data, clean_field_value,
-    is_template_or_dummy_value
+    is_template_or_dummy_value, extract_core_value
 )
 from minesearch.source_manager import SourceManager
 from minesearch.field_name_blacklist import is_field_name_value
@@ -109,17 +109,17 @@ class DataExtractor:
     
     def _is_valid_data_value(self, value: str, field: str) -> bool:
         """
-        CLEAN DATA AT SOURCE - Enhanced Data Quality Gate (25.08.2025)
+        RULE 10 COMPLIANCE 26.08.2025: ULTRA-VERSCHÄRFTES Quality Gate für alle Felder
         
-        Prüft ob ein extrahierter Wert ein echter Datenwert ist oder ein Template/Dummy-Wert.
-        Template/Dummy-Werte und Feldnamen werden abgelehnt und als NULL in die DB gespeichert.
+        Prüft JEDES Datenfeld gegen alle bekannten Template/Schätzungs/Dummy-Muster.
+        ABSOLUT NULL-TOLERANZ für verdächtige Werte.
         
         Args:
-            value: Zu prüfender Wert
+            value: Zu prüfender Wert  
             field: Feldname für spezifische Validierung
             
         Returns:
-            True wenn echter Datenwert, False wenn Template/Dummy/Feldname
+            True nur bei 100% verifizierten echten Datenwerten
         """
         if not value or not str(value).strip():
             return False
@@ -127,34 +127,111 @@ class DataExtractor:
         value_str = str(value).strip()
         value_lower = value_str.lower()
         
-        logger.debug(f"[DATA QUALITY GATE] Validiere Wert '{value_str}' für Feld '{field}'")
+        logger.debug(f"[ULTRA QUALITY GATE] Validiere Wert '{value_str}' für Feld '{field}'")
         
-        # 0. KRITISCHER FELDNAMEN-CHECK (25.08.2025) - HÖCHSTE PRIORITÄT
-        # Verhindert dass Feldnamen als Werte gespeichert werden (111 Einträge mit "x-Koordinate" Problem)
+        # 0. KRITISCHER FELDNAMEN-CHECK (HÖCHSTE PRIORITÄT) 
         if is_field_name_value(value_str, field):
-            logger.error(f"[CRITICAL FIELD-NAME-CHECK] Feldname als Wert erkannt: '{value_str}' für Feld '{field}' → BLOCKIERT")
+            logger.error(f"[CRITICAL FIELD-NAME-CHECK] Feldname als Wert: '{value_str}' für '{field}' → BLOCKIERT")
             return False
         
-        # 1. PRE-EXTRACTION TEMPLATE/DUMMY DETECTION - ABSOLUTE PRIORITY
-        # Nutze die dedizierte Template-Detection aus extraction_processors.py
+        # 1. TEMPLATE/DUMMY DETECTION (verschärft durch extraction_processors.py)
         if is_template_or_dummy_value(value_str, field):
-            logger.warning(f"[DATA QUALITY GATE] Template/Dummy-Wert über extraction_processors erkannt: '{value_str}' → ABGELEHNT")
+            logger.warning(f"[ULTRA QUALITY GATE] Template/Dummy-Wert: '{value_str}' → ABGELEHNT")
             return False
         
-        # 2. ADDITIONAL QUALITY CHECKS (nur noch spezifische Prüfungen nach Template-Detection)
+        # 2. RULE 10 COMPLIANCE CHECKS - NEUE VERSCHÄRFUNGEN
         
-        # Coordinates appearing in wrong fields 
-        if field in ['Betreiber', 'Eigentümer'] and re.match(r'^[\d\.\-\s,°\'\"]+$', value_str):
-            logger.warning(f"[DATA QUALITY GATE] Koordinaten in Betreiber/Eigentümer-Feld: '{value_str}' → ABGELEHNT")
+        # 2.1: NULL-NORMALISIERUNG Integration
+        from minesearch.null_normalizer import NullNormalizer
+        null_normalizer = NullNormalizer()
+        if null_normalizer.is_null_equivalent(value_str, field):
+            logger.warning(f"[ULTRA QUALITY GATE] NULL-äquivalenter Wert: '{value_str}' → ABGELEHNT")
             return False
         
-        # Very short values that are likely AI artifacts (but allow "-" as legitimate empty marker)
+        # 2.2: Koordinaten-Validierung (Integration mit extraction_validators.py)
+        if field in ['x-Koordinate', 'y-Koordinate']:
+            from minesearch.extraction_validators import validate_coordinate
+            coord_type = 'x' if field == 'x-Koordinate' else 'y'
+            validated_coord = validate_coordinate(value_str, coord_type)
+            if not validated_coord:
+                logger.warning(f"[ULTRA QUALITY GATE] Ungültige Koordinate: '{value_str}' → ABGELEHNT")
+                return False
+        
+        # 2.3: Restaurationskosten-Validierung  
+        if field == 'Restaurationskosten':
+            from minesearch.extraction_validators import validate_restoration_cost
+            validated_cost = validate_restoration_cost(value_str)
+            if not validated_cost:
+                logger.warning(f"[ULTRA QUALITY GATE] Ungültige Restaurationskosten: '{value_str}' → ABGELEHNT")
+                return False
+        
+        # 2.4: Jahr-Validierung
+        if field in ['Jahr der Aufnahme der Kosten', 'Jahr der Erstellung des Dokumentes', 
+                    'Produktionsstart', 'Produktionsende', 'Kostenjahr', 'Dokumentenjahr']:
+            from minesearch.extraction_validators import validate_year
+            field_type = 'costs' if 'kosten' in field.lower() else 'document' if 'dokument' in field.lower() else 'production'
+            validated_year = validate_year(value_str, field_type)
+            if not validated_year:
+                logger.warning(f"[ULTRA QUALITY GATE] Ungültiges Jahr: '{value_str}' → ABGELEHNT")
+                return False
+        
+        # 2.5: Flächenvalidierung
+        if field in ['Fläche der Mine in qkm', 'Minenfläche in qkm']:
+            from minesearch.extraction_validators import validate_area
+            validated_area = validate_area(value_str)
+            if not validated_area:
+                logger.warning(f"[ULTRA QUALITY GATE] Ungültige Fläche: '{value_str}' → ABGELEHNT")
+                return False
+        
+        # 2.6: Firmenname-Validierung (Eigentümer/Betreiber)
+        if field in ['Eigentümer', 'Betreiber']:
+            # Koordinaten in Firmennamen-Feldern
+            if re.match(r'^[\d\.\-\s,°\'\"]+$', value_str):
+                logger.warning(f"[ULTRA QUALITY GATE] Koordinaten in {field}: '{value_str}' → ABGELEHNT")
+                return False
+                
+            # Generic company names 
+            generic_company_patterns = [
+                r'^mining company$', r'^bergbauunternehmen$', r'^mining corp$',
+                r'^the company$', r'^das unternehmen$', r'^operator$', r'^betreiber$',
+                r'^owner$', r'^eigentümer$', r'^local company$', r'^private company$'
+            ]
+            if any(re.match(pattern, value_lower) for pattern in generic_company_patterns):
+                logger.warning(f"[ULTRA QUALITY GATE] Generischer Firmenname: '{value_str}' → ABGELEHNT")
+                return False
+        
+        # 2.7: Rohstoff-Validierung
+        if field in ['Rohstoffabbau', 'Rohstoffe']:
+            # Template-Strukturen mit "usw."
+            if 'usw.' in value_lower or 'etc.' in value_lower:
+                logger.warning(f"[ULTRA QUALITY GATE] Template-Rohstoff mit 'usw.': '{value_str}' → ABGELEHNT")
+                return False
+                
+        # 2.8: Status-Validierung
+        if field == 'Aktivitätsstatus':
+            # Template-Status mit Optionen
+            if '/' in value_str and any(word in value_lower for word in ['sonstiges', 'usw.', 'etc.']):
+                logger.warning(f"[ULTRA QUALITY GATE] Template-Status: '{value_str}' → ABGELEHNT")
+                return False
+        
+        # 2.9: AI-Entschuldigung Detection (erweitert)
+        ai_excuse_patterns = [
+            'ohne spezifische', 'mangels konkreter', 'keine verlässlichen',
+            'no specific', 'without specific', 'lacking concrete',
+            'based on similar', 'typical for', 'generally ranges',
+            'fachwissen', 'allgemeines fachwissen', 'expert knowledge'
+        ]
+        if any(pattern in value_lower for pattern in ai_excuse_patterns):
+            logger.warning(f"[ULTRA QUALITY GATE] AI-Entschuldigung erkannt: '{value_str}' → ABGELEHNT")
+            return False
+        
+        # 2.10: Zu kurze Werte (aber "-" als legitimier empty marker erlauben)
         if len(value_str) <= 2 and value_str not in ['-']:
-            logger.warning(f"[DATA QUALITY GATE] Zu kurzer Wert: '{value_str}' → ABGELEHNT")
+            logger.warning(f"[ULTRA QUALITY GATE] Zu kurzer Wert: '{value_str}' → ABGELEHNT")
             return False
-        
-        # Value passed all checks
-        logger.debug(f"[DATA QUALITY GATE] Wert '{value_str}' für Feld '{field}' → AKZEPTIERT")
+            
+        # ALLE CHECKS BESTANDEN - Wert ist echt und kann gespeichert werden
+        logger.debug(f"[ULTRA QUALITY GATE] Wert '{value_str}' für Feld '{field}' → AKZEPTIERT (alle Prüfungen bestanden)")
         return True
     
     def extract_structured_data(self, content: str, mine_name: str, country: Optional[str] = None) -> Dict[str, Any]:
@@ -200,6 +277,11 @@ class DataExtractor:
                         logger.debug(f"[EXTRACTION-POST] Feld '{field}' behalten: '{clean_value[:100]}...'")
                         data[field] = clean_value
                         
+                        # PHASE 8: Template-Monitoring Integration
+                        from minesearch.template_monitor import monitor_extraction_result
+                        source_values = [s.get('value', '') for s in field_sources] if field_sources else []
+                        monitor_extraction_result(field, clean_value, mine_name, source_values)
+                        
                         # Wenn Feldquellen gefunden, zuordnen; sonst alle Response-Quellen verwenden
                         if field_sources:
                             self.source_manager.assign_field_sources(field, field_sources)
@@ -226,10 +308,14 @@ class DataExtractor:
             # Füge Quellen-Mapping für JSON-Speicherung hinzu
             data['_source_mapping'] = self.source_manager.get_sources_dict()
             
+            # KERNWERTE-EXTRAKTION 27.08.2025: Extrahiere atomare Werte aus Sätzen
             # Bereinige alle Feldwerte NACH Quellen-Zuordnung
             for field in CSV_COLUMNS:
                 if field in data and data[field] and field not in FIELDS_WITHOUT_SOURCES:
                     if isinstance(data[field], str):  # Nur String-Werte bereinigen
+                        # 1. Extrahiere Kernwert (atomare Daten statt Sätze)
+                        data[field] = extract_core_value(data[field], field)
+                        # 2. Zusätzliche Bereinigung
                         data[field] = clean_field_value(data[field], field)
             
             # QUELLENREFERENZEN-FIX 19.07.2025: Formatiere Felder mit Quellen-Referenzen NACH Bereinigung
@@ -523,9 +609,27 @@ class DataExtractor:
                 'reliability': source_data['reliability']
             })
         
+        # RULE 10 COMPLIANCE 26.08.2025: NULL-Normalisierung der extrahierten Daten
+        from minesearch.null_normalizer import NullNormalizer
+        null_normalizer = NullNormalizer()
+        
+        # Normalisiere Daten (konvertiert "-", "unknown", etc. zu NULL)
+        normalized_data = null_normalizer.normalize_structured_data(data)
+        
+        # Normalisiere auch data_with_sources
+        normalized_data_with_sources = {}
+        for field, field_data in data_with_sources.items():
+            normalized_value = null_normalizer.normalize_value(field_data['value'], field)
+            normalized_data_with_sources[field] = {
+                'value': normalized_value,
+                'sources': field_data['sources']
+            }
+        
+        logger.info(f"[NULL-NORMALIZER] Datenextraktion für '{mine_name}' - NULL-Normalisierung angewendet")
+        
         return {
-            'data': data,
-            'data_with_sources': data_with_sources,
+            'data': normalized_data,
+            'data_with_sources': normalized_data_with_sources,
             'source_index': source_index,
             'source_mapping': source_mapping  # QUELLENREFERENZEN-FIX: Für DB-Speicherung
         }

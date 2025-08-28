@@ -17,8 +17,9 @@
  * Konsistente Anzeige für alle NULL/leeren Werte aus der bereinigten Datenbank
  */
 function formatFieldValue(value) {
-    // CLEAN DATA AT SOURCE: Backend liefert bereits "Nichts gefunden" für NULL-Werte
-    if (value === 'Nichts gefunden') {
+    // FIX 22.08.2025: Backend liefert bereits "nichts gefunden" - keine doppelte Formatierung
+    // FIX 23.08.2025: Case-insensitive comparison with whitespace trimming
+    if (value && value.trim().toLowerCase() === 'nichts gefunden') {
         return '❌ nichts gefunden';  // Consistent Frontend-Styling für Backend-normalisierte Werte
     }
     
@@ -1030,7 +1031,7 @@ async function displayMultiModelComparison(successfulResults, fullData) {
         const fullHTML = `
             <div class="multi-model-results">
                 <div class="search-metadata">
-                    <h2>🔬 Multi-Model Analysis Results</h2>
+                    <h2>🔬 Multi-Modell Analyseergebnisse</h2>
                     <div class="search-info">
                         <span class="search-query">${searchInfo}</span>
                         <span class="search-timestamp">${timestamp}</span>
@@ -1041,7 +1042,7 @@ async function displayMultiModelComparison(successfulResults, fullData) {
                 
                 <div class="individual-results-toggle">
                     <button onclick="toggleIndividualResults()" class="toggle-btn">
-                        📋 Show Individual Model Results
+                        📋 Einzelne Modell-Ergebnisse anzeigen
                     </button>
                     <div id="individual-results" style="display: none;">
                         ${generateIndividualModelResults(successfulResults)}
@@ -1211,7 +1212,7 @@ function displayIndividualResultsFallback(results) {
     const fallbackHTML = `
         <div class="comparison-fallback">
             <div class="fallback-header">
-                <h2>📊 Individual Model Results</h2>
+                <h2>📊 Einzelne Modell-Ergebnisse</h2>
                 <p>Comparison analysis temporarily unavailable. Showing individual results:</p>
             </div>
             
@@ -1232,10 +1233,10 @@ function toggleIndividualResults() {
     if (individualDiv && toggleBtn) {
         if (individualDiv.style.display === 'none') {
             individualDiv.style.display = 'block';
-            toggleBtn.textContent = '📋 Hide Individual Model Results';
+            toggleBtn.textContent = '📋 Einzelne Modell-Ergebnisse ausblenden';
         } else {
             individualDiv.style.display = 'none';
-            toggleBtn.textContent = '📋 Show Individual Model Results';
+            toggleBtn.textContent = '📋 Einzelne Modell-Ergebnisse anzeigen';
         }
     }
 }

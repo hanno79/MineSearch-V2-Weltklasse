@@ -9,16 +9,32 @@ import re
 def test_source_references():
     print("[QUELLENREFERENZ-TEST] Starte Test der Quellenreferenzen...")
     
-    # API-Aufruf
-    response = requests.post(
-        "http://localhost:8000/api/search",
-        headers={"Content-Type": "application/json"},
-        json={
-            "mine_name": "Eleonore Mine",
-            "model": "openrouter:deepseek-free",
-            "country": "Kanada"
-        }
-    )
+    # API-Aufruf mit Timeout und Error-Handling
+    try:
+        response = requests.post(
+            "http://localhost:8000/api/search",
+            headers={"Content-Type": "application/json"},
+            json={
+                "mine_name": "Eleonore Mine",
+                "model": "openrouter:deepseek-free",
+                "country": "Kanada"
+            },
+            timeout=10  # 10 second timeout to prevent hanging
+        )
+    except requests.exceptions.Timeout:
+        print("❌ Test failed: Request timed out after 10 seconds")
+        print("   This could indicate:")
+        print("   - Server is not responding")
+        print("   - Network connectivity issues")
+        print("   - Server is overloaded")
+        return
+    except requests.exceptions.ConnectionError:
+        print("❌ Test failed: Could not connect to server")
+        print("   Check if the server is running at http://localhost:8000")
+        return
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Test failed: Network error occurred: {e}")
+        return
     
     if response.status_code != 200:
         print(f"❌ API-Fehler: {response.status_code}")

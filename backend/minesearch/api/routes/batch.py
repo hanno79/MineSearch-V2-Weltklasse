@@ -11,6 +11,7 @@ import csv
 import io
 import logging
 import asyncio
+from ...fallback_detector import validate_data, clean_fallback_values
 try:
     import fcntl
     HAS_FCNTL = True
@@ -31,6 +32,9 @@ from minesearch.extraction_validators import is_placeholder_value
 from minesearch.html_utils import create_batch_results_table
 # BATCH-FIX 23.08.2025: Import MultiModelSearchOrchestrator für Provider-Suche
 from minesearch.multi_model_search_orchestrator import MultiModelSearchOrchestrator
+# ÄNDERUNG 27.08.2025: Import Sequential Field Orchestrator für neuen Workflow
+from minesearch.sequential_field_orchestrator import SequentialFieldOrchestrator
+from minesearch.database.sequential_manager import SequentialDatabaseManager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -284,6 +288,7 @@ async def upload_csv(csv_file: UploadFile = File(...)):
                     
                     <input type="hidden" name="session_id" value="{session_id}">
                     <input type="hidden" name="selected_models" value="">
+                    <input type="hidden" name="sequential_workflow" value="false">
                     
                     <div class="form-group">
                         <label><strong>Anzahl zu durchsuchender Minen:</strong></label>
@@ -300,10 +305,14 @@ async def upload_csv(csv_file: UploadFile = File(...)):
                     
                     <div class="form-group">
                         <label><strong>Suchtyp:</strong></label>
-                        <select name="search_type" style="width: 200px; padding: 5px;">
-                            <option value="standard">Standard-Suche</option>
+                        <select name="search_type" style="width: 300px; padding: 5px;">
+                            <option value="standard">Standard-Suche (parallel)</option>
                             <option value="comprehensive">Umfassende Suche</option>
+                            <option value="sequential">🔥 Sequential Workflow (NEU)</option>
                         </select>
+                        <div style="margin-top: 5px; font-size: 12px; color: #666;">
+                            <div id="search-type-help">Standard: Alle Modelle parallel | Sequential: Quellen akkumulieren → Feld-für-Feld suchen</div>
+                        </div>
                     </div>
                     
                     <div style="margin: 20px 0;">
@@ -325,6 +334,24 @@ async def upload_csv(csv_file: UploadFile = File(...)):
         </div>
         
         <div id="batch-results" style="margin-top: 30px;"></div>
+        
+        <script>
+        // ÄNDERUNG 27.08.2025: Sequential Workflow Parameter Management
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchTypeSelect = document.querySelector('select[name="search_type"]');
+            const sequentialWorkflowInput = document.querySelector('input[name="sequential_workflow"]');
+            
+            if (searchTypeSelect && sequentialWorkflowInput) {
+                searchTypeSelect.addEventListener('change', function() {
+                    if (this.value === 'sequential') {
+                        sequentialWorkflowInput.value = 'true';
+                    } else {
+                        sequentialWorkflowInput.value = 'false';
+                    }
+                });
+            }
+        });
+        </script>
         """
         
         from fastapi.responses import HTMLResponse
@@ -346,7 +373,9 @@ async def batch_search(
     consistency_check: Optional[str] = Form("false"),
     consistency_runs: Optional[int] = Form(3),
     # PHASE 2.3: COMPREHENSIVE SEARCH Option
-    comprehensive_search: Optional[str] = Form("false")
+    comprehensive_search: Optional[str] = Form("false"),
+    # ÄNDERUNG 27.08.2025: Sequential Field Orchestrator Option
+    sequential_workflow: Optional[str] = Form("false")
 ):
     """
     Batch-Suche für mehrere Minen aus CSV
@@ -551,8 +580,85 @@ async def batch_search(
                         # Fallback auf Standard-Suche
                         comprehensive_search = "false"
                 
+                # ÄNDERUNG 27.08.2025: SEQUENTIAL FIELD ORCHESTRATOR Option
+                elif search_type == "sequential" or sequential_workflow == "true":
+                    logger.info(f"[SEQUENTIAL] Starte Sequential Field Orchestrator für {mine_name}")
+                    try:
+                        # Erstelle Sequential Database Manager
+                        with db_manager.get_session() as db_session:
+                            seq_db_manager = SequentialDatabaseManager(db_session)
+                            
+                            # Erstelle Sequential Field Orchestrator
+                            orchestrator = SequentialFieldOrchestrator()
+                            
+                            # Führe Sequential Search durch
+                            sequential_result = await orchestrator.orchestrate_sequential_search(
+                                mine_name=mine_name,
+                                models=models_to_use,
+                                country=country,
+                                region=region,
+                                commodity=commodity,
+                                session_id=session_id
+                            )
+                            
+                            if sequential_result.success:
+                                # Formatiere für Batch-Ergebnisse
+                                result_data = {
+                                    "mine_name": mine_name,
+                                    "country": country,
+                                    "commodity": commodity,
+                                    "region": region,
+                                    "success": True,
+                                    "data": {
+                                        "structured_data": sequential_result.consolidated_data,
+                                        "field_confidence_scores": sequential_result.field_confidence,
+                                        "sources_discovered": sequential_result.total_sources_discovered,
+                                        "models_used": sequential_result.total_models_used,
+                                        "search_strategy": "sequential_field_orchestrator",
+                                        "performance_metrics": sequential_result.performance_metrics,
+                                        "quality_score": sequential_result.quality_score
+                                    }
+                                }
+                                results.append(result_data)
+                                
+                                logger.info(f"[SEQUENTIAL] Sequential search für {mine_name} erfolgreich abgeschlossen: Quality Score {sequential_result.quality_score}")
+                                
+                                # Sequential Orchestrator speichert bereits in Datenbank
+                                # Zusätzliche Legacy-Speicherung für Kompatibilität
+                                try:
+                                    db_manager.save_search_result(
+                                        mine_name=mine_name,
+                                        model_used='sequential_field_orchestrator',
+                                        structured_data=sequential_result.consolidated_data,
+                                        sources=[],
+                                        session_id=session_id,
+                                        country=country,
+                                        region=region,
+                                        commodity=commodity,
+                                        search_type='batch_sequential',
+                                        search_duration=sequential_result.performance_metrics.get('total_duration_seconds'),
+                                        data_quality={
+                                            'quality_score': sequential_result.quality_score,
+                                            'completeness_percentage': sequential_result.performance_metrics.get('completeness_percentage', 0),
+                                            'sources_discovered': sequential_result.total_sources_discovered
+                                        },
+                                        success=True
+                                    )
+                                    logger.info(f"[SEQUENTIAL-DB] Legacy-Kompatibilität Ergebnis für {mine_name} gespeichert")
+                                except Exception as db_error:
+                                    logger.error(f"[SEQUENTIAL-DB] Fehler beim Legacy-Speichern: {str(db_error)}")
+                            else:
+                                # Sequential search fehlgeschlagen, fallback auf Standard-Suche
+                                logger.warning(f"[SEQUENTIAL] Sequential search für {mine_name} fehlgeschlagen: {sequential_result.error_message}")
+                                sequential_workflow = "false"  # Fallback für diese Mine
+                            
+                    except Exception as e:
+                        logger.error(f"[SEQUENTIAL] Fehler bei sequential search für {mine_name}: {str(e)}")
+                        # Fallback auf Standard-Suche
+                        sequential_workflow = "false"
+                
                 # KRITISCHER FIX 23.08.2025: Verwende EXISTIERENDE Datenbank-Ergebnisse statt neue API-Calls
-                if comprehensive_search != "true":
+                if comprehensive_search != "true" and (search_type != "sequential" and sequential_workflow != "true"):
                     logger.info(f"[BATCH-DB-FIRST] Prüfe Datenbank für existierende {mine_name} Ergebnisse")
                     
                     # 1. PRÜFE DATENBANK-ERGEBNISSE ZUERST

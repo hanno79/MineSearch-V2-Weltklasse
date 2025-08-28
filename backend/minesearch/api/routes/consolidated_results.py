@@ -19,6 +19,9 @@ from .consolidated_field_utils import (
     consolidate_and_rename_field
 )
 
+# Import ValueNormalizer for semantic value equivalence
+from minesearch.value_normalizer import value_normalizer
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -32,22 +35,22 @@ from datetime import datetime
 
 def _normalize_placeholder_value(value):
     """
-    CRITICAL CSV-FIX 25.08.2025: Erweiterte Normalisierung für konsistente CSV-Ausgabe
-    Normalisiert ALLE Platzhalter-Werte und verhindert Feldverschiebung
+    RULE 10 COMPLIANCE 26.08.2025: NULL-konforme Normalisierung für CSV-Ausgabe
+    KEINE "nichts gefunden" Fallback-Werte - nur NULL oder echte Daten
     
     Behandelt sowohl neue als auch bereits in der DB gespeicherte LEER-Varianten
     """
     if not value or not str(value).strip():
-        return "nichts gefunden"
+        return None  # REGEL 10: NULL statt "nichts gefunden"
     
     value_str = str(value).strip()
     
     import re
     
-    # CSV-FIX: DIREKTE Überprüfung auf problematische Werte die Feldverschiebung verursachen
+    # REGEL 10: DIREKTE Überprüfung auf problematische Werte
     if value_str.startswith('TEMPLATE:'):
-        logger.debug(f"[CSV-FIX] Template-Wert normalisiert: '{value_str}' -> 'nichts gefunden'")
-        return 'nichts gefunden'
+        logger.debug(f"[REGEL 10] Template-Wert normalisiert: '{value_str}' -> NULL")
+        return None
     
     # CSV-FIX: Erweiterte exakte Platzhalter-Liste (verhindert Feldverschiebung)
     exact_placeholders = [
@@ -75,8 +78,8 @@ def _normalize_placeholder_value(value):
     ]
     
     if value_str in exact_placeholders:
-        logger.debug(f"[CSV-FIX] Exakter Platzhalter normalisiert: '{value_str}' -> 'nichts gefunden'")
-        return 'nichts gefunden'
+        logger.debug(f"[REGEL 10] Exakter Platzhalter normalisiert: '{value_str}' -> NULL")
+        return None
     
     # CSV-FIX: Template-Pattern für AI-generierte Werte
     template_patterns = [
@@ -107,10 +110,10 @@ def _normalize_placeholder_value(value):
     
     for pattern in template_patterns:
         if re.match(pattern, value_str, re.IGNORECASE):
-            logger.debug(f"[CSV-FIX] Template-Pattern erkannt: '{value_str}' -> 'nichts gefunden'")
-            return 'nichts gefunden'
+            logger.debug(f"[REGEL 10] Template-Pattern erkannt: '{value_str}' -> NULL")
+            return None
     
-    # CSV-FIX: AI-Kommentare in bestehenden DB-Daten
+    # REGEL 10: AI-Kommentare in bestehenden DB-Daten
     ai_comment_patterns = [
         'the user says', 'user says', 'so that\'s straightforward',
         'also unknown', 'no data, so leave blank', 'without specifics',
@@ -119,17 +122,18 @@ def _normalize_placeholder_value(value):
     ]
     
     if any(pattern in value_str.lower() for pattern in ai_comment_patterns):
-        logger.debug(f"[CSV-FIX] AI-Kommentar erkannt: '{value_str[:30]}...' -> 'nichts gefunden'")
-        return 'nichts gefunden'
+        logger.debug(f"[REGEL 10] AI-Kommentar erkannt: '{value_str[:30]}...' -> NULL")
+        return None
     
     # Echte Werte unverändert zurückgeben
     return value_str
 
-def _analyze_field_values(value_details):
+def _analyze_field_values(value_details, field_name=None):
     """
     Analysiert alle Werte für ein Feld und gruppiert sie nach Eindeutigkeit
     
     PHASE 15.3 FIX: Normalisiert ALLE Werte BEVOR sie analysiert werden!
+    VALUE-NORMALIZATION FIX 26.08.2025: Semantische Normalisierung für identische Begriffe
     
     Returns: Dict mit eindeutigen Werten und deren Metadaten
     """
@@ -137,11 +141,27 @@ def _analyze_field_values(value_details):
     
     for detail in value_details:
         # PHASE 15.3 KRITISCH: Normalisiere JEDEN Wert vor der Analyse!
-        original_value = detail['value'].strip()
+        original_value = str(detail.get('value', '')).strip() if detail.get('value') is not None else ''
         normalized_display_value = _normalize_placeholder_value(original_value)
         
-        value = normalized_display_value.strip().lower()  # Normalisiert für Vergleich
-        display_value = normalized_display_value  # Normalisiert für Anzeige
+        # Absicherung gegen None-Werte
+        if normalized_display_value is None:
+            normalized_display_value = ''
+        
+        # VALUE-NORMALIZATION FIX 26.08.2025: Semantische Normalisierung NACH Platzhalter-Normalisierung
+        # Beispiel: "Canada" und "Kanada" werden beide zu "Kanada" normalisiert
+        if normalized_display_value.strip() and field_name:
+            semantically_normalized = value_normalizer.normalize_value(normalized_display_value, field_name)
+            logger.debug(f"[VALUE-NORM] Feld '{field_name}': '{normalized_display_value}' → '{semantically_normalized}'")
+            
+            # Verwende semantisch normalisierten Wert für Display
+            display_value = semantically_normalized
+        else:
+            display_value = str(normalized_display_value)
+        
+        # CRITICAL FIX 27.08.2025: Verwende normalisierten Wert AUCH für Gruppenvergleich
+        # Damit "Gold" und "gold" in der GLEICHEN Gruppe landen
+        value = str(display_value).strip().lower()  # Normalisiert für Vergleich nach semantischer Normalisierung
         
         if value not in value_groups:
             value_groups[value] = {
@@ -153,6 +173,18 @@ def _analyze_field_values(value_details):
                 'data_quality_scores': [],
                 'search_durations': []
             }
+        else:
+            # CRITICAL FIX 27.08.2025: Bei mehreren normalisierten Werten, wähle den "besseren" Display-Wert
+            existing_display = value_groups[value]['display_value']
+            
+            # Bevorzuge Werte mit Großbuchstaben (Gold > gold, Kanada > canada)
+            if display_value != existing_display:
+                if display_value.istitle() and not existing_display.istitle():
+                    value_groups[value]['display_value'] = display_value
+                    logger.debug(f"[NORMALIZE-MERGE] Upgraded display value: '{existing_display}' → '{display_value}'")
+                elif display_value.isupper() and existing_display.islower():
+                    value_groups[value]['display_value'] = display_value
+                    logger.debug(f"[NORMALIZE-MERGE] Upgraded display value: '{existing_display}' → '{display_value}'")
         
         group = value_groups[value]
         group['frequency'] += 1
@@ -314,34 +346,53 @@ def _calculate_best_value(value_analysis, field_name=None):
             'reason': 'Keine gültigen Werte gefunden'
         }
     
-    # PHASE 13.2 FIX: Normalisiere Konfidenz-Score zu 0-100 (neue Berechnung)
-    # Platzhalter: frequency=9 (9), no diversity (0), no consensus (0), no quality (0), Platzhalter-Malus (-100) = -91.0
-    # Echter Wert: frequency=1 (1), diversity=1 (1.5), consensus=1 (1), quality=0 (0), Echte-Daten-Bonus (+50) = 53.5
-    # ERGEBNIS: Echte Werte gewinnen IMMER gegen Platzhalter!
-    max_reasonable_score = 60.0  # Angepasst an neue Bonusse
-    confidence_score = min(100, max(0, (best_score / max_reasonable_score) * 100))
+    # KRITISCHER CONSENSUS-BUG FIX 26.08.2025: Korrekte max_reasonable_score Berechnung
+    # Bei 17 Modellen mit identischem Wert sollte Vertrauen 100% sein, nicht 24%!
+    # 
+    # Beispiel 17x "Gold": frequency=17 (17), consensus=17 (17), echte-daten-bonus=50 = 84 Punkte
+    # max_reasonable_score muss dynamisch an tatsächliche Modellanzahl angepasst werden
+    
+    # Berechne dynamischen max_reasonable_score basierend auf verfügbaren Daten
+    if value_analysis and best_value:
+        max_frequency = max(analysis['frequency'] for analysis in value_analysis.values())
+        max_consensus = max(analysis['model_consensus'] for analysis in value_analysis.values())
+        
+        # Neue Formel: Wenn alle Modelle übereinstimmen = 100% Vertrauen
+        max_reasonable_score = max_frequency * 1.0 + max_consensus * 1.0 + 50.0  # bonuses
+        
+        # ZUSÄTZLICH: Bei perfektem Consensus (alle Modelle gleicher Wert) = automatisch 95-100%
+        if best_value['frequency'] == max_frequency and best_value['model_consensus'] == max_consensus:
+            confidence_score = min(100, max(95, (best_score / max_reasonable_score) * 100))
+            logger.info(f"[CONSENSUS-FIX] Perfekter Consensus erkannt: '{best_value['display_value']}' von {best_value['frequency']} Modellen → {confidence_score:.1f}% Vertrauen (Score: {best_score:.1f}/{max_reasonable_score:.1f})")
+        else:
+            confidence_score = min(100, max(0, (best_score / max_reasonable_score) * 100))
+            logger.debug(f"[SCORE-CALC] '{best_value['display_value']}': freq={best_value['frequency']}/{max_frequency}, consensus={best_value['model_consensus']}/{max_consensus} → {confidence_score:.1f}% Vertrauen")
+    else:
+        # Fallback: Alte statische Berechnung
+        max_reasonable_score = 60.0
+        confidence_score = min(100, max(0, (best_score / max_reasonable_score) * 100))
     
     # Bestimme Begründung
     reason_parts = []
-    if best_value['frequency'] > 1:
+    if best_value and best_value.get('frequency', 0) > 1:
         reason_parts.append(f"Häufigkeit: {best_value['frequency']}")
-    if best_value['source_diversity'] > 1:
+    if best_value and best_value.get('source_diversity', 0) > 1:
         reason_parts.append(f"Quellen: {best_value['source_diversity']}")
-    if best_value['model_consensus'] > 1:
+    if best_value and best_value.get('model_consensus', 0) > 1:
         reason_parts.append(f"Modelle: {best_value['model_consensus']}")
     
     reason = "Best Value aufgrund: " + ", ".join(reason_parts) if reason_parts else "Einziger verfügbarer Wert"
     
     return {
-        'display_value': best_value['display_value'],
+        'display_value': best_value.get('display_value', '') if best_value else '',
         'confidence_score': round(confidence_score, 1),
         'reason': reason,
-        'frequency': best_value['frequency'],
-        'source_diversity': best_value['source_diversity'],
-        'model_consensus': best_value['model_consensus'],
-        'avg_data_quality': round(best_value['avg_data_quality'], 1),
-        'supporting_models': best_value['unique_ai_models'],
-        'supporting_sources': best_value['unique_real_sources'][:3]  # Zeige nur ersten 3 URLs
+        'frequency': best_value.get('frequency', 0) if best_value else 0,
+        'source_diversity': best_value.get('source_diversity', 0) if best_value else 0,
+        'model_consensus': best_value.get('model_consensus', 0) if best_value else 0,
+        'avg_data_quality': round(best_value.get('avg_data_quality', 0), 1) if best_value else 0,
+        'supporting_models': best_value.get('unique_ai_models', []) if best_value else [],
+        'supporting_sources': best_value.get('unique_real_sources', [])[:3] if best_value else []  # Zeige nur ersten 3 URLs
     }
 
 @router.get("/results")
@@ -692,7 +743,8 @@ async def get_consolidated_results(
                 field_info = mine_data['consolidated_fields'][field_name]
                 
                 # Analysiere alle Werte für dieses Feld
-                value_analysis = _analyze_field_values(field_info['value_details'])
+                # VALUE-NORMALIZATION FIX 26.08.2025: Übergebe field_name für semantische Normalisierung
+                value_analysis = _analyze_field_values(field_info['value_details'], field_name)
                 
                 # Bestimme besten Wert basierend auf Algorithmus
                 # TEMPLATE-PATTERN-FIX 06.08.2025: Übergebe field_name für Template-Detection
@@ -1100,7 +1152,8 @@ async def get_mine_consolidated_details(
         
         for field_name, field_info in mine_data['consolidated_fields'].items():
             # Analysiere alle Werte für dieses Feld
-            value_analysis = _analyze_field_values(field_info['value_details'])
+            # VALUE-NORMALIZATION FIX 26.08.2025: Übergebe field_name für semantische Normalisierung
+            value_analysis = _analyze_field_values(field_info['value_details'], field_name)
             
             # Bestimme besten Wert
             best_value_info = _calculate_best_value(value_analysis, field_name)
@@ -1282,13 +1335,13 @@ async def export_consolidated_csv(
         # Metadaten-Felder
         for field_type in data_fields:
             if field_type == "mine_name":
-                row.append(result.get("mine_name", "nichts gefunden"))
+                row.append(result.get("mine_name", ""))  # REGEL 10: Leer statt "nichts gefunden"
             elif field_type == "country": 
                 country_val = result.get("country", "")
-                row.append(_normalize_placeholder_value(country_val) if country_val else "nichts gefunden")
+                row.append(_normalize_placeholder_value(country_val) or "")  # REGEL 10: Leer statt "nichts gefunden"
             elif field_type == "region":
                 region_val = result.get("region", "")
-                row.append(_normalize_placeholder_value(region_val) if region_val else "nichts gefunden")
+                row.append(_normalize_placeholder_value(region_val) or "")  # REGEL 10: Leer statt "nichts gefunden"
             elif field_type == "overall_confidence":
                 row.append(str(result.get("overall_confidence", 0)) + "%")
             elif field_type == "model_count":
@@ -1304,15 +1357,15 @@ async def export_consolidated_csv(
                 # CSV-FIX: Hole Wert aus best_values mit Fallback
                 value = result["best_values"].get(field, "")
                 
-                # CSV-FIX: IMMER normalisieren - auch leere Werte werden zu "nichts gefunden"  
-                normalized_value = _normalize_placeholder_value(value) if value else "nichts gefunden"
+                # REGEL 10: IMMER normalisieren - leere Werte bleiben leer
+                normalized_value = _normalize_placeholder_value(value) or ""
                 
                 # SOURCE-REFERENCE-FIX 25.08.2025: Verbesserte Quellenreferenzierung
                 detailed_breakdown = result.get("detailed_breakdown", {})
                 source_ids = []
                 
-                # Nur Quellenreferenzen hinzufügen wenn Wert nicht "nichts gefunden"
-                if field in detailed_breakdown and normalized_value != "nichts gefunden":
+                # REGEL 10: Quellenreferenzen nur bei echten Werten hinzufügen
+                if field in detailed_breakdown and normalized_value:
                     field_data = detailed_breakdown[field]
                     
                     # Primär: Verwende global_source_numbers
@@ -1348,13 +1401,13 @@ async def export_consolidated_csv(
                     escaped_value = str(normalized_value).replace("|", ";")
                     
                     # CRITICAL: Garantiere dass NIEMALS ein leerer Wert gesetzt wird
-                    final_value = escaped_value if escaped_value.strip() else "nichts gefunden"
+                    final_value = escaped_value if escaped_value.strip() else ""  # REGEL 10: Leer statt "nichts gefunden"
                     row.append(final_value)
                     
             except Exception as e:
-                # CSV-FIX: Bei jedem Fehler -> "nichts gefunden" um Feldverschiebung zu verhindern
+                # REGEL 10: Bei Fehler leeren Wert verwenden
                 logger.error(f"[CSV-FIX] Fehler bei Feld '{field}' für Mine '{result.get('mine_name', 'unknown')}': {e}")
-                row.append("nichts gefunden")
+                row.append("")  # REGEL 10: Leer statt "nichts gefunden"
         
         # EXAKTE-QUELLENANGABEN-FIX 24.08.2025: Füge detaillierte Quellenangaben hinzu
         exact_sources = []
@@ -1461,11 +1514,11 @@ async def export_consolidated_csv(
             
             # Repariere Zeile: Füge fehlende Spalten hinzu oder entferne überschüssige
             if actual_columns < expected_columns:
-                # Zu wenige Spalten - füge "nichts gefunden" hinzu
+                # REGEL 10: Zu wenige Spalten - füge leere Werte hinzu
                 missing_count = expected_columns - actual_columns
                 for i in range(missing_count):
-                    row.append("nichts gefunden")
-                logger.warning(f"[CSV-FIX] {missing_count} fehlende Spalten mit 'nichts gefunden' aufgefüllt")
+                    row.append("")  # REGEL 10: Leer statt "nichts gefunden"
+                logger.warning(f"[CSV-FIX] {missing_count} fehlende Spalten mit leeren Werten aufgefüllt")
             elif actual_columns > expected_columns:
                 # Zu viele Spalten - entferne überschüssige
                 row = row[:expected_columns]
@@ -1479,10 +1532,10 @@ async def export_consolidated_csv(
         else:
             logger.error(f"[CSV-FIX] KRITISCHER FEHLER: Zeile für Mine '{result.get('mine_name', 'unknown')}' "
                         f"konnte nicht repariert werden ({final_columns} != {expected_columns})")
-            # Fallback: Erstelle komplette Zeile mit "nichts gefunden"
-            fallback_row = [result.get('mine_name', 'unknown')] + ['nichts gefunden'] * (expected_columns - 1)
-            csv_lines.append("|".join(fallback_row))
-            logger.warning("[CSV-FIX] Fallback-Zeile mit 'nichts gefunden' erstellt")
+            # REGEL 10 COMPLIANCE 26.08.2025: KEINE Fallback-Daten - Fehlgeschlagene Zeile weglassen
+            logger.error(f"[REGEL 10] CSV-Zeile für Mine '{result.get('mine_name', 'unknown')}' wird übersprungen - "
+                        "Keine ausgedachten Fallback-Daten")
+            # Zeile wird komplett weggelassen statt mit falschen Daten gefüllt
     
     # PERFORMANCE-FIX 25.08.2025: Streaming für große CSV-Exports
     # Dateiname mit Timestamp
@@ -1524,3 +1577,273 @@ async def export_consolidated_csv(
             "Cache-Control": "no-cache"  # Verhindere Caching bei großen Exporten
         }
     )
+
+
+# ============================================================================
+# 🆕 NORMALIZED SCHEMA API ENDPOINTS
+# Datum: 27.08.2025
+# Zweck: Demo der neuen normalisierten Datenbank-Architektur
+# ============================================================================
+
+@router.get("/normalized/results")
+async def get_normalized_results(
+    days_back: int = Query(30),
+    sort_by: str = Query("mine_name", description="Sort by: mine_name, country, quality_score"),
+    order: str = Query("asc", description="Order: asc or desc"),
+    include_template_fields: bool = Query(False, description="Template/Dummy-Werte einschließen")
+):
+    """
+    🆕 NORMALIZED API: Verwendet neue atomare Datenbank-Struktur
+    
+    VORTEILE:
+    - Echte Deduplizierung (keine Eleonore/Éléonore Duplikate mehr)
+    - Qualitätsbewertung pro Feldwert
+    - Template-Wert Erkennung (REGEL 10 Compliance)
+    - Atomare Datenspeicherung statt JSON-Chaos
+    - Bessere Performance durch Indizes
+    """
+    from minesearch.database.normalized_manager import NormalizedDatabaseManager
+    from sqlalchemy import text, desc as sql_desc, asc as sql_asc
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+    
+    norm_db = NormalizedDatabaseManager()
+    
+    with norm_db.get_session() as session:
+        # Query-Builder für normalisierte Daten
+        base_query = """
+        SELECT 
+            m.id as mine_id,
+            m.name as mine_name,
+            m.normalized_name,
+            m.country,
+            m.region,
+            m.status,
+            m.primary_commodity,
+            owner.name as owner_company,
+            operator.name as operator_company,
+            
+            -- Feldwerte
+            mdf.field_name,
+            mdf.raw_value,
+            mdf.normalized_value,
+            mdf.numeric_value,
+            mdf.unit,
+            mdf.confidence_score,
+            mdf.is_template_value,
+            mdf.validation_status,
+            mdf.model_used,
+            mdf.source_name,
+            
+            -- Qualitätsmetriken pro Mine (SQLite-kompatibel ohne DISTINCT in window functions)
+            COUNT(mdf.field_name) OVER (PARTITION BY m.id) as total_fields,
+            COUNT(CASE WHEN mdf.validation_status = 'valid' THEN mdf.field_name END) OVER (PARTITION BY m.id) as valid_fields,
+            COUNT(CASE WHEN mdf.is_template_value = 1 THEN mdf.field_name END) OVER (PARTITION BY m.id) as template_fields,
+            MAX(mdf.created_at) OVER (PARTITION BY m.id) as last_updated
+            
+        FROM mines_normalized m
+        LEFT JOIN companies owner ON m.owner_company_id = owner.id
+        LEFT JOIN companies operator ON m.operator_company_id = operator.id
+        LEFT JOIN mine_data_fields mdf ON m.id = mdf.mine_id
+        
+        WHERE 1=1
+        """
+        
+        params = {}
+        
+        # Zeitfilter
+        if days_back > 0:
+            cutoff = datetime.now() - timedelta(days=days_back)
+            base_query += " AND mdf.created_at >= :cutoff"
+            params['cutoff'] = cutoff
+        
+        # Template-Filter
+        if not include_template_fields:
+            base_query += " AND (mdf.is_template_value = 0 OR mdf.is_template_value IS NULL)"
+        
+        # Sortierung
+        order_clause = "ASC" if order.lower() == "asc" else "DESC"
+        if sort_by == "mine_name":
+            base_query += f" ORDER BY m.name {order_clause}"
+        elif sort_by == "country":
+            base_query += f" ORDER BY m.country {order_clause}, m.name ASC"
+        elif sort_by == "quality_score":
+            base_query += f" ORDER BY valid_fields {order_clause}, m.name ASC"
+        
+        # Führe Query aus
+        result = session.execute(text(base_query), params)
+        rows = result.fetchall()
+        
+        logger.info(f"[NORMALIZED API] Query returned {len(rows)} field entries")
+        
+        # Gruppiere nach Mine
+        mines_data = defaultdict(lambda: {
+            'mine_info': None,
+            'fields': {},
+            'quality_metrics': None,
+            'models_used': set()
+        })
+        
+        for row in rows:
+            mine_id = row.mine_id
+            mine_key = row.normalized_name  # Verwende normalisierte Namen für Konsistenz
+            
+            # Mine-Grunddaten (nur einmal setzen)
+            if mines_data[mine_key]['mine_info'] is None:
+                mines_data[mine_key]['mine_info'] = {
+                    'id': row.mine_id,
+                    'name': row.mine_name,
+                    'normalized_name': row.normalized_name,
+                    'country': row.country,
+                    'region': row.region,
+                    'status': row.status,
+                    'primary_commodity': row.primary_commodity,
+                    'owner_company': row.owner_company,
+                    'operator_company': row.operator_company
+                }
+                
+                # Qualitätsmetriken
+                mines_data[mine_key]['quality_metrics'] = {
+                    'total_fields': row.total_fields or 0,
+                    'valid_fields': row.valid_fields or 0,
+                    'template_fields': row.template_fields or 0,
+                    'data_quality_score': round((row.valid_fields or 0) / max(1, row.total_fields or 1), 2),
+                    'last_updated': str(row.last_updated) if row.last_updated else None
+                }
+            
+            # Feldwerte hinzufügen
+            if row.field_name and row.raw_value:
+                field_key = row.field_name
+                
+                if field_key not in mines_data[mine_key]['fields']:
+                    mines_data[mine_key]['fields'][field_key] = []
+                
+                mines_data[mine_key]['fields'][field_key].append({
+                    'raw_value': row.raw_value,
+                    'normalized_value': row.normalized_value,
+                    'numeric_value': float(row.numeric_value) if row.numeric_value else None,
+                    'unit': row.unit,
+                    'confidence_score': float(row.confidence_score) if row.confidence_score else None,
+                    'is_template_value': bool(row.is_template_value),
+                    'validation_status': row.validation_status,
+                    'model_used': row.model_used,
+                    'source_name': row.source_name
+                })
+                
+                mines_data[mine_key]['models_used'].add(row.model_used)
+        
+        # Konvertiere zu Response-Format
+        response_data = []
+        for mine_key, mine_data in mines_data.items():
+            if mine_data['mine_info']:  # Nur Minen mit Daten
+                response_item = {
+                    **mine_data['mine_info'],
+                    'fields': mine_data['fields'],
+                    'quality_metrics': mine_data['quality_metrics'],
+                    'models_used': list(mine_data['models_used'])
+                }
+                response_data.append(response_item)
+        
+        return {
+            'success': True,
+            'data': {
+                'mines': response_data,
+                'total_mines': len(response_data),
+                'query_params': {
+                    'days_back': days_back,
+                    'sort_by': sort_by,
+                    'order': order,
+                    'include_template_fields': include_template_fields
+                }
+            },
+            'schema_info': {
+                'type': 'normalized',
+                'description': 'Daten aus normalisierter Atomstruktur',
+                'advantages': [
+                    'Echte Mine-Deduplizierung',
+                    'Qualitätsbewertung pro Feld',
+                    'Template-Wert Erkennung',
+                    'Atomare statt JSON-Speicherung'
+                ]
+            }
+        }
+
+
+@router.get("/normalized/schema/comparison")
+async def compare_schemas():
+    """
+    Vergleiche Legacy JSON-System vs. Normalisierte Atomstruktur
+    Zeigt Unterschiede in Datenqualität und -konsistenz
+    """
+    from minesearch.database.manager import DatabaseManager
+    from minesearch.database.normalized_manager import NormalizedDatabaseManager
+    from sqlalchemy import text
+    
+    legacy_db = DatabaseManager()
+    norm_db = NormalizedDatabaseManager()
+    
+    # Legacy System Stats
+    with legacy_db.get_session() as session:
+        result = session.execute(text("SELECT COUNT(*) FROM search_results"))
+        legacy_searches = result.fetchone()[0]
+        
+        result = session.execute(text("SELECT COUNT(DISTINCT mine_name) FROM search_results"))
+        legacy_unique_mines = result.fetchone()[0]
+    
+    # Normalized System Stats
+    with norm_db.get_session() as session:
+        result = session.execute(text("SELECT COUNT(*) FROM search_results_normalized"))
+        norm_searches = result.fetchone()[0]
+        
+        result = session.execute(text("SELECT COUNT(*) FROM mines_normalized"))
+        norm_unique_mines = result.fetchone()[0]
+        
+        result = session.execute(text("SELECT COUNT(*) FROM mine_data_fields"))
+        atomic_fields = result.fetchone()[0]
+        
+        result = session.execute(text("SELECT COUNT(*) FROM mine_data_fields WHERE is_template_value = 1"))
+        template_fields = result.fetchone()[0]
+        
+        result = session.execute(text("SELECT COUNT(*) FROM mine_data_fields WHERE validation_status = 'valid'"))
+        valid_fields = result.fetchone()[0]
+    
+    deduplication_improvement = legacy_unique_mines - norm_unique_mines if legacy_unique_mines > norm_unique_mines else 0
+    
+    return {
+        'success': True,
+        'comparison': {
+            'legacy_system': {
+                'description': 'JSON-basierte Speicherung',
+                'total_searches': legacy_searches,
+                'unique_mines': legacy_unique_mines,
+                'data_structure': 'Unstrukturierte JSON-Blobs',
+                'problems': [
+                    'Duplikate durch Akzent-Varianten (Eleonore/Éléonore)',
+                    'Inkonsistente Datentypen',
+                    'Schwierige Aggregation',
+                    'Keine Qualitätsbewertung'
+                ]
+            },
+            'normalized_system': {
+                'description': 'Atomare, normalisierte Struktur',
+                'total_searches': norm_searches,
+                'unique_mines': norm_unique_mines,
+                'atomic_fields': atomic_fields,
+                'template_fields_detected': template_fields,
+                'valid_fields': valid_fields,
+                'data_quality_score': round(valid_fields / max(1, atomic_fields), 2),
+                'advantages': [
+                    'Echte Deduplizierung durch Normalisierung',
+                    'Atomare Feldwerte mit Typisierung',
+                    'Template-Wert Erkennung (REGEL 10)',
+                    'Qualitätsbewertung pro Feld',
+                    'Bessere Performance durch Indizes'
+                ]
+            },
+            'improvements': {
+                'deduplication_savings': deduplication_improvement,
+                'data_quality_increase': f"{round(valid_fields / max(1, atomic_fields) * 100, 1)}%",
+                'template_rejection_rate': f"{round(template_fields / max(1, atomic_fields) * 100, 1)}%"
+            }
+        }
+    }

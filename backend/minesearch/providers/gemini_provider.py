@@ -198,11 +198,29 @@ class GeminiProvider(AbstractProvider):
                         if 'Restaurationskosten' in extracted_data.get('data_with_sources', {}):
                             extracted_data['data_with_sources']['Restaurationskosten'] = {"value": "", "sources": []}
                 
-                # Extrahiere Quellen aus der Antwort
-                sources_from_response = extract_sources_from_content(content)
+                # PHASE 1: Verwende discovered_sources als Basis-Quellen (wie Abacus Provider)
+                final_sources = []
+                for source in discovered_sources:
+                    final_sources.append({
+                        'url': source.get('url', ''),
+                        'title': source.get('title', source.get('url', '')),
+                        'type': source.get('type', 'discovered'),
+                        'reliability': source.get('reliability_score'),
+                        'searched': True  # Markiere als durchsucht
+                    })
                 
-                # Kombiniere mit übergebenen Quellen
-                final_sources = sources + sources_from_response
+                # PHASE 2: Zusätzliche Quellen aus Content
+                sources_from_response = extract_sources_from_content(content)
+                for source in sources_from_response:
+                    # Prüfe ob schon in discovered_sources
+                    if not any(ds.get('url') == source.get('url') for ds in discovered_sources):
+                        final_sources.append(source)
+                
+                # PHASE 3: Lokale sources (falls vorhanden)
+                for source in sources:
+                    # Prüfe ob schon vorhanden
+                    if not any(fs.get('url') == source.get('url') for fs in final_sources):
+                        final_sources.append(source)
                 
                 duration = (datetime.now() - start_time).total_seconds()
                 

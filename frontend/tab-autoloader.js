@@ -89,7 +89,7 @@ const TabAutoLoader = {
         const container = document.querySelector('.container');
         if (container) {
             // Entferne alle Tab-Klassen
-            const tabClasses = ['tab-single', 'tab-csv', 'tab-sources', 'tab-statistics', 'tab-consolidated'];
+            const tabClasses = ['tab-single', 'tab-csv', 'tab-sources', 'tab-statistics', 'tab-consolidated', 'tab-database'];
             container.classList.remove(...tabClasses);
             
             // Füge aktive Tab-Klasse hinzu
@@ -113,7 +113,8 @@ const TabAutoLoader = {
             'csv': 'csv-upload', 
             'sources': 'sources',
             'statistics': 'statistics',
-            'consolidated': 'consolidated'
+            'consolidated': 'consolidated',
+            'database': 'database'
         };
         
         const targetTabId = targetTabMap[activeTabName];
@@ -143,7 +144,7 @@ const TabAutoLoader = {
      * Lädt Tab-Daten mit Retry-Logic für display.js Funktionen
      */
     loadTabDataWithRetry(tabName, attempt = 0) {
-        const maxAttempts = 10;
+        const maxAttempts = 20; // PHASE 1 FIX: Verdoppelt für bessere Kompatibilität
         const retryDelay = 300;
         
         switch(tabName) {
@@ -182,16 +183,38 @@ const TabAutoLoader = {
             case 'consolidated':
                 console.log('📋 [TAB-AUTOLOADER] Loading consolidated results...');
                 if (typeof loadConsolidatedResults === 'function') {
-                    loadConsolidatedResults('mine_name', 'asc');
-                    console.log('✅ [TAB-AUTOLOADER] Consolidated loaded via global function');
+                    try {
+                        loadConsolidatedResults('mine_name', 'asc');
+                        console.log('✅ [TAB-AUTOLOADER] Consolidated loaded via global function');
+                    } catch (error) {
+                        console.error('❌ [TAB-AUTOLOADER] Error loading consolidated results:', error);
+                    }
                 } else if (typeof window.loadConsolidatedResults === 'function') {
-                    window.loadConsolidatedResults('mine_name', 'asc');
-                    console.log('✅ [TAB-AUTOLOADER] Consolidated loaded via window.loadConsolidatedResults');
+                    try {
+                        window.loadConsolidatedResults('mine_name', 'asc');
+                        console.log('✅ [TAB-AUTOLOADER] Consolidated loaded via window.loadConsolidatedResults');
+                    } catch (error) {
+                        console.error('❌ [TAB-AUTOLOADER] Error loading consolidated results:', error);
+                    }
                 } else if (attempt < maxAttempts) {
                     console.log(`🔄 [TAB-AUTOLOADER] loadConsolidatedResults not ready, retry ${attempt + 1}/${maxAttempts}...`);
                     setTimeout(() => this.loadTabDataWithRetry(tabName, attempt + 1), retryDelay);
                 } else {
                     console.error('❌ [TAB-AUTOLOADER] loadConsolidatedResults function not found after all retries');
+                    // Show error in consolidated container
+                    const container = document.getElementById('consolidated-table-container');
+                    if (container) {
+                        container.innerHTML = `
+                            <div style="padding: 20px; text-align: center; background: #fef2f2; border-radius: 8px; border: 1px solid #f87171;">
+                                <h3 style="color: #dc2626;">⚠️ Tab-Loading Problem</h3>
+                                <p>Die loadConsolidatedResults Funktion konnte nicht gefunden werden.</p>
+                                <p>Versuchen Sie, die Seite zu aktualisieren oder wechseln Sie manuell zum Ergebnisse-Tab.</p>
+                                <button onclick="location.reload()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    🔄 Seite neu laden
+                                </button>
+                            </div>
+                        `;
+                    }
                 }
                 break;
                 
@@ -201,6 +224,39 @@ const TabAutoLoader = {
                 
             case 'single':
                 console.log('🔍 [TAB-AUTOLOADER] Single search tab - no auto-loading needed');
+                break;
+                
+            case 'database':
+                console.log('🗂️ [TAB-AUTOLOADER] Loading database viewer...');
+                if (typeof initializeDatabaseViewer === 'function') {
+                    // Erst Tabellen laden, dann initialisieren
+                    initializeDatabaseViewer().then(() => {
+                        console.log('✅ [TAB-AUTOLOADER] Database viewer loaded and table counts updated');
+                    });
+                } else if (typeof window.databaseViewer?.initialize === 'function') {
+                    window.databaseViewer.initialize().then(() => {
+                        console.log('✅ [TAB-AUTOLOADER] Database viewer loaded via window.databaseViewer');
+                    });
+                } else if (attempt < maxAttempts) {
+                    console.log(`🔄 [TAB-AUTOLOADER] Database viewer not ready, retry ${attempt + 1}/${maxAttempts}...`);
+                    setTimeout(() => this.loadTabDataWithRetry(tabName, attempt + 1), retryDelay);
+                } else {
+                    console.error('❌ [TAB-AUTOLOADER] Database viewer function not found after all retries');
+                    // Show error in database container
+                    const container = document.getElementById('database-table-container');
+                    if (container) {
+                        container.innerHTML = `
+                            <div style="padding: 20px; text-align: center; background: #fef2f2; border-radius: 8px; border: 1px solid #f87171;">
+                                <h3 style="color: #dc2626;">⚠️ Database Viewer Problem</h3>
+                                <p>Der Database Viewer konnte nicht initialisiert werden.</p>
+                                <p>Versuchen Sie, die Seite zu aktualisieren.</p>
+                                <button onclick="location.reload()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    🔄 Seite neu laden
+                                </button>
+                            </div>
+                        `;
+                    }
+                }
                 break;
                 
             default:

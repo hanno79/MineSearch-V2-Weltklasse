@@ -16,6 +16,7 @@ from minesearch.providers.registry import provider_registry
 from minesearch.database import db_manager
 from minesearch.utils import generate_name_variants, get_country_config
 from minesearch.config import config
+from minesearch.source_validation import source_validator
 
 logger = logging.getLogger(__name__)
 
@@ -466,13 +467,41 @@ class MultiModelSearchOrchestrator:
                 else:
                     logger.error(f"[ORCHESTRATOR-EMPTY] Model {model_id} returned EMPTY structured_data!")
                 
+                # QUELLENVALIDIERUNG: Prüfe ob Provider discovered_sources korrekt verwendet
+                provider_name = search_result.metadata.get('provider', 'unknown') if hasattr(search_result, 'metadata') and search_result.metadata else 'unknown'
+                
+                # Erstelle Options für Validierung
+                validation_options = {
+                    'mine_name': mine_name,
+                    'country': country,
+                    'region': region,
+                    'commodity': commodity
+                }
+                
+                validation_result = source_validator.validate_search_result(
+                    search_result=search_result,
+                    provider_name=provider_name,
+                    model_id=model_id,
+                    discovered_sources=shared_sources,
+                    options=validation_options
+                )
+                
+                if not validation_result.valid:
+                    logger.warning(f"[SOURCE-VALIDATION] {model_id} hat Quellenprobleme: {validation_result.issues}")
+                
                 return ModelSearchResult(
                     model_id=model_id,
                     success=True,
                     data={
                         'structured_data': structured_data,  # Ensure this is not empty
                         'raw_content': search_result.content,
-                        'search_duration': search_duration
+                        'search_duration': search_duration,
+                        'source_validation': {  # Füge Validierungsergebnisse hinzu
+                            'valid': validation_result.valid,
+                            'issues': validation_result.issues,
+                            'discovered_count': validation_result.discovered_sources_count,
+                            'result_count': validation_result.result_sources_count
+                        }
                     },
                     sources=shared_sources,  # Use shared sources
                     search_duration=search_duration

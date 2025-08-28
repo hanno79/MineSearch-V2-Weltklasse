@@ -147,12 +147,89 @@ def is_template_or_dummy_value(value: str, field: str = None) -> bool:
         logger.warning(f"[TEMPLATE DETECTION] Expliziter Dummy-Wert: '{value_str}'")
         return True
     
-    # PHASE 6: FELD-SPEZIFISCHE DUMMY-DETECTION
+    # PHASE 6: UNIVERSELLE FELD-VALIDIERUNG GEGEN SCHÄTZUNGEN UND TEMPLATES
+    
+    # 6.1: QUELLEN-VALIDIERUNG FÜR ALLE FELDER (nicht nur Restaurationskosten)
+    # Erkenne ungültige Quellen-Patterns in JEDEM Feldwert
+    invalid_source_patterns = [
+        # Schätzungsbasierte Quellen
+        r'fachwissen', r'allgemeines fachwissen', r'schätzung', r'geschätzt',
+        r'typisch', r'typical', r'üblich', r'usual', r'standard',
+        r'based on', r'basierend auf', r'estimated', r'estimate',
+        r'generic_source:', r'general knowledge', r'expert knowledge',
+        
+        # Annahmen und Vermutungen
+        r'angenommen', r'assumed', r'vermutlich', r'probably',
+        r'wahrscheinlich', r'likely', r'möglich', r'possible',
+        r'ca\.', r'circa', r'approximately', r'ungefähr', r'etwa',
+        
+        # Vergleichsbasierte Werte
+        r'ähnlich wie', r'similar to', r'vergleichbar mit', r'comparable to',
+        r'wie bei anderen minen', r'like other mines', r'branchenüblich',
+        r'industry standard', r'industry typical', r'branchen-durchschnitt',
+        
+        # AI-generierte Ausreden
+        r'ohne spezifische daten', r'without specific data',
+        r'keine genauen angaben', r'no precise information',
+        r'mangels konkreter daten', r'due to lack of concrete data'
+    ]
+    
+    # Prüfe JEDEN Feldwert auf ungültige Quellen-Patterns
+    for pattern in invalid_source_patterns:
+        if re.search(pattern, value_lower, re.IGNORECASE):
+            logger.error(f"[RULE 10 VIOLATION] Ungültige Quelle in Feld '{field}': '{value_str[:100]}...' → BLOCKIERT")
+            return True
+    
+    # 6.2: SPEZIFISCHE VALIDIERUNG FÜR KRITISCHE FELDER
     if field == 'Restaurationskosten':
+        # Erkenne identische runde Beträge nur bei fehlender echter Quelle
+        suspicious_round_amounts = [
+            r'50\.0\s*millionen?\s*(cad|usd)',
+            r'150\.0\s*millionen?\s*(cad|usd)', 
+            r'20\.0\s*millionen?\s*(cad|usd)',
+            r'15\.0\s*millionen?\s*(cad|usd)',
+            r'75\.0\s*millionen?\s*(cad|usd)',
+            r'200\.0\s*millionen?\s*(cad|usd)'
+        ]
+        
+        for pattern in suspicious_round_amounts:
+            if re.search(pattern, value_lower, re.IGNORECASE):
+                # Prüfe ob echte Dokumentenquelle vorhanden
+                if not re.search(r'(annual report|ni.*43.*101|feasibility|environmental|sedar|edgar|gestim)', value_lower, re.IGNORECASE):
+                    logger.warning(f"[TEMPLATE DETECTION] Verdächtig runder Betrag ohne echte Quelle: '{value_str}' → ABGELEHNT")
+                    return True
+        
         # Unrealistic low values that are obvious placeholders
         if re.match(r'^\$?\s*[0-9]{1,2}(\.[0-9])?\s*(million|mio|usd|cad)?$', value_lower):
             logger.warning(f"[TEMPLATE DETECTION] Unrealistische Restaurationskosten: '{value_str}'")
             return True
+    
+    elif field in ['x-Koordinate', 'y-Koordinate']:
+        # 6.3: Koordinaten-Validierung
+        # Blockiere verdächtig gerundete Koordinaten
+        if re.match(r'^[\-\+]?\d{1,3}\.0+$', value_str):  # z.B. "49.000000", "-70.000000"
+            logger.warning(f"[TEMPLATE DETECTION] Verdächtig gerundete Koordinate: '{value_str}' → ABGELEHNT")
+            return True
+        
+        # Prüfe auf realistische Dezimalstellen (mindestens 3)
+        decimal_match = re.search(r'\.(\d+)', value_str)
+        if decimal_match and len(decimal_match.group(1)) < 3:
+            logger.warning(f"[TEMPLATE DETECTION] Zu wenig Dezimalstellen für echte Koordinate: '{value_str}' → ABGELEHNT")
+            return True
+    
+    elif field in ['Eigentümer', 'Betreiber']:
+        # 6.4: Eigentümer/Betreiber-Validierung
+        generic_company_patterns = [
+            r'^mining company$', r'^bergbauunternehmen$', r'^mining corp$',
+            r'^the company$', r'^das unternehmen$', r'^operator$', r'^betreiber$',
+            r'^owner$', r'^eigentümer$', r'^mining firm$', r'^local company$',
+            r'^private company$', r'^staatlicher betreiber$'
+        ]
+        
+        for pattern in generic_company_patterns:
+            if re.match(pattern, value_lower):
+                logger.warning(f"[TEMPLATE DETECTION] Generischer Firmenname: '{value_str}' → ABGELEHNT")
+                return True
     elif field in ['Betreiber', 'Eigentümer']:
         # Field labels appearing as values (AI model confusion)
         if value_lower in ['betreiber', 'eigentümer', 'owner', 'operator', 'company', 'unternehmen']:
@@ -510,6 +587,161 @@ def post_process_data(data: Dict[str, str], content: str, country_config: Dict) 
             data[field] = normalize_field_value(value)
     
     return data
+
+
+def extract_core_value(value: str, field: str) -> str:
+    """
+    Extrahiert atomare Kernwerte aus Sätzen/Beschreibungen
+    
+    Args:
+        value: Roher extrahierter Wert (kann Satz sein)
+        field: Feldname für kontextspezifische Extraktion
+        
+    Returns:
+        Atomarer Kernwert (nur das Wesentliche)
+    """
+    if not value or not isinstance(value, str):
+        return ""
+    
+    value = value.strip()
+    
+    # Entferne Quellenreferenzen [1,2,3] ZUERST
+    value = re.sub(r'\s*\[\d+(?:,\d+)*\]', '', value)
+    
+    field_lower = field.lower()
+    
+    # MINENTYP: Extrahiere nur den Kerntyp
+    if 'minentyp' in field_lower or 'mine type' in field_lower:
+        # Suche nach Kernbegriffen
+        underground_terms = ['untertage', 'underground', 'souterrain', 'untertagebau', 'unterirdisch', 'subterranean']
+        openpit_terms = ['open-pit', 'openpit', 'open pit', 'tagebau', 'à ciel ouvert', 'surface', 'oberflächenabbau']
+        
+        value_lower = value.lower()
+        
+        # Prüfe auf Underground
+        if any(term in value_lower for term in underground_terms):
+            return 'Untertage'
+        
+        # Prüfe auf Open-Pit
+        if any(term in value_lower for term in openpit_terms):
+            return 'Tagebau'
+        
+        # Hybrid falls beide erwähnt
+        underground_found = any(term in value_lower for term in underground_terms)
+        openpit_found = any(term in value_lower for term in openpit_terms)
+        if underground_found and openpit_found:
+            return 'Hybrid'
+        
+        # Fallback: Ersten Begriff nehmen
+        return value.split('.')[0].split(',')[0].strip().title()
+    
+    # ROHSTOFF: Extrahiere Mineralnamen
+    elif 'rohstoff' in field_lower or 'commodity' in field_lower:
+        value_lower = value.lower()
+        
+        # Häufige Rohstoffe direkt erkennen
+        mineral_mapping = {
+            'gold': 'Gold', 'or': 'Gold', 'oro': 'Gold',
+            'copper': 'Kupfer', 'cuivre': 'Kupfer', 'cobre': 'Kupfer',
+            'silver': 'Silber', 'argent': 'Silber', 'plata': 'Silber',
+            'iron': 'Eisenerz', 'fer': 'Eisenerz', 'hierro': 'Eisenerz',
+            'coal': 'Kohle', 'charbon': 'Kohle', 'carbón': 'Kohle',
+            'zinc': 'Zink', 'nickel': 'Nickel', 'lead': 'Blei',
+            'uranium': 'Uran', 'lithium': 'Lithium', 'cobalt': 'Kobalt'
+        }
+        
+        # Suche nach Mineraliennamen im Text
+        for mineral_key, mineral_name in mineral_mapping.items():
+            if mineral_key in value_lower:
+                return mineral_name
+        
+        # Falls nichts gefunden, ersten sinnvollen Begriff nehmen
+        # Entferne häufige Phrasen
+        cleaned = re.sub(r'(is known for|production|mining|abbau|förderung)', '', value_lower)
+        words = cleaned.split()
+        for word in words:
+            word_clean = re.sub(r'[^a-zA-Z]', '', word)
+            if len(word_clean) >= 3 and word_clean not in ['the', 'for', 'and', 'von', 'der', 'die', 'das']:
+                return word_clean.title()
+        
+        return value.split('.')[0].split(',')[0].strip().title()
+    
+    # REGION: Extrahiere Hauptregion
+    elif 'region' in field_lower:
+        value_lower = value.lower()
+        
+        # Quebec-spezifische Behandlung
+        quebec_indicators = ['quebec', 'québec', 'james bay', 'eeyou', 'nord-du-québec', 'nord-québec']
+        if any(indicator in value_lower for indicator in quebec_indicators):
+            return 'Quebec'
+        
+        # Ontario, British Columbia, etc.
+        if 'ontario' in value_lower:
+            return 'Ontario'
+        if 'british columbia' in value_lower or 'bc' in value_lower:
+            return 'British Columbia'
+        if 'alberta' in value_lower:
+            return 'Alberta'
+        
+        # Allgemeine Bereinigung: Ersten Hauptbegriff nehmen
+        # Entferne geografische Beschreibungen
+        parts = value.split(',')[0].split('(')[0].split('/')[0].strip()
+        return parts.title()
+    
+    # COUNTRY: Normalisiere zu Standardnamen
+    elif 'country' in field_lower or 'land' in field_lower:
+        value_lower = value.lower().strip()
+        
+        # Canada → Kanada Mapping
+        if value_lower in ['canada', 'can', 'canadá']:
+            return 'Kanada'
+        if value_lower in ['kanada']:
+            return 'Kanada'
+        
+        # Weitere Länder
+        if value_lower in ['australia', 'aus']:
+            return 'Australien'
+        if value_lower in ['united states', 'usa', 'us', 'united states of america']:
+            return 'USA'
+        if value_lower in ['chile']:
+            return 'Chile'
+        if value_lower in ['south africa', 'südafrika', 'rsa']:
+            return 'Südafrika'
+        
+        # Fallback: Title Case
+        return value.split(',')[0].strip().title()
+    
+    # STATUS: Normalisiere Aktivitätsstatus
+    elif 'status' in field_lower or 'aktivität' in field_lower:
+        value_lower = value.lower()
+        
+        if any(term in value_lower for term in ['aktiv', 'active', 'actif', 'operating', 'operational']):
+            return 'Aktiv'
+        if any(term in value_lower for term in ['geschlossen', 'closed', 'fermé', 'shutdown', 'stillgelegt']):
+            return 'Geschlossen'
+        if any(term in value_lower for term in ['geplant', 'planned', 'planifié']):
+            return 'Geplant'
+        if any(term in value_lower for term in ['entwicklung', 'development', 'développement']):
+            return 'Entwicklung'
+        
+        return value.split('.')[0].split(',')[0].strip().title()
+    
+    # EIGENTÜMER/BETREIBER: Firmenname bereinigen
+    elif 'eigentümer' in field_lower or 'betreiber' in field_lower or 'owner' in field_lower or 'operator' in field_lower:
+        # Entferne übliche Zusätze und Beschreibungen
+        cleaned = re.sub(r'\s*\([^)]*\)\s*', ' ', value)  # Klammern entfernen
+        cleaned = re.sub(r'\s+(Inc\.?|Corporation|Corp\.?|Ltd\.?|Limited|LLC|SA|GmbH|AG)\s*$', '', cleaned, flags=re.I)
+        cleaned = re.sub(r'(seit|since|ab|from)\s+\d{4}.*', '', cleaned, flags=re.I)  # Jahresangaben entfernen
+        
+        # Ersten Hauptfirmennamen nehmen
+        parts = cleaned.split(',')[0].split('/')[0].split('(')[0].strip()
+        return parts.title()
+    
+    # DEFAULT: Ersten sinnvollen Teil nehmen
+    else:
+        # Entferne Quellenreferenzen, Klammern am Ende, nehme ersten Satz/Teil
+        cleaned = value.split('.')[0].split(',')[0].split('(')[0].strip()
+        return cleaned
 
 
 def clean_field_value(value: str, field: str) -> str:

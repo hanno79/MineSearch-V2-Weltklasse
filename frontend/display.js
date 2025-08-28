@@ -151,8 +151,14 @@ async function loadResults(sortBy = 'search_timestamp', order = 'desc') {
  */
 async function loadConsolidatedResults(sortBy = 'mine_name', order = 'asc') {
     console.log(`📈 [CONSOLIDATED] Loading consolidated results with sort: ${sortBy}, order: ${order}`);
+    console.log(`🔧 [CONSOLIDATED] API_BASE_URL: ${window.API_BASE_URL}`);
     
     const targetElement = document.getElementById('consolidated-table-container');
+    if (!targetElement) {
+        console.error('❌ [CONSOLIDATED] consolidated-table-container element not found!');
+        return;
+    }
+    
     showEnhancedLoadingState(targetElement, 'Lade konsolidierte Ergebnisse...', true);
     
     try {
@@ -163,33 +169,64 @@ async function loadConsolidatedResults(sortBy = 'mine_name', order = 'asc') {
             days_back: '30'
         });
         
-        const response = await fetch(`${window.API_BASE_URL}/api/consolidated/results?${params}`);
+        const url = `${window.API_BASE_URL}/api/consolidated/results?${params}`;
+        console.log(`🌐 [CONSOLIDATED] Fetching from: ${url}`);
+        
+        const response = await fetch(url, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
+            }
+        });
+        
+        console.log(`📡 [CONSOLIDATED] Response status: ${response.status} ${response.statusText}`);
         
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            const errorText = await response.text();
+            console.error(`❌ [CONSOLIDATED] Server error: ${errorText}`);
+            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
         }
         
         const data = await response.json();
-        console.log(`📊 [CONSOLIDATED] Received data:`, data);
+        console.log(`📊 [CONSOLIDATED] Received data structure:`, {
+            success: data.success,
+            hasData: !!data.data,
+            dataKeys: data.data ? Object.keys(data.data) : [],
+            consolidatedResultsCount: data.data?.consolidated_results?.length || 0
+        });
         
-        if (data.success && data.data) {
+        if (data.success && data.data && data.data.consolidated_results) {
             displayConsolidatedResults(data.data, sortBy, order);
             
-            const totalResults = data.data.consolidated_results ? data.data.consolidated_results.length : 0;
+            const totalResults = data.data.consolidated_results.length;
             showNotification(`✅ Konsolidierte Ergebnisse geladen: ${totalResults} Minen`, 'success');
         } else {
-            throw new Error(data.error || 'Keine konsolidierten Daten verfügbar');
+            const errorMsg = data.error || data.message || 'Keine konsolidierten Daten verfügbar';
+            console.warn(`⚠️ [CONSOLIDATED] No data available: ${errorMsg}`);
+            
+            targetElement.innerHTML = createErrorHTML(
+                'Keine konsolidierten Ergebnisse verfügbar',
+                'Es wurden noch keine Suchergebnisse gespeichert. Führen Sie zunächst einige Suchen durch.'
+            );
+            
+            showNotification(`ℹ️ ${errorMsg}`, 'info');
         }
         
     } catch (error) {
         console.error('❌ [CONSOLIDATED] Loading error:', error);
+        console.error('❌ [CONSOLIDATED] Error stack:', error.stack);
+        
+        let errorMessage = error.message;
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            errorMessage = 'Verbindung zum Server fehlgeschlagen. Überprüfen Sie, ob der Service läuft.';
+        }
         
         targetElement.innerHTML = createErrorHTML(
             'Fehler beim Laden der konsolidierten Ergebnisse',
-            error.message
+            errorMessage
         );
         
-        showNotification(`❌ Konsolidierte Ergebnisse konnten nicht geladen werden: ${error.message}`, 'error');
+        showNotification(`❌ Konsolidierte Ergebnisse konnten nicht geladen werden: ${errorMessage}`, 'error');
     }
 }
 
@@ -1260,9 +1297,12 @@ window.loadEnhancedSourceDetails = loadEnhancedSourceDetails;
 async function exportConsolidatedCSV() {
     console.log('📊 [CSV-EXPORT] Starting CSV export for consolidated results...');
     
+    // Variable außerhalb des try-Blocks deklarieren für finally-Block Zugriff
+    let exportBtn = null;
+    
     try {
         // Zeige Loading-Status
-        const exportBtn = document.getElementById('csv-export-btn') || document.querySelector('button[onclick="exportConsolidatedCSV()"]');
+        exportBtn = document.getElementById('csv-export-btn') || document.querySelector('button[onclick="exportConsolidatedCSV()"]');
         if (exportBtn) {
             exportBtn.textContent = '⏳ Exportiere...';
             exportBtn.disabled = true;

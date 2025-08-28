@@ -217,7 +217,24 @@ WICHTIG: Lieber ein leeres Feld als einen falschen Wert!"""
                 country = options.get('country')
                 
                 extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
-                sources = extract_sources_from_content(content)
+                
+                # PHASE 1: Verwende discovered_sources als Basis-Quellen (wie Abacus Provider)
+                sources = []
+                for source in discovered_sources:
+                    sources.append({
+                        'url': source.get('url', ''),
+                        'title': source.get('title', source.get('url', '')),
+                        'type': source.get('type', 'discovered'),
+                        'reliability': source.get('reliability_score'),
+                        'searched': True  # Markiere als durchsucht
+                    })
+                
+                # PHASE 2: Zusätzliche Quellen aus Content
+                sources_from_content = extract_sources_from_content(content)
+                for source in sources_from_content:
+                    # Prüfe ob schon in discovered_sources
+                    if not any(ds.get('url') == source.get('url') for ds in discovered_sources):
+                        sources.append(source)
                 
                 # CONSOLIDATION 09.08.2025: validation_service entfernt - direkter Return
                 validated_data = extracted_data['data']  # Keine zusätzliche Validierung mehr nötig
@@ -373,58 +390,81 @@ QUELLEN ZUM ANALYSIEREN:
         return await self.search(query, model_id, options)
     
     def get_system_prompt(self, options: Dict[str, Any]) -> str:
-        """System-Prompt für Perplexity"""
+        """
+        RULE 10 COMPLIANCE 26.08.2025: Verschärfter System-Prompt für Perplexity
+        STRIKT VERBOTEN: Schätzungen, Allgemeines Fachwissen, Template-Daten
+        """
         currency = options.get('currency', 'USD')
         
         # ÄNDERUNG 05.07.2025: Angepasster Prompt für Source Sharing Phase
         if options.get('phase') == 'source_analysis':
             return self._get_source_analysis_prompt(options)
         
-        return f"""Du bist ein Mining-Recherche-Experte. Antworte auf Deutsch mit STRUKTURIERTEN DATEN im folgenden Format:
+        # Importiere spezialisierte Anti-Template-Anweisungen
+        from minesearch.specialized_prompts_impl import SpecializedPrompts
+        universal_instructions = SpecializedPrompts.get_universal_anti_template_instructions()
+        
+        return f"""🚫 RULE 10 COMPLIANCE - PERPLEXITY ANTI-ESTIMATION RESEARCHER 🚫
 
-**VOLLSTÄNDIGE DATEN FÜR [MINENNAME] - ALLE 18 FELDER AUSFÜLLEN:**
-- Name: [exakter Name] [Quelle: URL/Dokument]
-- Country: [Land] [Quelle: URL/Dokument]
-- Region: [Region/Provinz] [Quelle: URL/Dokument]
-- Eigentümer: [Eigentümer der Mine oder LEER] [Quelle: URL/Dokument]
-- Betreiber: [Betreiber/Operator - NIEMALS Koordinaten hier angeben! oder LEER] [Quelle: URL/Dokument]
-- x-Koordinate: [Latitude in Dezimalgrad oder LEER] [Quelle: URL/Dokument]
-- y-Koordinate: [Longitude in Dezimalgrad oder LEER] [Quelle: URL/Dokument]
-- Aktivitätsstatus: [aktiv/geschlossen/geplant oder LEER] [Quelle: URL/Dokument]
-- Restaurationskosten: [Betrag in {currency}$ oder LEER] [Quelle: URL/Dokument]
-- Jahr der Aufnahme der Kosten: [Jahr der Kostenschätzung oder LEER] [Quelle: URL/Dokument]
-- Jahr der Erstellung des Dokumentes: [Jahr des Reports/Studies oder LEER] [Quelle: URL/Dokument]
-- Rohstoffabbau: [NUR spezifische Rohstoffe wie 'Gold', 'Kupfer', 'Eisenerz' oder LEER - NIEMALS Template-Strukturen] [Quelle: URL/Dokument]
-- Minentyp: [NUR spezifische Werte wie 'Untertage', 'Open-Pit', 'Hybrid' oder LEER - NIEMALS Template-Strukturen] [Quelle: URL/Dokument]
-- Produktionsstart: [Jahr oder LEER] [Quelle: URL/Dokument]
-- Produktionsende: [Jahr oder 'aktiv' oder LEER] [Quelle: URL/Dokument]
-- Fördermenge/Jahr: [Menge/Jahr mit Einheit oder LEER] [Quelle: URL/Dokument]
-- Fläche der Mine in qkm: [Fläche in km² oder LEER] [Quelle: URL/Dokument]
-- Quellenangaben: [Referenzen oder 'Allgemeines Fachwissen'] [Quelle: URL/Dokument]
+Du bist ein Mining-Recherche-Experte mit Zugang zu ECHTEN Web-Quellen und Dokumenten.
 
-**WICHTIG FÜR RESTAURATIONSKOSTEN:**
-Suche nach: ARO, closure costs, environmental liability, restoration provision, rehabilitation costs, 
-decommissioning costs, closure bond, financial assurance, pasivos ambientales, costos de cierre,
-biaya reklamasi, jaminan reklamasi. Gib ALLE gefundenen Beträge an, auch wenn in verschiedenen Währungen!
+{universal_instructions}
 
-**QUELLEN-SEKTION:**
-[Liste ALLE verwendeten Quellen nummeriert auf]
-[1] URL oder Dokumentname
-[2] URL oder Dokumentname
-[3] URL oder Dokumentname
-... etc.
+**KRITISCHE REGEL 10 COMPLIANCE FÜR PERPLEXITY:**
+===============================================
 
-**KRITISCHE QUELLEN-REGELN:**
-1. JEDE einzelne Information MUSS mit [Quelle: ...] gekennzeichnet werden!
-2. Verwende [Quelle: Perplexity Search] wenn keine spezifische URL verfügbar ist
-3. PRIORISIERTE QUELLEN-SUCHE nach Tiers (siehe Dokumentation)
-4. WICHTIG: Lasse Felder LEER wenn keine Daten gefunden - KEINE Platzhalter!
+ABSOLUT VERBOTEN - NIEMALS VERWENDEN:
+❌ "Allgemeines Fachwissen" oder "General knowledge" als Quelle
+❌ "Perplexity Search" ohne spezifische URL
+❌ Schätzungen oder Vermutungen ("based on similar mines")
+❌ Template-Werte wie "50.0 Million", "100.0 Million"
+❌ Gerundete Koordinaten ohne ausreichende Präzision
+❌ Platzhalter-Unternehmen ohne echte Verifikation
 
-**VERBOTENE PLATZHALTER:**
-- NIEMALS "$1 CAD", "$2 CAD", "$3 CAD" oder ähnliche Minimalwerte verwenden
-- KEINE "k.A.", "n/a", "-", "unbekannt", "nicht gefunden" etc.
-- Bei Restaurationskosten: NUR realistische Beträge (mind. $10,000) oder LEER lassen
-- Wenn keine Daten gefunden: Feld einfach LEER lassen"""
+NUR ERLAUBT - Dokumentierte Web-Fakten:
+✅ Spezifische URLs mit nachprüfbaren Daten
+✅ Company Reports mit direkten Zitaten
+✅ Regierungswebsites mit Primärdaten
+✅ SEC Filings mit verifizierten Zahlen
+✅ Bei Unsicherheit: LEER LASSEN ("") - NIEMALS schätzen!
+
+**DATENFELDER FÜR [MINENNAME] - NUR ECHTE WEB-DATEN:**
+- Name: [EXAKTER Name aus Webquelle oder leer]
+- Country: [Land aus offizieller Website oder leer]
+- Region: [Region aus Dokumenten oder leer]
+- Eigentümer: [Aus Unternehmenswebsite oder leer]
+- Betreiber: [Aus Betreiberwebsite oder leer]
+- x-Koordinate: [GPS aus Maps/Berichten mit 4+ Dezimalstellen oder leer]
+- y-Koordinate: [GPS aus Maps/Berichten mit 4+ Dezimalstellen oder leer]
+- Aktivitätsstatus: [Aus aktueller Quelle oder leer]
+- Restaurationskosten: [Aus Finanzberichten in {currency}$ oder leer]
+- Jahr der Aufnahme der Kosten: [Aus Kostenbericht oder leer]
+- Jahr der Erstellung des Dokumentes: [Dokumentdatum oder leer]
+- Rohstoffabbau: [Aus Produktionsberichten oder leer]
+- Minentyp: [Aus technischen Dokumenten oder leer]
+- Produktionsstart: [Aus historischen Berichten oder leer]
+- Produktionsende: [Aus aktuellen Quellen oder leer]
+- Fördermenge/Jahr: [Aus Produktionsstatistiken oder leer]
+- Fläche der Mine in qkm: [Aus Genehmigungsdokumenten oder leer]
+- Quellenangaben: [NUR spezifische URLs - NIEMALS "Allgemeines Fachwissen"]
+
+**QUELLEN-ANFORDERUNGEN:**
+1. JEDE Information mit spezifischer URL [Quelle: https://...]
+2. NIEMALS generische Quellenangaben verwenden
+3. Bei fehlendem Link: Information NICHT verwenden
+4. Primärquellen bevorzugen (Unternehmensberichte, Regierung)
+
+**RESTAURATIONSKOSTEN-SUCHE:**
+Suche nach: ARO, closure costs, environmental liability, rehabilitation costs,
+decommissioning provision. NUR aus verifizierten Finanzberichten übernehmen!
+
+**SELBST-VALIDIERUNG vor jeder Antwort:**
+- ❓ Hat JEDER Wert eine spezifische URL-Quelle?
+- ❓ Habe ich irgendwo geschätzt statt recherchiert?
+- ❓ Sind alle Koordinaten präzise genug (4+ Nachkommastellen)?
+- ❓ Sind alle Kosten aus echten Berichten?
+
+WENN KEINE ECHTE QUELLE: LEER LASSEN ("")"""
     
     def _get_source_analysis_prompt(self, options: Dict[str, Any]) -> str:
         """Spezieller System-Prompt für Source Sharing Phase 2"""

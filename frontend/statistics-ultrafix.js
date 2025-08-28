@@ -334,4 +334,107 @@ window.loadStatistics = loadStatisticsULTRAFIX;
 window.loadModelStatistics = loadStatisticsULTRAFIX;  // KRITISCHER FIX: Tab-Autoloader verwendet loadModelStatistics
 window.loadStatisticsULTRAFIX = loadStatisticsULTRAFIX;
 
+/**
+ * PHASE 2 FIX: Zeigt Model-Performance von Search-Ergebnissen im Statistik-Tab an
+ */
+function displaySearchModelPerformance(searchResults) {
+    console.log('📊 [SEARCH-PERFORMANCE] Displaying search model performance in statistics tab');
+    console.log('📊 [SEARCH-PERFORMANCE] Received results:', searchResults);
+    
+    if (!searchResults || !Array.isArray(searchResults) || searchResults.length === 0) {
+        console.warn('⚠️ [SEARCH-PERFORMANCE] No search results to analyze');
+        return;
+    }
+    
+    // Container für Search-Performance (zusätzlich zu normalen Statistiken)
+    const statsContainer = document.getElementById('statistics-table-container');
+    if (!statsContainer) {
+        console.error('❌ [SEARCH-PERFORMANCE] Statistics container not found');
+        return;
+    }
+    
+    // Erstelle Search-Performance Sektion OBERHALB der normalen Statistiken
+    let searchPerformanceHtml = `
+        <div id="search-performance-section" style="margin-bottom: 24px; padding: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 12px;">
+            <h3 style="margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px;">
+                <span>🔍</span> Search-Session Performance
+                <span style="font-size: 0.8em; opacity: 0.8;">(${searchResults.length} Modell${searchResults.length !== 1 ? 'e' : ''})</span>
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+    `;
+    
+    searchResults.forEach((result, index) => {
+        const modelId = result.model_id || `Modell ${index + 1}`;
+        const success = result.success || false;
+        const data = result.data || {};
+        const error = result.error || '';
+        
+        // Analysiere Felddaten wenn verfügbar
+        let fieldStats = { total: 0, filled: 0, percentage: 0 };
+        if (data && typeof data === 'object') {
+            const fields = Object.keys(data).filter(key => !['mine_name', 'search_timestamp', 'model_used'].includes(key));
+            fieldStats.total = fields.length;
+            fieldStats.filled = fields.filter(key => {
+                const value = data[key];
+                return value && value !== 'Nichts gefunden' && value !== 'X' && value !== '';
+            }).length;
+            fieldStats.percentage = fieldStats.total > 0 ? Math.round((fieldStats.filled / fieldStats.total) * 100) : 0;
+        }
+        
+        const statusColor = success ? '#10b981' : '#ef4444';
+        const statusIcon = success ? '✅' : '❌';
+        
+        searchPerformanceHtml += `
+            <div style="background: rgba(255,255,255,0.15); padding: 16px; border-radius: 8px; backdrop-filter: blur(10px);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                    <h4 style="margin: 0; font-size: 1em;">${statusIcon} ${modelId}</h4>
+                    <span style="padding: 2px 8px; border-radius: 12px; font-size: 0.75em; background: ${statusColor}; color: white;">
+                        ${success ? 'ERFOLG' : 'FEHLER'}
+                    </span>
+                </div>
+                
+                ${success ? `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9em;">
+                        <div>
+                            <strong>📊 Felder gefüllt:</strong><br>
+                            ${fieldStats.filled}/${fieldStats.total} (${fieldStats.percentage}%)
+                        </div>
+                        <div>
+                            <strong>🎯 Vollständigkeit:</strong><br>
+                            <div style="background: rgba(255,255,255,0.2); border-radius: 4px; height: 8px; margin-top: 4px;">
+                                <div style="background: ${fieldStats.percentage > 70 ? '#10b981' : fieldStats.percentage > 40 ? '#f59e0b' : '#ef4444'}; height: 100%; border-radius: 4px; width: ${fieldStats.percentage}%; transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+                    </div>
+                ` : `
+                    <div style="font-size: 0.85em; color: #fecaca;">
+                        <strong>❌ Fehler:</strong> ${error || 'Unbekannter Fehler'}
+                    </div>
+                `}
+            </div>
+        `;
+    });
+    
+    searchPerformanceHtml += `
+            </div>
+            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.2); font-size: 0.85em; opacity: 0.9;">
+                💡 <strong>Tipp:</strong> Diese Daten stammen aus Ihrer letzten Suche und zeigen die Performance der verwendeten Modelle.
+            </div>
+        </div>
+    `;
+    
+    // Füge Search-Performance am Anfang des Statistics-Containers hinzu
+    const existingPerformance = document.getElementById('search-performance-section');
+    if (existingPerformance) {
+        existingPerformance.outerHTML = searchPerformanceHtml;
+    } else {
+        statsContainer.insertAdjacentHTML('afterbegin', searchPerformanceHtml);
+    }
+    
+    console.log('✅ [SEARCH-PERFORMANCE] Search model performance displayed successfully');
+}
+
+// Export der neuen Funktion
+window.displaySearchModelPerformance = displaySearchModelPerformance;
+
 console.log('✅ [STATISTICS-ULTRAFIX] ULTRAFIX module ready - completely new implementation!');

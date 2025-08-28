@@ -60,6 +60,9 @@
     <!-- ÄNDERUNG 22.08.2025: Progressive Model Selection System hinzufügen -->
     <script src="/static/progressive-model-selection.js?v=1.0.0"></script>
     
+    <!-- ÄNDERUNG 27.08.2025: Database Viewer System hinzufügen -->
+    <script src="/static/database-viewer.js?v=1.0.0"></script>
+    
     <!-- Phase 4: Modern CSS Design System with Basic UI Revolution -->
     <link rel="stylesheet" href="/static/style.css?v=4.0.0">
 </head>
@@ -134,6 +137,10 @@
                     <a href="#" class="nav-item" onclick="switchToTab('sources')" data-tab="sources">
                         <span class="nav-icon">📚</span>
                         <span class="nav-label">Quellen</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="switchToTab('database')" data-tab="database">
+                        <span class="nav-icon">🗂️</span>
+                        <span class="nav-label">Datenbank</span>
                     </a>
                 </nav>
                 
@@ -621,6 +628,139 @@ Canadian Malartic,Canada,Gold,Quebec</pre>
                 <div id="field-performance-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; overflow-y: auto;">
                     <div style="background: white; margin: 20px; padding: 30px; border-radius: 8px; max-width: 1400px; margin: 20px auto;">
                         <!-- Field performance details werden hier eingefügt -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Database Viewer Tab -->
+            <section id="database" class="tab-content">
+                <h2>🗂️ Datenbank Viewer</h2>
+                
+                <!-- Database Navigation -->
+                <div class="database-navigation">
+                    <div class="database-tabs">
+                        <!-- Legacy System Tables -->
+                        <div class="tab-group">
+                            <h4 style="margin: 10px 0 5px 0; font-size: 0.85rem; color: #666; text-transform: uppercase;">Legacy System</h4>
+                            <button class="database-tab-btn active" data-table="search_results">
+                                <span class="db-icon">🔍</span>
+                                Suchergebnisse
+                                <span class="db-count" id="count-search_results">(0)</span>
+                            </button>
+                            <button class="database-tab-btn" data-table="sources">
+                                <span class="db-icon">📚</span>
+                                Quellen  
+                                <span class="db-count" id="count-sources">(0)</span>
+                            </button>
+                            <button class="database-tab-btn" data-table="model_statistics_comprehensive">
+                                <span class="db-icon">📊</span>
+                                Modell-Stats
+                                <span class="db-count" id="count-model_statistics_comprehensive">(0)</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Normalized System Tables -->
+                        <div class="tab-group">
+                            <h4 style="margin: 15px 0 5px 0; font-size: 0.85rem; color: #059669; text-transform: uppercase; font-weight: 600;">🆕 Normalized Schema</h4>
+                            <button class="database-tab-btn" data-table="mines_normalized">
+                                <span class="db-icon">⛏️</span>
+                                Minen (Normalized)
+                                <span class="db-count" id="count-mines_normalized">(0)</span>
+                            </button>
+                            <button class="database-tab-btn" data-table="companies">
+                                <span class="db-icon">🏢</span>
+                                Unternehmen
+                                <span class="db-count" id="count-companies">(0)</span>
+                            </button>
+                            <button class="database-tab-btn" data-table="search_results_normalized">
+                                <span class="db-icon">🔍</span>
+                                Suchen (Normalized)
+                                <span class="db-count" id="count-search_results_normalized">(0)</span>
+                            </button>
+                            <button class="database-tab-btn" data-table="mine_data_fields">
+                                <span class="db-icon">📊</span>
+                                Feldwerte (Atomic)
+                                <span class="db-count" id="count-mine_data_fields">(0)</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Other Tables -->
+                        <div class="tab-group">
+                            <h4 style="margin: 15px 0 5px 0; font-size: 0.85rem; color: #666; text-transform: uppercase;">System Tables</h4>
+                            <button class="database-tab-btn" data-table="constraint_log">
+                                <span class="db-icon">⚠️</span>
+                                Validierung
+                                <span class="db-count" id="count-constraint_log">(0)</span>
+                            </button>
+                            <button class="database-tab-btn" data-table="monitoring_events">
+                                <span class="db-icon">📡</span>
+                                Monitoring
+                                <span class="db-count" id="count-monitoring_events">(0)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Controls -->
+                <div class="database-controls">
+                    <div class="db-control-left">
+                        <select id="db-page-limit" class="db-control-select">
+                            <option value="25">25 pro Seite</option>
+                            <option value="50" selected>50 pro Seite</option>
+                            <option value="100">100 pro Seite</option>
+                        </select>
+                        
+                        <div class="db-filter-group">
+                            <select id="db-filter-column" class="db-control-select">
+                                <option value="">Filter Spalte wählen</option>
+                            </select>
+                            <input type="text" id="db-filter-value" placeholder="Filter Wert" class="db-control-input">
+                            <button onclick="applyDatabaseFilter()" class="db-btn-filter">Filter</button>
+                            <button onclick="clearDatabaseFilter()" class="db-btn-clear">Clear</button>
+                        </div>
+                    </div>
+                    
+                    <div class="db-control-right">
+                        <button onclick="refreshCurrentTable()" class="db-btn-refresh">🔄 Refresh</button>
+                        <button onclick="exportCurrentTable()" class="db-btn-export">📥 CSV Export</button>
+                    </div>
+                </div>
+
+                <!-- Table Container -->
+                <div id="database-table-container" class="database-table-container">
+                    <div id="database-loading" class="database-loading">
+                        <div class="loading-spinner"></div>
+                        <p>Lade Datenbank-Tabelle...</p>
+                    </div>
+                    
+                    <div id="database-table-wrapper" style="display: none;">
+                        <table id="database-table" class="database-table">
+                            <thead id="database-table-head">
+                                <!-- Table headers werden hier eingefügt -->
+                            </thead>
+                            <tbody id="database-table-body">
+                                <!-- Table rows werden hier eingefügt -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="database-error" class="database-error" style="display: none;">
+                        <p>Fehler beim Laden der Datenbank-Tabelle</p>
+                        <button onclick="refreshCurrentTable()">Erneut versuchen</button>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <div id="database-pagination" class="database-pagination" style="display: none;">
+                    <div class="pagination-info">
+                        <span id="pagination-info-text">Zeige 1-50 von 1000 Einträgen</span>
+                    </div>
+                    <div class="pagination-controls">
+                        <button id="pagination-prev" class="pagination-btn" onclick="previousPage()">◀ Vorherige</button>
+                        <div class="pagination-pages" id="pagination-pages">
+                            <!-- Page buttons werden hier eingefügt -->
+                        </div>
+                        <button id="pagination-next" class="pagination-btn" onclick="nextPage()">Nächste ▶</button>
                     </div>
                 </div>
             </section>

@@ -13,34 +13,71 @@ sys.path.insert(0, '.')
 
 import csv
 import re
+import os
+import argparse
 from collections import defaultdict
 from pathlib import Path
+from typing import Dict, List, Any, Optional
 
-def analyze_csv_complete():
+def _get_default_csv_path() -> str:
+    """Gibt den Standard-CSV-Pfad zurück"""
+    return "/app/docs/minesearch_ohne_quellenangaben_25082025_korrigiert.csv"
+
+def _get_csv_file_path(csv_file_path: Optional[str] = None) -> str:
     """
-    VOLLSTÄNDIGE CSV-ANALYSE 25.08.2025
-    Analysiert alle Aspekte des CSV auf Probleme und Eigenartigkeiten
+    Bestimmt den CSV-Dateipfad aus verschiedenen Quellen:
+    1. Explizit übergebener Parameter
+    2. Umgebungsvariable CSV_FILE_PATH  
+    3. Standard-Pfad als Fallback
     """
+    if csv_file_path:
+        return csv_file_path
     
-    csv_file = "/app/docs/minesearch_ohne_quellenangaben_25082025_korrigiert.csv"
+    env_path = os.environ.get('CSV_FILE_PATH')
+    if env_path:
+        return env_path
     
-    if not Path(csv_file).exists():
-        print(f"❌ CSV-Datei nicht gefunden: {csv_file}")
-        return
-    
-    print("🔍 VOLLSTÄNDIGE CSV-ANALYSE")
-    print("=" * 50)
-    
-    problems = []
-    statistics = {
+    return _get_default_csv_path()
+
+def _create_default_statistics() -> Dict[str, Any]:
+    """Erstellt eine Standard-Statistik-Struktur für Fehlerfälle"""
+    return {
         'total_rows': 0,
         'empty_fields': defaultdict(int),
         'suspicious_values': defaultdict(list),
         'field_contamination': defaultdict(list),
         'encoding_issues': [],
         'format_inconsistencies': defaultdict(int),
-        'duplicate_columns': []
+        'duplicate_columns': [],
+        'error': None  # Feld für Fehlermeldungen
     }
+
+def analyze_csv_complete(csv_file_path: Optional[str] = None) -> Dict[str, Any]:
+    """
+    VOLLSTÄNDIGE CSV-ANALYSE 25.08.2025
+    Analysiert alle Aspekte des CSV auf Probleme und Eigenartigkeiten
+    
+    Args:
+        csv_file_path: Optionaler Pfad zur CSV-Datei. Falls None, wird der Pfad
+                      aus der Umgebungsvariable CSV_FILE_PATH oder der Standard-Pfad verwendet.
+    
+    Returns:
+        Dict mit Analyseergebnissen und Statistiken
+    """
+    
+    csv_file = _get_csv_file_path(csv_file_path)
+    
+    if not Path(csv_file).exists():
+        print(f"❌ CSV-Datei nicht gefunden: {csv_file}")
+        error_stats = _create_default_statistics()
+        error_stats['error'] = f"CSV-Datei nicht gefunden: {csv_file}"
+        return error_stats
+    
+    print("🔍 VOLLSTÄNDIGE CSV-ANALYSE")
+    print("=" * 50)
+    
+    problems = []
+    statistics = _create_default_statistics()
     
     try:
         with open(csv_file, 'r', encoding='utf-8') as f:
@@ -57,7 +94,8 @@ def analyze_csv_complete():
             header = next(reader, None)
             if not header:
                 problems.append("❌ KRITISCH: Kein Header gefunden!")
-                return
+                statistics['error'] = "Kein Header im CSV gefunden"
+                return statistics
             
             print(f"📋 HEADER-ANALYSE:")
             print(f"   Spalten: {len(header)}")
@@ -133,10 +171,11 @@ def analyze_csv_complete():
     
     except Exception as e:
         problems.append(f"❌ KRITISCHER FEHLER beim CSV-Lesen: {e}")
+        statistics['error'] = f"Kritischer Fehler beim CSV-Lesen: {e}"
     
     # ERGEBNISSE AUSGEBEN
     print(f"\n📊 ANALYSE-ERGEBNISSE:")
-    print(f"   📈 Analysierte Zeilen: {statistics['total_rows']}")
+    print(f"   📈 Analysierte Zeilen: {statistics.get('total_rows', 0)}")
     print(f"   🚨 Gefundene Probleme: {len(problems)}")
     
     # PROBLEME AUFLISTEN
@@ -148,9 +187,9 @@ def analyze_csv_complete():
         print(f"\n✅ Keine kritischen Probleme gefunden!")
     
     # FELDKONTAMINATION
-    if statistics['field_contamination']:
+    if statistics.get('field_contamination'):
         print(f"\n🔴 FELDKONTAMINATION GEFUNDEN:")
-        for field, contaminations in statistics['field_contamination'].items():
+        for field, contaminations in statistics.get('field_contamination', {}).items():
             print(f"   💥 Feld '{field}': {len(contaminations)} Kontaminationen")
             for cont in contaminations[:3]:  # Nur erste 3 zeigen
                 print(f"      - Zeile {cont['row']}: '{cont['value']}'")
@@ -158,9 +197,9 @@ def analyze_csv_complete():
                 print(f"      ... und {len(contaminations)-3} weitere")
     
     # VERDÄCHTIGE WERTE
-    if statistics['suspicious_values']:
+    if statistics.get('suspicious_values'):
         print(f"\n⚠️ VERDÄCHTIGE WERTE:")
-        for field, suspicions in statistics['suspicious_values'].items():
+        for field, suspicions in statistics.get('suspicious_values', {}).items():
             if len(suspicions) > 3:  # Nur Felder mit mehreren verdächtigen Werten
                 print(f"   🔍 Feld '{field}': {len(suspicions)} verdächtige Werte")
                 for susp in suspicions[:2]:
@@ -168,15 +207,15 @@ def analyze_csv_complete():
     
     # LEERE FELDER STATISTIK
     print(f"\n📊 LEERE FELDER (Top 10):")
-    empty_sorted = sorted(statistics['empty_fields'].items(), key=lambda x: x[1], reverse=True)
+    empty_sorted = sorted(statistics.get('empty_fields', {}).items(), key=lambda x: x[1], reverse=True)
     for field, count in empty_sorted[:10]:
-        percentage = (count / statistics['total_rows']) * 100
+        percentage = (count / statistics.get('total_rows', 1)) * 100
         print(f"   📉 {field}: {count} ({percentage:.1f}%)")
     
     # ENCODING-PROBLEME
-    if statistics['encoding_issues']:
+    if statistics.get('encoding_issues'):
         print(f"\n🔤 ENCODING-PROBLEME:")
-        for issue in statistics['encoding_issues'][:5]:
+        for issue in statistics.get('encoding_issues', [])[:5]:
             print(f"   - Zeile {issue['row']}, Feld '{issue['field']}': '{issue['value']}'")
     
     # EMPFEHLUNGEN
@@ -185,15 +224,16 @@ def analyze_csv_complete():
     if "Quellenangaben" in [col.strip() for col in header if col]:
         print(f"   🔧 ENTFERNE redundante 'Quellenangaben' Spalte")
     
-    if statistics['field_contamination']:
+    if statistics.get('field_contamination'):
         print(f"   🛡️ AKTIVIERE Feldkontamination-Schutz (bereits implementiert)")
     
-    if statistics['empty_fields']:
-        most_empty = max(statistics['empty_fields'].items(), key=lambda x: x[1])
-        if most_empty[1] > statistics['total_rows'] * 0.8:
-            print(f"   📉 Feld '{most_empty[0]}' ist zu {(most_empty[1]/statistics['total_rows']*100):.1f}% leer - prüfen ob nötig")
+    empty_fields = statistics.get('empty_fields', {})
+    if empty_fields:
+        most_empty = max(empty_fields.items(), key=lambda x: x[1])
+        if most_empty[1] > statistics.get('total_rows', 1) * 0.8:
+            print(f"   📉 Feld '{most_empty[0]}' ist zu {(most_empty[1]/statistics.get('total_rows', 1)*100):.1f}% leer - prüfen ob nötig")
     
-    if not statistics['field_contamination'] and len(problems) <= 2:
+    if not statistics.get('field_contamination') and len(problems) <= 2:
         print(f"   ✅ CSV-Qualität ist gut - nur kleinere Korrekturen nötig")
     
     return statistics
@@ -283,11 +323,61 @@ def has_encoding_issues(value):
     
     return False
 
+def _parse_arguments() -> argparse.Namespace:
+    """Parst Kommandozeilenargumente"""
+    parser = argparse.ArgumentParser(
+        description="Vollständige CSV-Analyse für Sonderbarkeiten",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Beispiele:
+  python analyze_csv_complete.py
+  python analyze_csv_complete.py --csv-file /pfad/zur/datei.csv
+  CSV_FILE_PATH=/pfad/zur/datei.csv python analyze_csv_complete.py
+
+Priorität der Pfad-Bestimmung:
+  1. --csv-file Argument (höchste Priorität)
+  2. CSV_FILE_PATH Umgebungsvariable  
+  3. Standard-Pfad (niedrigste Priorität)
+        """
+    )
+    
+    parser.add_argument(
+        '--csv-file', '-f',
+        type=str,
+        help=f'Pfad zur CSV-Datei (Standard: {_get_default_csv_path()})'
+    )
+    
+    parser.add_argument(
+        '--show-config',
+        action='store_true',
+        help='Zeigt die aktuelle Konfiguration an und beendet das Programm'
+    )
+    
+    return parser.parse_args()
+
 def main():
     """Hauptfunktion"""
-    statistics = analyze_csv_complete()
+    args = _parse_arguments()
     
-    if statistics and not statistics['field_contamination'] and len(statistics.get('duplicate_columns', [])) == 0:
+    # Konfiguration anzeigen falls gewünscht
+    if args.show_config:
+        csv_file = _get_csv_file_path(args.csv_file)
+        print("🔧 KONFIGURATION:")
+        print(f"   Standard-Pfad: {_get_default_csv_path()}")
+        print(f"   Umgebungsvariable CSV_FILE_PATH: {os.environ.get('CSV_FILE_PATH', '(nicht gesetzt)')}")
+        print(f"   Kommandozeilen-Argument: {args.csv_file or '(nicht gesetzt)'}")
+        print(f"   Verwendeter Pfad: {csv_file}")
+        print(f"   Datei existiert: {'✅ Ja' if Path(csv_file).exists() else '❌ Nein'}")
+        return
+    
+    # Hauptanalyse durchführen
+    statistics = analyze_csv_complete(args.csv_file)
+    
+    # Prüfe auf kritische Fehler
+    if statistics.get('error'):
+        print(f"\n❌ CSV-ANALYSE FEHLGESCHLAGEN - Kritischer Fehler aufgetreten!")
+        exit(1)
+    elif not statistics.get('field_contamination') and len(statistics.get('duplicate_columns', [])) == 0:
         print(f"\n🎉 CSV-ANALYSE ERFOLGREICH - Keine kritischen Probleme!")
         exit(0)
     else:

@@ -29,6 +29,23 @@ class Source(Base):
     source_type = Column(String(50), nullable=False, default='unknown')  # government, exchange, industry, database, document
     reliability_score = Column(Float, nullable=False, default=50.0)
     
+    # ÄNDERUNG 27.08.2025: Erweiterte Felder für Sequential Orchestrator
+    # Akkumulations-Tracking
+    discovery_count = Column(Integer, nullable=False, default=1)  # Wie oft wurde diese Quelle entdeckt
+    first_discovered_by = Column(String(100), nullable=True)  # Modell das diese Quelle zuerst fand
+    discovery_models = Column(JSON, nullable=True)  # Liste aller Modelle die diese Quelle fanden
+    last_discovery_session = Column(String(100), nullable=True, index=True)  # Letzte Session die diese Quelle fand
+    
+    # Qualitätsbewertung für Akkumulation
+    cumulative_quality_score = Column(Float, nullable=False, default=0.0)  # Akkumulierte Qualitätsbewertung
+    field_specialization = Column(JSON, nullable=True)  # Welche Felder diese Quelle gut abdeckt
+    mine_specialization = Column(JSON, nullable=True)  # Für welche Minen diese Quelle besonders gut ist
+    
+    # Verwendungs-Statistiken für Sequential Search
+    times_used_in_field_search = Column(Integer, nullable=False, default=0)
+    successful_field_extractions = Column(Integer, nullable=False, default=0)
+    field_extraction_success_rate = Column(Float, nullable=False, default=0.0)
+    
     # Zugriffs-Statistiken
     last_successful_access = Column(DateTime, nullable=True)
     last_attempted_access = Column(DateTime, nullable=True)
@@ -47,6 +64,9 @@ class Source(Base):
     __table_args__ = (
         Index('idx_country_region', 'country', 'region'),
         Index('idx_source_type_score', 'source_type', 'reliability_score'),
+        # ÄNDERUNG 27.08.2025: Neue Indizes für Sequential Orchestrator
+        Index('idx_source_discovery_session', 'last_discovery_session', 'discovery_count'),
+        Index('idx_source_quality_usage', 'cumulative_quality_score', 'times_used_in_field_search'),
     )
     
     def to_dict(self) -> Dict[str, Any]:
@@ -67,7 +87,18 @@ class Source(Base):
             'typical_content_types': self.typical_content_types or [],
             'metadata': self.extra_metadata or {},
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            # ÄNDERUNG 27.08.2025: Neue Felder für Sequential Orchestrator
+            'discovery_count': self.discovery_count,
+            'first_discovered_by': self.first_discovered_by,
+            'discovery_models': self.discovery_models or [],
+            'last_discovery_session': self.last_discovery_session,
+            'cumulative_quality_score': self.cumulative_quality_score,
+            'field_specialization': self.field_specialization or {},
+            'mine_specialization': self.mine_specialization or {},
+            'times_used_in_field_search': self.times_used_in_field_search,
+            'successful_field_extractions': self.successful_field_extractions,
+            'field_extraction_success_rate': self.field_extraction_success_rate
         }
     
     def update_access(self, success: bool, content_type: Optional[str] = None):
@@ -152,6 +183,136 @@ class Source(Base):
         
         # Stelle sicher, dass Score zwischen 0 und 100 liegt
         return min(100.0, max(0.0, score))
+    
+    def update_discovery_tracking(
+        self,
+        model_id: str,
+        session_id: str,
+        is_new_discovery: bool = False
+    ):
+        """
+        ÄNDERUNG 27.08.2025: Update Discovery-Tracking für Sequential Orchestrator
+        
+        Args:
+            model_id: ID des Modells das diese Quelle entdeckt hat
+            session_id: ID der Discovery-Session
+            is_new_discovery: Ist das die erste Entdeckung dieser Quelle?
+        """
+        # Erste Entdeckung
+        if is_new_discovery or not self.first_discovered_by:
+            self.first_discovered_by = model_id
+            self.discovery_models = [model_id]
+            self.discovery_count = 1
+        else:
+            # Weitere Entdeckungen
+            if self.discovery_models is None:
+                self.discovery_models = []
+            
+            if model_id not in self.discovery_models:
+                self.discovery_models.append(model_id)
+            
+            self.discovery_count += 1
+        
+        # Update session tracking
+        self.last_discovery_session = session_id
+    
+    def update_field_extraction_stats(self, field_name: str, success: bool, quality_score: float = 0.0):
+        """
+        ÄNDERUNG 27.08.2025: Update Field Extraction Statistics
+        
+        Args:
+            field_name: Name des extrahierten Feldes
+            success: War die Extraktion erfolgreich?
+            quality_score: Qualitätsbewertung der Extraktion (0.0-100.0)
+        """
+        self.times_used_in_field_search += 1
+        
+        if success:
+            self.successful_field_extractions += 1
+            
+            # Update field specialization
+            if self.field_specialization is None:
+                self.field_specialization = {}
+            
+            current_score = self.field_specialization.get(field_name, 0.0)
+            # Gewichteter Durchschnitt der Qualitätsbewertungen
+            field_count = self.field_specialization.get(f"{field_name}_count", 0) + 1
+            new_score = ((current_score * (field_count - 1)) + quality_score) / field_count
+            
+            self.field_specialization[field_name] = new_score
+            self.field_specialization[f"{field_name}_count"] = field_count
+        
+        # Update success rate
+        self.field_extraction_success_rate = (
+            (self.successful_field_extractions / self.times_used_in_field_search * 100)
+            if self.times_used_in_field_search > 0 else 0.0
+        )
+        
+        # Update cumulative quality score
+        if quality_score > 0:
+            current_cumulative = self.cumulative_quality_score * (self.times_used_in_field_search - 1)
+            self.cumulative_quality_score = (current_cumulative + quality_score) / self.times_used_in_field_search
+    
+    def update_mine_specialization(self, mine_name: str, effectiveness_score: float):
+        """
+        ÄNDERUNG 27.08.2025: Update Mine Specialization Tracking
+        
+        Args:
+            mine_name: Name der Mine
+            effectiveness_score: Effektivitätsbewertung für diese Mine (0.0-100.0)
+        """
+        if self.mine_specialization is None:
+            self.mine_specialization = {}
+        
+        # Gewichteter Durchschnitt der Effektivitätsbewertungen
+        current_score = self.mine_specialization.get(mine_name, 0.0)
+        current_count = self.mine_specialization.get(f"{mine_name}_count", 0) + 1
+        new_score = ((current_score * (current_count - 1)) + effectiveness_score) / current_count
+        
+        self.mine_specialization[mine_name] = new_score
+        self.mine_specialization[f"{mine_name}_count"] = current_count
+    
+    def get_quality_for_field(self, field_name: str) -> float:
+        """
+        ÄNDERUNG 27.08.2025: Ermittle Qualitätsbewertung für spezifisches Feld
+        
+        Returns:
+            Qualitätsscore für das angegebene Feld (0.0-100.0)
+        """
+        if not self.field_specialization:
+            return self.reliability_score  # Fallback auf allgemeine Zuverlässigkeit
+        
+        field_score = self.field_specialization.get(field_name, 0.0)
+        if field_score > 0:
+            return field_score
+        
+        # Fallback: Durchschnitt aller Feld-Scores oder allgemeine Zuverlässigkeit
+        field_scores = [v for k, v in self.field_specialization.items() if not k.endswith('_count') and v > 0]
+        if field_scores:
+            return sum(field_scores) / len(field_scores)
+        
+        return self.reliability_score
+    
+    def get_effectiveness_for_mine(self, mine_name: str) -> float:
+        """
+        ÄNDERUNG 27.08.2025: Ermittle Effektivität für spezifische Mine
+        
+        Returns:
+            Effektivitätsscore für die angegebene Mine (0.0-100.0)
+        """
+        if not self.mine_specialization:
+            return self.reliability_score  # Fallback auf allgemeine Zuverlässigkeit
+        
+        mine_score = self.mine_specialization.get(mine_name, 0.0)
+        if mine_score > 0:
+            return mine_score
+        
+        # Fallback: Durchschnitt aller Mine-Scores oder allgemeine Zuverlässigkeit
+        mine_scores = [v for k, v in self.mine_specialization.items() if not k.endswith('_count') and v > 0]
+        if mine_scores:
+            return sum(mine_scores) / len(mine_scores)
+        
+        return self.reliability_score
     
     @classmethod
     def classify_source_type(cls, url: str, domain: str) -> str:
@@ -787,6 +948,299 @@ class ModelStatisticsComprehensive(Base):
             'first_search_at': self.first_search_at.isoformat() if self.first_search_at else None,
             'last_search_at': self.last_search_at.isoformat() if self.last_search_at else None,
             'last_updated': self.last_updated.isoformat() if self.last_updated else None
+        }
+
+
+class SourceDiscoverySession(Base):
+    """
+    ÄNDERUNG 27.08.2025: Neue Tabelle für Sequential Field Orchestrator
+    Tracking von Quellensuch-Sessions mit inkrementeller Akkumulation
+    """
+    __tablename__ = 'source_discovery_sessions'
+    
+    id = Column(Integer, primary_key=True)
+    session_id = Column(String(100), nullable=False, unique=True, index=True)
+    mine_name = Column(String(255), nullable=False, index=True)
+    country = Column(String(100), nullable=True)
+    region = Column(String(100), nullable=True)
+    commodity = Column(String(100), nullable=True)
+    
+    # Workflow-Status
+    phase = Column(String(50), nullable=False, default='source_discovery')  # source_discovery, field_search, completed
+    current_model_index = Column(Integer, nullable=False, default=0)
+    total_models = Column(Integer, nullable=False, default=0)
+    models_list = Column(JSON, nullable=False)  # Liste der verwendeten Modelle
+    
+    # Source Discovery Progress
+    sources_discovered_total = Column(Integer, nullable=False, default=0)
+    models_completed_discovery = Column(Integer, nullable=False, default=0)
+    
+    # Field Search Progress
+    fields_to_search = Column(JSON, nullable=True)  # Liste aller zu suchenden Felder
+    current_field_index = Column(Integer, nullable=False, default=0)
+    fields_completed = Column(Integer, nullable=False, default=0)
+    
+    # Session Metadaten
+    started_at = Column(DateTime, nullable=False, server_default=func.now())
+    discovery_completed_at = Column(DateTime, nullable=True)
+    search_completed_at = Column(DateTime, nullable=True)
+    total_duration_seconds = Column(Float, nullable=True)
+    
+    # Quality Metrics
+    quality_score = Column(Float, nullable=False, default=0.0)
+    final_results_count = Column(Integer, nullable=False, default=0)
+    
+    # Indizes
+    __table_args__ = (
+        Index('idx_source_session_mine', 'mine_name', 'session_id'),
+        Index('idx_source_session_phase', 'phase', 'started_at'),
+    )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Konvertiere zu Dictionary für API-Responses"""
+        return {
+            'id': self.id,
+            'session_id': self.session_id,
+            'mine_name': self.mine_name,
+            'country': self.country,
+            'region': self.region,
+            'commodity': self.commodity,
+            'phase': self.phase,
+            'current_model_index': self.current_model_index,
+            'total_models': self.total_models,
+            'models_list': self.models_list or [],
+            'sources_discovered_total': self.sources_discovered_total,
+            'models_completed_discovery': self.models_completed_discovery,
+            'fields_to_search': self.fields_to_search or [],
+            'current_field_index': self.current_field_index,
+            'fields_completed': self.fields_completed,
+            'started_at': self.started_at.isoformat() if self.started_at else None,
+            'discovery_completed_at': self.discovery_completed_at.isoformat() if self.discovery_completed_at else None,
+            'search_completed_at': self.search_completed_at.isoformat() if self.search_completed_at else None,
+            'total_duration_seconds': self.total_duration_seconds,
+            'quality_score': self.quality_score,
+            'final_results_count': self.final_results_count
+        }
+
+
+class ModelSourceContribution(Base):
+    """
+    ÄNDERUNG 27.08.2025: Tracking welches Modell welche Quellen beigetragen hat
+    Ermöglicht Analyse der Quellenentdeckungs-Effektivität pro Modell
+    """
+    __tablename__ = 'model_source_contributions'
+    
+    id = Column(Integer, primary_key=True)
+    session_id = Column(String(100), nullable=False, index=True)
+    model_id = Column(String(100), nullable=False, index=True)
+    source_id = Column(Integer, ForeignKey('sources.id'), nullable=False)
+    
+    # Contribution Details
+    discovered_at = Column(DateTime, nullable=False, server_default=func.now())
+    contribution_order = Column(Integer, nullable=False)  # Reihenfolge der Entdeckung (1, 2, 3, ...)
+    is_unique_contribution = Column(Boolean, nullable=False, default=True)  # War diese Quelle neu?
+    discovery_method = Column(String(50), nullable=False, default='search')  # search, related, referenced
+    
+    # Quality Assessment
+    initial_quality_score = Column(Float, nullable=False, default=50.0)
+    contribution_value = Column(Float, nullable=False, default=0.0)  # Wie wertvoll war diese Quelle
+    
+    # Relationships
+    source = relationship("Source", backref="model_contributions")
+    
+    # Indizes
+    __table_args__ = (
+        Index('idx_model_contribution_session_model', 'session_id', 'model_id'),
+        Index('idx_model_contribution_source', 'source_id', 'discovered_at'),
+    )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Konvertiere zu Dictionary für API-Responses"""
+        return {
+            'id': self.id,
+            'session_id': self.session_id,
+            'model_id': self.model_id,
+            'source_id': self.source_id,
+            'discovered_at': self.discovered_at.isoformat() if self.discovered_at else None,
+            'contribution_order': self.contribution_order,
+            'is_unique_contribution': self.is_unique_contribution,
+            'discovery_method': self.discovery_method,
+            'initial_quality_score': self.initial_quality_score,
+            'contribution_value': self.contribution_value,
+            'source': self.source.to_dict() if self.source else None
+        }
+
+
+class FieldSearchResult(Base):
+    """
+    ÄNDERUNG 27.08.2025: Ergebnisse der feld-spezifischen Suche
+    Speichert Ergebnisse der Phase 2 (Field-by-Field Search)
+    """
+    __tablename__ = 'field_search_results'
+    
+    id = Column(Integer, primary_key=True)
+    session_id = Column(String(100), nullable=False, index=True)
+    model_id = Column(String(100), nullable=False, index=True)
+    field_name = Column(String(100), nullable=False, index=True)
+    
+    # Search Details
+    searched_at = Column(DateTime, nullable=False, server_default=func.now())
+    sources_used_count = Column(Integer, nullable=False, default=0)
+    sources_used_ids = Column(JSON, nullable=True)  # Liste der Source-IDs die verwendet wurden
+    
+    # Results
+    field_value_found = Column(Text, nullable=True)
+    confidence_score = Column(Float, nullable=True)
+    source_references = Column(JSON, nullable=True)  # Referenzen zu den Quellen die diesen Wert lieferten
+    search_duration_seconds = Column(Float, nullable=True)
+    
+    # Quality Metrics
+    result_quality = Column(String(20), nullable=False, default='unknown')  # high, medium, low, none
+    verification_status = Column(String(20), nullable=False, default='unverified')  # verified, conflicting, unverified
+    alternative_values = Column(JSON, nullable=True)  # Falls mehrere Werte gefunden wurden
+    
+    # Success Indicators
+    search_successful = Column(Boolean, nullable=False, default=False)
+    value_found = Column(Boolean, nullable=False, default=False)
+    sources_matched = Column(Boolean, nullable=False, default=False)
+    
+    # Indizes
+    __table_args__ = (
+        Index('idx_field_search_session_field', 'session_id', 'field_name'),
+        Index('idx_field_search_model_field', 'model_id', 'field_name', 'searched_at'),
+    )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Konvertiere zu Dictionary für API-Responses"""
+        return {
+            'id': self.id,
+            'session_id': self.session_id,
+            'model_id': self.model_id,
+            'field_name': self.field_name,
+            'searched_at': self.searched_at.isoformat() if self.searched_at else None,
+            'sources_used_count': self.sources_used_count,
+            'sources_used_ids': self.sources_used_ids or [],
+            'field_value_found': self.field_value_found,
+            'confidence_score': self.confidence_score,
+            'source_references': self.source_references or [],
+            'search_duration_seconds': self.search_duration_seconds,
+            'result_quality': self.result_quality,
+            'verification_status': self.verification_status,
+            'alternative_values': self.alternative_values or [],
+            'search_successful': self.search_successful,
+            'value_found': self.value_found,
+            'sources_matched': self.sources_matched
+        }
+
+
+class SequentialSearchResult(Base):
+    """
+    ÄNDERUNG 27.08.2025: Konsolidierte Ergebnisse einer Sequential Search Session
+    Speichert die finalen, zusammengefassten Ergebnisse des gesamten Workflows
+    """
+    __tablename__ = 'sequential_search_results'
+    
+    id = Column(Integer, primary_key=True)
+    session_id = Column(String(100), nullable=False, unique=True, index=True)
+    mine_name = Column(String(255), nullable=False, index=True)
+    country = Column(String(100), nullable=True)
+    region = Column(String(100), nullable=True)
+    commodity = Column(String(100), nullable=True)
+    
+    # Session Summary
+    total_models_used = Column(Integer, nullable=False, default=0)
+    total_sources_discovered = Column(Integer, nullable=False, default=0)
+    total_fields_searched = Column(Integer, nullable=False, default=0)
+    total_values_found = Column(Integer, nullable=False, default=0)
+    
+    # Final Consolidated Data
+    final_structured_data = Column(JSON, nullable=True)  # Beste Werte für alle Felder
+    field_confidence_scores = Column(JSON, nullable=True)  # Konfidenz pro Feld
+    field_source_mapping = Column(JSON, nullable=True)  # Welche Quelle lieferte welchen Wert
+    quality_assessment = Column(JSON, nullable=True)  # Qualitätsbewertung der Gesamtergebnisse
+    
+    # Performance Metrics
+    total_duration_seconds = Column(Float, nullable=True)
+    source_discovery_duration = Column(Float, nullable=True)
+    field_search_duration = Column(Float, nullable=True)
+    consolidation_duration = Column(Float, nullable=True)
+    
+    # Quality Indicators
+    overall_quality_score = Column(Float, nullable=False, default=0.0)  # 0.0 bis 100.0
+    completeness_percentage = Column(Float, nullable=False, default=0.0)  # % gefundener Felder
+    source_diversity_score = Column(Float, nullable=False, default=0.0)  # Vielfalt der verwendeten Quellen
+    model_consensus_score = Column(Float, nullable=False, default=0.0)  # Übereinstimmung zwischen Modellen
+    
+    # Status
+    workflow_completed = Column(Boolean, nullable=False, default=False)
+    has_errors = Column(Boolean, nullable=False, default=False)
+    error_summary = Column(JSON, nullable=True)  # Zusammenfassung aufgetretener Fehler
+    
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    completed_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    
+    # Indizes
+    __table_args__ = (
+        Index('idx_sequential_results_mine', 'mine_name', 'created_at'),
+        Index('idx_sequential_results_quality', 'overall_quality_score', 'completeness_percentage'),
+    )
+    
+    def calculate_quality_metrics(self):
+        """
+        Berechne Qualitäts-Metriken basierend auf den Ergebnissen
+        """
+        # Completeness: Prozentsatz der gefundenen Felder
+        expected_fields = 18  # Standard Anzahl erwarteter Felder
+        self.completeness_percentage = (self.total_values_found / expected_fields * 100) if expected_fields > 0 else 0
+        
+        # Source Diversity: Bewertung der Quellenvielfalt
+        self.source_diversity_score = min(100, self.total_sources_discovered * 5)  # 20 Quellen = 100 Punkte
+        
+        # Ensure model_consensus_score is not None
+        consensus_score = self.model_consensus_score or 0.0
+        
+        # Overall Quality: Gewichteter Score
+        self.overall_quality_score = (
+            self.completeness_percentage * 0.5 +
+            self.source_diversity_score * 0.3 +
+            consensus_score * 0.2
+        )
+        
+        self.overall_quality_score = min(100.0, max(0.0, self.overall_quality_score))
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Konvertiere zu Dictionary für API-Responses"""
+        return {
+            'id': self.id,
+            'session_id': self.session_id,
+            'mine_name': self.mine_name,
+            'country': self.country,
+            'region': self.region,
+            'commodity': self.commodity,
+            'total_models_used': self.total_models_used,
+            'total_sources_discovered': self.total_sources_discovered,
+            'total_fields_searched': self.total_fields_searched,
+            'total_values_found': self.total_values_found,
+            'final_structured_data': self.final_structured_data or {},
+            'field_confidence_scores': self.field_confidence_scores or {},
+            'field_source_mapping': self.field_source_mapping or {},
+            'quality_assessment': self.quality_assessment or {},
+            'total_duration_seconds': self.total_duration_seconds,
+            'source_discovery_duration': self.source_discovery_duration,
+            'field_search_duration': self.field_search_duration,
+            'consolidation_duration': self.consolidation_duration,
+            'overall_quality_score': self.overall_quality_score,
+            'completeness_percentage': self.completeness_percentage,
+            'source_diversity_score': self.source_diversity_score,
+            'model_consensus_score': self.model_consensus_score,
+            'workflow_completed': self.workflow_completed,
+            'has_errors': self.has_errors,
+            'error_summary': self.error_summary or {},
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
 

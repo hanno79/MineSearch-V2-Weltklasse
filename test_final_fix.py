@@ -1,88 +1,86 @@
 #!/usr/bin/env python3
 """
-Author: rahn
-Datum: 14.08.2025  
+Author: rahn  
+Datum: 23.08.2025
 Version: 1.0
-Beschreibung: FINALER UI-TEST für vollständig repariertes System
+Beschreibung: Finaler Test der kompletten Counter-Reparatur
 """
 
 import asyncio
 from playwright.async_api import async_playwright
+import sys
+import time
 
 async def test_final_fix():
-    """FINALER Test: Manual Button-Clicking statt Auto-Loading"""
-    print("🏁 FINAL UI FIX TEST")
-    print("====================")
-    
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False, args=['--no-sandbox'])
-        page = await browser.new_page()
-        
-        print("🌐 Loading MineSearch 2.0...")
-        await page.goto('http://localhost:8000/', wait_until='networkidle')
-        await page.wait_for_timeout(3000)
-        
-        # Test 1: Manual Consolidated Loading
-        print("\n📊 MANUAL TEST: Consolidated Loading")
-        consolidated_tab = page.locator('.nav-item[data-tab="consolidated"]')
-        await consolidated_tab.click()
-        await page.wait_for_timeout(2000)
-        
-        # Manual button click for loading
-        load_button = page.locator('button:has-text("Laden")')
-        if await load_button.count() > 0:
-            await load_button.click()
-            print("✅ Manual load button clicked")
-            await page.wait_for_timeout(5000)
+        try:
+            # Browser starten 
+            browser = await p.chromium.launch(headless=False)
+            page = await browser.new_page()
             
-            # Check results
-            cards = page.locator('.mine-card')
-            count = await cards.count()
-            print(f"📋 Loaded {count} mine cards manually")
-        
-        # Test 2: Manual Statistics Loading
-        print("\n📈 MANUAL TEST: Statistics Loading")
-        stats_tab = page.locator('.nav-item[data-tab="statistics"]')
-        await stats_tab.click()
-        await page.wait_for_timeout(2000)
-        
-        # Manual button click for loading
-        stats_button = page.locator('button:has-text("Modell-Statistiken laden"), button:has-text("Laden")')
-        if await stats_button.count() > 0:
-            await stats_button.first.click()
-            print("✅ Manual stats button clicked")
-            await page.wait_for_timeout(5000)
+            print("🌐 Testing final Progressive Model Selection fix...")
+            await page.goto("http://localhost:8000/static/index.html")
             
-            # Check results
-            stats_rows = page.locator('.statistics-row, tr')
-            count = await stats_rows.count()
-            print(f"📊 Loaded {count} statistics rows manually")
-        
-        # Test 3: Manual Sources Loading
-        print("\n📚 MANUAL TEST: Sources Loading")
-        sources_tab = page.locator('.nav-item[data-tab="sources"]')
-        await sources_tab.click()
-        await page.wait_for_timeout(2000)
-        
-        # Manual button click for loading
-        sources_button = page.locator('button:has-text("Quellen laden"), button:has-text("Laden")')
-        if await sources_button.count() > 0:
-            await sources_button.first.click()
-            print("✅ Manual sources button clicked")
-            await page.wait_for_timeout(5000)
+            # Warte auf vollständiges Laden
+            await asyncio.sleep(4)
             
-            # Check results
-            source_items = page.locator('.source-item, tr')
-            count = await source_items.count()
-            print(f"📚 Loaded {count} source items manually")
-        
-        print("\n🎯 FINAL TEST RESULT")
-        print("====================")
-        print("✅ Tab-Navigation funktioniert korrekt")  
-        print("✅ Backend-APIs funktionieren korrekt")
-        print("⚠️ Auto-Loading muss durch manuelle Buttons ersetzt werden")
-        
-        await browser.close()
+            # Test 1: Counter existiert
+            counter_exists = await page.evaluate('!!document.getElementById("selected-count")')
+            print(f"✅ Counter element exists: {counter_exists}")
+            
+            if not counter_exists:
+                print("❌ Counter element missing - test failed")
+                return
+            
+            # Test 2: Initial counter value
+            initial_value = await page.evaluate('document.getElementById("selected-count").textContent')
+            print(f"📊 Initial counter value: {initial_value}")
+            
+            # Test 3: Click Kostenlos button
+            print("\n🧪 Testing Kostenlos category selection...")
+            await page.click('.smart-selection[data-selection-type="free"]')
+            await asyncio.sleep(2)
+            
+            # Test 4: Check counter after click
+            final_value = await page.evaluate('document.getElementById("selected-count").textContent')
+            print(f"📊 Counter after Kostenlos click: {final_value}")
+            
+            # Test 5: Check button state
+            button_classes = await page.get_attribute('.smart-selection[data-selection-type="free"]', 'class')
+            is_selected = 'selected' in button_classes
+            print(f"🎯 Kostenlos button selected: {is_selected}")
+            
+            # Test 6: Deselect test
+            print("\n🧪 Testing deselection...")
+            await page.click('.smart-selection[data-selection-type="free"]')
+            await asyncio.sleep(2)
+            
+            deselect_value = await page.evaluate('document.getElementById("selected-count").textContent')
+            print(f"📊 Counter after deselect: {deselect_value}")
+            
+            # Final assessment
+            success = (
+                counter_exists and
+                final_value != "0" and 
+                final_value != initial_value and
+                deselect_value == "0"
+            )
+            
+            print(f"\n🎯 FINAL RESULT: {'🎉 SUCCESS!' if success else '❌ FAILED'}")
+            
+            if success:
+                print("✅ Progressive Model Selection counter is fully functional!")
+                print(f"✅ Kostenlos selection shows: {final_value} models")
+                print("✅ Visual feedback works correctly")
+                print("✅ Deselection resets to 0")
+            
+        except Exception as e:
+            print(f"❌ Test failed: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            if 'browser' in locals():
+                await browser.close()
 
 if __name__ == "__main__":
     asyncio.run(test_final_fix())

@@ -598,7 +598,7 @@ function resetSettings() {
  * Update Settings Status Display
  */
 function updateSettingsStatusDisplay() {
-    console.log('📊 [STATUS] Updating settings status display...');
+    // ÄNDERUNG 23.08.2025: Console-Spam reduziert - nur bei Debug-Mode
     
     // Get current settings from localStorage or defaults
     const savedSettings = localStorage.getItem('minesearch-settings');
@@ -654,7 +654,7 @@ function updateSettingsStatusDisplay() {
         }
     }
     
-    console.log('✅ [STATUS] Settings status display updated');
+    // ÄNDERUNG 23.08.2025: Console-Log entfernt wegen Spam
 }
 
 /**
@@ -733,8 +733,8 @@ function initializeHeaderNavigation() {
     setTimeout(() => {
         updateSettingsStatusDisplay();
         
-        // Set up periodic updates for model count
-        setInterval(updateSettingsStatusDisplay, 5000);
+        // ÄNDERUNG 23.08.2025: Weniger häufige Updates wegen Console-Spam (5s → 15s)
+        setInterval(updateSettingsStatusDisplay, 15000);
     }, 3000);
     
     console.log('✅ [NAVIGATION] Professional header system initialized');
