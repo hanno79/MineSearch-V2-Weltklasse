@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from minesearch.enhanced_source_discovery import EnhancedSourceDiscovery
 from minesearch.providers.registry import provider_registry
 from minesearch.database import db_manager
+from minesearch.database.normalized_manager import NormalizedDatabaseManager
 from minesearch.utils import generate_name_variants, get_country_config
 from minesearch.config import config
 from minesearch.source_validation import source_validator
@@ -59,6 +60,7 @@ class MultiModelSearchOrchestrator:
     
     def __init__(self):
         self.source_discovery = EnhancedSourceDiscovery()
+        self.normalized_db_manager = NormalizedDatabaseManager()
         # Initialize provider registry
         # BATCH-FIX 28.08.2025: Force reinitialize für Batch-Kontext
         logger.info(f"[ORCHESTRATOR-INIT] Provider Registry Status: {len(provider_registry._providers)} Provider geladen")
@@ -333,7 +335,22 @@ class MultiModelSearchOrchestrator:
                     search_duration=result.search_duration
                 )
                 
-                logger.info(f"[ORCHESTRATOR-DB-SUCCESS] Database save successful for {result.model_id}")
+                logger.info(f"[ORCHESTRATOR-DB-SUCCESS] Legacy database save successful for {result.model_id}")
+                
+                # NORMALIZED SCHEMA FIX 28.08.2025: Speichere auch in normalized schema
+                try:
+                    normalized_result_id = self.normalized_db_manager.save_search_result_normalized(
+                        mine_name=mine_name,
+                        model_used=result.model_id,
+                        structured_data=structured_data,
+                        sources=result.sources,
+                        session_id=session_id,
+                        country=country,
+                        search_duration=result.search_duration
+                    )
+                    logger.info(f"[ORCHESTRATOR-NORMALIZED] ✅ Normalized database save successful for {result.model_id} (ID: {normalized_result_id})")
+                except Exception as e:
+                    logger.error(f"[ORCHESTRATOR-NORMALIZED] ❌ Normalized database save failed for {result.model_id}: {e}")
                 
                 # DATABASE-CACHE KONSISTENZ-FIX: save_search_result ruft automatisch update_model_statistics_comprehensive auf
                 # Daher NICHT nochmal explizit aufrufen um Doppel-Updates zu vermeiden
