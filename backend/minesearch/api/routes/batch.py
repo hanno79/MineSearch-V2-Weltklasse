@@ -336,21 +336,20 @@ async def upload_csv(csv_file: UploadFile = File(...)):
         <div id="batch-results" style="margin-top: 30px;"></div>
         
         <script>
-        // ÄNDERUNG 27.08.2025: Sequential Workflow Parameter Management
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function() {{
             const searchTypeSelect = document.querySelector('select[name="search_type"]');
             const sequentialWorkflowInput = document.querySelector('input[name="sequential_workflow"]');
             
-            if (searchTypeSelect && sequentialWorkflowInput) {
-                searchTypeSelect.addEventListener('change', function() {
-                    if (this.value === 'sequential') {
+            if (searchTypeSelect && sequentialWorkflowInput) {{
+                searchTypeSelect.addEventListener('change', function() {{
+                    if (this.value === 'sequential') {{
                         sequentialWorkflowInput.value = 'true';
-                    } else {
+                    }} else {{
                         sequentialWorkflowInput.value = 'false';
-                    }
-                });
-            }
-        });
+                    }}
+                }});
+            }}
+        }});
         </script>
         """
         

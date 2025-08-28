@@ -574,7 +574,8 @@ class ProgressiveModelSelection {
                     this.selectedModels.add(model.model_id);
                 }
             });
-            pill.classList.add('selected');
+            // SMART-SELECTION FIX 28.08.2025: Entferne selected-Klasse sofort nach Aktion
+            // pill.classList.add('selected'); // Deaktiviert - Button bleibt unselected
             console.log(`✅ [MODEL-UX] Smart selection: ${selectionType} (${modelsToToggle.length} models)`);
         }
         
@@ -767,7 +768,9 @@ class ProgressiveModelSelection {
                 this.selectedModels.has(model.model_id)
             ).length;
             
-            pill.classList.toggle('selected', selectedFromRelevant === relevantModels.length && relevantModels.length > 0);
+            // SMART-SELECTION FIX 28.08.2025: Button bleibt deselektiert nach Aktion
+            // Entferne automatische "selected" Markierung - Button soll nur temporär selected sein während Klick
+            // pill.classList.toggle('selected', selectedFromRelevant === relevantModels.length && relevantModels.length > 0);
         });
         
         // Update provider selection pills

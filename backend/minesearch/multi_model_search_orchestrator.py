@@ -60,7 +60,14 @@ class MultiModelSearchOrchestrator:
     def __init__(self):
         self.source_discovery = EnhancedSourceDiscovery()
         # Initialize provider registry
+        # BATCH-FIX 28.08.2025: Force reinitialize für Batch-Kontext
+        logger.info(f"[ORCHESTRATOR-INIT] Provider Registry Status: {len(provider_registry._providers)} Provider geladen")
         if not provider_registry._providers:
+            logger.info("[ORCHESTRATOR-INIT] Initialisiere Provider Registry...")
+            provider_registry.initialize(config.PROVIDERS)
+        else:
+            # FORCE REFRESH für Batch-Kontext - Provider könnten expired sein
+            logger.info("[ORCHESTRATOR-INIT] Force-Refresh der Provider Registry für Batch-Kontext...")
             provider_registry.initialize(config.PROVIDERS)
     
     def _validate_provider_response(self, search_result, model_id: str) -> Dict[str, Any]:
