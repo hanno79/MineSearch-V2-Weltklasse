@@ -74,8 +74,9 @@ class NormalizedDatabaseManager(DatabaseManager):
         if filtered_words:
             normalized = ' '.join(filtered_words)
         
-        # Grundlegende Bereinigung
-        normalized = re.sub(r'[^a-z0-9\s&]', '', normalized)
+        # Grundlegende Bereinigung - BEHALTE Umlaute und Akzente
+        # Entferne nur wirklich problematische Zeichen, behalte aber ä,ö,ü,é,è,etc.
+        normalized = re.sub(r'[^\w\s&äöüßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ]', '', normalized, flags=re.UNICODE)
         normalized = re.sub(r'\s+', ' ', normalized).strip()
         
         return normalized
@@ -250,7 +251,13 @@ class NormalizedDatabaseManager(DatabaseManager):
                 
                 # Value-Normalisierung für atomare Speicherung
                 raw_value = str(field_value)
-                normalized_value = raw_value
+                
+                # CRITICAL: Entferne Quellenreferenzen für atomare Speicherung
+                # "Aktiv [1,2,3,4,5]" → "Aktiv"
+                import re
+                atomic_value = re.sub(r'\s*\[\d+(,\d+)*\]$', '', raw_value).strip()
+                
+                normalized_value = atomic_value
                 numeric_value = None
                 unit = None
                 is_template = False
@@ -267,12 +274,12 @@ class NormalizedDatabaseManager(DatabaseManager):
                     except:
                         pass
                 
-                # Numerische Werte extrahieren
+                # Numerische Werte extrahieren (aus bereinigtem Wert)
                 if isinstance(field_value, (int, float)):
                     numeric_value = float(field_value)
                 else:
-                    # Versuche numerischen Wert aus String zu extrahieren
-                    numeric_match = re.search(r'[\d,\.]+', str(field_value))
+                    # Versuche numerischen Wert aus bereinigtem String zu extrahieren
+                    numeric_match = re.search(r'[\d,\.]+', atomic_value)
                     if numeric_match:
                         try:
                             numeric_str = numeric_match.group().replace(',', '.')
@@ -280,8 +287,8 @@ class NormalizedDatabaseManager(DatabaseManager):
                         except (ValueError, AttributeError):
                             pass
                 
-                # Einheit extrahieren (z.B. "150 Millionen CAD" → unit: "CAD")
-                if isinstance(field_value, str):
+                # Einheit extrahieren (z.B. "150 Millionen CAD" → unit: "CAD") - aus bereinigtem Wert
+                if isinstance(atomic_value, str):
                     unit_patterns = [
                         r'(CAD|USD|EUR|AUD|GBP)$',
                         r'(kg|t|oz|g)$',
@@ -289,7 +296,7 @@ class NormalizedDatabaseManager(DatabaseManager):
                         r'(qkm|ha)$'
                     ]
                     for pattern in unit_patterns:
-                        match = re.search(pattern, field_value, re.IGNORECASE)
+                        match = re.search(pattern, atomic_value, re.IGNORECASE)
                         if match:
                             unit = match.group(1).upper()
                             break

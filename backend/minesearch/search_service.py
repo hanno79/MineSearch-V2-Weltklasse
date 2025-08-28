@@ -28,6 +28,11 @@ from minesearch.cache_service import get_cache_service, cached_search
 from minesearch.cost_monitor import cost_monitor
 from minesearch.database.manager import DatabaseManager
 from minesearch.database.normalized_manager import NormalizedDatabaseManager
+from minesearch.field_value_parser import (
+    extract_atomic_value_and_sources, 
+    normalize_atomic_value, 
+    find_or_create_source_by_url
+)
 
 logger = logging.getLogger(__name__)
 
@@ -330,22 +335,7 @@ class MineSearchService:
             )
             logger.info(f"[DB] Legacy-Suchergebnis für {mine_name} gespeichert (ID: {search_result.id})")
             
-            # 🆕 NORMALISIERTES SYSTEM: Parallele Speicherung
-            try:
-                logger.info(f"[DB NORMALIZED] Speichere normalisiert: {mine_name} → {legacy_full_model_id}")
-                normalized_result_id = self.normalized_db_manager.save_search_result_normalized(
-                    mine_name=mine_name,
-                    model_used=legacy_full_model_id,
-                    structured_data=clean_structured_data,
-                    sources=sources,
-                    session_id=None,  # FIX: session_id war nicht definiert
-                    country=country,
-                    search_duration=result.search_duration
-                )
-                logger.info(f"✅ DUAL SAVE SUCCESS: Legacy ID={search_result.id}, Normalized ID={normalized_result_id}")
-            except Exception as norm_error:
-                logger.error(f"❌ Normalized save failed: {norm_error}")
-                # Continue with legacy system if normalized fails
+            # 🆕 NORMALISIERTES SYSTEM: Entfernt - wird jetzt in _process_search_result erledigt
             
             # 🚀 CRITICAL FIX: Update ModelStatisticsComprehensive für Legacy Search auch
             try:
@@ -480,21 +470,52 @@ class MineSearchService:
             logger.info(f"[DB] Suchergebnis für {mine_name} gespeichert (ID: {search_result.id})")
             
             # 🆕 NORMALISIERTES SYSTEM: Parallele Speicherung
+            # Debug-Datei Logging
+            with open('/app/normalized_debug.log', 'a') as f:
+                f.write(f"DEBUG: Normalized save attempt for {mine_name} with model {actual_model_used}\n")
+            
+            print(f"🔥🔥🔥 DEBUG: Normalized save attempt for {mine_name} with model {actual_model_used}")
             try:
+                with open('/app/normalized_debug.log', 'a') as f:
+                    f.write(f"DEBUG: Inside try block, calling save_search_result_normalized\n")
                 logger.info(f"[DB NORMALIZED] Speichere normalisiert: {mine_name} → {actual_model_used}")
+                print(f"🔥🔥🔥 DEBUG: Inside try block, calling save_search_result_normalized")
                 normalized_result_id = self.normalized_db_manager.save_search_result_normalized(
                     mine_name=mine_name,
                     model_used=actual_model_used,
                     structured_data=clean_structured_data,
                     sources=sources,
-                    session_id=None,  # FIX: session_id war nicht definiert
+                    session_id=None,
                     country=country,
-                    search_duration=result.search_duration
+                    search_duration=search_duration
                 )
+                with open('/app/normalized_debug.log', 'a') as f:
+                    f.write(f"DEBUG: Normalized save SUCCESS! ID = {normalized_result_id}\n")
+                print(f"🔥🔥🔥 DEBUG: Normalized save SUCCESS! ID = {normalized_result_id}")
                 logger.info(f"✅ DUAL SAVE SUCCESS: Legacy ID={search_result.id}, Normalized ID={normalized_result_id}")
             except Exception as norm_error:
+                with open('/app/normalized_debug.log', 'a') as f:
+                    f.write(f"DEBUG: Normalized save FAILED! Error = {norm_error}\n")
+                    import traceback
+                    f.write(f"DEBUG: Traceback = {traceback.format_exc()}\n")
+                print(f"🔥🔥🔥 DEBUG: Normalized save FAILED! Error = {norm_error}")
                 logger.error(f"❌ Normalized save failed: {norm_error}")
+                import traceback
+                logger.error(f"❌ Normalized save traceback:\n{traceback.format_exc()}")
                 # Continue with legacy system if normalized fails
+            
+            # 🆕 SCHEMA-NORMALISIERUNG 28.08.2025: Atomische Feldwerte speichern (Legacy backup)
+            try:
+                await self._save_atomic_field_values(
+                    search_result.id, 
+                    clean_structured_data, 
+                    sources,
+                    result.metadata.get('structured_data_with_sources', {})
+                )
+                logger.info(f"✅ Atomische Feldwerte gespeichert für SearchResult ID={search_result.id}")
+            except Exception as atomic_error:
+                logger.error(f"❌ Atomic values save failed: {atomic_error}")
+                # Continue with legacy system if atomic save fails
             
             # 🚀 CRITICAL FIX: Update ModelStatisticsComprehensive nach neuer Search
             try:
@@ -950,6 +971,122 @@ class MineSearchService:
             'important_fields_filled': important_filled,
             'important_fields_total': len(important_fields)
         }
+    
+    async def _save_atomic_field_values(
+        self, 
+        search_result_id: int, 
+        structured_data: Dict[str, Any], 
+        sources: List[Dict],
+        structured_data_with_sources: Dict[str, Any] = None
+    ) -> None:
+        """
+        SCHEMA-NORMALISIERUNG 28.08.2025: Speichert atomische Feldwerte in neuen Tabellen
+        
+        Args:
+            search_result_id: ID des SearchResult
+            structured_data: Bereinigte strukturierte Daten  
+            sources: Liste der Quellen
+            structured_data_with_sources: Originaldaten mit [1,2,3] Referenzen
+        """
+        from minesearch.database.models import FieldValue, FieldValueSource
+        
+        # Verwende structured_data_with_sources wenn verfügbar, sonst structured_data
+        data_to_parse = structured_data_with_sources or structured_data
+        
+        if not data_to_parse:
+            logger.info(f"[ATOMIC] Keine Daten zu speichern für SearchResult {search_result_id}")
+            return
+        
+        saved_count = 0
+        skipped_count = 0
+        
+        with self.db_manager.get_session() as session:
+            try:
+                # Erstelle Mapping von Source-URLs zu Source-IDs
+                source_url_to_id = {}
+                for source_dict in sources:
+                    source_url = source_dict.get('url')
+                    if source_url:
+                        source_obj = find_or_create_source_by_url(session, source_url)
+                        if source_obj:
+                            source_url_to_id[source_url] = source_obj.id
+                
+                # Verarbeite jedes Feld
+                for field_name, field_value in data_to_parse.items():
+                    if not field_value:
+                        continue
+                    
+                    # Handle different data formats
+                    if isinstance(field_value, dict):
+                        # Newer format: {'value': 'Kanada', 'sources': [...]}
+                        raw_value = field_value.get('value', '')
+                        if isinstance(raw_value, str) and '[' in raw_value:
+                            # Even dict format might have "Gold [1,2]" in value
+                            atomic_value, source_refs = extract_atomic_value_and_sources(raw_value)
+                        else:
+                            atomic_value = raw_value
+                            source_refs = field_value.get('sources', [])
+                    elif isinstance(field_value, str):
+                        # Legacy format: "Kanada [1,2,3]"
+                        atomic_value, source_refs = extract_atomic_value_and_sources(field_value)
+                    else:
+                        # Direct value
+                        atomic_value = str(field_value) if field_value else ''
+                        source_refs = []
+                    
+                    # Normalisiere atomischen Wert
+                    normalized_value = normalize_atomic_value(atomic_value)
+                    
+                    # Nur speichern wenn wir einen validen normalisierten Wert haben
+                    if not normalized_value:
+                        skipped_count += 1
+                        continue
+                    
+                    # Erstelle FieldValue-Eintrag
+                    field_value_obj = FieldValue(
+                        search_result_id=search_result_id,
+                        field_name=field_name,
+                        atomic_value=normalized_value,
+                        confidence_score=75.0  # Standard-Confidence für neue Werte
+                    )
+                    session.add(field_value_obj)
+                    session.flush()  # Für ID-Generierung
+                    
+                    # Verknüpfe Quellen basierend auf Referenzen
+                    if source_refs:
+                        for ref_num in source_refs:
+                            # Mappe Referenznummer zu Source-URL (vereinfacht)
+                            # In der Realität könnte das komplexer sein
+                            if ref_num <= len(sources):
+                                source_url = sources[ref_num - 1].get('url')  # Array ist 0-basiert
+                                source_id = source_url_to_id.get(source_url)
+                                
+                                if source_id:
+                                    field_source = FieldValueSource(
+                                        field_value_id=field_value_obj.id,
+                                        source_id=source_id,
+                                        extraction_confidence=75.0
+                                    )
+                                    session.add(field_source)
+                    else:
+                        # Keine spezifischen Quellenreferenzen - verknüpfe mit allen Quellen
+                        for source_id in source_url_to_id.values():
+                            field_source = FieldValueSource(
+                                field_value_id=field_value_obj.id,
+                                source_id=source_id,
+                                extraction_confidence=50.0  # Niedrigere Confidence bei unspezifischen Zuordnungen
+                            )
+                            session.add(field_source)
+                    
+                    saved_count += 1
+                
+                session.commit()
+                logger.info(f"[ATOMIC] ✅ {saved_count} atomische Feldwerte gespeichert, {skipped_count} übersprungen")
+                
+            except Exception as e:
+                session.rollback()
+                logger.error(f"[ATOMIC] ❌ Fehler beim Speichern atomischer Werte: {e}")
+                raise
 
 
 # Service-Instanz für Kompatibilität (DEPRECATED - use services_container)

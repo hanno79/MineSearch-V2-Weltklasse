@@ -104,7 +104,16 @@ class DiscrepancyHighlighter {
         const severity = this.calculateSeverityClass(discrepancy.severity);
         
         // Find field elements in the comparison view
-        const fieldElements = containerElement.querySelectorAll(`[data-field="${fieldName}"], .field-name:contains("${fieldName}")`);
+        let fieldElements = containerElement.querySelectorAll(`[data-field="${fieldName}"]`);
+        
+        // Fallback: manually search for elements containing the field name
+        if (fieldElements.length === 0) {
+            const allFieldElements = containerElement.querySelectorAll('.field-name');
+            const matchingElements = Array.from(allFieldElements).filter(el => 
+                el.textContent && el.textContent.trim().includes(fieldName)
+            );
+            fieldElements = matchingElements;
+        }
         
         if (fieldElements.length === 0) {
             console.warn(`⚠️ [DISCREPANCY] Field elements not found for: ${fieldName}`);

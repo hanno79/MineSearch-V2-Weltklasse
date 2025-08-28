@@ -24,21 +24,24 @@ let databaseViewer = {
  * Initialisiert den Database Viewer
  */
 async function initializeDatabaseViewer() {
-    console.log('🗂️ Initialisiere Database Viewer...');
+    console.log('🗂️ [DATABASE-VIEWER-DEBUG] Initialisiere Database Viewer...');
     
     try {
         // Lade verfügbare Tabellen
+        console.log('🔄 [DATABASE-VIEWER-DEBUG] Loading available tables...');
         await loadDatabaseTables();
         
         // Lade Standard-Tabelle
+        console.log('🔄 [DATABASE-VIEWER-DEBUG] Loading default table: search_results...');
         await loadTableData('search_results');
         
         // Event Listener für Tab-Wechsel
+        console.log('🔄 [DATABASE-VIEWER-DEBUG] Setting up event listeners...');
         setupDatabaseEventListeners();
         
-        console.log('✅ Database Viewer initialisiert');
+        console.log('✅ [DATABASE-VIEWER-DEBUG] Database Viewer vollständig initialisiert');
     } catch (error) {
-        console.error('❌ Fehler beim Initialisieren des Database Viewers:', error);
+        console.error('❌ [DATABASE-VIEWER-DEBUG] Fehler beim Initialisieren des Database Viewers:', error);
         showDatabaseError('Fehler beim Laden des Database Viewers');
     }
 }
@@ -48,7 +51,7 @@ async function initializeDatabaseViewer() {
  */
 async function loadDatabaseTables() {
     try {
-        const response = await fetch('/api/database/tables');
+        const response = await fetch('/api/database/tables?' + new Date().getTime()); // Cache-Buster
         const data = await response.json();
         
         if (data.success) {
@@ -123,11 +126,21 @@ async function loadTableData(tableName, page = 1) {
         const response = await fetch(`/api/database/table/${tableName}?${params}`);
         const result = await response.json();
         
+        // DEBUG: Erweiterte Logging für Datenbank-Viewer
+        console.log(`🔍 [DATABASE-VIEWER-DEBUG] API Response for ${tableName}:`, {
+            success: result.success,
+            totalRows: result.success ? result.data.pagination.total_count : 'N/A',
+            returnedRows: result.success ? result.data.rows.length : 'N/A',
+            columns: result.success ? result.data.columns.length : 'N/A'
+        });
+        
         if (result.success) {
             // Update State
             databaseViewer.columns = result.data.columns;
             databaseViewer.totalCount = result.data.pagination.total_count;
             databaseViewer.totalPages = result.data.pagination.total_pages;
+            
+            console.log(`✅ [DATABASE-VIEWER-DEBUG] Rendering ${result.data.rows.length} rows with ${result.data.columns.length} columns`);
             
             // Render Table
             renderDatabaseTable(result.data);
@@ -150,14 +163,29 @@ async function loadTableData(tableName, page = 1) {
  * Rendert die Datenbank-Tabelle
  */
 function renderDatabaseTable(data) {
+    console.log(`🎨 [DATABASE-VIEWER-DEBUG] renderDatabaseTable called with:`, {
+        rowCount: data.rows.length,
+        columnCount: data.columns.length,
+        tableName: databaseViewer.currentTable
+    });
+    
     const thead = document.getElementById('database-table-head');
     const tbody = document.getElementById('database-table-body');
+    
+    if (!thead || !tbody) {
+        console.error('❌ [DATABASE-VIEWER-DEBUG] Table elements not found!', {
+            thead: !!thead,
+            tbody: !!tbody
+        });
+        return;
+    }
     
     // Clear existing content
     thead.innerHTML = '';
     tbody.innerHTML = '';
     
     if (data.rows.length === 0) {
+        console.log('ℹ️ [DATABASE-VIEWER-DEBUG] No rows to render - showing empty message');
         tbody.innerHTML = `
             <tr>
                 <td colspan="${data.columns.length}" style="text-align: center; padding: 40px; color: #666;">
