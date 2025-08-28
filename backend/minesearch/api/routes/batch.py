@@ -736,10 +736,18 @@ async def batch_search(
                         # NORMALIZED SCHEMA FIX 28.08.2025: Speichere existierende Ergebnisse auch in normalized schema
                         for db_result in db_results:
                             try:
+                                # BUGFIX: structured_data ist verschachtelt in 'data'
+                                data_section = db_result.get('data', {})
+                                structured_data = data_section.get('structured_data', {})
+                                
+                                if not structured_data:
+                                    logger.warning(f"[BATCH-DB-FIRST-NORMALIZED] ⚠️ No structured_data found for {db_result['model_id']}, skipping")
+                                    continue
+                                
                                 normalized_result_id = normalized_db_manager.save_search_result_normalized(
                                     mine_name=mine_name,
                                     model_used=db_result['model_id'],
-                                    structured_data=db_result['structured_data'],
+                                    structured_data=structured_data,
                                     sources=db_result.get('sources', []),
                                     session_id=session_id,
                                     country=country,
@@ -748,6 +756,10 @@ async def batch_search(
                                 logger.info(f"[BATCH-DB-FIRST-NORMALIZED] ✅ DB-Result saved to normalized schema: {db_result['model_id']} (ID: {normalized_result_id})")
                             except Exception as normalized_error:
                                 logger.error(f"[BATCH-DB-FIRST-NORMALIZED] ❌ Failed to save {db_result['model_id']} to normalized: {normalized_error}")
+                                # Debug-Info bei Fehlern
+                                logger.debug(f"[BATCH-DB-FIRST-NORMALIZED] Debug - db_result keys: {list(db_result.keys())}")
+                                if 'data' in db_result:
+                                    logger.debug(f"[BATCH-DB-FIRST-NORMALIZED] Debug - data keys: {list(db_result['data'].keys())}")
                     else:
                         # 3. FALLBACK: Nur wenn keine guten DB-Ergebnisse, dann neue Provider-Suche
                         logger.info(f"[BATCH-FALLBACK] Keine ausreichenden DB-Ergebnisse - starte Provider-Suche für {mine_name}")
