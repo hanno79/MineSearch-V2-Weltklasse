@@ -28,6 +28,7 @@ from minesearch.search_service import MineSearchService
 # CONSOLIDATION 09.08.2025: MultiProviderSearchService entfernt - verwende MineSearchService direkt
 from minesearch.providers.registry import provider_registry
 from minesearch.database import db_manager
+from minesearch.database.normalized_manager import NormalizedDatabaseManager
 from minesearch.extraction_validators import is_placeholder_value
 from minesearch.html_utils import create_batch_results_table
 # BATCH-FIX 23.08.2025: Import MultiModelSearchOrchestrator für Provider-Suche
@@ -38,6 +39,9 @@ from minesearch.database.sequential_manager import SequentialDatabaseManager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# NORMALIZED SCHEMA FIX 28.08.2025: Initialize NormalizedDatabaseManager
+normalized_db_manager = NormalizedDatabaseManager()
 
 def safe_write_to_file(filepath: str, content: str, mode: str = 'a'):
     """
@@ -566,7 +570,22 @@ async def batch_search(
                                     data_quality=comprehensive_result['completion_report'],
                                     success=True
                                 )
-                                logger.info(f"[COMPREHENSIVE-DB] Ergebnis für {mine_name} gespeichert")
+                                logger.info(f"[COMPREHENSIVE-DB] Legacy save successful for {mine_name}")
+                                
+                                # NORMALIZED SCHEMA FIX 28.08.2025: Speichere auch in normalized schema
+                                try:
+                                    normalized_result_id = normalized_db_manager.save_search_result_normalized(
+                                        mine_name=mine_name,
+                                        model_used='comprehensive_systematic',
+                                        structured_data=comprehensive_result['data'],
+                                        sources=[],
+                                        session_id=session_id,
+                                        country=country,
+                                        search_duration=comprehensive_result.get('duration_seconds')
+                                    )
+                                    logger.info(f"[COMPREHENSIVE-NORMALIZED] ✅ Normalized save successful for {mine_name} (ID: {normalized_result_id})")
+                                except Exception as normalized_error:
+                                    logger.error(f"[COMPREHENSIVE-NORMALIZED] ❌ Normalized save failed for {mine_name}: {normalized_error}")
                             except Exception as db_error:
                                 logger.error(f"[COMPREHENSIVE-DB] Fehler beim Speichern: {str(db_error)}")
                         else:
@@ -643,7 +662,22 @@ async def batch_search(
                                         },
                                         success=True
                                     )
-                                    logger.info(f"[SEQUENTIAL-DB] Legacy-Kompatibilität Ergebnis für {mine_name} gespeichert")
+                                    logger.info(f"[SEQUENTIAL-DB] Legacy save successful for {mine_name}")
+                                    
+                                    # NORMALIZED SCHEMA FIX 28.08.2025: Speichere auch in normalized schema
+                                    try:
+                                        normalized_result_id = normalized_db_manager.save_search_result_normalized(
+                                            mine_name=mine_name,
+                                            model_used='sequential_field_orchestrator',
+                                            structured_data=sequential_result.consolidated_data,
+                                            sources=[],
+                                            session_id=session_id,
+                                            country=country,
+                                            search_duration=sequential_result.performance_metrics.get('total_duration_seconds')
+                                        )
+                                        logger.info(f"[SEQUENTIAL-NORMALIZED] ✅ Normalized save successful for {mine_name} (ID: {normalized_result_id})")
+                                    except Exception as normalized_error:
+                                        logger.error(f"[SEQUENTIAL-NORMALIZED] ❌ Normalized save failed for {mine_name}: {normalized_error}")
                                 except Exception as db_error:
                                     logger.error(f"[SEQUENTIAL-DB] Fehler beim Legacy-Speichern: {str(db_error)}")
                             else:
@@ -698,6 +732,22 @@ async def batch_search(
                     if db_results:
                         logger.info(f"[BATCH-DB-FIRST] Verwende {len(db_results)} existierende DB-Ergebnisse statt neue API-Calls")
                         individual_results = db_results
+                        
+                        # NORMALIZED SCHEMA FIX 28.08.2025: Speichere existierende Ergebnisse auch in normalized schema
+                        for db_result in db_results:
+                            try:
+                                normalized_result_id = normalized_db_manager.save_search_result_normalized(
+                                    mine_name=mine_name,
+                                    model_used=db_result['model_id'],
+                                    structured_data=db_result['structured_data'],
+                                    sources=db_result.get('sources', []),
+                                    session_id=session_id,
+                                    country=country,
+                                    search_duration=db_result.get('search_duration')
+                                )
+                                logger.info(f"[BATCH-DB-FIRST-NORMALIZED] ✅ DB-Result saved to normalized schema: {db_result['model_id']} (ID: {normalized_result_id})")
+                            except Exception as normalized_error:
+                                logger.error(f"[BATCH-DB-FIRST-NORMALIZED] ❌ Failed to save {db_result['model_id']} to normalized: {normalized_error}")
                     else:
                         # 3. FALLBACK: Nur wenn keine guten DB-Ergebnisse, dann neue Provider-Suche
                         logger.info(f"[BATCH-FALLBACK] Keine ausreichenden DB-Ergebnisse - starte Provider-Suche für {mine_name}")
