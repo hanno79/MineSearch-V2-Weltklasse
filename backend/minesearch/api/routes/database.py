@@ -34,7 +34,11 @@ IMPORTANT_TABLES = [
     "mines_normalized",
     "companies", 
     "search_results_normalized",
-    "mine_data_fields"
+    "mine_data_fields",
+    
+    # Atomic Values System (28.08.2025)
+    "field_values",           # Atomische Feldwerte ohne Quellenreferenzen
+    "field_value_sources"     # N:M Verknüpfung zwischen Feldwerten und Quellen
 ]
 
 @router.get("/tables")

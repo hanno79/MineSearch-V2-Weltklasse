@@ -1366,3 +1366,78 @@ class ModelFieldConsistency(Base):
             'last_found_at': self.last_found_at.isoformat() if self.last_found_at else None,
             'last_updated': self.last_updated.isoformat() if self.last_updated else None
         }
+
+
+class FieldValue(Base):
+    """
+    SCHEMA-NORMALISIERUNG 28.08.2025: Atomische Feldwerte ohne Quellenreferenzen
+    Speichert nur den reinen Wert (z.B. "Kanada") ohne [1,2,3] Referenzen
+    """
+    __tablename__ = 'field_values'
+    
+    id = Column(Integer, primary_key=True)
+    search_result_id = Column(Integer, ForeignKey('search_results.id'), nullable=False)
+    field_name = Column(String(100), nullable=False, index=True)
+    atomic_value = Column(Text, nullable=True)  # Nur der Wert, z.B. "Kanada"
+    confidence_score = Column(Float, nullable=False, default=0.0)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    
+    # Relationships
+    search_result = relationship("SearchResult", backref="field_values")
+    field_sources = relationship("FieldValueSource", back_populates="field_value", cascade="all, delete-orphan")
+    
+    # Indizes für Performance
+    __table_args__ = (
+        Index('idx_field_values_result', 'search_result_id'),
+        Index('idx_field_values_name', 'field_name'),
+        Index('idx_field_values_atomic', 'atomic_value'),
+        Index('idx_field_values_result_field', 'search_result_id', 'field_name'),
+    )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Konvertiere zu Dictionary für API-Responses"""
+        return {
+            'id': self.id,
+            'search_result_id': self.search_result_id,
+            'field_name': self.field_name,
+            'atomic_value': self.atomic_value,
+            'confidence_score': self.confidence_score,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'source_count': len(self.field_sources) if self.field_sources else 0
+        }
+
+
+class FieldValueSource(Base):
+    """
+    SCHEMA-NORMALISIERUNG 28.08.2025: N:M Beziehung zwischen Feldwerten und Quellen
+    Ermöglicht saubere Trennung von Wert und Quellenreferenzen
+    """
+    __tablename__ = 'field_value_sources'
+    
+    id = Column(Integer, primary_key=True)
+    field_value_id = Column(Integer, ForeignKey('field_values.id'), nullable=False)
+    source_id = Column(Integer, ForeignKey('sources.id'), nullable=False)
+    extraction_confidence = Column(Float, nullable=False, default=50.0)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    
+    # Relationships
+    field_value = relationship("FieldValue", back_populates="field_sources")
+    source = relationship("Source", backref="field_value_sources")
+    
+    # Indizes für Performance
+    __table_args__ = (
+        Index('idx_fvs_field_value', 'field_value_id'),
+        Index('idx_fvs_source', 'source_id'),
+        Index('idx_fvs_field_source', 'field_value_id', 'source_id'),
+    )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Konvertiere zu Dictionary für API-Responses"""
+        return {
+            'id': self.id,
+            'field_value_id': self.field_value_id,
+            'source_id': self.source_id,
+            'extraction_confidence': self.extraction_confidence,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'source': self.source.to_dict() if self.source else None
+        }
