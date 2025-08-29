@@ -74,14 +74,14 @@ async def test_source_attribution_consistency():
             validation_data = model_result.data.get('source_validation', {})
             validation_valid = validation_data.get('valid', False)
             validation_issues = validation_data.get('issues', [])
-            discovered_count = validation_data.get('discovered_count', 0)
-            result_count = validation_data.get('result_count', 0)
+            discovered_sources_count = validation_data.get('discovered_sources_count', 0)
+            result_sources_count = validation_data.get('result_sources_count', 0)
             
             status_icon = "✅" if validation_valid else "❌"
             print(f"{status_icon} {model_id}:")
             print(f"   📋 Sources im Result: {sources_count}")
-            print(f"   🔍 Discovered Sources: {discovered_count}")
-            print(f"   📊 Result Sources: {result_count}")
+            print(f"   🔍 Discovered Sources: {discovered_sources_count}")
+            print(f"   📊 Result Sources: {result_sources_count}")
             
             if validation_issues:
                 print(f"   ⚠️  Issues: {', '.join(validation_issues)}")
@@ -94,8 +94,8 @@ async def test_source_attribution_consistency():
                 'valid': validation_valid,
                 'issues': validation_issues,
                 'sources_count': sources_count,
-                'discovered_count': discovered_count,
-                'result_count': result_count
+                'discovered_count': discovered_sources_count,
+                'result_count': result_sources_count
             })
         
         # Gesamtbericht

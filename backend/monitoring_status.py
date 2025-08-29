@@ -11,8 +11,51 @@ MONITORING-STATUS 25.08.2025: Einfacher Status-Check für alle Schutzebenen
 import sys
 sys.path.insert(0, '.')
 
+import os
 import sqlite3
 from datetime import datetime
+from pathlib import Path
+from urllib.parse import urlparse
+
+def _resolve_repo_root() -> Path:
+    """Liefert das Projekt-Root basierend auf dem Dateipfad dieser Datei."""
+    # /app/backend/monitoring_status.py → parents[1] = /app
+    return Path(__file__).resolve().parents[1]
+
+def _resolve_database_path() -> str:
+    """
+    Ermittelt den Pfad zur SQLite‑Datenbank in folgender Priorität:
+    1) ENV DATABASE_PATH
+    2) ENV MINES_DB_PATH (Kompatibilität für Tests/CI)
+    3) minesearch.config.base.config.DATABASE_URL (falls sqlite)
+    4) Fallback: backend/minesearch/database/mines.db relativ zum Repo‑Root
+    """
+    repo_root = _resolve_repo_root()
+
+    # 1) & 2) Environment Variablen
+    for env_var in ("DATABASE_PATH", "MINES_DB_PATH"):
+        raw = os.environ.get(env_var)
+        if raw is not None and str(raw).strip() != "":
+            candidate = Path(str(raw).strip())
+            if not candidate.is_absolute():
+                candidate = (repo_root / candidate)
+            return str(candidate.resolve())
+
+    # 3) Konfiguration (nur sqlite URLs)
+    try:
+        from minesearch.config.base import config  # type: ignore
+        db_url = getattr(config, "DATABASE_URL", "")
+        if isinstance(db_url, str) and db_url.startswith("sqlite"):
+            parsed = urlparse(db_url)
+            if parsed.path:
+                return str(Path(parsed.path).resolve())
+    except Exception:
+        # Konfiguration ist optional für dieses Standalone‑Skript
+        pass
+
+    # 4) Fallback: projektrelativer Standardpfad
+    fallback = (repo_root / "backend" / "minesearch" / "database" / "mines.db").resolve()
+    return str(fallback)
 
 def check_monitoring_status():
     """
@@ -59,7 +102,13 @@ def check_monitoring_status():
     
     # 3. DATABASE LAYER CHECK
     try:
-        db_path = "/app/backend/minesearch/database/mines.db"
+        db_path = _resolve_database_path()
+        db_path_obj = Path(db_path)
+        if not (db_path_obj.exists() and db_path_obj.is_file()):
+            raise FileNotFoundError(
+                f"Datenbank nicht gefunden: {db_path}. Setze ENV 'DATABASE_PATH' oder 'MINES_DB_PATH' oder konfiguriere 'DATABASE_URL' (sqlite)."
+            )
+        print(f"   🔎 Datenbank-Pfad: {db_path}")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         

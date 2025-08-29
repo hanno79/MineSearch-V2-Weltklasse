@@ -15,15 +15,12 @@ from datetime import datetime
 from pathlib import Path
 
 # Liste der identifizierten aktiven Datenbanken (aus vorheriger Analyse)
+# ÄNDERUNG 28.08.2025: Konsolidierung auf eine Datenbank
 ACTIVE_DATABASES = [
-    '/app/backend/minesearch/database/mines_backup_pre_cleanup_20250819_070936.db',
-    '/app/backend/minesearch/database/mines.db', 
-    '/app/mines.db',
+    '/app/backend/minesearch/database/mines.db',  # Einzige produktive Datenbank
     '/app/.claude-flow/metrics/memory.db',
     '/app/.swarm/memory.db',
-    '/app/.claude-flow/knowledge.db',
-    '/app/backend/minesearch.db',
-    '/app/backend/mines.db'
+    '/app/.claude-flow/knowledge.db'
 ]
 
 def verify_database_integrity(db_path):

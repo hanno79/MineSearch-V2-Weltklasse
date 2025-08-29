@@ -7,6 +7,7 @@ Beschreibung: Basis-Konfiguration für MineSearch
 
 import os
 from pathlib import Path
+from typing import Any, Dict, Optional
 from dotenv import load_dotenv
 from minesearch.config.api_keys import APIKeysConfig
 from minesearch.config.providers import PROVIDERS_CONFIG
@@ -130,6 +131,125 @@ class Config(APIKeysConfig):
         '*reclamation*.pdf', '*rehabilitation*.pdf', '*annual-report*.pdf',
         '*sustainability-report*.pdf', '*resource-estimate*.pdf'
     ]
+    
+    # Defaults für den Sequential Field Orchestrator
+    _SEQUENTIAL_DEFAULTS: Dict[str, Any] = {
+        'max_sources_per_model': 50,
+        'source_quality_threshold': 0.3,
+        'field_search_timeout': 30,
+        'max_concurrent_field_searches': 3,
+        'enable_source_ranking': True,
+    }
+
+    @classmethod
+    def get_sequential_search_settings(cls, overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Liefert typisierte und validierte Einstellungen für den Sequential Field Orchestrator
+        aus der zentralen Konfiguration/Umgebung mit sinnvollen Defaults.
+
+        Unterstützte ENV-Variablen:
+        - SEQUENTIAL_MAX_SOURCES_PER_MODEL (int >= 1)
+        - SEQUENTIAL_SOURCE_QUALITY_THRESHOLD (float 0.0..1.0)
+        - SEQUENTIAL_FIELD_SEARCH_TIMEOUT (int >= 1, Sekunden)
+        - SEQUENTIAL_MAX_CONCURRENT_FIELD_SEARCHES (int >= 1)
+        - SEQUENTIAL_ENABLE_SOURCE_RANKING (bool)
+        """
+
+        def _parse_int(name: str, default: int, min_value: int = 1) -> int:
+            raw = os.getenv(name)
+            if raw is None or str(raw).strip() == '':
+                return default
+            try:
+                value = int(str(raw).strip())
+            except Exception:
+                raise ValueError(f"Ungültiger Integer für {name}: '{raw}'. Erwartet wird eine ganze Zahl.")
+            if value < min_value:
+                raise ValueError(f"Ungültiger Wert für {name}: {value} (Minimum: {min_value}).")
+            return value
+
+        def _parse_float(name: str, default: float, min_value: Optional[float] = None, max_value: Optional[float] = None) -> float:
+            raw = os.getenv(name)
+            if raw is None or str(raw).strip() == '':
+                return default
+            try:
+                value = float(str(raw).strip())
+            except Exception:
+                raise ValueError(f"Ungültiger Float für {name}: '{raw}'. Erwartet wird eine Zahl.")
+            if min_value is not None and value < min_value:
+                raise ValueError(f"Ungültiger Wert für {name}: {value} (< {min_value}).")
+            if max_value is not None and value > max_value:
+                raise ValueError(f"Ungültiger Wert für {name}: {value} (> {max_value}).")
+            return value
+
+        def _parse_bool(name: str, default: bool) -> bool:
+            raw = os.getenv(name)
+            if raw is None or str(raw).strip() == '':
+                return default
+            lowered = str(raw).strip().lower()
+            if lowered in ('1', 'true', 'yes', 'on'):
+                return True
+            if lowered in ('0', 'false', 'no', 'off'):
+                return False
+            raise ValueError(
+                f"Ungültiger boolescher Wert für {name}: '{raw}'. Erlaubt sind: 1/0, true/false, yes/no, on/off."
+            )
+
+        # Zuerst Werte aus ENV laden
+        settings = {
+            'max_sources_per_model': _parse_int(
+                'SEQUENTIAL_MAX_SOURCES_PER_MODEL', cls._SEQUENTIAL_DEFAULTS['max_sources_per_model'], 1
+            ),
+            'source_quality_threshold': _parse_float(
+                'SEQUENTIAL_SOURCE_QUALITY_THRESHOLD', cls._SEQUENTIAL_DEFAULTS['source_quality_threshold'], 0.0, 1.0
+            ),
+            'field_search_timeout': _parse_int(
+                'SEQUENTIAL_FIELD_SEARCH_TIMEOUT', cls._SEQUENTIAL_DEFAULTS['field_search_timeout'], 1
+            ),
+            'max_concurrent_field_searches': _parse_int(
+                'SEQUENTIAL_MAX_CONCURRENT_FIELD_SEARCHES', cls._SEQUENTIAL_DEFAULTS['max_concurrent_field_searches'], 1
+            ),
+            'enable_source_ranking': _parse_bool(
+                'SEQUENTIAL_ENABLE_SOURCE_RANKING', cls._SEQUENTIAL_DEFAULTS['enable_source_ranking']
+            ),
+        }
+
+        # Dann optionale Overrides anwenden (mit Validierung)
+        if overrides:
+            for key, value in overrides.items():
+                if key not in settings:
+                    raise ValueError(f"Unbekannte Orchestrator-Einstellung: '{key}'")
+                try:
+                    if key in ('max_sources_per_model', 'field_search_timeout', 'max_concurrent_field_searches'):
+                        # Erlaube Strings, ints
+                        if isinstance(value, bool):
+                            # bool ist Subklasse von int -> nicht akzeptieren hier
+                            raise ValueError
+                        coerced = int(value)
+                        if coerced < 1:
+                            raise ValueError
+                        settings[key] = coerced
+                    elif key == 'source_quality_threshold':
+                        coerced_f = float(value)
+                        if coerced_f < 0.0 or coerced_f > 1.0:
+                            raise ValueError
+                        settings[key] = coerced_f
+                    elif key == 'enable_source_ranking':
+                        if isinstance(value, bool):
+                            settings[key] = value
+                        elif isinstance(value, str):
+                            lowered = value.strip().lower()
+                            if lowered in ('1', 'true', 'yes', 'on'):
+                                settings[key] = True
+                            elif lowered in ('0', 'false', 'no', 'off'):
+                                settings[key] = False
+                            else:
+                                raise ValueError
+                        else:
+                            raise ValueError
+                except Exception:
+                    raise ValueError(f"Ungültiger Wert für Override '{key}': {value}")
+
+        return settings
     
     @classmethod
     def validate(cls):

@@ -19,6 +19,8 @@ except ImportError:
     fcntl = None
     HAS_FCNTL = False
 import os
+import tempfile
+import threading
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -40,33 +42,156 @@ from minesearch.database.sequential_manager import SequentialDatabaseManager
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Konfigurierbares Sicherheitslimit für CSV-Einträge (Default 10.000)
+MAX_MINES_LIMIT = int(os.getenv("MAX_MINES_LIMIT", "10000"))
+
+# Anfrage-basiertes Sicherheitslimit pro Batch-Request (Client/Server-Validierung)
+BATCH_REQUEST_MAX_COUNT = int(os.getenv("BATCH_MAX_COUNT", "1000"))
+
 # NORMALIZED SCHEMA FIX 28.08.2025: Initialize NormalizedDatabaseManager
 normalized_db_manager = NormalizedDatabaseManager()
 
+# Modulweiter Fallback-Lock für plattformübergreifende Serialisierung von Dateischreibzugriffen
+file_write_lock = threading.Lock()
+
 def safe_write_to_file(filepath: str, content: str, mode: str = 'a'):
     """
-    Thread-safe file writing with fcntl locking
+    Thread-safe, cross-platform file writing with locking
     
     Args:
         filepath: Path to the file
         content: Content to write
         mode: File mode ('a' for append, 'w' for overwrite)
     """
+    # Prefer lightweight cross-platform file locks if available
+    # Order: fcntl (POSIX) -> portalocker -> filelock -> threading.Lock
     try:
-        with open(filepath, mode, encoding='utf-8') as f:
-            # Acquire exclusive lock if fcntl is available
-            if HAS_FCNTL:
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        # Lazy import of optional dependencies to avoid hard dependency
+        try:
+            import portalocker  # type: ignore
+            HAS_PORTALOCKER = True
+        except Exception:
+            portalocker = None  # type: ignore
+            HAS_PORTALOCKER = False
+        try:
+            from filelock import FileLock  # type: ignore
+            HAS_FILELOCK = True
+        except Exception:
+            FileLock = None  # type: ignore
+            HAS_FILELOCK = False
+
+        lock_timeout_seconds = 10
+        lockfile_path = f"{filepath}.lock"
+
+        if HAS_FCNTL:
+            # POSIX path: use fcntl on a dedicated handle to serialize writers
             try:
-                f.write(content)
-                f.flush()
-                os.fsync(f.fileno())  # Ensure data is written to disk
+                with open(filepath, 'a+', encoding='utf-8') as lock_handle:
+                    fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+                    if mode == 'a':
+                        with open(filepath, 'a', encoding='utf-8') as f:
+                            f.write(content)
+                            f.flush()
+                            os.fsync(f.fileno())
+                    else:
+                        # Atomic overwrite via temp file + os.replace
+                        dir_name = os.path.dirname(filepath) or '.'
+                        base_name = os.path.basename(filepath)
+                        fd, tmp_path = tempfile.mkstemp(prefix=f".{base_name}.", dir=dir_name, text=True)
+                        try:
+                            with os.fdopen(fd, 'w', encoding='utf-8') as tmp_f:
+                                tmp_f.write(content)
+                                tmp_f.flush()
+                                os.fsync(tmp_f.fileno())
+                            os.replace(tmp_path, filepath)
+                        finally:
+                            try:
+                                if os.path.exists(tmp_path):
+                                    os.remove(tmp_path)
+                            except Exception:
+                                pass
             finally:
-                # Lock is automatically released when file is closed
+                # fcntl lock released on close
                 pass
+        else:
+            # Cross-platform fallback using external or in-process locks
+            if 'HAS_PORTALOCKER' in locals() and HAS_PORTALOCKER:
+                with portalocker.Lock(lockfile_path, timeout=lock_timeout_seconds):
+                    if mode == 'a':
+                        with open(filepath, 'a', encoding='utf-8') as f:
+                            f.write(content)
+                            f.flush()
+                            os.fsync(f.fileno())
+                    else:
+                        dir_name = os.path.dirname(filepath) or '.'
+                        base_name = os.path.basename(filepath)
+                        fd, tmp_path = tempfile.mkstemp(prefix=f".{base_name}.", dir=dir_name, text=True)
+                        try:
+                            with os.fdopen(fd, 'w', encoding='utf-8') as tmp_f:
+                                tmp_f.write(content)
+                                tmp_f.flush()
+                                os.fsync(tmp_f.fileno())
+                            os.replace(tmp_path, filepath)
+                        finally:
+                            try:
+                                if os.path.exists(tmp_path):
+                                    os.remove(tmp_path)
+                            except Exception:
+                                pass
+            elif 'HAS_FILELOCK' in locals() and HAS_FILELOCK:
+                with FileLock(lockfile_path, timeout=lock_timeout_seconds):
+                    if mode == 'a':
+                        with open(filepath, 'a', encoding='utf-8') as f:
+                            f.write(content)
+                            f.flush()
+                            os.fsync(f.fileno())
+                    else:
+                        dir_name = os.path.dirname(filepath) or '.'
+                        base_name = os.path.basename(filepath)
+                        fd, tmp_path = tempfile.mkstemp(prefix=f".{base_name}.", dir=dir_name, text=True)
+                        try:
+                            with os.fdopen(fd, 'w', encoding='utf-8') as tmp_f:
+                                tmp_f.write(content)
+                                tmp_f.flush()
+                                os.fsync(tmp_f.fileno())
+                            os.replace(tmp_path, filepath)
+                        finally:
+                            try:
+                                if os.path.exists(tmp_path):
+                                    os.remove(tmp_path)
+                            except Exception:
+                                pass
+            else:
+                # Last resort: serialize within this process
+                with file_write_lock:
+                    if mode == 'a':
+                        with open(filepath, 'a', encoding='utf-8') as f:
+                            f.write(content)
+                            f.flush()
+                            os.fsync(f.fileno())
+                    else:
+                        dir_name = os.path.dirname(filepath) or '.'
+                        base_name = os.path.basename(filepath)
+                        fd, tmp_path = tempfile.mkstemp(prefix=f".{base_name}.", dir=dir_name, text=True)
+                        try:
+                            with os.fdopen(fd, 'w', encoding='utf-8') as tmp_f:
+                                tmp_f.write(content)
+                                tmp_f.flush()
+                                os.fsync(tmp_f.fileno())
+                            os.replace(tmp_path, filepath)
+                        finally:
+                            try:
+                                if os.path.exists(tmp_path):
+                                    os.remove(tmp_path)
+                            except Exception:
+                                pass
     except (IOError, OSError) as e:
         logger.error(f"Failed to write to {filepath}: {e}")
         # Fallback to regular logging
+        logger.info(f"[DEBUG-FILE-FALLBACK] {content.strip()}")
+    except Exception as e:
+        # Logge auch nicht-OS-Fehler (z.B. Lock-Timeouts externer Libraries)
+        logger.error(f"Failed to write to {filepath}: {e}")
         logger.info(f"[DEBUG-FILE-FALLBACK] {content.strip()}")
 
 # Alternative: Use application logging infrastructure (recommended)
@@ -252,6 +377,13 @@ async def upload_csv(csv_file: UploadFile = File(...)):
             if i == 0:
                 columns = list(row.keys())
             mines.append(row)
+            # Abbruch bei Erreichen des konfigurierten Limits, um Systemüberlastung zu vermeiden
+            if i + 1 >= MAX_MINES_LIMIT:
+                logger.warning(
+                    "MAX_MINES_LIMIT erreicht (%d). Verarbeitung wird gestoppt, um das System zu schützen.",
+                    MAX_MINES_LIMIT,
+                )
+                break
         
         # Erstelle Session
         import uuid
@@ -300,7 +432,7 @@ async def upload_csv(csv_file: UploadFile = File(...)):
                             <label><input type="radio" name="search_all" value="false" checked> Nur erste 5 Minen (schnell)</label>
                         </div>
                         <div style="margin: 10px 0;">
-                            <label><input type="radio" name="search_all" value="false"> Erste <input type="number" name="count" value="20" min="1" max="10000" style="width: 60px;"> Minen</label>
+                            <label><input type="radio" name="search_all" value="false"> Erste <input type="number" name="count" value="20" min="1" max="1000" style="width: 60px;"> Minen</label>
                         </div>
                         <div style="margin: 10px 0;">
                             <label><input type="radio" name="search_all" value="true"> <strong>Alle {mine_count} Minen durchsuchen</strong></label>
@@ -371,6 +503,7 @@ async def batch_search(
     search_type: str = Form("standard"),
     count: Optional[int] = Form(None),
     search_all: Optional[str] = Form("false"),
+    start_index: Optional[int] = Form(0),
     selected_models: Optional[str] = Form(None, description="Komma-getrennte Modell-Liste"),
     # ÄNDERUNG 07.07.2025: Option für Mehrfach-Durchlauf
     consistency_check: Optional[str] = Form("false"),
@@ -399,13 +532,27 @@ async def batch_search(
         logger.info(f"[BATCH-MINE-SELECTION] Parameters - search_all: '{search_all}', count: {count}")
         logger.info(f"[BATCH-MINE-SELECTION] CSV enthält {len(mines)} Minen total")
         
+        # Serverseitige Validierung & Pagination
+        try:
+            effective_start = int(start_index or 0)
+            if effective_start < 0:
+                effective_start = 0
+        except Exception:
+            effective_start = 0
+
         if search_all == "true":
-            mines_to_search = mines
-            logger.info(f"[BATCH-MINE-SELECTION] ✅ ALLE MINEN MODUS - verarbeite {len(mines_to_search)} Minen")
+            # Wenn 'alle', verarbeite ab start_index in Seiten von maximal BATCH_REQUEST_MAX_COUNT
+            end_index = min(len(mines), effective_start + BATCH_REQUEST_MAX_COUNT)
+            mines_to_search = mines[effective_start:end_index]
+            logger.info(f"[BATCH-MINE-SELECTION] ✅ ALLE MINEN MODUS (paginiert) - verarbeite {len(mines_to_search)} Minen (Start {effective_start})")
         else:
             limit = count if count else 5
-            mines_to_search = mines[:limit]
-            logger.info(f"[BATCH-MINE-SELECTION] 🧪 BEGRENZT MODUS - verarbeite erste {limit} von {len(mines)} Minen")
+            if limit > BATCH_REQUEST_MAX_COUNT:
+                logger.warning(f"[BATCH-VALIDATION] count {limit} > MAX {BATCH_REQUEST_MAX_COUNT} - kappen")
+                limit = BATCH_REQUEST_MAX_COUNT
+            end_index = min(len(mines), effective_start + limit)
+            mines_to_search = mines[effective_start:end_index]
+            logger.info(f"[BATCH-MINE-SELECTION] 🧪 BEGRENZT MODUS - verarbeite {len(mines_to_search)} (Start {effective_start}, Limit {limit}) von {len(mines)} Minen")
             
         logger.info(f"[BATCH-MINE-SELECTION] 🎯 FINALE ENTSCHEIDUNG: {len(mines_to_search)} Minen werden durchsucht")
         
@@ -434,6 +581,18 @@ async def batch_search(
                 status_code=400, 
                 detail="Mindestens ein gültiges Modell muss ausgewählt werden. Frontend-Parameter: selected_models, model"
             )
+
+        # Zusätzliche serverseitige Validierung: count darf nicht > BATCH_REQUEST_MAX_COUNT sein
+        if search_all != "true":
+            try:
+                requested_count = int(count or 0)
+            except Exception:
+                requested_count = 0
+            if requested_count > BATCH_REQUEST_MAX_COUNT:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Maximale Batch-Größe pro Anfrage ist {BATCH_REQUEST_MAX_COUNT}. Nutzen Sie Pagination über 'start_index'."
+                )
         
         # DEBUG: Schaue erste Minen an
         logger.info(f"[BATCH-DEBUG] Erste 3 Minen: {mines_to_search[:3]}")

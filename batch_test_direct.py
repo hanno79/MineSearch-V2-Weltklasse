@@ -8,12 +8,40 @@ import asyncio
 from playwright.async_api import async_playwright
 import time
 import logging
+import os
+
+def env_to_bool(name: str, default: bool) -> bool:
+    """Parse a boolean from environment variable values.
+    Accepts: 1/0, true/false, t/f, yes/no, y/n, on/off (case-insensitive).
+    Falls back to default on missing/invalid values.
+    """
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in ("1", "true", "t", "yes", "y", "on"):
+        return True
+    if normalized in ("0", "false", "f", "no", "n", "off"):
+        return False
+    return default
+
+def env_to_int(name: str, default: int) -> int:
+    """Parse an integer from an environment variable, with default fallback."""
+    value = os.environ.get(name)
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
 
 async def test_fixed_batch_route():
     print("🎬 [FIXED-BATCH-TEST] Starting direct browser test...")
     
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False, slow_mo=500)  # Sichtbar für Debug
+        headless = env_to_bool("HEADLESS", True)
+        slow_mo = env_to_int("SLOW_MO", 0)
+        browser = await p.chromium.launch(headless=headless, slow_mo=slow_mo)  # Konfigurierbar via ENV
         page = await browser.new_page()
         
         try:
@@ -58,14 +86,19 @@ async def test_fixed_batch_route():
 Canadian Malartic,Canada,Quebec,Gold
 Lac Expanse,Canada,Quebec,Gold"""
             
-            with open("/tmp/test_batch.csv", "w", encoding="utf-8", newline="") as f:
-                f.write(csv_content)
-            print("📝 [TEST] Created test CSV with 3 mines")
+            csv_path = "/tmp/test_batch.csv"
+            try:
+                with open(csv_path, "w", encoding="utf-8", newline="") as f:
+                    f.write(csv_content)
+                print("📝 [TEST] Created test CSV with 3 mines")
+            except Exception as write_err:
+                print(f"❌ [TEST] Failed to write CSV to {csv_path}: {write_err}")
+                raise RuntimeError(f"Failed to write test CSV at {csv_path}") from write_err
             
             # 5. Upload CSV
             file_input = page.locator("input[type='file']").first
             if await file_input.count() > 0:
-                await file_input.set_input_files("/tmp/test_batch.csv")
+                await file_input.set_input_files(csv_path)
                 await page.wait_for_timeout(2000)
                 print("✅ [TEST] CSV uploaded")
                 
@@ -185,6 +218,14 @@ Lac Expanse,Canada,Quebec,Gold"""
         finally:
             print("🏁 [TEST] Test completed, closing browser...")
             await browser.close()
+            # Cleanup temporary CSV file
+            try:
+                csv_path = "/tmp/test_batch.csv"
+                if os.path.exists(csv_path):
+                    os.remove(csv_path)
+                    print("🧹 [TEST] Removed temporary CSV file")
+            except Exception as cleanup_err:
+                print(f"⚠️ [TEST] Could not remove {csv_path}: {cleanup_err}")
 
 if __name__ == "__main__":
     asyncio.run(test_fixed_batch_route())

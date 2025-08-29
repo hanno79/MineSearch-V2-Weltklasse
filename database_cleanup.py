@@ -18,9 +18,9 @@ def identify_cleanup_candidates():
     print("🔍 CLEANUP-KANDIDATEN IDENTIFIKATION")
     print("-" * 40)
     
-    # Nach der Konsolidierung: Nur eine aktive DB + Backups behalten
+    # ÄNDERUNG 28.08.2025: Nach der Konsolidierung - nur eine aktive DB
     active_db = "/app/backend/minesearch/database/mines.db"
-    gui_symlink = "/app/mines.db"
+    # Alte GUI-DB sollte nicht mehr existieren
     
     # Alle .db Dateien finden
     all_dbs = []

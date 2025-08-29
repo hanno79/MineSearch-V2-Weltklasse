@@ -104,7 +104,12 @@ if not exact_sources:
 
 # CSV-kompatible Formatierung
 exact_sources_text = "; ".join(exact_sources)
-escaped_exact_sources = exact_sources_text.replace("|", "\\|")
+import csv
+import io
+string_buffer = io.StringIO()
+csv_writer = csv.writer(string_buffer, delimiter='|')
+csv_writer.writerow([exact_sources_text])
+escaped_exact_sources = string_buffer.getvalue().rstrip("\r\n")
 row.append(escaped_exact_sources)
 ```
 

@@ -44,6 +44,15 @@ htmlcov/
 # Cleanup
 to_delete/
 
+# Ignore duplicate backend metrics artifacts
+backend/.claude-flow/metrics/
+backend/.claude-flow/metrics/system-metrics.json
+
+# Metrics (do not version raw dumps)
+.claude-flow/metrics/
+!.claude-flow/metrics/README.md
+!.claude-flow/metrics/*.sample.json
+
 # Node
 node_modules/
 **/node_modules/

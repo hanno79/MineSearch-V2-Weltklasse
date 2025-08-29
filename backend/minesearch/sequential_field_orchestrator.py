@@ -7,6 +7,9 @@ Beschreibung: Sequential Field Orchestrator - Optimaler Workflow für maximale D
 
 import asyncio
 import logging
+import os
+import json
+from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Set
 from dataclasses import dataclass, field
@@ -89,14 +92,14 @@ class SequentialFieldOrchestrator:
     2. Feld-für-Feld Suche: Jedes Modell durchsucht alle Quellen für jedes Feld
     """
     
-    def __init__(self):
+    def __init__(self, settings: Optional[Dict[str, Any]] = None):
         self.registry = provider_registry
         self.source_discovery = EnhancedSourceDiscovery()
         
-        # Definiere die zu durchsuchenden Felder in Prioritätsreihenfolge
-        self.critical_fields = [
+        # Kritische Felder: aus Konfiguration laden (Priorität = Reihenfolge); Fallback auf Standardliste
+        default_critical_fields = [
             'Country',
-            'Region', 
+            'Region',
             'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)',
             'Eigentümer',
             'Betreiber',
@@ -114,15 +117,15 @@ class SequentialFieldOrchestrator:
             'Kostenjahr',
             'Minenfläche in qkm'
         ]
+
+        self.critical_fields = self._load_critical_fields_from_config(default_critical_fields)
         
-        # Konfiguration für sequentielle Suche
-        self.config = {
-            'max_sources_per_model': 50,  # Maximum neue Quellen pro Modell
-            'source_quality_threshold': 0.3,  # Mindest-Qualitätsscore für Quellen
-            'field_search_timeout': 30,  # Timeout pro Feld-Suche in Sekunden
-            'max_concurrent_field_searches': 3,  # Max parallele Feld-Suchen pro Modell
-            'enable_source_ranking': True,  # Quellen nach Qualität sortieren
-        }
+        # Konfiguration für sequentielle Suche aus zentraler Config laden
+        # Unterstützt ENV-Overrides und beinhaltet Typvalidierung
+        try:
+            self.config = config.get_sequential_search_settings(settings)
+        except Exception as e:
+            raise ValueError(f"Ungültige Orchestrator-Konfiguration: {e}")
     
     async def orchestrate_sequential_search(
         self,
@@ -293,7 +296,7 @@ class SequentialFieldOrchestrator:
                 logger.info(f"[SOURCE-DISCOVERY-PHASE] {model_id} fand {len(model_sources)} Quellen, {len(new_sources)} davon neu")
                 
                 # Aktualisiere Quellendatenbank mit neuen Quellen
-                await self._update_source_database(new_sources, model_id, mine_name)
+                self._update_source_database(new_sources, model_id, mine_name)
                 
             except Exception as e:
                 logger.error(f"[SOURCE-DISCOVERY-PHASE] Fehler bei {model_id}: {str(e)}")
@@ -339,32 +342,70 @@ class SequentialFieldOrchestrator:
             
             field_search_results = []
             
-            # Jedes Modell durchsucht alle Quellen für dieses eine Feld
+            # Begrenzte Nebenläufigkeit: pro Feld mehrere Modelle parallel suchen lassen
+            max_concurrent = max(1, int(self.config.get('max_concurrent_field_searches', 1)))
+            field_search_timeout = max(1, int(self.config.get('field_search_timeout', 30)))
+            semaphore = asyncio.Semaphore(max_concurrent)
+            tasks = []
+
+            # Vorab Start-Logging in stabiler Reihenfolge
             for model_idx, model_id in enumerate(models, 1):
                 logger.info(f"[FIELD-BY-FIELD-PHASE] Feld '{field_name}' mit {model_id} ({model_idx}/{len(models)})")
-                
-                try:
-                    field_result = await self._search_single_field_with_all_sources(
-                        field_name=field_name,
-                        model_id=model_id,
-                        sources=sources,
-                        mine_name=mine_name,
-                        country=country,
-                        region=region,
-                        commodity=commodity
-                    )
-                    
-                    field_search_results.append(field_result)
-                    
-                    if field_result.success and field_result.value_found:
-                        logger.info(f"[FIELD-BY-FIELD-PHASE] ✅ {model_id} fand für '{field_name}': '{field_result.value_found}' (Confidence: {field_result.confidence})")
-                    else:
-                        logger.info(f"[FIELD-BY-FIELD-PHASE] ❌ {model_id} fand nichts für '{field_name}'")
-                
-                except Exception as e:
-                    logger.error(f"[FIELD-BY-FIELD-PHASE] Fehler bei {model_id} für Feld '{field_name}': {str(e)}")
-                    
-                    field_search_results.append(FieldSearchResult(
+
+                async def _run_model_search(mid=model_id, mindex=model_idx, fname=field_name):
+                    async with semaphore:
+                        try:
+                            return await asyncio.wait_for(
+                                self._search_single_field_with_all_sources(
+                                    field_name=fname,
+                                    model_id=mid,
+                                    sources=sources,
+                                    mine_name=mine_name,
+                                    country=country,
+                                    region=region,
+                                    commodity=commodity
+                                ),
+                                timeout=field_search_timeout
+                            )
+                        except asyncio.TimeoutError:
+                            logger.error(f"[FIELD-BY-FIELD-PHASE] Fehler bei {mid} für Feld '{fname}': Timeout nach {field_search_timeout}s")
+                            return FieldSearchResult(
+                                field_name=fname,
+                                model_id=mid,
+                                value_found=None,
+                                confidence=None,
+                                sources_used=[],
+                                sources_that_had_data=[],
+                                search_duration=0,
+                                success=False,
+                                error=f"Timeout nach {field_search_timeout}s"
+                            )
+                        except Exception as e:
+                            # Fehler pro Task protokollieren und in FieldSearchResult umwandeln (wie zuvor)
+                            logger.error(f"[FIELD-BY-FIELD-PHASE] Fehler bei {mid} für Feld '{fname}': {str(e)}")
+                            return FieldSearchResult(
+                                field_name=fname,
+                                model_id=mid,
+                                value_found=None,
+                                confidence=None,
+                                sources_used=[],
+                                sources_that_had_data=[],
+                                search_duration=0,
+                                success=False,
+                                error=str(e)
+                            )
+
+                tasks.append(asyncio.create_task(_run_model_search()))
+
+            # Warte auf alle Tasks; Ergebnisse bleiben in Modell-Reihenfolge
+            gathered = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for model_idx, model_id, result in zip(range(1, len(models) + 1), models, gathered):
+                if isinstance(result, Exception):
+                    # Unerwarteter Ausnahmefall außerhalb des Task-Handlings
+                    err_msg = str(result)
+                    logger.error(f"[FIELD-BY-FIELD-PHASE] Fehler bei {model_id} für Feld '{field_name}': {err_msg}")
+                    result = FieldSearchResult(
                         field_name=field_name,
                         model_id=model_id,
                         value_found=None,
@@ -373,8 +414,16 @@ class SequentialFieldOrchestrator:
                         sources_that_had_data=[],
                         search_duration=0,
                         success=False,
-                        error=str(e)
-                    ))
+                        error=err_msg
+                    )
+
+                field_search_results.append(result)
+
+                # Logging wie zuvor: ✅ bei Erfolg; ❌ bei Misserfolg ohne Fehlerobjekt
+                if result.success and result.value_found:
+                    logger.info(f"[FIELD-BY-FIELD-PHASE] ✅ {model_id} fand für '{field_name}': '{result.value_found}' (Confidence: {result.confidence})")
+                elif not result.error:
+                    logger.info(f"[FIELD-BY-FIELD-PHASE] ❌ {model_id} fand nichts für '{field_name}'")
             
             # Erstelle Field Completion Report
             field_report = self._create_field_completion_report(field_name, field_search_results, len(sources))
@@ -586,7 +635,7 @@ class SequentialFieldOrchestrator:
         
         return consolidated
     
-    async def _update_source_database(
+    def _update_source_database(
         self,
         sources: List[Dict],
         model_id: str,
@@ -657,3 +706,105 @@ class SequentialFieldOrchestrator:
         }
         
         return stats
+
+    def _load_critical_fields_from_config(self, default_fields: List[str]) -> List[str]:
+        """
+        Lädt priorisierte Felder aus Konfiguration.
+        Quellen (in Reihenfolge):
+          1) Datei aus ENV SEQUENTIAL_CRITICAL_FIELDS_FILE (JSON oder YAML)
+          2) ENV SEQUENTIAL_CRITICAL_FIELDS (JSON-Array oder Komma-separiert)
+          3) Fallback: default_fields
+        """
+        # 1) Datei aus ENV
+        file_path_env = os.getenv('SEQUENTIAL_CRITICAL_FIELDS_FILE')
+        if file_path_env:
+            try:
+                cfg_path = Path(file_path_env).expanduser()
+                if not cfg_path.is_absolute():
+                    # Versuche relativ zum Projektroot (/app)
+                    project_root = Path(__file__).resolve().parents[3]
+                    cfg_path = (project_root / cfg_path).resolve()
+                if cfg_path.exists() and cfg_path.is_file():
+                    if cfg_path.suffix.lower() == '.json':
+                        with cfg_path.open('r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        fields = self._extract_fields_from_loaded_data(data)
+                        if fields:
+                            logger.info(f"[CONFIG] Kritische Felder aus JSON-Datei geladen: {cfg_path}")
+                            return fields
+                    elif cfg_path.suffix.lower() in ('.yml', '.yaml'):
+                        try:
+                            import yaml  # type: ignore
+                        except Exception:
+                            logger.warning("[CONFIG] YAML-Unterstützung nicht verfügbar (PyYAML fehlt). Fallback auf Default-Felder.")
+                        else:
+                            with cfg_path.open('r', encoding='utf-8') as f:
+                                data = yaml.safe_load(f)
+                            fields = self._extract_fields_from_loaded_data(data)
+                            if fields:
+                                logger.info(f"[CONFIG] Kritische Felder aus YAML-Datei geladen: {cfg_path}")
+                                return fields
+                    else:
+                        logger.warning(f"[CONFIG] Nicht unterstütztes Dateiformat für SEQUENTIAL_CRITICAL_FIELDS_FILE: {cfg_path.suffix}")
+                else:
+                    logger.warning(f"[CONFIG] Datei in SEQUENTIAL_CRITICAL_FIELDS_FILE nicht gefunden: {cfg_path}")
+            except Exception as e:
+                logger.warning(f"[CONFIG] Fehler beim Laden der Datei {file_path_env}: {e}")
+
+        # 2) ENV-Variable direkt
+        env_value = os.getenv('SEQUENTIAL_CRITICAL_FIELDS')
+        if env_value:
+            # Versuche zuerst JSON
+            parsed: Optional[List[str]] = None
+            try:
+                data = json.loads(env_value)
+                parsed = self._extract_fields_from_loaded_data(data)
+            except Exception:
+                # Fallback: Komma-/Zeilen-separiert
+                candidates = [p.strip() for p in env_value.replace('\n', ',').split(',')]
+                cleaned = [c for c in candidates if c]
+                if self._is_valid_fields_list(cleaned):
+                    parsed = cleaned
+            if parsed:
+                logger.info("[CONFIG] Kritische Felder aus ENV SEQUENTIAL_CRITICAL_FIELDS geladen")
+                return parsed
+            else:
+                logger.warning("[CONFIG] Ungültiger Wert in SEQUENTIAL_CRITICAL_FIELDS - verwende Default-Felder")
+
+        # 3) Fallback: Defaults (Kopie)
+        logger.info("[CONFIG] Verwende Default-Liste für kritische Felder")
+        return list(default_fields)
+
+    def _extract_fields_from_loaded_data(self, data: Any) -> Optional[List[str]]:
+        """Extrahiert und validiert eine Felderliste aus beliebigen geladenen Daten."""
+        fields: Optional[List[str]] = None
+        if isinstance(data, list):
+            if self._is_valid_fields_list(data):
+                fields = [str(x).strip() for x in data]
+        elif isinstance(data, dict):
+            for key in ('fields', 'sequential_critical_fields', 'critical_fields'):
+                value = data.get(key)
+                if isinstance(value, list) and self._is_valid_fields_list(value):
+                    fields = [str(x).strip() for x in value]
+                    break
+        # Dedupliziere unter Beibehaltung der Reihenfolge
+        if fields:
+            seen = set()
+            deduped: List[str] = []
+            for item in fields:
+                if item not in seen and item != '':
+                    seen.add(item)
+                    deduped.append(item)
+            return deduped if deduped else None
+        return None
+
+    def _is_valid_fields_list(self, value: Any) -> bool:
+        """Prüft ob value eine Liste nicht-leerer Strings ist."""
+        if not isinstance(value, list):
+            return False
+        for item in value:
+            if not isinstance(item, (str, bytes)):
+                return False
+            if not str(item).strip():
+                return False
+        return True

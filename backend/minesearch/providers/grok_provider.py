@@ -22,7 +22,7 @@ from minesearch.utils import (
     generate_multilingual_search_terms,
     get_country_config,
 )
-from minesearch.specialized_prompts import SpecializedPrompts
+from minesearch.specialized_prompts_impl import SpecializedPrompts
 
 logger = logging.getLogger(__name__)
 
@@ -398,8 +398,6 @@ Markiere deutlich welche Informationen AKTUALISIERT wurden!"""
         """
         currency = options.get('currency', 'USD')
         
-        # Importiere spezialisierte Anti-Template-Anweisungen
-        from minesearch.specialized_prompts_impl import SpecializedPrompts
         universal_instructions = SpecializedPrompts.get_universal_anti_template_instructions()
         
         # Grok-spezifischer Prompt für Real-time Daten mit RULE 10 Compliance

@@ -7,7 +7,45 @@ Beschreibung: Prüfe Datenbank-Inhalte für Statistik-Debug
 """
 
 import sys
-sys.path.append('/app/backend')
+import os
+from pathlib import Path
+import importlib.util
+
+def _ensure_backend_on_sys_path() -> None:
+    # Bevor wir sys.path verändern, prüfen wir, ob das Paket bereits installiert/auffindbar ist
+    if importlib.util.find_spec('minesearch') is not None:
+        return
+
+    backend_env = os.environ.get('BACKEND_PATH')
+    candidate_paths = []
+
+    if backend_env:
+        env_path = Path(backend_env).expanduser().resolve()
+        # Entweder zeigt BACKEND_PATH direkt auf den Backend-Ordner
+        if (env_path / 'minesearch').is_dir():
+            candidate_paths.append(env_path)
+        # ...oder auf das Repo-Root und wir hängen 'backend' an
+        elif (env_path / 'backend' / 'minesearch').is_dir():
+            candidate_paths.append(env_path / 'backend')
+
+    # Fallback: relativ zum aktuellen Skript nach /backend suchen
+    start_dir = Path(__file__).resolve().parent
+    if (start_dir / 'backend' / 'minesearch').is_dir():
+        candidate_paths.append(start_dir / 'backend')
+    else:
+        for parent in start_dir.parents:
+            candidate = parent / 'backend'
+            if (candidate / 'minesearch').is_dir():
+                candidate_paths.append(candidate)
+                break
+
+    for candidate in candidate_paths:
+        candidate_str = str(candidate)
+        if candidate.is_dir() and candidate_str not in sys.path:
+            sys.path.append(candidate_str)
+            break
+
+_ensure_backend_on_sys_path()
 
 from minesearch.database import db_manager
 from sqlalchemy import text
@@ -106,4 +144,7 @@ with db_manager.get_session() as session:
     for row in result:
         print(f'\n📱 Model: {row[0]}')
         print(f'🔍 Count: {row[1]}')
-        print(f'⏱️ Avg Duration: {row[2]:.2f}ms' if row[2] else 'Avg Duration: None')
+        if row[2] is not None:
+            print(f'⏱️ Avg Duration: {row[2]:.2f}ms')
+        else:
+            print('Avg Duration: None')

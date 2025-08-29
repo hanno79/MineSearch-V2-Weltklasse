@@ -3,13 +3,19 @@
 Test für die neue "Exakte Quellenangaben" Spalte im CSV Export
 """
 import requests
+import re
 
 def test_exact_sources_csv():
     print("🧪 TEST: Exakte Quellenangaben im CSV Export")
     print("=" * 60)
     
     # CSV Export testen
-    response = requests.get("http://localhost:8000/api/consolidated/results/export/csv?exclude_exa=true&days_back=30&sort_by=mine_name")
+    url = "http://localhost:8000/api/consolidated/results/export/csv?exclude_exa=true&days_back=30&sort_by=mine_name"
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        raise AssertionError(f"❌ CSV Export fehlgeschlagen: GET {url} – {exc}") from exc
     
     if response.status_code == 200:
         csv_content = response.text
@@ -63,7 +69,6 @@ def test_exact_sources_csv():
                     print(f"   Exakte Quellenangaben: {exakte_quellenangaben[:150]}...")
                     
                     # Zähle [X] Referenzen in exakten Quellenangaben
-                    import re
                     refs = re.findall(r'\[\d+\]', exakte_quellenangaben)
                     print(f"   Gefundene Quellenreferenzen: {len(refs)} ({refs})")
                     
@@ -86,7 +91,6 @@ def test_exact_sources_csv():
                             exact_sources = parts[exakte_quellenangaben_idx]
                             
                             # Prüfe auf Quellenreferenzen
-                            import re
                             refs = re.findall(r'\[\d+\]', exact_sources)
                             
                             if len(refs) > 0:

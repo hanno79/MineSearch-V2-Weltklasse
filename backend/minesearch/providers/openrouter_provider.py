@@ -21,7 +21,14 @@ from minesearch.utils import (
     get_country_config,
     generate_multilingual_search_terms,
 )
-from minesearch.specialized_prompts import SpecializedPrompts
+try:
+    from minesearch.specialized_prompts import SpecializedPrompts as BaseSpecializedPrompts
+except ImportError as exc:
+    raise ImportError("OpenRouterProvider: Benötigtes Modul 'minesearch.specialized_prompts' konnte nicht importiert werden. Bitte installieren Sie die Abhängigkeit oder prüfen Sie den PYTHONPATH.") from exc
+try:
+    from minesearch.specialized_prompts_impl import SpecializedPrompts as ImplSpecializedPrompts
+except ImportError as exc:
+    raise ImportError("OpenRouterProvider: Benötigtes Modul 'minesearch.specialized_prompts_impl' konnte nicht importiert werden. Wenn dieses Modul optional ist, entfernen Sie Abhängigkeiten oder stellen Sie die Implementierung bereit.") from exc
 
 logger = logging.getLogger(__name__)
 
@@ -267,7 +274,7 @@ class OpenRouterProvider(AbstractProvider):
         
         # ÄNDERUNG 04.07.2025: Nutze spezialisierte Prompts
         # ÄNDERUNG 05.07.2025: Verstärkter Fokus auf Restaurationskosten
-        specialized_prompt = SpecializedPrompts.get_enhanced_query(
+        specialized_prompt = BaseSpecializedPrompts.get_enhanced_query(
             mine_name=mine_name,
             country=country,
             region=region,
@@ -276,7 +283,7 @@ class OpenRouterProvider(AbstractProvider):
         )
         
         # Füge zusätzlichen spezifischen Restaurationskosten-Prompt hinzu
-        restoration_prompt = SpecializedPrompts.get_restoration_costs_prompt(mine_name, country, commodity)
+        restoration_prompt = BaseSpecializedPrompts.get_restoration_costs_prompt(mine_name, country, commodity)
         
         # ÄNDERUNG 08.07.2025: ALLE Quellen nutzen, nicht nur Top 20
         sources_text = ""
@@ -407,9 +414,8 @@ ANTWORTE IM STRUKTURIERTEN FORMAT wie im System-Prompt beschrieben."""
         """
         currency = options.get('currency', 'USD')
         
-        # Importiere spezialisierte Anti-Template-Anweisungen
-        from minesearch.specialized_prompts_impl import SpecializedPrompts
-        universal_instructions = SpecializedPrompts.get_universal_anti_template_instructions()
+        # Importiere spezialisierte Anti-Template-Anweisungen (auf Modulebene geladen)
+        universal_instructions = ImplSpecializedPrompts.get_universal_anti_template_instructions()
         
         return f"""🚫 RULE 10 COMPLIANCE - ANTI-ESTIMATION MINING RESEARCHER 🚫
 

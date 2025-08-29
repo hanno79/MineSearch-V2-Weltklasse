@@ -6,6 +6,8 @@ Extrahiert saubere Werte aus "Kanada [1,2,3]" Format
 import re
 from typing import Tuple, List, Optional
 import logging
+from urllib.parse import urlparse
+from minesearch.database.models import Source
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +52,32 @@ def extract_atomic_value_and_sources(field_value: str) -> Tuple[str, List[int]]:
             # Parse Nummern aus "1,2,3,4" -> [1, 2, 3, 4]
             source_refs = [int(num.strip()) for num in source_refs_str.split(',')]
         except (ValueError, AttributeError):
-            logger.warning(f"Fehler beim Parsen von Quellenreferenzen: {source_refs_str}")
-            source_refs = []
+            stripped = (source_refs_str or "").strip()
+            # Versuche einen atomaren Einzelwert zu retten
+            try:
+                if stripped:
+                    recovered_int = int(stripped)
+                    source_refs = [recovered_int]
+                    logger.warning(
+                        f"Fehler beim Parsen von Quellenreferenzen: {source_refs_str} — einzelner Integer wiederhergestellt: {recovered_int}"
+                    )
+                else:
+                    logger.warning(
+                        f"Fehler beim Parsen von Quellenreferenzen: {source_refs_str} — kein Wert wiederherstellbar (leer)"
+                    )
+                    source_refs = []
+            except ValueError:
+                if stripped:
+                    # Fallback: nicht-integer Einzelwert übernehmen
+                    source_refs = [stripped]
+                    logger.warning(
+                        f"Fehler beim Parsen von Quellenreferenzen: {source_refs_str} — einzelner Wert wiederhergestellt: '{stripped}'"
+                    )
+                else:
+                    logger.warning(
+                        f"Fehler beim Parsen von Quellenreferenzen: {source_refs_str} — kein Wert wiederherstellbar (leer)"
+                    )
+                    source_refs = []
         
         return atomic_value, source_refs
     else:
@@ -102,10 +128,40 @@ def build_display_value(atomic_value: str, source_refs: List[int]) -> str:
         return ""
     
     if source_refs:
-        # Sortiere und entferne Duplikate
-        unique_refs = sorted(list(set(source_refs)))
-        ref_str = ','.join(map(str, unique_refs))
-        return f"{atomic_value} [{ref_str}]"
+        # Robust: Unterstütze ggf. nicht-int Einträge (z.B. aus Wiederherstellung)
+        try:
+            # Wenn alle numerisch (ints oder numerische Strings), numerisch sortieren
+            all_numeric_like = True
+            normalized_ints = []
+            for ref in source_refs:
+                if isinstance(ref, int):
+                    normalized_ints.append(ref)
+                else:
+                    s = str(ref).strip()
+                    if s.isdigit():
+                        normalized_ints.append(int(s))
+                    else:
+                        all_numeric_like = False
+                        break
+
+            if all_numeric_like:
+                unique_refs = sorted(set(normalized_ints))
+                ref_str = ','.join(map(str, unique_refs))
+                return f"{atomic_value} [{ref_str}]"
+
+            # Andernfalls lexikografisch nach String-Repräsentation sortieren
+            ref_strings = sorted({str(ref).strip() for ref in source_refs if str(ref).strip()})
+            if ref_strings:
+                ref_str = ','.join(ref_strings)
+                return f"{atomic_value} [{ref_str}]"
+            else:
+                return atomic_value
+        except Exception as e:
+            logger.warning(f"Fehler beim Formatieren der Quellenreferenzen: {e}")
+            ref_strings = [str(ref).strip() for ref in source_refs if str(ref).strip()]
+            if ref_strings:
+                return f"{atomic_value} [{','.join(ref_strings)}]"
+            return atomic_value
     else:
         return atomic_value
 
@@ -121,9 +177,7 @@ def find_or_create_source_by_url(session, source_url: str):
     Returns:
         Source-Objekt oder None
     """
-    from minesearch.database.models import Source
-    import re
-    from urllib.parse import urlparse
+    
     
     if not source_url:
         return None

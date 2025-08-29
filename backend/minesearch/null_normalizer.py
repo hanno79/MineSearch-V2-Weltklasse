@@ -44,10 +44,7 @@ class NullNormalizer:
             # Leer/Whitespace (wird separat behandelt)
             '', ' ', '  ', '   ',
             
-            # Spezielle Mining-spezifische leere Werte
-            'still active', 'noch aktiv', 'mine closed', 'mine geschlossen',
-            'nur exploration', 'only exploration', 'noch geplant', 'still planned',
-            'in entwicklung', 'in development'
+            # Spezielle Mining-spezifische Statuswerte wurden entfernt, da es echte Zustände sind
         }
         
         # CONDITIONAL NULL VALUES 25.08.2025

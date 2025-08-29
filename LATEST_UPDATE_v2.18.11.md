@@ -127,7 +127,7 @@ excluded_field_keys = set(metadata_mapping.keys()) | {"Details", "Quellenangaben
 ## 📞 SUPPORT
 
 Bei Fragen zu diesem Fix kontaktieren:
-- **Implementierung:** Claude Code Assistant
-- **GitHub:** Branch v2.18.11-csv-cleanup-quellenangaben-fix
+- **Implementierung:** Claude Code Assistant  
+- **GitHub Branch:** v2.18.11-csv-cleanup-quellenangaben-fix  
 - **Datum:** 25.08.2025
 - **Status:** VOLLSTÄNDIG ABGESCHLOSSEN ✅

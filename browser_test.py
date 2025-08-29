@@ -9,6 +9,7 @@ Beschreibung: Einfacher Browser-Test für MineSearch
 from playwright.sync_api import sync_playwright
 import time
 import sys
+import traceback
 
 def test_minesearch_ui():
     """Testet die MineSearch UI im Browser"""
@@ -60,9 +61,17 @@ def test_minesearch_ui():
             
             # 5. JavaScript-Fehler prüfen
             errors = []
+            handler_errors = []
             def handle_console(msg):
-                if msg.type == 'error':
-                    errors.append(msg.text)
+                try:
+                    if msg.type == 'error':
+                        errors.append(msg.text)
+                except Exception as e:
+                    try:
+                        handler_errors.append(f"Console handler exception: {str(e)}\n{traceback.format_exc()}")
+                    except Exception:
+                        handler_errors.append(f"Console handler exception: {str(e)}")
+                    return
             
             page.on('console', handle_console)
             time.sleep(2)  # Warte auf potentielle JS-Fehler
@@ -73,6 +82,11 @@ def test_minesearch_ui():
                     print(f"   • {error}")
             else:
                 print("✅ Keine JavaScript-Fehler gefunden")
+            
+            if handler_errors:
+                print(f"⚠️  Ausnahmen im Console-Handler: {len(handler_errors)}")
+                for herr in handler_errors[:3]:
+                    print(f"   • {herr}")
             
             # 6. Suchfeld prüfen
             search_input = page.locator('input[placeholder*="mine"], input[id*="mine"]')

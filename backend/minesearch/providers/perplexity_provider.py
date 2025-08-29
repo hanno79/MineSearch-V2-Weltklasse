@@ -9,6 +9,7 @@ import httpx
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
+import urllib.parse
 
 from .base_provider import AbstractProvider, ModelConfig, SearchResult
 
@@ -19,6 +20,7 @@ from minesearch.utils import (
     generate_name_variants,
     generate_multilingual_search_terms,
     get_country_config,
+    validate_url,
 )
 from minesearch.specialized_prompts import SpecializedPrompts
 # CONSOLIDATION 09.08.2025: validation_service entfernt - war defekter Adapter
@@ -217,24 +219,106 @@ WICHTIG: Lieber ein leeres Feld als einen falschen Wert!"""
                 country = options.get('country')
                 
                 extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
-                
-                # PHASE 1: Verwende discovered_sources als Basis-Quellen (wie Abacus Provider)
-                sources = []
-                for source in discovered_sources:
+
+                # Hilfsfunktion: URL normalisieren (Host lowercase, Trailing Slashes entfernen, Fragmente entfernen)
+                def _normalize_url(raw_url: str) -> Optional[str]:
+                    try:
+                        if not raw_url:
+                            return None
+                        raw_url = raw_url.strip()
+                        parsed = urllib.parse.urlparse(raw_url)
+                        if not parsed.scheme or not parsed.netloc:
+                            return None
+                        scheme = parsed.scheme.lower()
+                        netloc = parsed.netloc.lower()
+                        # Default-Ports entfernen
+                        if ':' in netloc:
+                            host, port = netloc.rsplit(':', 1)
+                            if (scheme == 'http' and port == '80') or (scheme == 'https' and port == '443'):
+                                netloc = host
+                        path = parsed.path or ''
+                        # Trailing Slash entfernen (außer Root)
+                        if path == '/':
+                            path = ''
+                        elif path.endswith('/'):
+                            path = path.rstrip('/')
+                        # Fragmente entfernen, Query beibehalten
+                        normalized = urllib.parse.urlunparse((
+                            scheme,
+                            netloc,
+                            path,
+                            parsed.params,
+                            parsed.query,
+                            ''
+                        ))
+                        return normalized
+                    except Exception as e:
+                        logger.debug(f"[PERPLEXITY] URL-Normalisierung fehlgeschlagen für '{str(raw_url)[:100]}': {e}")
+                        return None
+
+                # PHASE 1 + 2: Zusammenführen mit Validierung, Normalisierung und Deduplizierung
+                sources: List[Dict[str, Any]] = []
+                seen_normalized_urls = set()
+
+                # Phase 1: discovered_sources (searched=True)
+                for src in discovered_sources or []:
+                    raw_url = (src or {}).get('url', '')
+                    if not raw_url:
+                        continue
+                    if not validate_url(raw_url):
+                        logger.warning(f"[PERPLEXITY] Ungültige URL in discovered_sources übersprungen: {raw_url}")
+                        continue
+                    normalized_url = _normalize_url(raw_url)
+                    if not normalized_url:
+                        logger.warning(f"[PERPLEXITY] Normalisierung fehlgeschlagen, überspringe URL: {raw_url}")
+                        continue
+                    if normalized_url in seen_normalized_urls:
+                        logger.debug(f"[PERPLEXITY] Duplikat (Phase 1) übersprungen: {normalized_url}")
+                        continue
+                    seen_normalized_urls.add(normalized_url)
+
+                    title = src.get('title') or raw_url
+                    src_type = src.get('type') or 'discovered'
+                    reliability = src.get('reliability') if 'reliability' in src else src.get('reliability_score')
+
                     sources.append({
-                        'url': source.get('url', ''),
-                        'title': source.get('title', source.get('url', '')),
-                        'type': source.get('type', 'discovered'),
-                        'reliability': source.get('reliability_score'),
-                        'searched': True  # Markiere als durchsucht
+                        'url': normalized_url,
+                        'title': title,
+                        'type': src_type,
+                        'reliability': reliability,  # Keinen künstlichen Fallback verwenden
+                        'searched': True
                     })
-                
-                # PHASE 2: Zusätzliche Quellen aus Content
+
+                # Phase 2: Quellen aus Content (searched=False)
                 sources_from_content = extract_sources_from_content(content)
-                for source in sources_from_content:
-                    # Prüfe ob schon in discovered_sources
-                    if not any(ds.get('url') == source.get('url') for ds in discovered_sources):
-                        sources.append(source)
+                for src in sources_from_content or []:
+                    raw_url = (src or {}).get('url') or (src or {}).get('value') or ''
+                    if not raw_url:
+                        continue
+                    if not validate_url(raw_url):
+                        logger.debug(f"[PERPLEXITY] Ungültige URL in sources_from_content übersprungen: {raw_url}")
+                        continue
+                    normalized_url = _normalize_url(raw_url)
+                    if not normalized_url:
+                        logger.debug(f"[PERPLEXITY] Normalisierung fehlgeschlagen, überspringe URL: {raw_url}")
+                        continue
+                    if normalized_url in seen_normalized_urls:
+                        logger.debug(f"[PERPLEXITY] Duplikat (Phase 2) übersprungen: {normalized_url}")
+                        continue
+
+                    seen_normalized_urls.add(normalized_url)
+
+                    title = src.get('title') or normalized_url
+                    src_type = src.get('type') or 'extracted'
+                    reliability = src.get('reliability') if 'reliability' in src else src.get('reliability_score')
+
+                    sources.append({
+                        'url': normalized_url,
+                        'title': title,
+                        'type': src_type,
+                        'reliability': reliability,
+                        'searched': False
+                    })
                 
                 # CONSOLIDATION 09.08.2025: validation_service entfernt - direkter Return
                 validated_data = extracted_data['data']  # Keine zusätzliche Validierung mehr nötig
@@ -400,8 +484,7 @@ QUELLEN ZUM ANALYSIEREN:
         if options.get('phase') == 'source_analysis':
             return self._get_source_analysis_prompt(options)
         
-        # Importiere spezialisierte Anti-Template-Anweisungen
-        from minesearch.specialized_prompts_impl import SpecializedPrompts
+        # Verwende spezialisierte Anti-Template-Anweisungen (modulweiter Import)
         universal_instructions = SpecializedPrompts.get_universal_anti_template_instructions()
         
         return f"""🚫 RULE 10 COMPLIANCE - PERPLEXITY ANTI-ESTIMATION RESEARCHER 🚫

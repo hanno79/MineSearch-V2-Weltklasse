@@ -7,6 +7,8 @@ Prüfe direkt die API-Responses ohne Browser
 import requests
 import json
 import time
+import tempfile
+import os
 
 def debug_batch_api():
     print("🔍 STARTE DIREKTE API-ANALYSE")
@@ -15,12 +17,18 @@ def debug_batch_api():
     print("\n📤 UPLOADE TEST-CSV...")
     csv_content = "Name,Country,Region\nÉléonore,Canada,Quebec\nLac Expanse,Canada,Quebec\nAubelle,Canada,Quebec"
     
-    with open('/tmp/debug_test.csv', 'w', encoding='utf-8', newline='') as f:
-        f.write(csv_content)
-    
-    with open('/tmp/debug_test.csv', 'rb') as f:
+    with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', newline='', suffix='.csv', delete=False) as tmp:
+        tmp.write(csv_content)
+        tmp_path = tmp.name
+
+    with open(tmp_path, 'rb') as f:
         files = {'csv_file': f}
         upload_response = requests.post('http://localhost:8000/api/upload-csv', files=files)
+
+    try:
+        os.remove(tmp_path)
+    except OSError:
+        pass
     
     print(f"Upload Status: {upload_response.status_code}")
     
@@ -109,7 +117,37 @@ def debug_batch_api():
     print(f"\n🗄️ VERGLEICHE MIT DATENBANK:")
     try:
         import sys
-        sys.path.append('/app/backend')
+        import os
+        from pathlib import Path
+
+        # Portabler Backend-Pfad:
+        # 1) Wenn die Umgebungsvariable 'PYTHONPATH_BACKEND' gesetzt ist, wird dieser Pfad verwendet.
+        # 2) Andernfalls wird relativ zu dieser Datei der Ordner 'backend' gesucht (auch in Elternordnern).
+        #    Hinweis: Idealerweise dieses Skript als Modul ausführen (z.B. "python -m ..."),
+        #    um Änderungen an sys.path zu vermeiden.
+        backend_env = os.environ.get('PYTHONPATH_BACKEND')
+        if backend_env:
+            backend_path = Path(backend_env).expanduser().resolve()
+        else:
+            current_file = Path(__file__).resolve()
+            project_root = current_file.parent
+            candidate = project_root / 'backend'
+            if candidate.is_dir():
+                backend_path = candidate
+            else:
+                backend_path = None
+                for parent in project_root.parents:
+                    maybe = parent / 'backend'
+                    if maybe.is_dir():
+                        backend_path = maybe
+                        break
+            if backend_path is None:
+                raise RuntimeError("Backend-Pfad konnte nicht gefunden werden. Setze 'PYTHONPATH_BACKEND' oder starte als Modul.")
+
+        backend_str = str(backend_path)
+        if backend_str not in sys.path:
+            sys.path.insert(0, backend_str)
+
         from minesearch.database import db_manager
         from sqlalchemy import text
         

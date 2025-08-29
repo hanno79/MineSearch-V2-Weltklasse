@@ -1,4 +1,4 @@
-# 🚀 KRITISCHER CSV-UPLOAD FIX: 100-Minen-Limit vollständig entfernt
+# 🚀 KRITISCHER CSV-UPLOAD FIX: Hartes 100er Limit durch konfigurierbares MAX_MINES_LIMIT ersetzt
 
 **Datum:** 25.08.2025  
 **Branch:** v2.18.13-csv-upload-limit-fix  
@@ -11,7 +11,7 @@
 **User-Bericht:** CSV-Upload mit 893 Minen verarbeitete nur die ersten 100 Minen statt aller Einträge.
 
 **Zusätzliche Anforderungen:**
-- Alle Minen aus der CSV-Datei sollen verarbeitet werden (nicht auf 100 begrenzt)
+- Alle Minen bis zum konfigurierbaren Limit sollen verarbeitet werden (nicht hart auf 100 begrenzt)
 - User-Feedback vor der Suche: Anzahl der gefundenen Minen anzeigen
 - Klare Anzeige der erwarteten Ergebnisse vor der Verarbeitung
 
@@ -67,7 +67,7 @@ if (batchMode === 'limited' && (isNaN(batchCount) || batchCount < 1 || batchCoun
 <input type="number" name="count" value="20" min="1" max="10000">
 ```
 
-**KRITISCHER FIX - Demo-Limit entfernt:**
+**KRITISCHER FIX - Konfigurierbares `MAX_MINES_LIMIT` eingeführt:**
 ```python
 # VORHER (Zeile 249-250)
 mines.append(row)
@@ -77,8 +77,23 @@ if i >= 100:
     break
 
 # NACHHER
+import os
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Konfigurierbares Sicherheitslimit (Default: 10.000)
+MAX_MINES_LIMIT = int(os.getenv("MAX_MINES_LIMIT", "10000"))
+
 mines.append(row)
-# Demo-Limit vollständig entfernt
+
+# Abbruch bei Erreichen des Limits, um Systemüberlastung zu vermeiden
+if i + 1 >= MAX_MINES_LIMIT:
+    logger.warning(
+        "MAX_MINES_LIMIT erreicht (%d). Verarbeitung wird gestoppt, um das System zu schützen.",
+        MAX_MINES_LIMIT,
+    )
+    break
 ```
 
 ### 3. **Enhanced User Feedback:**
@@ -114,12 +129,12 @@ showLoadingMessage(resultsDiv, `${searchTypeText} läuft...`,
 curl -X POST "http://localhost:8000/api/upload-csv" -F "csv_file=@test_csv_large.csv"
 
 ✅ VORHER: 101 Minen wurden erkannt (Demo-Limit aktiv)
-✅ NACHHER: 150 Minen wurden erkannt (Kein Limit)
+✅ NACHHER: 150 Minen wurden erkannt (Limit 10000 nicht erreicht)
 ```
 
 ### Neue Limits:
-- **Technisches Limit:** 10.000 Minen (ausreichend für alle realistischen Use Cases)
-- **Demo-Modus entfernt:** Keine hardcodierte Begrenzung mehr im Backend
+- **Konfigurierbares Limit:** Standard 10.000 Minen via `MAX_MINES_LIMIT` (ausreichend für realistische Use Cases)
+- **Hartes 100er Limit entfernt:** Ersetzt durch konfigurierbare Sicherheitsgrenze
 - **User-Choice:** User entscheidet selbst, wie viele Minen verarbeitet werden
 
 ---
@@ -128,7 +143,7 @@ curl -X POST "http://localhost:8000/api/upload-csv" -F "csv_file=@test_csv_large
 
 1. **`/app/frontend/index.html`** - max="100" → max="10000"
 2. **`/app/frontend/search.js`** - Validierung erweitert, User-Feedback hinzugefügt
-3. **`/app/backend/minesearch/api/routes/batch.py`** - Demo-Limit entfernt, max="100" → max="10000"
+3. **`/app/backend/minesearch/api/routes/batch.py`** - Hartes Limit durch `MAX_MINES_LIMIT` ersetzt; max="100" → max="10000"
 
 **Insgesamt:** 3 Dateien geändert, 4 kritische Limitierungen entfernt
 
@@ -188,7 +203,7 @@ showLoadingMessage(resultsDiv, `${searchTypeText} läuft...`,
 ```bash
 ✅ 150-Minen CSV erfolgreich verarbeitet
 ✅ Alle Frontend-Limits auf 10.000 erweitert
-✅ Backend Demo-Limit vollständig entfernt
+✅ Hartes 100er Limit durch `MAX_MINES_LIMIT` ersetzt
 ✅ User-Feedback implementiert
 ✅ Erwartete Ergebnisse werden angezeigt
 ✅ JavaScript Validierung angepasst
@@ -198,7 +213,7 @@ showLoadingMessage(resultsDiv, `${searchTypeText} läuft...`,
 - 📊 **Sofortiges Feedback:** "150 Minen wurden erkannt"
 - 🎯 **Erwartungsmanagement:** "Verarbeitung aller 150 Minen mit 2 Modellen"
 - 🔧 **Flexibilität:** Bis zu 10.000 Minen unterstützt
-- ⚡ **Keine künstlichen Limits:** Demo-Beschränkung entfernt
+- ⚡ **Kein hartes 100er Limit:** Konfigurierbare Sicherheitsgrenze aktiv
 
 ---
 
@@ -225,7 +240,7 @@ showLoadingMessage(resultsDiv, `${searchTypeText} läuft...`,
 **Status:** 🎯 VOLLSTÄNDIG GELÖST ✅  
 
 **Schlüsselverbesserungen:**
-- Hardcodierte Demo-Limits entfernt
+- Hartes 100er Limit durch konfigurierbares `MAX_MINES_LIMIT` ersetzt
 - Frontend/Backend Synchronisierung auf 10.000 Minen
 - Enhanced User-Feedback mit Mine-Count und Erwartungsanzeige
 - Vollständige CSV-Verarbeitung ohne künstliche Beschränkungen

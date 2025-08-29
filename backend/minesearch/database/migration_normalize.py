@@ -19,6 +19,88 @@ from typing import Dict, List, Optional, Any
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+def _parse_decimal_value(raw: Any) -> Optional[float]:
+    """Parst einen numerischen Dezimalwert robust aus diversen Eingabeformaten.
+
+    Regeln:
+    - Entfernt Whitespace und alle nicht-numerischen Zeichen außer Ziffern, Vorzeichen, Punkt und Komma
+    - Handhabt Tausendertrennzeichen und unterschiedliche Dezimaltrennzeichen
+    - Ersetzt Komma erst nach Sicherstellung, dass höchstens ein Dezimaltrennzeichen übrig bleibt
+    - Gibt bei ungültigen/leerem Input None zurück
+    """
+    if raw is None:
+        return None
+    try:
+        if isinstance(raw, (int, float)):
+            return float(raw)
+
+        text = str(raw).strip()
+        if not text:
+            return None
+
+        # Entferne Whitespaces und alle Zeichen außer Ziffern, +, -, ., ,
+        cleaned = re.sub(r"\s+", "", text)
+        cleaned = re.sub(r"[^0-9+\-\.,]", "", cleaned)
+
+        # Muss mindestens eine Ziffer enthalten
+        if not re.search(r"\d", cleaned or ""):
+            return None
+
+        # Behalte optionales Vorzeichen nur am Anfang
+        sign = ""
+        if cleaned and cleaned[0] in "+-":
+            sign = "-" if cleaned[0] == "-" else ""
+        # Entferne alle Vorzeichen im restlichen String
+        numeric_part = re.sub(r"[+\-]", "", cleaned)
+
+        # Bestimme Dezimaltrennzeichen-Strategie
+        dot_pos = numeric_part.rfind(".")
+        comma_pos = numeric_part.rfind(",")
+
+        if dot_pos != -1 and comma_pos != -1:
+            # Beide vorhanden: der letzte Separator ist das Dezimaltrennzeichen, die anderen sind Tausender
+            decimal_pos = dot_pos if dot_pos > comma_pos else comma_pos
+            result_chars = []
+            for idx, ch in enumerate(numeric_part):
+                if ch.isdigit():
+                    result_chars.append(ch)
+                elif ch in ",.":
+                    if idx == decimal_pos:
+                        result_chars.append(".")  # Normalisiere auf Punkt
+                    # alle anderen Separatoren werden ignoriert (Tausender)
+            normalized = "".join(result_chars)
+        else:
+            # Nur ein Separator-Typ oder keiner vorhanden
+            if comma_pos != -1:
+                # Nur Kommas vorhanden
+                if numeric_part.count(",") == 1:
+                    normalized = numeric_part.replace(",", ".")
+                else:
+                    # Mehrere Kommas: als Tausendertrennzeichen betrachten
+                    normalized = numeric_part.replace(",", "")
+            else:
+                # Nur Punkte vorhanden (oder keiner)
+                if numeric_part.count(".") == 1:
+                    normalized = numeric_part
+                else:
+                    # Mehrere Punkte: als Tausendertrennzeichen betrachten
+                    normalized = numeric_part.replace(".", "")
+
+        # Füge Vorzeichen wieder an den Anfang an (falls negativ)
+        if sign:
+            normalized = sign + normalized
+
+        # Final: validiere Format (maximal eine Dezimalstelle)
+        if normalized.count(".") > 1:
+            # Sollte durch obige Logik nicht vorkommen; als ungültig behandeln
+            return None
+
+        # Konvertiere zu float
+        return float(normalized)
+    except (ValueError, TypeError) as e:
+        logger.debug(f"Ungültiges Dezimalformat '{raw}': {e}")
+        return None
+
 class DatabaseNormalizer:
     """
     Migriert die bestehende JSON-basierte Datenbank zu einem normalisierten Schema
@@ -269,16 +351,14 @@ class DatabaseNormalizer:
                             lat_raw = data.get('x-Koordinate') or data.get('latitude') or data.get('lat')
                             lon_raw = data.get('y-Koordinate') or data.get('longitude') or data.get('lon')
                             
-                            if lat_raw:
-                                try:
-                                    latitude = float(str(lat_raw).replace(',', '.'))
-                                except:
-                                    pass
-                            if lon_raw:
-                                try:
-                                    longitude = float(str(lon_raw).replace(',', '.'))
-                                except:
-                                    pass
+                            if lat_raw is not None:
+                                latitude = _parse_decimal_value(lat_raw)
+                                if latitude is None:
+                                    logger.debug(f"Latitude konnte nicht geparst werden: {lat_raw!r}")
+                            if lon_raw is not None:
+                                longitude = _parse_decimal_value(lon_raw)
+                                if longitude is None:
+                                    logger.debug(f"Longitude konnte nicht geparst werden: {lon_raw!r}")
                             
                             # Status
                             status_raw = data.get('Aktivitätsstatus') or data.get('status')

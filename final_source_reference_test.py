@@ -31,7 +31,8 @@ def final_validation():
                     if '[' in value and ']' in value:
                         fields_with_refs += 1
             
-            print(f"   ✅ Felder mit Quellenreferenzen: {fields_with_refs}/{total_fields} ({fields_with_refs/total_fields*100:.1f}%)")
+            percentage_str = f"{(fields_with_refs/total_fields)*100:.1f}%" if total_fields > 0 else "N/A"
+            print(f"   ✅ Felder mit Quellenreferenzen: {fields_with_refs}/{total_fields} ({percentage_str})")
             
             # Zähle eindeutige Quellen aus _source_mapping
             source_mapping = structured.get('_source_mapping', {})
@@ -93,7 +94,7 @@ def final_validation():
                         if count <= 15:
                             print(f"   ✅ Quellenanzahl KORREKT (≤15)")
                         else:
-                            print(f"   ⚠️ Quellenanzahl zu hoch (>{count})")
+                            print("   ⚠️ Quellenanzahl zu hoch (>15)")
     else:
         print(f"   ❌ CSV Export Fehler: {csv_response.status_code}")
     

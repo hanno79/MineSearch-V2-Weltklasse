@@ -5,9 +5,10 @@ Version: 1.0
 Beschreibung: DatabaseManager Klasse für MineSearch v2 (extrahiert aus database.py)
 """
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Optional, Dict, List, Any
+import sqlite3
 import logging
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
@@ -36,6 +37,18 @@ class DatabaseManager:
             pool_recycle=3600,  # Verbindungen nach 1 Stunde recyceln
             pool_pre_ping=True  # Teste Verbindung vor Nutzung
         )
+
+        # Stelle sicher, dass Foreign Keys in SQLite erzwungen werden
+        if (self.database_url or "").startswith("sqlite"):
+            @event.listens_for(self.engine, "connect")
+            def _set_sqlite_pragma(dbapi_connection, connection_record):
+                try:
+                    if isinstance(dbapi_connection, sqlite3.Connection):
+                        cursor = dbapi_connection.cursor()
+                        cursor.execute("PRAGMA foreign_keys=ON")
+                        cursor.close()
+                except Exception as e:
+                    logger.warning(f"[DB] Konnte PRAGMA foreign_keys=ON nicht setzen: {e}")
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         
         # Erstelle Tabellen wenn nicht vorhanden
@@ -148,6 +161,7 @@ class DatabaseManager:
 
     def save_search_result(self, mine_name: str, model_used: str, structured_data: Dict[str, Any],
                           sources: List[Dict[str, Any]], session_id: Optional[str] = None,
+                          session: Optional[Session] = None,
                           **kwargs) -> SearchResult:
         """
         Speichere Suchergebnis in der Datenbank und aktualisiere automatisch Statistiken
@@ -164,10 +178,22 @@ class DatabaseManager:
             **kwargs
         )
         
-        with self.get_session() as session:
+        # Wenn eine externe Session übergeben wurde, verwende diese ohne eigenen Commit
+        if session is not None:
             session.add(result)
-            session.commit()
-            session.refresh(result)
+            # Stelle sicher, dass IDs generiert werden
+            try:
+                session.flush()
+            except Exception:
+                # Flush-Fehler sollen nicht still geschluckt werden
+                raise
+            return result
+        
+        # Ansonsten eigene Session öffnen und vollständig committen inkl. Statistik-Update
+        with self.get_session() as local_session:
+            local_session.add(result)
+            local_session.commit()
+            local_session.refresh(result)
             
             # AUTO-UPDATE STATISTIKEN für Live-Updates im Statistik-Tab
             try:

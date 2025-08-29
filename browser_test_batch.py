@@ -8,6 +8,64 @@ import asyncio
 from playwright.async_api import async_playwright
 import time
 import os
+import json
+
+# Standard-Feldnamen als Fallback
+DEFAULT_FIELD_NAMES = [
+    'Name',
+    'Country',
+    'Region',
+    'Eigentümer',
+    'Betreiber',
+    'x-Koordinate',
+    'y-Koordinate',
+    'Aktivitätsstatus',
+    'Restaurationskosten',
+    'Jahr der Aufnahme der Kosten',
+    'Jahr der Erstellung des Dokumentes',
+    'Rohstoffabbau',
+    'Minentyp',
+    'Produktionsstart',
+    'Produktionsende',
+    'Fördermenge/Jahr',
+    'Fläche der Mine in qkm',
+    'Quellenangaben',
+]
+
+# Pfad zur optionalen Konfigurationsdatei (kann via Env überschrieben werden)
+CONFIG_FIELD_NAMES_PATH = os.getenv('FIELD_NAMES_CONFIG', '/app/config/field_names.json')
+
+def load_field_names_config(path: str = CONFIG_FIELD_NAMES_PATH):
+    """
+    Lädt Feldnamen aus einer JSON-Datei. Erwartet eine Liste von Strings.
+    Fällt bei Fehlern oder ungültiger Struktur auf DEFAULT_FIELD_NAMES zurück.
+    """
+    try:
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if not isinstance(data, list):
+                print("⚠️ Feldnamen-Konfiguration ist kein Array. Fallback auf Default.")
+                return DEFAULT_FIELD_NAMES
+            cleaned = []
+            for idx, item in enumerate(data):
+                if isinstance(item, str) and item.strip():
+                    cleaned.append(item.strip())
+                else:
+                    print(f"⚠️ Ungültiger Eintrag in Feldnamen-Konfiguration an Position {idx}: {repr(item)}")
+            if not cleaned:
+                print("⚠️ Feldnamen-Konfiguration ist leer nach Bereinigung. Fallback auf Default.")
+                return DEFAULT_FIELD_NAMES
+            return cleaned
+        else:
+            print(f"ℹ️ Feldnamen-Konfigurationsdatei nicht gefunden: {path}. Verwende Default.")
+            return DEFAULT_FIELD_NAMES
+    except Exception as e:
+        print(f"⚠️ Fehler beim Laden der Feldnamen-Konfiguration ({path}): {e}. Verwende Default.")
+        return DEFAULT_FIELD_NAMES
+
+# Global geladene Feldnamen
+FIELD_NAMES = load_field_names_config()
 
 async def test_batch_search():
     print("🔍 STARTE BROWSER-TEST FÜR BATCH-SUCHE")
@@ -114,13 +172,12 @@ Aubelle,Canada,Quebec"""
                         for i, text in enumerate(cell_texts):
                             if text == 'Éléonore':
                                 print(f"   Éléonore gefunden bei Index {i}")
-                                # Zeige die nächsten 18 Zellen (alle Felder)
-                                eleonore_row = cell_texts[i:i+19]  # Include Éléonore + 18 fields
+                                # Zeige die nächsten Zellen entsprechend der Feldnamen-Anzahl (Éléonore + Felder)
+                                eleonore_row = cell_texts[i:i+1+len(FIELD_NAMES)]
                                 for j, field_value in enumerate(eleonore_row):
-                                    field_names = ['Name', 'Country', 'Region', 'Eigentümer', 'Betreiber', 'x-Koordinate', 'y-Koordinate', 'Aktivitätsstatus', 'Restaurationskosten', 'Jahr der Aufnahme der Kosten', 'Jahr der Erstellung des Dokumentes', 'Rohstoffabbau', 'Minentyp', 'Produktionsstart', 'Produktionsende', 'Fördermenge/Jahr', 'Fläche der Mine in qkm', 'Quellenangaben']
-                                    if j < len(field_names):
+                                    if j < len(FIELD_NAMES):
                                         status = '✅' if field_value and field_value.strip() and 'nichts gefunden' not in field_value else '❌'
-                                        print(f"     {status} {field_names[j]}: {repr(field_value)}")
+                                        print(f"     {status} {FIELD_NAMES[j]}: {repr(field_value)}")
                                 eleonore_found = True
                                 break
                         

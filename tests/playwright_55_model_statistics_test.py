@@ -43,7 +43,7 @@ class MineSearchE2ETester:
         await self.page.goto(MINESEARCH_URL)
         
         # Wait for essential elements to load
-        await self.page.wait_for_selector('[data-tab="search"]', timeout=10000)
+        await self.page.wait_for_selector('[data-tab="single"]', timeout=10000)
         await self.page.wait_for_selector('#model-selection', timeout=10000)
         
         # Wait for models to load
@@ -72,7 +72,7 @@ class MineSearchE2ETester:
         logger.info(f"📈 [E2E-BASELINE] Initial statistics: {self.initial_model_count} model cards")
         
         # Return to Search tab
-        await self.page.click('[data-tab="search"]')
+        await self.page.click('[data-tab="single"]')
         await self.page.wait_for_timeout(1000)
         
     async def select_all_55_models(self):

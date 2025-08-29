@@ -61,7 +61,7 @@
     <script src="/static/progressive-model-selection.js?v=1.0.0"></script>
     
     <!-- ÄNDERUNG 27.08.2025: Database Viewer System hinzufügen -->
-    <script src="/static/database-viewer.js?v=1.0.0"></script>
+    <script src="/static/database-viewer.js?v=1.0.1-debug"></script>
     
     <!-- Phase 4: Modern CSS Design System with Basic UI Revolution -->
     <link rel="stylesheet" href="/static/style.css?v=4.0.0">
@@ -346,9 +346,12 @@ Canadian Malartic,Canada,Gold,Quebec</pre>
                                 <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer; padding: var(--space-md); border: 2px solid var(--success-200); border-radius: var(--radius-md); background: var(--success-50);">
                                     <input type="radio" name="batch_mode" value="limited" checked id="batch-limited">
                                     <div>
-                                        <strong>🧪 Nur erste <input type="number" id="batch-count" value="15" min="1" max="10000" style="width: 60px; margin: 0 5px; padding: 2px 5px; border: 1px solid var(--success-300); border-radius: 4px;"> Minen</strong>
+                                        <strong>🧪 Nur erste <input type="number" id="batch-count" value="15" min="1" max="1000" oninput="handleBatchCountInput()" title="Große Batches können langsam sein. Nutzen Sie ggf. Pagination." style="width: 60px; margin: 0 5px; padding: 2px 5px; border: 1px solid var(--success-300); border-radius: 4px;"> Minen</strong>
                                         <div style="font-size: 0.875rem; color: var(--success-700); margin-top: 4px;">
                                             Empfohlen für Tests und schnelle Ergebnisse
+                                        </div>
+                                        <div id="batch-count-warning" style="display: none; font-size: 0.85rem; color: #b45309; margin-top: 6px;">
+                                            ⚠️ Große Batch-Größen können langsam sein. Wir empfehlen Pagination in Teilpaketen.
                                         </div>
                                     </div>
                                 </label>

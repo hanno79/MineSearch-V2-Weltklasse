@@ -15,6 +15,7 @@ import logging
 from pathlib import Path
 
 from minesearch.search_service import MineSearchService
+from minesearch.field_name_blacklist import is_field_name_value
 
 # Logging konfigurieren
 logging.basicConfig(
@@ -91,7 +92,6 @@ def test_problematic_mines():
                             print(f"   🔄 {field}: NULL (normalisiert)")
                         elif value and str(value).strip():
                             # Prüfe auf Feldkontamination
-                            from minesearch.field_name_blacklist import is_field_name_value
                             if is_field_name_value(str(value), field):
                                 contamination_found = True
                                 print(f"   🚨 {field}: '{value}' (KONTAMINATION GEFUNDEN!)")

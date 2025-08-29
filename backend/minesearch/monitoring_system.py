@@ -15,6 +15,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
 from collections import defaultdict
+from minesearch.field_name_blacklist import is_field_name_value
 
 logger = logging.getLogger(__name__)
 
@@ -236,8 +237,6 @@ class DataQualityMonitor:
     def _analyze_field_contamination(self) -> Dict[str, Any]:
         """Analysiert aktuelle Feldkontamination in der Datenbank"""
         try:
-            from minesearch.field_name_blacklist import is_field_name_value
-            
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             

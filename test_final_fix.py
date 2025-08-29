@@ -13,6 +13,7 @@ import time
 
 async def test_final_fix():
     async with async_playwright() as p:
+        browser = None
         try:
             # Browser starten 
             browser = await p.chromium.launch(headless=False)
@@ -30,7 +31,7 @@ async def test_final_fix():
             
             if not counter_exists:
                 print("❌ Counter element missing - test failed")
-                return
+                sys.exit(1)
             
             # Test 2: Initial counter value
             initial_value = await page.evaluate('document.getElementById("selected-count").textContent')
@@ -79,7 +80,7 @@ async def test_final_fix():
             import traceback
             traceback.print_exc()
         finally:
-            if 'browser' in locals():
+            if browser is not None:
                 await browser.close()
 
 if __name__ == "__main__":

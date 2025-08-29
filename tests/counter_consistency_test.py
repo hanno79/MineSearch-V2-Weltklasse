@@ -28,7 +28,7 @@ async def test_model_counter_consistency():
         try:
             # Navigate to MineSearch
             await page.goto("http://localhost:8000/static/index.html")
-            await page.wait_for_selector('[data-tab="search"]', timeout=10000)
+            await page.wait_for_selector('[data-tab="single"]', timeout=10000)
             
             # Wait for models to load
             await page.wait_for_function(

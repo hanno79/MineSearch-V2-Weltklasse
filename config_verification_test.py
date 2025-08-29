@@ -69,70 +69,70 @@ def test_database_connection():
         print(f"❌ Verbindungstest fehlgeschlagen: {e}")
         return None
 
-def test_gui_database_path():
-    """Testet den GUI-Datenbankpfad"""
-    print("\n🖥️  GUI-DATENBANK TEST")
+def test_single_database_path():
+    """ÄNDERUNG 28.08.2025: Testet dass nur noch eine Datenbank existiert"""
+    print("\n🖥️  EINZELDATENBANK TEST")
     print("-" * 40)
     
-    gui_db = "/app/mines.db"
+    # Alte GUI-Datenbank sollte nicht mehr existieren
+    old_gui_db = "/app/mines.db"
     
-    if os.path.exists(gui_db):
-        if os.path.islink(gui_db):
-            target = os.readlink(gui_db)
-            print(f"✅ GUI-DB (Symlink): {gui_db} → {target}")
-            
-            if os.path.exists(target):
-                size_mb = os.path.getsize(target) / (1024 * 1024)
-                print(f"✅ Ziel gefunden: {size_mb:.2f} MB")
-                return target
-            else:
-                print(f"❌ Symlink-Ziel nicht gefunden: {target}")
-                return None
-        else:
-            size_mb = os.path.getsize(gui_db) / (1024 * 1024)
-            print(f"✅ GUI-DB (Datei): {size_mb:.2f} MB")
-            return gui_db
+    if os.path.exists(old_gui_db):
+        print(f"⚠️ Alte GUI-Datenbank noch vorhanden: {old_gui_db}")
+        print("⚠️ Diese sollte nach Konsolidierung entfernt werden!")
+        return False
     else:
-        print(f"❌ GUI-DB nicht gefunden: {gui_db}")
-        return None
+        print("✅ Konsolidierung erfolgreich: Nur noch eine Datenbank")
+        
+        # Prüfe aktive Datenbank
+        active_db = "/app/backend/minesearch/database/mines.db"
+        if os.path.exists(active_db):
+            size_mb = os.path.getsize(active_db) / (1024 * 1024)
+            print(f"✅ Aktive Datenbank: {active_db} ({size_mb:.2f} MB)")
+            return True
+        else:
+            print(f"❌ Aktive Datenbank nicht gefunden: {active_db}")
+            return False
 
-def test_data_consistency():
-    """Testet die Datenkonsistenz zwischen Backend und GUI"""
-    print("\n📊 DATENKONSISTENZ TEST")
+def test_single_database_integrity():
+    """ÄNDERUNG 28.08.2025: Testet die Integrität der einzigen Datenbank"""
+    print("\n📊 DATENBANK-INTEGRITÄT TEST")
     print("-" * 40)
     
     try:
         import sqlite3
         
-        backend_db = "/app/backend/minesearch/database/mines.db"
-        gui_db = "/app/mines.db"
+        single_db = "/app/backend/minesearch/database/mines.db"
         
-        # Backend count
-        conn1 = sqlite3.connect(backend_db)
-        cursor1 = conn1.cursor()
-        cursor1.execute("SELECT COUNT(*) FROM search_results")
-        backend_count = cursor1.fetchone()[0]
-        conn1.close()
+        # Datenbank-Integrität prüfen
+        conn = sqlite3.connect(single_db)
+        cursor = conn.cursor()
         
-        # GUI count
-        conn2 = sqlite3.connect(gui_db)
-        cursor2 = conn2.cursor()
-        cursor2.execute("SELECT COUNT(*) FROM search_results")
-        gui_count = cursor2.fetchone()[0]
-        conn2.close()
+        # PRAGMA integrity_check
+        cursor.execute("PRAGMA integrity_check")
+        integrity_result = cursor.fetchone()[0]
         
-        print(f"📈 Backend Search Results: {backend_count}")
-        print(f"📈 GUI Search Results: {gui_count}")
+        # Tabellen zählen
+        cursor.execute("SELECT COUNT(*) FROM search_results")
+        search_count = cursor.fetchone()[0]
         
-        if backend_count == gui_count:
-            print("✅ Daten synchron: Backend ↔ GUI")
+        cursor.execute("SELECT COUNT(*) FROM field_values")
+        field_values_count = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        print(f"📈 Search Results: {search_count}")
+        print(f"📈 Field Values: {field_values_count}")
+        
+        if integrity_result == 'ok':
+            print("✅ Datenbank-Integrität: OK")
             return True
         else:
-            print(f"❌ Daten-Inkonsistenz: {backend_count} ≠ {gui_count}")
+            print(f"❌ Datenbank-Integrität: {integrity_result}")
             return False
             
     except Exception as e:
-        print(f"❌ Konsistenz-Test fehlgeschlagen: {e}")
+        print(f"❌ Integrität-Test fehlgeschlagen: {e}")
         return False
 
 def main():
@@ -147,11 +147,11 @@ def main():
     # Test 2: Datenbankverbindung  
     search_results_count = test_database_connection()
     
-    # Test 3: GUI-Datenbank
-    gui_db_path = test_gui_database_path()
+    # Test 3: Einzeldatenbank
+    single_db_ok = test_single_database_path()
     
-    # Test 4: Datenkonsistenz
-    consistency_ok = test_data_consistency()
+    # Test 4: Datenbank-Integrität
+    integrity_ok = test_single_database_integrity()
     
     # Gesamtbewertung
     print("\n" + "=" * 50)
@@ -173,17 +173,17 @@ def main():
     else:
         print("❌ Datenbankverbindung: FEHLER")
     
-    if gui_db_path:
-        print("✅ GUI-Datenbank: OK")
+    if single_db_ok:
+        print("✅ Datenbank-Konsolidierung: OK")
         tests_passed += 1
     else:
-        print("❌ GUI-Datenbank: FEHLER")
+        print("❌ Datenbank-Konsolidierung: FEHLER")
     
-    if consistency_ok:
-        print("✅ Datenkonsistenz: OK")
+    if integrity_ok:
+        print("✅ Datenbank-Integrität: OK")
         tests_passed += 1
     else:
-        print("❌ Datenkonsistenz: FEHLER")
+        print("❌ Datenbank-Integrität: FEHLER")
     
     success_rate = (tests_passed / total_tests) * 100
     

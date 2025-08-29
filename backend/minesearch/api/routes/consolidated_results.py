@@ -30,6 +30,7 @@ import csv
 import io
 from fastapi.responses import StreamingResponse
 from datetime import datetime
+import re
 
 # Field mappings are now imported from consolidated_field_utils.py
 
@@ -44,8 +45,6 @@ def _normalize_placeholder_value(value):
         return None  # REGEL 10: NULL statt "nichts gefunden"
     
     value_str = str(value).strip()
-    
-    import re
     
     # REGEL 10: DIREKTE Überprüfung auf problematische Werte
     if value_str.startswith('TEMPLATE:'):
@@ -742,13 +741,56 @@ async def get_consolidated_results(
             for field_name in all_field_names:
                 field_info = mine_data['consolidated_fields'][field_name]
                 
-                # Analysiere alle Werte für dieses Feld
-                # VALUE-NORMALIZATION FIX 26.08.2025: Übergebe field_name für semantische Normalisierung
-                value_analysis = _analyze_field_values(field_info['value_details'], field_name)
-                
-                # Bestimme besten Wert basierend auf Algorithmus
-                # TEMPLATE-PATTERN-FIX 06.08.2025: Übergebe field_name für Template-Detection
-                best_value_info = _calculate_best_value(value_analysis, field_name)
+                # 🆕 SCHEMA-NORMALISIERUNG 28.08.2025: Prüfe atomische Werte zuerst
+                try:
+                    from minesearch.atomic_value_service import calculate_best_atomic_value
+                    from minesearch.database import db_manager
+                    
+                    with db_manager.get_session() as session:
+                        atomic_best_value = calculate_best_atomic_value(
+                            session, mine_name, field_name, fallback_to_json=True
+                        )
+                        
+                        # Verwende atomischen Wert wenn verfügbar und von hoher Qualität
+                        if (atomic_best_value['method'] == 'atomic_normalized' and 
+                            atomic_best_value['confidence_score'] >= 50.0):
+                            
+                            logger.info(f"[ATOMIC] Verwende atomischen Wert für {mine_name}.{field_name}: {atomic_best_value['atomic_value']}")
+                            best_value_info = {
+                                'display_value': atomic_best_value['display_value'],
+                                'confidence_score': atomic_best_value['confidence_score'],
+                                'frequency': atomic_best_value['frequency'],
+                                'supporting_sources': [],  # URLs werden über source_references gemappt
+                                'model_consensus': atomic_best_value['frequency'],  # Häufigkeit = Consensus
+                                'method': 'atomic_normalized'
+                            }
+                            
+                            # Erstelle value_analysis für Kompatibilität
+                            value_analysis = {
+                                atomic_best_value['atomic_value']: {
+                                    'display_value': atomic_best_value['display_value'],
+                                    'frequency': atomic_best_value['frequency'],
+                                    'confidence': atomic_best_value['confidence_score'],
+                                    'ai_models': [],  # Wird nicht benötigt für atomische Werte
+                                    'search_timestamps': []
+                                }
+                            }
+                        else:
+                            # Fallback auf bestehende Methode
+                            logger.info(f"[ATOMIC] Fallback zu JSON für {mine_name}.{field_name}")
+                            # Analysiere alle Werte für dieses Feld
+                            # VALUE-NORMALIZATION FIX 26.08.2025: Übergebe field_name für semantische Normalisierung
+                            value_analysis = _analyze_field_values(field_info['value_details'], field_name)
+                            
+                            # Bestimme besten Wert basierend auf Algorithmus
+                            # TEMPLATE-PATTERN-FIX 06.08.2025: Übergebe field_name für Template-Detection
+                            best_value_info = _calculate_best_value(value_analysis, field_name)
+                            
+                except Exception as e:
+                    logger.warning(f"[ATOMIC] Fehler bei atomischen Werten für {mine_name}.{field_name}: {e}")
+                    # Fallback auf bestehende Methode
+                    value_analysis = _analyze_field_values(field_info['value_details'], field_name)
+                    best_value_info = _calculate_best_value(value_analysis, field_name)
                 
                 # Speichere besten Wert für Haupttabelle
                 # FIELD-CONSOLIDATION-FIX 06.08.2025: Bessere UX mit 'Unbekannt' statt N/A
@@ -1230,6 +1272,116 @@ async def get_mine_consolidated_details(
             }
         }
 
+# Utility class to encapsulate CSV field processing logic (atomic lookup, normalization, sources, escaping)
+class CSVFieldProcessor:
+    @staticmethod
+    def process_field(field: str, result: Dict[str, Any]) -> str:
+        # Get raw value (atomic lookup with DB session; fallback to best_values)
+        value = CSVFieldProcessor._get_field_value(field, result)
+
+        # Normalize according to Rule 10 semantics (empty -> empty string)
+        normalized_value = CSVFieldProcessor._normalize_value(value)
+
+        # Resolve source ids via layered fallbacks
+        source_ids = CSVFieldProcessor._resolve_source_ids(field, result)
+
+        # Append source references only when appropriate
+        value_with_refs = CSVFieldProcessor._add_source_references(normalized_value, source_ids)
+
+        # Escape for CSV and enforce final empty-string on whitespace-only
+        final_value = CSVFieldProcessor._escape_for_csv(value_with_refs)
+        return final_value
+
+    @staticmethod
+    def _get_field_value(field: str, result: Dict[str, Any]) -> Any:
+        atomic_value = None
+        try:
+            from minesearch.atomic_value_service import calculate_best_atomic_value
+            from minesearch.database import db_manager
+
+            with db_manager.get_session() as session:
+                atomic_result = calculate_best_atomic_value(
+                    session, result["mine_name"], field, fallback_to_json=False
+                )
+
+                if (
+                    atomic_result.get('method') == 'atomic_normalized'
+                    and atomic_result.get('confidence_score', 0.0) >= 30.0
+                ):
+                    atomic_value = atomic_result.get('display_value')
+                    logger.debug(f"[CSV-ATOMIC] Verwende atomischen Wert für {result['mine_name']}.{field}: {atomic_value}")
+
+        except Exception as e:
+            # Handle DB/session and atomic lookup errors internally; fall back to best_values
+            logger.debug(f"[CSV-ATOMIC] Fehler bei atomischen Werten für {field}: {e}")
+
+        if atomic_value:
+            return atomic_value
+
+        best_values = result.get("best_values", {})
+        return best_values.get(field, "")
+
+    @staticmethod
+    def _normalize_value(value: Any) -> str:
+        return _normalize_placeholder_value(value) or ""
+
+    @staticmethod
+    def _resolve_source_ids(field: str, result: Dict[str, Any]) -> List[int]:
+        detailed_breakdown = result.get("detailed_breakdown", {})
+        if field not in detailed_breakdown:
+            return []
+
+        field_data = detailed_breakdown.get(field, {}) or {}
+        source_ids = field_data.get('global_source_numbers', []) or []
+
+        # Fallback 1: structured_fields
+        if not source_ids:
+            structured_fields = result.get('structured_fields', {}) or {}
+            if field in structured_fields:
+                source_ids = structured_fields[field].get('global_source_numbers', []) or []
+
+        # Fallback 2: source_mapping (extract first 10 numeric source ids)
+        if not source_ids:
+            source_mapping = result.get("source_mapping", {})
+            if source_mapping and isinstance(source_mapping, dict):
+                available_sources = source_mapping.get("sources", {}) or {}
+                if available_sources:
+                    try:
+                        numeric_keys = [int(k) for k in available_sources.keys() if str(k).isdigit()]
+                        source_ids = sorted(numeric_keys)[:10]
+                    except Exception:
+                        source_ids = []
+
+        # Deduplicate while preserving order
+        seen: set[int] = set()
+        deduped_ids: List[int] = []
+        for sid in source_ids:
+            if sid not in seen:
+                deduped_ids.append(sid)
+                seen.add(sid)
+        return deduped_ids
+
+    @staticmethod
+    def _add_source_references(normalized_value: str, source_ids: List[int]) -> str:
+        # Only add references for non-empty values and when not already present
+        if not normalized_value or not normalized_value.strip():
+            return normalized_value
+
+        if not source_ids or len(source_ids) < 3:
+            return normalized_value
+
+        # Check if bracketed references already exist
+        if re.search(r'\[\d+(?:,\d+)*\]', normalized_value):
+            return normalized_value
+
+        refs = f"[{','.join(map(str, source_ids))}]"
+        return f"{normalized_value} {refs}"
+
+    @staticmethod
+    def _escape_for_csv(value: str) -> str:
+        escaped_value = str(value).replace("|", ";")
+        return escaped_value.strip() and escaped_value or ""
+
 @router.get("/results/export/csv")
 async def export_consolidated_csv(
     country: Optional[str] = Query(None),
@@ -1349,63 +1501,15 @@ async def export_consolidated_csv(
             elif field_type == "last_updated":
                 row.append(result.get("last_updated", ""))
         
+        # 🆕 SCHEMA-NORMALISIERUNG 28.08.2025: CSV mit atomischen Werten optimieren
         # CRITICAL CSV-FIX 25.08.2025: Strikte Feld-Verarbeitung verhindert Feldverschiebung
         # Für JEDEN Feld aus remaining_fields MUSS ein Wert existieren
         for field in remaining_fields:
             try:
-                # Standard-Feldverarbeitung (Quellenangaben bereits aus remaining_fields entfernt)
-                # CSV-FIX: Hole Wert aus best_values mit Fallback
-                value = result["best_values"].get(field, "")
-                
-                # REGEL 10: IMMER normalisieren - leere Werte bleiben leer
-                normalized_value = _normalize_placeholder_value(value) or ""
-                
-                # SOURCE-REFERENCE-FIX 25.08.2025: Verbesserte Quellenreferenzierung
-                detailed_breakdown = result.get("detailed_breakdown", {})
-                source_ids = []
-                
-                # REGEL 10: Quellenreferenzen nur bei echten Werten hinzufügen
-                if field in detailed_breakdown and normalized_value:
-                    field_data = detailed_breakdown[field]
-                    
-                    # Primär: Verwende global_source_numbers
-                    source_ids = field_data.get('global_source_numbers', [])
-                    
-                    # SOURCE-FIX: Erweiterte Fallback-Strategie für vollständige Quellenreferenzen
-                    if not source_ids:
-                        # Fallback 1: structured_fields
-                        structured_fields = result.get('structured_fields', {})
-                        if field in structured_fields:
-                            source_ids = structured_fields[field].get('global_source_numbers', [])
-                    
-                    # SOURCE-FIX: Wenn immer noch keine source_ids, nutze alle verfügbaren Quellen
-                    if not source_ids:
-                        # Fallback 2: Aus source_mapping alle Quellen-IDs extrahieren
-                        source_mapping = result.get("source_mapping", {})
-                        if source_mapping and isinstance(source_mapping, dict):
-                            # Extrahiere alle verfügbaren Quellen-IDs
-                            available_sources = source_mapping.get("sources", {})
-                            if available_sources:
-                                # Nutze die ersten 10 verfügbaren Quellen (nicht nur 1,2,3)
-                                source_ids = sorted([int(k) for k in available_sources.keys() if k.isdigit()])[:10]
-                        
-                        # SOURCE-FIX: Nur [1,2,3] Problem beheben - verwende mehr Quellen
-                        if source_ids and len(source_ids) >= 3:
-                            # Füge Quellenreferenzen hinzu (entferne doppelte Referenzen)
-                            source_refs = f"[{','.join(map(str, source_ids))}]"
-                            # Prüfe ob bereits Quellenreferenzen im Wert enthalten sind
-                            if not re.search(r'\[\d+(?:,\d+)*\]', normalized_value):
-                                normalized_value = f"{normalized_value} {source_refs}"
-                    
-                    # CSV-FIX: Ersetze Pipe-Zeichen durch Semikolons
-                    escaped_value = str(normalized_value).replace("|", ";")
-                    
-                    # CRITICAL: Garantiere dass NIEMALS ein leerer Wert gesetzt wird
-                    final_value = escaped_value if escaped_value.strip() else ""  # REGEL 10: Leer statt "nichts gefunden"
-                    row.append(final_value)
-                    
+                final_value = CSVFieldProcessor.process_field(field, result)
+                row.append(final_value)
             except Exception as e:
-                # REGEL 10: Bei Fehler leeren Wert verwenden
+                # REGEL 10: Bei unerwartetem Fehler leeren Wert verwenden (DB-Fehler bereits intern behandelt)
                 logger.error(f"[CSV-FIX] Fehler bei Feld '{field}' für Mine '{result.get('mine_name', 'unknown')}': {e}")
                 row.append("")  # REGEL 10: Leer statt "nichts gefunden"
         
@@ -1500,8 +1604,13 @@ async def export_consolidated_csv(
         # Kombiniere Quellen zu einem String (Semikolon-getrennt für CSV)
         exact_sources_text = "; ".join(exact_sources)
         
-        # Ersetze Pipe-Zeichen durch Semikolons und füge zur Zeile hinzu
-        escaped_exact_sources = exact_sources_text.replace("|", ";")
+        # CSV-quoting für die Zelle mit Delimiter '|', damit '|' korrekt gehandhabt wird
+        import csv
+        import io
+        _cell_buffer = io.StringIO()
+        _cell_writer = csv.writer(_cell_buffer, delimiter='|', quoting=csv.QUOTE_MINIMAL)
+        _cell_writer.writerow([exact_sources_text])
+        escaped_exact_sources = _cell_buffer.getvalue().rstrip("\r\n")
         row.append(escaped_exact_sources)
         
         # CRITICAL CSV-FIX 25.08.2025: Validiere Spaltenanzahl BEVOR Zeile hinzugefügt wird

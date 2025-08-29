@@ -71,7 +71,6 @@ FIELD_CONSOLIDATION_MAP = {
     'output': 'Fördermenge/Jahr',
     
     # PHASE 1.3: Sonstige wichtige Mappings
-    'sources': 'Quellenangaben',
     'source': 'Quellenangaben',
     'data_sources': 'Quellenangaben',
     'references': 'Quellenangaben'
@@ -191,8 +190,13 @@ def consolidate_and_rename_field(field_name, field_value):
     Returns: (final_field_name, processed_field_value)
     """
     # CSV-FIX: Spezielle Felder nicht als Template behandeln
-    if field_name in ['_source_mapping', 'source_mapping', 'sources']:
+    if field_name in ['_source_mapping', 'source_mapping']:
         return field_name, field_value  # Lass diese Felder unverändert
+
+    # Sonderfall: 'sources' soll zu 'Quellenangaben' umbenannt werden,
+    # aber der Wert darf NICHT durch Template-Erkennung verändert werden
+    if field_name == 'sources':
+        return 'Quellenangaben', field_value
     
     # Step 1: Check if field should be consolidated (removed)
     if field_name in FIELD_CONSOLIDATION_MAP:

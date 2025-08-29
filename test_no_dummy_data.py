@@ -4,6 +4,7 @@ Test: Überprüft dass das System keine Dummy-Daten mehr erzeugt (Regel 10)
 """
 import requests
 import time
+import re
 
 def test_no_dummy_data():
     print("🧪 TEST: REGEL 10 - KEINE DUMMY-DATEN")
@@ -32,13 +33,50 @@ Test Mine ABC,Canada,Quebec,Aktiv"""
         # Robustes HTML-Parsing mit BeautifulSoup
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(upload_html, 'html.parser')
-        session_element = soup.find(string=lambda text: text and "Session ID:" in text)
-        if session_element:
-            session_id = session_element.split("Session ID:")[-1].strip()
-            print(f"📋 Session ID: {session_id}")
-        else:
-            print("❌ Keine Session ID gefunden")
-            return
+
+        session_id = None
+
+        # 1) Versuche Hidden-Input (z. B. <input name="session_id" value="...">)
+        input_tag = soup.find('input', attrs={'name': 'session_id'}) or soup.find('input', attrs={'id': 'session_id'})
+        if input_tag and input_tag.get('value'):
+            session_id = input_tag.get('value').strip()
+
+        # 2) Versuche bekannte Container (id/class oder data-Attribut)
+        if not session_id:
+            explicit = soup.select_one('#session-id, .session-id, #session_id, .session_id, [data-session-id]')
+            if explicit:
+                if explicit.has_attr('data-session-id'):
+                    session_id = explicit['data-session-id'].strip()
+                else:
+                    text_content = explicit.get_text(" ", strip=True)
+                    m = re.search(r'([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})', text_content)
+                    if m:
+                        session_id = m.group(1)
+
+        # 3) Suche nach Text "Session ID" in semantischen Tags
+        if not session_id:
+            label_candidate = soup.find(lambda tag: tag.name in ['em', 'p', 'span', 'div', 'label'] and tag.get_text() and 'Session ID' in tag.get_text())
+            if label_candidate:
+                text_content = label_candidate.get_text(" ", strip=True)
+                m = re.search(r'([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})', text_content)
+                if m:
+                    session_id = m.group(1)
+
+        # 4) Striktes Regex-Fallback gegen kompletten HTML-Text
+        if not session_id:
+            m = re.search(r'name=["\']session_id["\']\s+value=["\']([^"\']+)["\']', upload_html, flags=re.IGNORECASE)
+            if m:
+                session_id = m.group(1).strip()
+
+        if not session_id:
+            m = re.search(r'Session\s*ID[:\s]*([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})', upload_html, flags=re.IGNORECASE)
+            if m:
+                session_id = m.group(1).strip()
+
+        if not session_id:
+            raise ValueError("Session ID nicht gefunden in Upload-Response")
+
+        print(f"📋 Session ID: {session_id}")
         
         # Teste Batch-Search mit einem verfügbaren Modell
         batch_data = {
@@ -103,8 +141,8 @@ Test Mine ABC,Canada,Quebec,Aktiv"""
                 value_str = str(value) if value is not None else ""
                 
                 # Prüfe auf typische Dummy-Indikatoren
+                # Hinweis: 'X' gilt nur als Dummy, wenn das gesamte Feld genau 'X' ist
                 dummy_patterns = [
-                    'X',  # Der alte X-Marker
                     'dummy', 'DUMMY',
                     'placeholder', 'PLACEHOLDER',
                     'template', 'TEMPLATE',
@@ -112,15 +150,20 @@ Test Mine ABC,Canada,Quebec,Aktiv"""
                     'example', 'EXAMPLE',
                     'test', 'TEST'
                 ]
-                
-                for pattern in dummy_patterns:
-                    if pattern in value_str:
-                        dummy_indicators_found += 1
-                        print(f"❌ DUMMY-INDIKATOR GEFUNDEN: {field} = '{value_str}'")
-                        break
+
+                # Strenger 'X'-Check: nur vollständiger Feldwert 'X' (keine Teilwörter wie "Mine X")
+                if re.fullmatch(r'\s*X\s*', value_str):
+                    dummy_indicators_found += 1
+                    print(f"❌ DUMMY-INDIKATOR GEFUNDEN: {field} = '{value_str}'")
                 else:
-                    if value_str.strip():
-                        print(f"✅ {field}: '{value_str[:50]}{'...' if len(value_str) > 50 else ''}'")
+                    for pattern in dummy_patterns:
+                        if pattern in value_str:
+                            dummy_indicators_found += 1
+                            print(f"❌ DUMMY-INDIKATOR GEFUNDEN: {field} = '{value_str}'")
+                            break
+                    else:
+                        if value_str.strip():
+                            print(f"✅ {field}: '{value_str[:50]}{'...' if len(value_str) > 50 else ''}'")
         
         print(f"\n📈 ANALYSE-ERGEBNIS:")
         print(f"   📊 Analysierte Felder: {total_fields_analyzed}")

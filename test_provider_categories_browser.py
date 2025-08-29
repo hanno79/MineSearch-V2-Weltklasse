@@ -66,7 +66,7 @@ def test_provider_categories():
             print(f"   Gefundene Provider: {len(found_providers)}/{len(expected_providers)}")
             print(f"   Erfolgsrate: {(len(found_providers)/len(expected_providers)*100):.1f}%")
             
-            if len(found_providers) >= 8:  # Erwarten mindestens 8 der 11 Provider
+            if len(found_providers) >= 8:  # Erwarten mindestens 8 der 12 Provider
                 print("   ✅ PROVIDER-KATEGORISIERUNG ERFOLGREICH")
             else:
                 print("   ❌ PROVIDER-KATEGORISIERUNG FEHLGESCHLAGEN")

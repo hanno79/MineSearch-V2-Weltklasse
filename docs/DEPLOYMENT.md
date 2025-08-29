@@ -355,12 +355,27 @@ AGENT_TIMEOUT=60
 # SQLite (Standard)
 DATABASE_URL=sqlite:///data/minesearch.db
 
+# Analyse-/Wartungs-Skripte (optional):
+# Diese Skripte (z. B. backend/analyze_database_contamination.py) lesen zuerst DATABASE_PATH,
+# dann MINES_DB_PATH, dann (falls sqlite) DATABASE_URL und nutzen andernfalls einen Fallback.
+# Setze dies, um Pfade ohne Codeänderung zu überschreiben.
+DATABASE_PATH=/app/data/minesearch.db
+# Kompatibilitäts-Variable, wird in Tests häufig gesetzt
+MINES_DB_PATH=/app/backend/minesearch/database/mines.db
+
 # PostgreSQL (Production)
 DATABASE_URL=postgresql://user:pass@host:5432/minesearch
 
 # MySQL
 DATABASE_URL=mysql://user:pass@host:3306/minesearch
 ```
+
+#### Monitoring‑Status‑Skript
+Das Skript `backend/monitoring_status.py` ermittelt den Datenbankpfad in folgender
+Priorität: `DATABASE_PATH` → `MINES_DB_PATH` → `DATABASE_URL` (nur `sqlite://`) →
+Fallback (`backend/minesearch/database/mines.db` relativ zum Repo‑Root). Der
+aufgelöste Pfad wird vor Nutzung validiert. Ist die Datei nicht vorhanden,
+bricht das Skript mit einer klaren Fehlermeldung ab.
 
 ## Monitoring & Logging
 
@@ -402,6 +417,18 @@ LOGGING_CONFIG = {
 - Cache Hit-Rate
 - Aktive Verbindungen
 - Memory-Nutzung
+
+#### Speicherort & Aufbewahrung (NEU)
+- Roh-Metriken werden NICHT im Git-Repository versioniert.
+- Externer Speicher: S3/Azure Blob/Google Cloud Storage (empfohlen).
+- Beispiel-Variablen:
+  - METRICS_STORE=s3
+  - METRICS_BUCKET=minesearch-metrics
+  - METRICS_PREFIX=system/
+  - METRICS_RETENTION_MAX=500      # letzte 500 Einträge
+  - METRICS_ROTATE_DAYS=1          # tägliche Rotation
+- Alternative: Git LFS möglich, bevorzugt jedoch Object Storage.
+- Pipelines/Crons sollen alte Dateien gemäß Retention entfernen.
 
 ## Sicherheit
 

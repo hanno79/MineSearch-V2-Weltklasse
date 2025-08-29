@@ -153,7 +153,7 @@ def analyze_csv_complete(csv_file_path: Optional[str] = None) -> Dict[str, Any]:
                     
                     # Format-Inkonsistenzen
                     if field_name in ['x-Koordinate', 'y-Koordinate'] and value:
-                        if not is_valid_coordinate(value):
+                        if not is_valid_coordinate(value, field_name):
                             statistics['format_inconsistencies'][f'{field_name}_format'] += 1
                     
                     # Encoding-Probleme
@@ -294,14 +294,30 @@ def get_suspicious_reason(value, field_name):
     else:
         return "Ungewöhnliches Format"
 
-def is_valid_coordinate(value):
-    """Prüft ob ein Koordinatenwert valide ist"""
+def is_valid_coordinate(value, field_name: Optional[str] = None):
+    """Prüft ob ein Koordinatenwert valide ist.
+
+    - Leere/Platzhalter-Werte gelten als valide (True)
+    - Wenn das Feld ein Breitengrad (Latitude) zu sein scheint ("y" oder "lat" im Feldnamen),
+      dann muss der Wert in [-90, 90] liegen
+    - Andernfalls wird der Wert als Längengrad (Longitude) behandelt und muss in [-180, 180] liegen
+    """
     if not value or value.lower() in ['nichts gefunden', 'leer']:
         return True  # Leere Werte sind OK
     
+    # Bestimme, ob es sich um Latitude handelt
+    is_latitude = False
+    if field_name:
+        name_lower = field_name.lower()
+        if ('lat' in name_lower) or ('y' in name_lower):
+            is_latitude = True
+    
     try:
         float_val = float(value)
-        return -180 <= float_val <= 180
+        if is_latitude:
+            return -90 <= float_val <= 90
+        else:
+            return -180 <= float_val <= 180
     except ValueError:
         return False
 

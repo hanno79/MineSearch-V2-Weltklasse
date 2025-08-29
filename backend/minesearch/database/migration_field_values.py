@@ -7,6 +7,7 @@ Revises: base
 Create Date: 2025-08-28
 """
 
+import logging
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import text
@@ -17,6 +18,7 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
+logger = logging.getLogger('alembic.runtime.migration')
 
 def upgrade():
     """Erstelle neue normalisierte Tabellen für Feldwerte"""
@@ -53,7 +55,7 @@ def upgrade():
     op.create_index('idx_fvs_source', 'field_value_sources', ['source_id'])
     op.create_index('idx_fvs_field_source', 'field_value_sources', ['field_value_id', 'source_id'])
     
-    print("✅ Neue normalisierte Tabellen für atomische Feldwerte erstellt")
+    logger.info("✅ Neue normalisierte Tabellen für atomische Feldwerte erstellt")
 
 
 def downgrade():
@@ -73,4 +75,4 @@ def downgrade():
     op.drop_table('field_value_sources')
     op.drop_table('field_values')
     
-    print("❌ Normalisierte Tabellen für atomische Feldwerte entfernt")
+    logger.info("❌ Normalisierte Tabellen für atomische Feldwerte entfernt")

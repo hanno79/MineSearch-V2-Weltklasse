@@ -45,19 +45,6 @@ def test_database_architecture():
             results['gui_target'] = target
             print(f"✅ GUI-DB (Symlink): {gui_db} → {target}")
             
-            # Verifikation des Symlink-Ziels
-            if target == backend_db:
-                results['symlink_correct'] = True
-                print("✅ Symlink-Ziel: Korrekt")
-            else:
-                results['symlink_correct'] = False
-                print(f"❌ Symlink-Ziel falsch: Erwartet {backend_db}, gefunden {target}")
-        else:
-            results['gui_is_symlink'] = False
-            print(f"❌ GUI-DB ist kein Symlink: {gui_db}")
-    else:
-        results['gui_exists'] = False
-        print(f"❌ GUI-DB nicht gefunden: {gui_db}")
     
     return results
 

@@ -8,6 +8,7 @@ ZWECK: Erkennung von wiederkehrenden Template-/Dummy-Datenmustern über Zeit
 
 import logging
 import json
+import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Set
 from collections import defaultdict, Counter
@@ -485,5 +486,3 @@ def monitor_extraction_result(field: str, value: str, mine_name: str,
     template_monitor.record_pattern(
         'duplicate_value', field, mine_name, value_str, severity='low'
     )
-
-import re

@@ -113,7 +113,11 @@ async def get_result_statistics():
     stats = db_manager.get_statistics()
     
     # Erweitere um Modell-Statistiken für Frontend-Kompatibilität
-    models_data = db_manager.get_model_statistics_comprehensive()
+    try:
+        models_data = db_manager.get_model_statistics_comprehensive()
+    except Exception as exc:
+        logger.exception("Fehler beim Abrufen der Modell-Statistiken in /results/stats; setze leeres Fallback.", exc_info=True)
+        models_data = []
     stats['models'] = models_data
     
     return {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Author: rahn  
-Datum: 23.08.2025
+Datum: 29.08.2025
 Version: 1.0
 Beschreibung: Finaler Test der Zähler-Korrektur mit erweiterten Debug-Infos
 """
@@ -12,6 +12,7 @@ import sys
 import time
 
 async def test_final_counter_fix():
+    browser = None
     async with async_playwright() as p:
         try:
             # Browser starten 
@@ -23,7 +24,7 @@ async def test_final_counter_fix():
             
             # Warte auf vollständiges Laden
             print("⏳ Waiting for Progressive Model Selection to load...")
-            await asyncio.sleep(5)
+            await page.wait_for_selector('.smart-selection[data-selection-type="free"]', state="visible", timeout=5000)
             
             # Browser Console Logs aktivieren mit Filter für Counter-Updates
             page.on("console", lambda msg: print(f"[CONSOLE] {msg.type}: {msg.text}") if "🔢" in msg.text or "MODEL-UX" in msg.text else None)
@@ -81,7 +82,7 @@ async def test_final_counter_fix():
             import traceback
             traceback.print_exc()
         finally:
-            if 'browser' in locals():
+            if browser is not None:
                 await browser.close()
 
 if __name__ == "__main__":

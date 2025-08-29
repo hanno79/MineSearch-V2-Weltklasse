@@ -5,7 +5,7 @@ Version: 1.0
 Beschreibung: Datenbank-Modelle für MineSearch v2 (aufgeteilt aus database.py)
 """
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Text, Boolean, Index, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Text, Boolean, Index, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -996,6 +996,21 @@ class SourceDiscoverySession(Base):
         Index('idx_source_session_phase', 'phase', 'started_at'),
     )
     
+    # Relationships
+    contributions = relationship("ModelSourceContribution", back_populates="session", cascade="all, delete-orphan")
+    field_search_results = relationship("FieldSearchResult", back_populates="session", cascade="all, delete-orphan")
+    sequential_result = relationship("SequentialSearchResult", back_populates="session", uselist=False, cascade="all, delete-orphan")
+    
+    # Bequeme M:N-Relationship zu Sources über Contributions (viewonly)
+    sources = relationship(
+        "Source",
+        secondary="model_source_contributions",
+        primaryjoin="SourceDiscoverySession.session_id==ModelSourceContribution.session_id",
+        secondaryjoin="Source.id==ModelSourceContribution.source_id",
+        viewonly=True,
+        backref="discovery_sessions"
+    )
+    
     def to_dict(self) -> Dict[str, Any]:
         """Konvertiere zu Dictionary für API-Responses"""
         return {
@@ -1031,7 +1046,7 @@ class ModelSourceContribution(Base):
     __tablename__ = 'model_source_contributions'
     
     id = Column(Integer, primary_key=True)
-    session_id = Column(String(100), nullable=False, index=True)
+    session_id = Column(String(100), ForeignKey('source_discovery_sessions.session_id', ondelete='CASCADE'), nullable=False, index=True)
     model_id = Column(String(100), nullable=False, index=True)
     source_id = Column(Integer, ForeignKey('sources.id'), nullable=False)
     
@@ -1047,6 +1062,7 @@ class ModelSourceContribution(Base):
     
     # Relationships
     source = relationship("Source", backref="model_contributions")
+    session = relationship("SourceDiscoverySession", back_populates="contributions")
     
     # Indizes
     __table_args__ = (
@@ -1079,7 +1095,7 @@ class FieldSearchResult(Base):
     __tablename__ = 'field_search_results'
     
     id = Column(Integer, primary_key=True)
-    session_id = Column(String(100), nullable=False, index=True)
+    session_id = Column(String(100), ForeignKey('source_discovery_sessions.session_id', ondelete='CASCADE'), nullable=False, index=True)
     model_id = Column(String(100), nullable=False, index=True)
     field_name = Column(String(100), nullable=False, index=True)
     
@@ -1103,6 +1119,19 @@ class FieldSearchResult(Base):
     search_successful = Column(Boolean, nullable=False, default=False)
     value_found = Column(Boolean, nullable=False, default=False)
     sources_matched = Column(Boolean, nullable=False, default=False)
+    
+    # Relationships
+    session = relationship("SourceDiscoverySession", back_populates="field_search_results")
+    # Neue Relation: Assoziation zu verwendeten Quellen über Join-Tabelle
+    source_usages = relationship("FieldSearchSourceUsage", back_populates="field_search", cascade="all, delete-orphan")
+    # Bequeme ViewOnly M:N-Relation direkt zu Source
+    used_sources = relationship(
+        "Source",
+        secondary="field_search_source_usages",
+        primaryjoin="FieldSearchResult.id==FieldSearchSourceUsage.field_search_id",
+        secondaryjoin="Source.id==FieldSearchSourceUsage.source_id",
+        viewonly=True
+    )
     
     # Indizes
     __table_args__ = (
@@ -1133,6 +1162,37 @@ class FieldSearchResult(Base):
         }
 
 
+class FieldSearchSourceUsage(Base):
+    """
+    Assoziationstabelle zwischen FieldSearchResult und Source (welche Quellen wurden verwendet)
+    """
+    __tablename__ = 'field_search_source_usages'
+    
+    id = Column(Integer, primary_key=True)
+    field_search_id = Column(Integer, ForeignKey('field_search_results.id', ondelete='CASCADE'), nullable=False, index=True)
+    source_id = Column(Integer, ForeignKey('sources.id', ondelete='CASCADE'), nullable=False, index=True)
+    used_at = Column(DateTime, nullable=False, server_default=func.now())
+    
+    # Beziehungen
+    field_search = relationship("FieldSearchResult", back_populates="source_usages")
+    source = relationship("Source", backref="field_search_usages")
+    
+    # Indizes und Eindeutigkeit
+    __table_args__ = (
+        UniqueConstraint('field_search_id', 'source_id', name='uix_field_search_source'),
+        Index('idx_fssu_field_search', 'field_search_id'),
+        Index('idx_fssu_source', 'source_id'),
+    )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'id': self.id,
+            'field_search_id': self.field_search_id,
+            'source_id': self.source_id,
+            'used_at': self.used_at.isoformat() if self.used_at else None
+        }
+
+
 class SequentialSearchResult(Base):
     """
     ÄNDERUNG 27.08.2025: Konsolidierte Ergebnisse einer Sequential Search Session
@@ -1141,7 +1201,7 @@ class SequentialSearchResult(Base):
     __tablename__ = 'sequential_search_results'
     
     id = Column(Integer, primary_key=True)
-    session_id = Column(String(100), nullable=False, unique=True, index=True)
+    session_id = Column(String(100), ForeignKey('source_discovery_sessions.session_id', ondelete='CASCADE'), nullable=False, unique=True, index=True)
     mine_name = Column(String(255), nullable=False, index=True)
     country = Column(String(100), nullable=True)
     region = Column(String(100), nullable=True)
@@ -1180,6 +1240,9 @@ class SequentialSearchResult(Base):
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     completed_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    session = relationship("SourceDiscoverySession", back_populates="sequential_result", uselist=False)
     
     # Indizes
     __table_args__ = (

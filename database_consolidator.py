@@ -20,9 +20,10 @@ def consolidate_databases():
     print(f"Zeitstempel: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print()
     
-    # Primäre Datenbank (identifiziert durch Analyse)
-    primary_db = "/app/backend/minesearch/database/mines_backup_pre_cleanup_20250819_070936.db"
+    # ÄNDERUNG 28.08.2025: Konsolidierung bereits durch Löschung alter Datenbanken abgeschlossen
     target_db = "/app/backend/minesearch/database/mines.db"
+    print("ℹ️  Konsolidierung bereits abgeschlossen - nur noch eine Datenbank aktiv")
+    return True
     
     print(f"🎯 PRIMÄRE DATENBANK: {primary_db}")
     print(f"🎯 ZIEL-PFAD: {target_db}")

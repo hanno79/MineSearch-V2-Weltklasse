@@ -5,10 +5,28 @@ Final test for all provider categories
 
 import requests
 import json
+import pytest
 
 def test_final_categories():
     try:
-        response = requests.get("http://localhost:8000/api/available-models")
+        # Netzwerkaufruf mit Timeout und expliziter Fehlerbehandlung
+        try:
+            response = requests.get(
+                "http://localhost:8000/api/available-models",
+                timeout=5,
+            )
+        except requests.exceptions.Timeout:
+            pytest.fail(
+                "Zeitüberschreitung beim Abruf von /api/available-models (timeout=5s). Läuft der Backend-Server und reagiert rechtzeitig?"
+            )
+        except requests.exceptions.ConnectionError:
+            pytest.fail(
+                "Verbindungsfehler zu http://localhost:8000/api/available-models. Ist der Dienst erreichbar (localhost:8000)?"
+            )
+        except requests.exceptions.RequestException as e:
+            pytest.fail(
+                f"Anfragefehler beim Abruf von /api/available-models: {e}"
+            )
         data = response.json()
         models = data['data']['available_models']
         
@@ -69,6 +87,8 @@ def test_final_categories():
         print(f"Fehler: {e}")
         import traceback
         traceback.print_exc()
+        # Fehler nicht verschlucken: sicherstellen, dass der Test fehlschlägt
+        raise
 
 if __name__ == "__main__":
     test_final_categories()

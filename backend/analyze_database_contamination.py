@@ -2,10 +2,20 @@
 """
 Author: rahn
 Datum: 25.08.2025
-Version: 1.0
+Version: 1.1
 Beschreibung: Analyse-Script für Datenbank-Kontamination (nur Lesen, keine Änderungen)
 
 ANALYSE-TOOL 25.08.2025: Prüft die Feldkontamination ohne DB-Änderungen
+
+Konfiguration:
+- Dieses Skript liest den Datenbankpfad aus folgenden Quellen (in Prioritätsreihenfolge):
+  1) Environment Variable "DATABASE_PATH"
+  2) Environment Variable "MINES_DB_PATH" (Kompatibilität für Tests/CI)
+  3) `minesearch.config.config.DATABASE_URL` (falls SQLite)
+  4) Fallback: backend/minesearch/database/mines.db relativ zum Repo-Root
+
+Der aufgelöste Pfad wird vor Nutzung validiert (existiert und ist eine Datei).
+So kann der Pfad ohne Codeänderung via Environment/Config überschrieben werden.
 """
 
 import os
@@ -14,6 +24,7 @@ import sqlite3
 import json
 import logging
 from pathlib import Path
+from urllib.parse import urlparse
 from collections import defaultdict
 
 # Logging konfigurieren
@@ -27,23 +38,70 @@ if str(backend_path) not in sys.path:
 
 from field_name_blacklist import is_field_name_value
 
+
+def _resolve_repo_root() -> Path:
+    """Ermittelt den Repo-Root basierend auf dieser Datei."""
+    backend_dir = Path(__file__).resolve().parent  # /app/backend
+    return backend_dir.parent  # /app
+
+
+def _resolve_database_path() -> str:
+    """Liest den DB-Pfad aus ENV/Config mit robustem Fallback.
+
+    Priorität:
+    1) ENV DATABASE_PATH
+    2) ENV MINES_DB_PATH (für Tests/CI)
+    3) minesearch.config.config.DATABASE_URL (nur sqlite)
+    4) Fallback: backend/minesearch/database/mines.db relativ zum Repo-Root
+    """
+    repo_root = _resolve_repo_root()
+
+    # 1) & 2) Environment Variablen
+    for env_var in ("DATABASE_PATH", "MINES_DB_PATH"):
+        value = os.getenv(env_var, "").strip()
+        if value:
+            candidate = Path(value).expanduser()
+            if not candidate.is_absolute():
+                candidate = (repo_root / candidate).resolve()
+            return str(candidate)
+
+    # 3) Konfigurationsobjekt (nur wenn verfügbar)
+    try:
+        # minesearch liegt bereits im sys.path (siehe oben)
+        from config import config  # type: ignore
+    except Exception:
+        config = None  # noqa: N806
+
+    if config is not None:
+        db_url = getattr(config, "DATABASE_URL", "")
+        if isinstance(db_url, str) and db_url.startswith("sqlite"):
+            parsed = urlparse(db_url)
+            # Erwartete Form: sqlite:////abs/path/to/db.sqlite
+            if parsed.path:
+                return str(Path(parsed.path).resolve())
+
+    # 4) Fallback
+    fallback = (repo_root / "backend" / "minesearch" / "database" / "mines.db").resolve()
+    return str(fallback)
+
 def analyze_database_contamination():
     """
     ANALYSE-FUNKTION 25.08.2025: Analysiert Feldkontamination ohne DB-Änderungen
     """
     
-    # Datenbank-Pfad
-    db_path = "/app/backend/minesearch/database/mines.db"
-    
-    if not os.path.exists(db_path):
-        print(f"❌ Datenbank nicht gefunden: {db_path}")
+    # Datenbank-Pfad ermitteln und validieren
+    db_path = _resolve_database_path()
+    db_path_obj = Path(db_path)
+    if not (db_path_obj.exists() and db_path_obj.is_file()):
+        print(f"❌ Datenbank nicht gefunden oder keine Datei: {db_path}")
+        print("   Hinweis: Setze ENV 'DATABASE_PATH' oder 'MINES_DB_PATH' oder konfiguriere 'DATABASE_URL' (sqlite).")
         return
     
     print("🔍 DATENBANK-KONTAMINATIONS-ANALYSE")
     print("=" * 50)
     
     try:
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(str(db_path_obj))
         cursor = conn.cursor()
         
         # Tabellen-Info
@@ -88,15 +146,34 @@ def analyze_database_contamination():
         
         # HAUPTANALYSE: structured_data Kontamination
         if structured_count > 0:
-            print(f"\n🔍 ANALYSIERE {structured_count} STRUCTURED_DATA EINTRÄGE...")
-            
-            cursor.execute("""
-                SELECT id, mine_name, structured_data 
-                FROM search_results 
-                WHERE structured_data IS NOT NULL AND structured_data != ''
-                LIMIT 100
-            """)
-            
+            # Limit konfigurierbar (ENV ANALYZE_SAMPLE_LIMIT), Standard 100; <=0 bedeutet kein Limit
+            sample_limit_env = os.getenv("ANALYZE_SAMPLE_LIMIT", "").strip()
+            sample_limit = 100
+            if sample_limit_env:
+                try:
+                    sample_limit = int(sample_limit_env)
+                except ValueError:
+                    print(f"⚠️  Ungültiger Wert in ENV ANALYZE_SAMPLE_LIMIT='{sample_limit_env}', verwende Standard 100.")
+                    sample_limit = 100
+
+            if sample_limit > 0:
+                print(f"\n🔍 ANALYSIERE bis zu {sample_limit} STRUCTURED_DATA EINTRÄGE (insgesamt {structured_count})...")
+                if structured_count > sample_limit:
+                    print(f"Hinweis: Ausgabe auf {sample_limit} Einträge begrenzt, insgesamt {structured_count} Einträge gefunden")
+                cursor.execute("""
+                    SELECT id, mine_name, structured_data 
+                    FROM search_results 
+                    WHERE structured_data IS NOT NULL AND structured_data != ''
+                    LIMIT ?
+                """, (sample_limit,))
+            else:
+                print(f"\n🔍 ANALYSIERE ALLE {structured_count} STRUCTURED_DATA EINTRÄGE...")
+                cursor.execute("""
+                    SELECT id, mine_name, structured_data 
+                    FROM search_results 
+                    WHERE structured_data IS NOT NULL AND structured_data != ''
+                """)
+
             sample_results = cursor.fetchall()
             
             contamination_stats = {

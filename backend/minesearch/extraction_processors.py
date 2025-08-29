@@ -605,6 +605,10 @@ def extract_core_value(value: str, field: str) -> str:
     
     value = value.strip()
     
+    # Explizite Guard für None, bevor Regex angewandt wird
+    if value is None:
+        return ""
+    
     # Entferne Quellenreferenzen [1,2,3] ZUERST
     value = re.sub(r'\s*\[\d+(?:,\d+)*\]', '', value)
     

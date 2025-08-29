@@ -17,6 +17,8 @@ import sys
 import sqlite3
 import logging
 import json
+import shutil
+import tempfile
 from datetime import datetime
 from typing import Dict, List, Tuple, Any
 from pathlib import Path
@@ -395,15 +397,28 @@ class DatabaseCleanupTool:
             
             logger.warning(f"[RESTORE] ⚠️  WIEDERHERSTELLUNG AUS BACKUP: {self.backup_path}")
             
-            # Original löschen und Backup kopieren
-            if os.path.exists(self.db_path):
-                os.remove(self.db_path)
-            
-            import shutil
-            shutil.copy2(self.backup_path, self.db_path)
-            
-            logger.info(f"[RESTORE] ✅ Datenbank aus Backup wiederhergestellt")
-            return True
+            # Backup in temporäre Datei im selben Verzeichnis kopieren und dann atomar ersetzen
+            db_dir = os.path.dirname(self.db_path) or "."
+            tmp_fd, tmp_path = tempfile.mkstemp(
+                prefix=os.path.basename(self.db_path) + ".restore_",
+                suffix=".tmp",
+                dir=db_dir
+            )
+            os.close(tmp_fd)
+            try:
+                shutil.copy2(self.backup_path, tmp_path)
+                os.replace(tmp_path, self.db_path)
+                logger.info(f"[RESTORE] ✅ Datenbank aus Backup atomar wiederhergestellt")
+                return True
+            except Exception as inner_e:
+                logger.error(f"[RESTORE] FEHLER während atomarer Wiederherstellung: {inner_e}")
+                # Aufräumen: temporäre Datei entfernen, Original bleibt unangetastet
+                try:
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                except Exception as cleanup_e:
+                    logger.warning(f"[RESTORE] Konnte temporäre Datei nicht entfernen: {cleanup_e}")
+                return False
             
         except Exception as e:
             logger.error(f"[RESTORE] KRITISCHER FEHLER bei Wiederherstellung: {e}")

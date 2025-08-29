@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS field_definitions (
 );
 
 -- Standard-Felder definieren
-INSERT OR REPLACE INTO field_definitions 
+INSERT INTO field_definitions 
 (field_name, display_name, field_category, data_type, unit_type, is_required) VALUES
 ('name', 'Mine Name', 'administrative', 'text', NULL, TRUE),
 ('country', 'Land', 'geographical', 'text', NULL, TRUE),
@@ -101,7 +101,8 @@ INSERT OR REPLACE INTO field_definitions
 ('restoration_costs', 'Restaurationskosten', 'financial', 'currency', 'currency', FALSE),
 ('production_year', 'Fördermenge/Jahr', 'operational', 'number', 'weight', FALSE),
 ('area_sqkm', 'Fläche in qkm', 'technical', 'number', 'area', FALSE),
-('depth_meters', 'Tiefe in Metern', 'technical', 'number', 'length', FALSE);
+('depth_meters', 'Tiefe in Metern', 'technical', 'number', 'length', FALSE)
+ON CONFLICT(field_name) DO NOTHING;
 
 -- =====================================================
 -- 4. MINE_DATA_FIELDS (Atomare Feldwerte!)
@@ -138,7 +139,7 @@ CREATE TABLE IF NOT EXISTS mine_data_fields (
     -- Constraints
     FOREIGN KEY (mine_id) REFERENCES mines_normalized(id) ON DELETE CASCADE,
     FOREIGN KEY (field_name) REFERENCES field_definitions(field_name) ON DELETE CASCADE,
-    FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE SET NULL
+    FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- Indizes für Performance
@@ -192,6 +193,7 @@ CREATE INDEX IF NOT EXISTS idx_search_norm_timestamp ON search_results_normalize
 -- Auto-Update timestamp auf mines_normalized
 CREATE TRIGGER IF NOT EXISTS update_mines_timestamp 
     AFTER UPDATE ON mines_normalized
+    WHEN NEW.updated_at IS OLD.updated_at
 BEGIN
     UPDATE mines_normalized 
     SET updated_at = CURRENT_TIMESTAMP 
@@ -201,6 +203,7 @@ END;
 -- Auto-Update timestamp auf mine_data_fields
 CREATE TRIGGER IF NOT EXISTS update_mine_data_fields_timestamp 
     AFTER UPDATE ON mine_data_fields
+    WHEN NEW.updated_at IS OLD.updated_at
 BEGIN
     UPDATE mine_data_fields 
     SET updated_at = CURRENT_TIMESTAMP 

@@ -13,6 +13,7 @@ import time
 
 async def test_single_selection():
     async with async_playwright() as p:
+        browser = None
         try:
             # Browser starten 
             browser = await p.chromium.launch(headless=False)
@@ -23,7 +24,7 @@ async def test_single_selection():
             
             # Warte auf vollständiges Laden
             print("⏳ Waiting for Progressive Model Selection to load...")
-            await asyncio.sleep(5)
+            await page.wait_for_selector('.advanced-toggle-btn', timeout=5000)
             
             # Console monitoring nur für relevante Infos
             page.on("console", lambda msg: print(f"[CONSOLE] {msg.text}") if "MODEL-UX" in msg.text or "COUNTER" in msg.text else None)
@@ -80,8 +81,12 @@ async def test_single_selection():
             import traceback
             traceback.print_exc()
         finally:
-            if 'browser' in locals():
-                await browser.close()
+            if browser is not None:
+                try:
+                    if browser.is_connected():
+                        await browser.close()
+                except Exception:
+                    pass
 
 if __name__ == "__main__":
     asyncio.run(test_single_selection())

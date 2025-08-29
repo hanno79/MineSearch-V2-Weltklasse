@@ -61,16 +61,13 @@ class MultiModelSearchOrchestrator:
     def __init__(self):
         self.source_discovery = EnhancedSourceDiscovery()
         self.normalized_db_manager = NormalizedDatabaseManager()
-        # Initialize provider registry
-        # BATCH-FIX 28.08.2025: Force reinitialize für Batch-Kontext
+        # Initialize provider registry (threadsicher/idempotent)
         logger.info(f"[ORCHESTRATOR-INIT] Provider Registry Status: {len(provider_registry._providers)} Provider geladen")
         if not provider_registry._providers:
-            logger.info("[ORCHESTRATOR-INIT] Initialisiere Provider Registry...")
-            provider_registry.initialize(config.PROVIDERS)
+            logger.info("[ORCHESTRATOR-INIT] Provider Registry wird initialisiert (idempotent)...")
         else:
-            # FORCE REFRESH für Batch-Kontext - Provider könnten expired sein
-            logger.info("[ORCHESTRATOR-INIT] Force-Refresh der Provider Registry für Batch-Kontext...")
-            provider_registry.initialize(config.PROVIDERS)
+            logger.info("[ORCHESTRATOR-INIT] Registry bereits gefüllt – führe idempotente Initialisierung aus (wird ggf. übersprungen)")
+        provider_registry.initialize(config.PROVIDERS)
     
     def _validate_provider_response(self, search_result, model_id: str) -> Dict[str, Any]:
         """
@@ -321,40 +318,50 @@ class MultiModelSearchOrchestrator:
                 else:
                     logger.error(f"[ORCHESTRATOR-DB-ERROR] Model {result.model_id} has EMPTY structured_data - cannot save!")
                 
-                db_manager.save_search_result(
-                    mine_name=mine_name,
-                    model_used=result.model_id,
-                    structured_data=structured_data,  # FIXED: Ensure this has content
-                    sources=result.sources,
-                    session_id=session_id,
-                    country=country,
-                    region=region,
-                    commodity=commodity,
-                    search_type='orchestrated_multi_model',
-                    success=True,
-                    search_duration=result.search_duration
-                )
-                
-                logger.info(f"[ORCHESTRATOR-DB-SUCCESS] Legacy database save successful for {result.model_id}")
-                
-                # NORMALIZED SCHEMA FIX 28.08.2025: Speichere auch in normalized schema
-                try:
-                    normalized_result_id = self.normalized_db_manager.save_search_result_normalized(
-                        mine_name=mine_name,
-                        model_used=result.model_id,
-                        structured_data=structured_data,
-                        sources=result.sources,
-                        session_id=session_id,
-                        country=country,
-                        search_duration=result.search_duration
-                    )
-                    logger.info(f"[ORCHESTRATOR-NORMALIZED] ✅ Normalized database save successful for {result.model_id} (ID: {normalized_result_id})")
-                except Exception as e:
-                    logger.error(f"[ORCHESTRATOR-NORMALIZED] ❌ Normalized database save failed for {result.model_id}: {e}")
-                
-                # DATABASE-CACHE KONSISTENZ-FIX: save_search_result ruft automatisch update_model_statistics_comprehensive auf
-                # Daher NICHT nochmal explizit aufrufen um Doppel-Updates zu vermeiden
-                logger.info(f"[ORCHESTRATOR-STATS] Statistics auto-updated via save_search_result for {result.model_id}")
+                # ATOMIC SAVE: Beide Saves (Legacy + Normalized) in einer Transaktion
+                from minesearch.database import db_manager as legacy_db_manager
+                with legacy_db_manager.get_session() as tx_session:
+                    try:
+                        # Legacy speichern (ohne eigenen Commit)
+                        legacy_db_manager.save_search_result(
+                            mine_name=mine_name,
+                            model_used=result.model_id,
+                            structured_data=structured_data,
+                            sources=result.sources,
+                            session_id=session_id,
+                            country=country,
+                            region=region,
+                            commodity=commodity,
+                            search_type='orchestrated_multi_model',
+                            success=True,
+                            search_duration=result.search_duration,
+                            session=tx_session
+                        )
+                        
+                        # Normalized speichern (gleiche Transaktion/Session)
+                        normalized_result_id = self.normalized_db_manager.save_search_result_normalized(
+                            mine_name=mine_name,
+                            model_used=result.model_id,
+                            structured_data=structured_data,
+                            sources=result.sources,
+                            session_id=session_id,
+                            country=country,
+                            search_duration=result.search_duration,
+                            db_session=tx_session
+                        )
+                        
+                        # Expliziter Commit nachdem beide erfolgreich sind
+                        tx_session.commit()
+                        logger.info(f"[ORCHESTRATOR-DB-SUCCESS] ✅ Atomic save committed for {result.model_id} (normalized_id={normalized_result_id})")
+                        logger.info(f"[ORCHESTRATOR-STATS] Statistics auto-updated via save_search_result for {result.model_id}")
+                    except Exception as atomic_err:
+                        # Rollback bei irgendeinem Fehler
+                        try:
+                            tx_session.rollback()
+                        except Exception:
+                            pass
+                        logger.error(f"[ORCHESTRATOR-ATOMIC] ❌ Atomic save failed for {result.model_id}: {atomic_err}")
+                        raise
                 
                 saved_count += 1
                 logger.info(f"[ORCHESTRATOR-DB-COUNT] Successfully saved {saved_count} results so far")

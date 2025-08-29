@@ -191,7 +191,18 @@ def detailed_batch_debug():
         'html_critical_values': found_values
     }
     
-    with open('/tmp/batch_debug_detailed.json', 'w') as f:
+    # Schreibe Debug-Daten mit restriktiven Dateiberechtigungen (0600)
+    debug_path = '/tmp/batch_debug_detailed.json'
+    fd = os.open(debug_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    # Erzwinge 0600 auch, wenn Datei bereits existierte
+    if hasattr(os, 'fchmod'):
+        os.fchmod(fd, 0o600)
+    else:
+        try:
+            os.chmod(debug_path, 0o600)
+        except Exception:
+            pass
+    with os.fdopen(fd, 'w') as f:
         json.dump(debug_data, f, indent=2, default=str)
     
     print("\n📁 Debug-Daten gespeichert: /tmp/batch_debug_detailed.json")

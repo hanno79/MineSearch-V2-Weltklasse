@@ -159,21 +159,21 @@ class ProviderStatusChecker:
         if provider_name not in test_configs:
             return {'accessible': True, 'budget_ok': True, 'error': 'No specific test available'}
         
-        config = test_configs[provider_name]
+        provider_config = test_configs[provider_name]
         
         try:
             timeout = aiohttp.ClientTimeout(total=10)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 
-                if config['method'] == 'GET':
+                if provider_config['method'] == 'GET':
                     async with session.get(
-                        config['url'], 
-                        headers=config['headers']
+                        provider_config['url'], 
+                        headers=provider_config['headers']
                     ) as response:
                         text = await response.text()
                         
                         if response.status == 200:
-                            budget_ok = config['budget_check'](text)
+                            budget_ok = provider_config['budget_check'](text)
                             return {'accessible': True, 'budget_ok': budget_ok}
                         elif response.status == 401:
                             return {'accessible': False, 'budget_ok': False, 'error': 'Invalid API key'}
@@ -182,16 +182,16 @@ class ProviderStatusChecker:
                         else:
                             return {'accessible': False, 'budget_ok': False, 'error': f'HTTP {response.status}'}
                 
-                elif config['method'] == 'POST':
+                elif provider_config['method'] == 'POST':
                     async with session.post(
-                        config['url'], 
-                        headers=config['headers'],
-                        json=config.get('data', {})
+                        provider_config['url'], 
+                        headers=provider_config['headers'],
+                        json=provider_config.get('data', {})
                     ) as response:
                         text = await response.text()
                         
                         if response.status in [200, 201]:
-                            budget_ok = config['budget_check'](text)
+                            budget_ok = provider_config['budget_check'](text)
                             return {'accessible': True, 'budget_ok': budget_ok}
                         elif response.status == 401:
                             return {'accessible': False, 'budget_ok': False, 'error': 'Invalid API key'}

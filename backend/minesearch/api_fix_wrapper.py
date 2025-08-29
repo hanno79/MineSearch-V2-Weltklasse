@@ -7,7 +7,7 @@ Beschreibung: Defensive API Wrapper für robuste Suchfunktionalität
 
 import logging
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,9 @@ class DefensiveSearchWrapper:
             return {
                 "success": False,
                 "error": "Mine-Name ist erforderlich",
-                "data": None
+                "data": {},
+                "model_used": "none",
+                "search_timestamp": datetime.now(timezone.utc).isoformat()
             }
         
         if not self.service:
@@ -58,7 +60,9 @@ class DefensiveSearchWrapper:
                 return {
                     "success": False,
                     "error": "Search Service nicht verfügbar",
-                    "data": None
+                    "data": {},
+                    "model_used": "none",
+                    "search_timestamp": datetime.now(timezone.utc).isoformat()
                 }
         
         try:
@@ -103,6 +107,11 @@ class DefensiveSearchWrapper:
             # Timing hinzufügen
             search_duration = (datetime.now() - search_start).total_seconds()
             result['search_duration'] = search_duration
+
+            # Schema-Symmetrie sicherstellen
+            result.setdefault('model_used', model)
+            if 'search_timestamp' not in result:
+                result['search_timestamp'] = datetime.now(timezone.utc).isoformat()
             
             logger.info(f"✅ Suche erfolgreich für {mine_name} in {search_duration:.2f}s")
             return result
@@ -121,11 +130,11 @@ class DefensiveSearchWrapper:
         return {
             "success": False,
             "error": f"Search Service Fehler: {error}",
-            "data": None,  # REGEL 10: Keine ausgedachten Daten
+            "data": {},  # REGEL 10: Keine ausgedachten Daten
             "mine_name": mine_name,
             "country": country,
             "model_used": "none",
-            "search_timestamp": datetime.now().isoformat(),
+            "search_timestamp": datetime.now(timezone.utc).isoformat(),
             "search_duration": 0.0,
             "fallback_mode": False  # Kein Fallback mehr
         }

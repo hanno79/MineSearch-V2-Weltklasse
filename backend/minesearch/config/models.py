@@ -5,6 +5,36 @@ Version: 1.0
 Beschreibung: Model-Konfigurationen für alle Provider
 """
 
+# Hilfsfunktionen zur Normalisierung von Model-Konfigurationen
+def _apply_defaults_to_models(models_dict, provider_category_default=None, default_supports_web_search=False):
+    for _model_key, _model in models_dict.items():
+        if not isinstance(_model, dict):
+            continue
+        # Erkenne "free"-Modelle heuristisch aus Key/ID/Name/Beschreibung
+        _key_l = str(_model_key).lower()
+        _id_l = str(_model.get('id', '')).lower()
+        _name_l = str(_model.get('name', '')).lower()
+        _desc_l = str(_model.get('description', '')).lower()
+        _is_free_marker = (
+            ':free' in _id_l
+            or '-free' in _key_l
+            or 'free' in _key_l
+            or 'free' in _name_l
+            or 'kostenlos' in _name_l or 'kostenfrei' in _name_l or 'gratis' in _name_l
+            or 'kostenlos' in _desc_l or 'kostenfrei' in _desc_l or 'gratis' in _desc_l
+        )
+        # Pflicht-/Basisfelder sicherstellen
+        _model.setdefault('id', None)
+        _model.setdefault('name', None)
+        _model.setdefault('timeout', None)
+        _model.setdefault('max_tokens', None)
+        _model.setdefault('description', None)
+        # Einheitliche optionale Felder mit Defaults
+        _model.setdefault('supports_web_search', default_supports_web_search)
+        _model['is_free'] = bool(_model.get('is_free', False) or _is_free_marker)
+        _model.setdefault('provider_category', provider_category_default)
+        _model.setdefault('supports_deep_research', False)
+
 # Perplexity Modelle
 PERPLEXITY_MODELS = {
     "sonar": {
@@ -36,6 +66,13 @@ PERPLEXITY_MODELS = {
         "description": "Komplexe Analysen mit logischem Denken"
     }
 }
+
+# Normalisierung: fehlende Standardfelder für Perplexity-Modelle setzen
+_apply_defaults_to_models(
+    PERPLEXITY_MODELS,
+    provider_category_default='perplexity',
+    default_supports_web_search=True
+)
 
 # OpenRouter Modelle (DeepSeek wird jetzt separat geführt)
 OPENROUTER_MODELS = {
@@ -304,6 +341,13 @@ OPENROUTER_MODELS = {
     }
 }
 
+# Normalisierung: fehlende Standardfelder für OpenRouter-Modelle setzen
+_apply_defaults_to_models(
+    OPENROUTER_MODELS,
+    provider_category_default='openrouter',
+    default_supports_web_search=False
+)
+
 # Abacus Modelle
 ABACUS_MODELS = {
     'deep-agent': {
@@ -317,6 +361,13 @@ ABACUS_MODELS = {
         'is_free': False
     }
 }
+
+# Normalisierung: fehlende Standardfelder für Abacus-Modelle setzen
+_apply_defaults_to_models(
+    ABACUS_MODELS,
+    provider_category_default='abacus',
+    default_supports_web_search=True
+)
 
 # Tavily Modelle
 # WICHTIG: Tavily hat ein Query-Limit von 400 Zeichen
@@ -341,6 +392,13 @@ TAVILY_MODELS = {
         'is_free': False
     }
 }
+
+# Normalisierung: fehlende Standardfelder für Tavily-Modelle setzen
+_apply_defaults_to_models(
+    TAVILY_MODELS,
+    provider_category_default='tavily',
+    default_supports_web_search=True
+)
 
 # Exa Modelle
 EXA_MODELS = {
@@ -377,6 +435,13 @@ EXA_MODELS = {
     }
 }
 
+# Normalisierung: fehlende Standardfelder für Exa-Modelle setzen
+_apply_defaults_to_models(
+    EXA_MODELS,
+    provider_category_default='exa',
+    default_supports_web_search=True
+)
+
 # ScrapingBee Modelle
 SCRAPINGBEE_MODELS = {
     'basic-scrape': {
@@ -412,6 +477,13 @@ SCRAPINGBEE_MODELS = {
     }
 }
 
+# Normalisierung: fehlende Standardfelder für ScrapingBee-Modelle setzen
+_apply_defaults_to_models(
+    SCRAPINGBEE_MODELS,
+    provider_category_default='scrapingbee',
+    default_supports_web_search=True
+)
+
 # Firecrawl Modelle
 FIRECRAWL_MODELS = {
     'scrape': {
@@ -445,6 +517,13 @@ FIRECRAWL_MODELS = {
     }
 }
 
+# Normalisierung: fehlende Standardfelder für Firecrawl-Modelle setzen
+_apply_defaults_to_models(
+    FIRECRAWL_MODELS,
+    provider_category_default='firecrawl',
+    default_supports_web_search=True
+)
+
 # Brightdata Modelle
 BRIGHTDATA_MODELS = {
     'web-scraper': {
@@ -476,6 +555,13 @@ BRIGHTDATA_MODELS = {
         'is_free': False
     }
 }
+
+# Normalisierung: fehlende Standardfelder für Brightdata-Modelle setzen
+_apply_defaults_to_models(
+    BRIGHTDATA_MODELS,
+    provider_category_default='brightdata',
+    default_supports_web_search=True
+)
 
 # ÄNDERUNG 06.07.2025: Premium LLM Modelle für verbesserte Restaurationskosten-Extraktion
 
@@ -566,6 +652,13 @@ OPENAI_MODELS = {
     }
 }
 
+# Normalisierung: fehlende Standardfelder für OpenAI-Modelle setzen
+_apply_defaults_to_models(
+    OPENAI_MODELS,
+    provider_category_default='openai',
+    default_supports_web_search=False
+)
+
 # Anthropic Modelle
 ANTHROPIC_MODELS = {
     'claude-sonnet-4': {
@@ -619,6 +712,13 @@ ANTHROPIC_MODELS = {
         'is_free': False
     }
 }
+
+# Normalisierung: fehlende Standardfelder für Anthropic-Modelle setzen
+_apply_defaults_to_models(
+    ANTHROPIC_MODELS,
+    provider_category_default='anthropic',
+    default_supports_web_search=False
+)
 
 # Google Gemini Modelle
 GEMINI_MODELS = {
@@ -683,6 +783,13 @@ GEMINI_MODELS = {
     }
 }
 
+# Normalisierung: fehlende Standardfelder für Gemini-Modelle setzen
+_apply_defaults_to_models(
+    GEMINI_MODELS,
+    provider_category_default='gemini',
+    default_supports_web_search=False
+)
+
 # xAI Grok Modelle
 GROK_MODELS = {
     'grok-4': {
@@ -728,6 +835,13 @@ GROK_MODELS = {
     # DEPRECATED 11.08.2025: grok-beta entfernt - Modell deprecated
     # DEPRECATED 11.08.2025: grok-vision-beta entfernt - Modell deprecated
 }
+
+# Normalisierung: fehlende Standardfelder für Grok-Modelle setzen
+_apply_defaults_to_models(
+    GROK_MODELS,
+    provider_category_default='grok',
+    default_supports_web_search=True
+)
 
 # ENTFERNT 06.08.2025: DeepSeek-Duplikate eliminiert
 # DeepSeek-Modelle werden nur noch über OpenRouter bereitgestellt

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-PRIMÄRE DATENBANK ANALYZER
-Identifiziert die optimale primäre Datenbank für die Konsolidierung
+PRIMÄRE DATENBANK ANALYZER - DEPRECATED
+
+ÄNDERUNG 28.08.2025: Konsolidierung abgeschlossen
+Nur noch eine Datenbank aktiv: /app/backend/minesearch/database/mines.db
 
 Author: rahn  
 Datum: 20.08.2025
-Version: 1.0
+Version: 1.1 (deprecated)
 """
 
 import os

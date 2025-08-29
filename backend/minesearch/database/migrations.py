@@ -5,14 +5,57 @@ Version: 1.0
 Beschreibung: Database Migrations für Sequential Field Orchestrator
 """
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker
 import logging
+import re
 from typing import Dict, Any, Optional, List
+import os
+import importlib
 
-from .models import Base, Source, SourceDiscoverySession, ModelSourceContribution, FieldSearchResult, SequentialSearchResult
+from .models import Base, Source, SourceDiscoverySession, ModelSourceContribution, FieldSearchResult, SequentialSearchResult, FieldSearchSourceUsage
 
 logger = logging.getLogger(__name__)
+
+def _load_database_url_from_config() -> str:
+    """
+    Lädt die DATABASE_URL aus der Konfiguration über einen sicheren Importpfad.
+    Verwendet einen bewachten Lazy-Import, um ImportError klar zu behandeln.
+
+    Fallback: falls die Konfiguration nicht importiert werden kann, wird
+    die Umgebungsvariable "DATABASE_URL" genutzt, sofern vorhanden.
+    """
+    try:
+        config_module = importlib.import_module("minesearch.config.base")
+    except ImportError as ie:
+        logger.error("Konfiguration kann nicht importiert werden (minesearch.config.base): %s", ie)
+        env_url = os.environ.get("DATABASE_URL")
+        if env_url:
+            logger.info("Verwende Fallback aus Umgebungsvariable DATABASE_URL")
+            return env_url
+        raise
+
+    try:
+        Config = getattr(config_module, "Config")
+    except AttributeError:
+        logger.error("Config-Klasse nicht in minesearch.config.base gefunden")
+        env_url = os.environ.get("DATABASE_URL")
+        if env_url:
+            logger.info("Verwende Fallback aus Umgebungsvariable DATABASE_URL")
+            return env_url
+        raise ImportError("'Config' nicht in minesearch.config.base vorhanden")
+
+    config = Config()
+    database_url = getattr(config, "DATABASE_URL", None)
+    if not database_url:
+        logger.error("DATABASE_URL fehlt oder ist leer in der Konfiguration")
+        env_url = os.environ.get("DATABASE_URL")
+        if env_url:
+            logger.info("Verwende Fallback aus Umgebungsvariable DATABASE_URL")
+            return env_url
+        raise ValueError("DATABASE_URL ist nicht gesetzt")
+
+    return database_url
 
 
 class SequentialMigrationManager:
@@ -25,6 +68,25 @@ class SequentialMigrationManager:
         self.engine = create_engine(database_url)
         Session = sessionmaker(bind=self.engine)
         self.session = Session()
+    
+    def _validate_identifier(self, identifier: str) -> bool:
+        """Whitelist-Validierung für SQL-Bezeichner (z. B. Tabellen-/Spaltennamen)."""
+        return bool(re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', identifier))
+    
+    def _quote_identifier(self, identifier: str) -> str:
+        """Dialect-spezifisches Quoten von SQL-Bezeichnern."""
+        return self.engine.dialect.identifier_preparer.quote(identifier)
+    
+    def _sanitize_type_clause(self, clause: str) -> str:
+        """Whitelist-Validierung des Typ-/Constraint-Teils für ALTER TABLE ... ADD COLUMN.
+        Erlaubt sind Buchstaben/Ziffern/Unterstrich/Leerzeichen/Klammern/Komma/Punkt.
+        Blockiert Steuerzeichen wie ;, --, /*, */.
+        """
+        if ";" in clause or "--" in clause or "/*" in clause or "*/" in clause:
+            raise ValueError("Unsichere Zeichen in Typdefinition erkannt")
+        if not re.match(r'^[A-Za-z0-9_(),.\s]+$', clause):
+            raise ValueError("Unerlaubte Zeichen in Typdefinition")
+        return clause.strip()
     
     def check_table_exists(self, table_name: str) -> bool:
         """
@@ -57,8 +119,12 @@ class SequentialMigrationManager:
             Liste der Spaltennamen
         """
         try:
-            result = self.session.execute(text(f"PRAGMA table_info({table_name})"))
-            columns = [row[1] for row in result.fetchall()]  # row[1] ist der column name
+            if not self._validate_identifier(table_name):
+                logger.error(f"[SequentialMigrationManager] Invalid table name: {table_name}")
+                return []
+            inspector = inspect(self.session.bind)
+            columns_info = inspector.get_columns(table_name)
+            columns = [col.get('name') for col in columns_info if col.get('name')]
             return columns
         except Exception as e:
             logger.error(f"[SequentialMigrationManager] Error getting columns for {table_name}: {e}")
@@ -77,9 +143,26 @@ class SequentialMigrationManager:
             True wenn erfolgreich
         """
         try:
+            # Validierung der Bezeichner
+            if not self._validate_identifier(table_name) or not self._validate_identifier(column_name):
+                raise ValueError("Ungültiger Tabellen- oder Spaltenname")
+
             existing_columns = self.get_table_columns(table_name)
             if column_name not in existing_columns:
-                self.session.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_definition}"))
+                # Unterstütze sowohl Definitionen mit als auch ohne Spaltennamen-Präfix
+                definition = (column_definition or "").strip()
+                if definition.lower().startswith(column_name.lower() + " "):
+                    type_clause = definition[len(column_name):].strip()
+                else:
+                    type_clause = definition
+
+                # Whitelist-basierte Validierung der Typ-/Constraint-Klausel
+                type_clause = self._sanitize_type_clause(type_clause)
+
+                quoted_table = self._quote_identifier(table_name)
+                quoted_column = self._quote_identifier(column_name)
+                sql = f"ALTER TABLE {quoted_table} ADD COLUMN {quoted_column} {type_clause}"
+                self.session.execute(text(sql))
                 self.session.commit()
                 logger.info(f"[SequentialMigrationManager] Added column {column_name} to {table_name}")
                 return True
@@ -105,6 +188,58 @@ class SequentialMigrationManager:
             return True
         except Exception as e:
             logger.error(f"[SequentialMigrationManager] Error creating new tables: {e}")
+            return False
+
+    def backfill_field_search_source_usage(self) -> bool:
+        """
+        Backfill: Überführe bestehende FieldSearchResult.sources_used_ids in
+        die neue Assoziationstabelle field_search_source_usages.
+        """
+        logger.info("[SequentialMigrationManager] Starting backfill for field_search_source_usages...")
+        try:
+            # Prüfe, ob beide Tabellen existieren
+            if not self.check_table_exists('field_search_results') or not self.check_table_exists('field_search_source_usages'):
+                logger.warning("[SequentialMigrationManager] Required tables for backfill do not exist; skipping backfill")
+                return True
+
+            # Lade alle FieldSearchResults mit vorhandenen sources_used_ids
+            results = self.session.query(FieldSearchResult).filter(
+                FieldSearchResult.sources_used_ids.isnot(None)
+            ).all()
+
+            created = 0
+            for fsr in results:
+                try:
+                    ids = fsr.sources_used_ids or []
+                    # Normalisiere auf Integers
+                    normalized_ids = []
+                    for sid in ids:
+                        try:
+                            normalized_ids.append(int(sid))
+                        except Exception:
+                            # Überspringe nicht-konvertierbare Einträge
+                            continue
+
+                    # Erzeuge Assoziationen, vermeide Duplikate per UniqueConstraint
+                    for sid in set(normalized_ids):
+                        usage = FieldSearchSourceUsage(field_search_id=fsr.id, source_id=sid)
+                        self.session.add(usage)
+                        created += 1
+
+                    # Optional: flush in Batches
+                    if created % 500 == 0:
+                        self.session.flush()
+
+                except Exception as ie:
+                    logger.error(f"[SequentialMigrationManager] Error backfilling FSR id={getattr(fsr,'id',None)}: {ie}")
+                    self.session.rollback()
+            # Final commit
+            self.session.commit()
+            logger.info(f"[SequentialMigrationManager] Backfill completed, created ~{created} usage rows")
+            return True
+        except Exception as e:
+            logger.error(f"[SequentialMigrationManager] Backfill failed: {e}")
+            self.session.rollback()
             return False
     
     def migrate_sources_table(self) -> bool:
@@ -176,6 +311,165 @@ class SequentialMigrationManager:
             logger.info("[SequentialMigrationManager] All indexes created successfully")
         
         return success
+
+    def ensure_mine_data_fields_on_update_cascade(self) -> bool:
+        """
+        Stellt sicher, dass der FK mine_data_fields.source_id → sources(id)
+        die Klausel ON UPDATE CASCADE besitzt. Falls nicht, wird die Tabelle in SQLite
+        per Rebuild (CREATE TABLE AS + COPY + RENAME) neu erstellt.
+        """
+        try:
+            # Existiert Tabelle überhaupt?
+            if not self.check_table_exists('mine_data_fields'):
+                logging.info("[SequentialMigrationManager] 'mine_data_fields' nicht vorhanden – kein Rebuild nötig")
+                return True
+
+            # Prüfe aktuelle FK-Definition
+            fk_rows = self.session.execute(text("PRAGMA foreign_key_list(mine_data_fields)"))
+            rows = fk_rows.fetchall()
+            on_update_ok = False
+            for row in rows:
+                # row Schema: (id, seq, table, from, to, on_update, on_delete, match)
+                try:
+                    ref_table = row[2]
+                    from_col = row[3]
+                    to_col = row[4]
+                    on_update = (row[5] or '').upper()
+                    if ref_table == 'sources' and from_col == 'source_id' and to_col == 'id':
+                        if on_update == 'CASCADE':
+                            on_update_ok = True
+                            break
+                except Exception:
+                    continue
+
+            if on_update_ok:
+                logging.info("[SequentialMigrationManager] ON UPDATE CASCADE bereits aktiv für mine_data_fields.source_id")
+                return True
+
+            logging.info("[SequentialMigrationManager] Rebuild von 'mine_data_fields' für ON UPDATE CASCADE gestartet…")
+
+            # Temporär FK-Checks deaktivieren
+            self.session.execute(text("PRAGMA foreign_keys=OFF"))
+
+            # Temporäre Rebuild-Table bereinigen, falls von vorherigem Versuch vorhanden
+            try:
+                self.session.execute(text("DROP TABLE IF EXISTS mine_data_fields_new"))
+            except Exception:
+                pass
+
+            # Neue Tabelle mit gewünschter Constraint anlegen
+            create_new_sql = """
+            CREATE TABLE IF NOT EXISTS mine_data_fields_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                search_result_id INTEGER NOT NULL,
+                mine_id INTEGER NOT NULL,
+                field_name VARCHAR(100) NOT NULL,
+                raw_value TEXT,
+                normalized_value TEXT,
+                numeric_value DECIMAL(20,2),
+                unit VARCHAR(50),
+                confidence_score DECIMAL(3,2),
+                is_template_value BOOLEAN DEFAULT FALSE,
+                validation_status VARCHAR(20) DEFAULT 'valid' CHECK(validation_status IN ('valid', 'invalid', 'template', 'uncertain')),
+                source_id INTEGER,
+                source_name VARCHAR(500),
+                model_used VARCHAR(100) NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (mine_id) REFERENCES mines_normalized(id) ON DELETE CASCADE,
+                FOREIGN KEY (field_name) REFERENCES field_definitions(field_name) ON DELETE CASCADE,
+                FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE SET NULL ON UPDATE CASCADE
+            );
+            """
+            self.session.execute(text(create_new_sql))
+
+            # Daten kopieren (inkl. id zur Beibehaltung der bestehenden IDs)
+            copy_sql = text(
+                """
+                INSERT INTO mine_data_fields_new (
+                    id, search_result_id, mine_id, field_name, raw_value, normalized_value,
+                    numeric_value, unit, confidence_score, is_template_value, validation_status,
+                    source_id, source_name, model_used, created_at, updated_at
+                )
+                SELECT 
+                    id, search_result_id, mine_id, field_name, raw_value, normalized_value,
+                    numeric_value, unit, confidence_score, is_template_value, validation_status,
+                    source_id, source_name, model_used, created_at, updated_at
+                FROM mine_data_fields
+                """
+            )
+            self.session.execute(copy_sql)
+
+            # Abhängige Views, die mine_data_fields referenzieren, temporär droppen
+            dependent_views = []
+            try:
+                view_rows = self.session.execute(text(
+                    "SELECT name, sql FROM sqlite_master WHERE type='view' AND sql LIKE :pattern"
+                ), {"pattern": "%mine_data_fields%"}).fetchall()
+                for name, sql in view_rows:
+                    if name and sql:
+                        dependent_views.append((name, sql))
+                # Drop all dependent views
+                preparer = self.session.bind.dialect.identifier_preparer
+                for name, _ in dependent_views:
+                    quoted_name = preparer.quote(name)
+                    self.session.execute(text(f"DROP VIEW IF EXISTS {quoted_name}"))
+            except Exception as ve:
+                logging.warning(f"[SequentialMigrationManager] Konnte Views nicht ermitteln/droppen: {ve}")
+
+            # Alte Tabelle entfernen und neue umbenennen
+            self.session.execute(text("DROP TABLE mine_data_fields"))
+            self.session.execute(text("ALTER TABLE mine_data_fields_new RENAME TO mine_data_fields"))
+
+            # Indizes neu erstellen
+            index_sqls = [
+                "CREATE INDEX IF NOT EXISTS idx_mine_fields_mine_id ON mine_data_fields(mine_id)",
+                "CREATE INDEX IF NOT EXISTS idx_mine_fields_field_name ON mine_data_fields(field_name)",
+                "CREATE INDEX IF NOT EXISTS idx_mine_fields_search_result ON mine_data_fields(search_result_id)",
+                "CREATE INDEX IF NOT EXISTS idx_mine_fields_model ON mine_data_fields(model_used)",
+                "CREATE INDEX IF NOT EXISTS idx_mine_fields_validation ON mine_data_fields(validation_status)",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_mine_field_search ON mine_data_fields(mine_id, field_name, search_result_id)"
+            ]
+            for sql in index_sqls:
+                self.session.execute(text(sql))
+
+            # Trigger neu erstellen
+            trigger_sql = """
+            CREATE TRIGGER IF NOT EXISTS update_mine_data_fields_timestamp 
+                AFTER UPDATE ON mine_data_fields
+                WHEN NEW.updated_at IS OLD.updated_at
+            BEGIN
+                UPDATE mine_data_fields 
+                SET updated_at = CURRENT_TIMESTAMP 
+                WHERE id = NEW.id;
+            END;
+            """
+            self.session.execute(text(trigger_sql))
+
+            # Abhängige Views wiederherstellen
+            for name, sql in dependent_views:
+                try:
+                    self.session.execute(text(sql))
+                except Exception as re:
+                    logging.error(f"[SequentialMigrationManager] Fehler beim Re-CREATE View {name}: {re}")
+                    # Fail the migration if we cannot restore required view
+                    raise
+
+            # FK-Checks wieder aktivieren und committen
+            self.session.execute(text("PRAGMA foreign_keys=ON"))
+            self.session.commit()
+
+            logging.info("[SequentialMigrationManager] Rebuild von 'mine_data_fields' abgeschlossen – ON UPDATE CASCADE aktiv")
+            return True
+
+        except Exception as e:
+            logging.error(f"[SequentialMigrationManager] Fehler beim Rebuild von mine_data_fields: {e}")
+            self.session.rollback()
+            try:
+                self.session.execute(text("PRAGMA foreign_keys=ON"))
+            except Exception:
+                pass
+            return False
     
     def run_full_migration(self) -> bool:
         """
@@ -189,7 +483,9 @@ class SequentialMigrationManager:
         steps = [
             ("Create new tables", self.create_new_tables),
             ("Migrate sources table", self.migrate_sources_table),
-            ("Create indexes", self.create_indexes)
+            ("Backfill field_search_source_usages", self.backfill_field_search_source_usage),
+            ("Create indexes", self.create_indexes),
+            ("Ensure mine_data_fields ON UPDATE CASCADE", self.ensure_mine_data_fields_on_update_cascade)
         ]
         
         success = True
@@ -219,7 +515,8 @@ class SequentialMigrationManager:
             'migration_successful': True,
             'tables_verified': {},
             'columns_verified': {},
-            'indexes_verified': {}
+            'indexes_verified': {},
+            'constraints_verified': {}
         }
         
         # Prüfe neue Tabellen
@@ -227,6 +524,7 @@ class SequentialMigrationManager:
             'source_discovery_sessions',
             'model_source_contributions', 
             'field_search_results',
+            'field_search_source_usages',
             'sequential_search_results'
         ]
         
@@ -274,6 +572,27 @@ class SequentialMigrationManager:
         except Exception as e:
             logger.error(f"[SequentialMigrationManager] Error verifying indexes: {e}")
             results['migration_successful'] = False
+
+        # Prüfe FK ON UPDATE CASCADE für mine_data_fields.source_id
+        try:
+            if self.check_table_exists('mine_data_fields'):
+                fk_rows = self.session.execute(text("PRAGMA foreign_key_list(mine_data_fields)"))
+                rows = fk_rows.fetchall()
+                cascade_ok = False
+                for row in rows:
+                    try:
+                        if row[2] == 'sources' and row[3] == 'source_id' and row[4] == 'id':
+                            if (row[5] or '').upper() == 'CASCADE':
+                                cascade_ok = True
+                                break
+                    except Exception:
+                        continue
+                results['constraints_verified']['mine_data_fields.source_id_on_update_cascade'] = cascade_ok
+                if not cascade_ok:
+                    results['migration_successful'] = False
+        except Exception as e:
+            logger.error(f"[SequentialMigrationManager] Error verifying mine_data_fields FK on_update: {e}")
+            results['migration_successful'] = False
         
         return results
     
@@ -317,9 +636,11 @@ def run_sequential_migration(database_url: str) -> bool:
 
 if __name__ == "__main__":
     # Test migration with configured database
-    from minesearch.config.base import Config
-    config = Config()
-    database_url = config.DATABASE_URL
+    try:
+        database_url = _load_database_url_from_config()
+    except (ImportError, ValueError) as e:
+        logger.error("[SequentialMigration] Konfiguration/Database URL konnte nicht geladen werden: %s", e)
+        raise SystemExit(1)
     success = run_sequential_migration(database_url)
     
     if success:

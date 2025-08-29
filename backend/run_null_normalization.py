@@ -9,6 +9,7 @@ AUTOMATED NULL-NORMALIZATION 25.08.2025: Führt NULL-Normalisierung automatisch 
 """
 
 import sys
+import argparse
 sys.path.insert(0, '.')
 
 from minesearch.null_normalizer import NullNormalizer
@@ -20,7 +21,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-def run_automatic_null_normalization():
+def run_automatic_null_normalization(dry_run: bool = False, assume_yes: bool = False) -> bool:
     """
     AUTOMATISCHE NULL-NORMALISIERUNG 25.08.2025
     Führt NULL-Normalisierung ohne Benutzerinteraktion durch
@@ -58,8 +59,25 @@ def run_automatic_null_normalization():
     # Automatische Normalisierung ohne Benutzerinteraktion
     print(f"\n🚀 Starte automatische NULL-Normalisierung für {stats['total_null_normalizable']} Werte...")
     print("⚠️  WARNUNG: Dieser Vorgang verändert die Datenbank irreversibel!")
-    
-    # Führe Normalisierung durch
+
+    # Dry-Run: Nur anzeigen, was passieren würde, ohne zu schreiben
+    if dry_run:
+        print("\n🧪 DRY-RUN aktiv: Es werden KEINE Änderungen in die Datenbank geschrieben.")
+        print("   🔎 Vorschau: Die obigen Statistiken zeigen, welche Felder betroffen wären.")
+        print(f"   📊 Geschätzte Anzahl zu normalisierender Feldwerte: {stats['total_null_normalizable']}")
+        print("   👉 Führen Sie ohne --dry-run aus, um die Änderungen zu übernehmen.")
+        return True
+
+    # Sicherheitsabfrage, falls nicht vorausbestätigt
+    if not assume_yes:
+        print("\nSicherheitsbestätigung erforderlich: Tippen Sie 'CONFIRM' ein und drücken Sie Enter,")
+        print("um die irreversiblen Änderungen an der Datenbank durchzuführen. Andernfalls abbrechen.")
+        confirmation = input("Bestätigung eingeben ('CONFIRM'): ").strip()
+        if confirmation != "CONFIRM":
+            print("❌ Abgebrochen. Es wurden keine Änderungen vorgenommen.")
+            return False
+
+    # Führe Normalisierung durch (schreibender Pfad, nur nach Bestätigung oder --yes)
     result_stats = normalizer.normalize_database(batch_size=200)  # Größere Batches für Performance
     
     if 'error' in result_stats:
@@ -96,5 +114,10 @@ def run_automatic_null_normalization():
     return True
 
 if __name__ == "__main__":
-    success = run_automatic_null_normalization()
+    parser = argparse.ArgumentParser(description="Automatische NULL-Normalisierung mit Sicherheitsmechanismen")
+    parser.add_argument("--dry-run", action="store_true", help="Simulation: zeigt geplante Änderungen, schreibt nichts")
+    parser.add_argument("--yes", "--force", "-y", "-f", dest="assume_yes", action="store_true", help="Überspringt die interaktive Bestätigung")
+    args = parser.parse_args()
+
+    success = run_automatic_null_normalization(dry_run=args.dry_run, assume_yes=args.assume_yes)
     exit(0 if success else 1)

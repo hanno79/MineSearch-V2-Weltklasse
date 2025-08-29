@@ -1,0 +1,20 @@
+[
+  "Name",
+  "Country",
+  "Region",
+  "Eigentümer",
+  "Betreiber",
+  "x-Koordinate",
+  "y-Koordinate",
+  "Aktivitätsstatus",
+  "Restaurationskosten",
+  "Jahr der Aufnahme der Kosten",
+  "Jahr der Erstellung des Dokumentes",
+  "Rohstoffabbau",
+  "Minentyp",
+  "Produktionsstart",
+  "Produktionsende",
+  "Fördermenge/Jahr",
+  "Fläche der Mine in qkm",
+  "Quellenangaben"
+]

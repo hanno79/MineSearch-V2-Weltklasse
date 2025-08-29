@@ -10,6 +10,7 @@ from fastapi import APIRouter, Form, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse
 import logging
 import json
+import os
 import csv
 import io
 import uuid
@@ -128,11 +129,19 @@ def create_fixed_batch_route(db_manager, batch_results_cache):
             mines = []
             columns = []
             
+            # Konfigurierbares Sicherheitslimit (Default: 10.000)
+            MAX_MINES_LIMIT = int(os.getenv("MAX_MINES_LIMIT", "10000"))
+
             for i, row in enumerate(csv_reader):
                 if i == 0:
                     columns = list(row.keys())
                 mines.append(row)
-                if i >= 100:  # Limit für Demo
+                # Abbruch bei Erreichen des Limits, um Systemüberlastung zu vermeiden
+                if i + 1 >= MAX_MINES_LIMIT:
+                    logger.warning(
+                        "MAX_MINES_LIMIT erreicht (%d). Verarbeitung wird gestoppt, um das System zu schützen.",
+                        MAX_MINES_LIMIT,
+                    )
                     break
             
             # Erstelle Session

@@ -6,6 +6,7 @@ Beschreibung: Umfassendes Test-Script für Sequential Field Orchestrator Workflo
 """
 
 import asyncio
+import json
 import logging
 import sys
 import os
@@ -41,10 +42,14 @@ class SequentialWorkflowTester:
         """
         logger.info("🔧 Setting up test environment...")
         
-        # Remove existing test database
+        # Remove existing test database (sicher, mit Verbindungs-Freigabe und Retry)
+        await self._ensure_db_closed()
         if os.path.exists(self.db_path):
-            os.remove(self.db_path)
-            logger.info("🗑️  Removed existing test database")
+            deleted = await self._safe_remove_db_file(self.db_path, retries=5, delay_seconds=0.1)
+            if deleted:
+                logger.info("🗑️  Removed existing test database")
+            else:
+                logger.warning("⚠️  Could not remove test database after retries; continuing tests deterministically")
         
         # Run migrations
         logger.info("📊 Running database migrations...")
@@ -59,6 +64,50 @@ class SequentialWorkflowTester:
             return False
         
         return True
+
+    async def _ensure_db_closed(self):
+        """Versucht, offene DB-Verbindungen zu schließen (Engine dispose), bevor wir die Datei löschen."""
+        try:
+            # Versuche, globale DB-Manager-Ressourcen freizugeben (falls vorhanden)
+            if hasattr(db_manager, 'engine') and db_manager.engine is not None:
+                db_manager.engine.dispose()
+        except Exception as e:
+            logger.debug(f"[setup] Konnte DB-Engine nicht dispose'n: {e}")
+
+    async def _safe_remove_db_file(self, path: str, retries: int = 5, delay_seconds: float = 0.1) -> bool:
+        """Löscht die Datenbankdatei mit kleinem Retry-Loop robust gegen Race-Conditions.
+
+        Args:
+            path: Pfad zur DB-Datei
+            retries: Anzahl der Versuche
+            delay_seconds: Wartezeit zwischen Versuchen
+        Returns:
+            True, wenn Datei gelöscht wurde oder nicht existiert; sonst False
+        """
+        try:
+            # Doppelt prüfen: Wenn Datei bereits weg ist, sind wir fertig
+            if not os.path.exists(path):
+                return True
+            for attempt in range(retries):
+                try:
+                    if os.path.exists(path):
+                        os.remove(path)
+                    # Nach remove erneut prüfen
+                    if not os.path.exists(path):
+                        return True
+                except OSError as oe:
+                    # Falls parallel noch Handles offen sind, kurz warten und erneut versuchen
+                    logger.debug(f"[setup] Entfernen der DB-Datei fehlgeschlagen (Versuch {attempt + 1}/{retries}): {oe}")
+                # Kurze asynchrone Pause vor erneutem Versuch
+                try:
+                    await asyncio.sleep(delay_seconds)
+                except Exception:
+                    pass
+            # Letzte Existenzprüfung
+            return not os.path.exists(path)
+        except Exception as e:
+            logger.warning(f"[setup] Unerwarteter Fehler beim Entfernen der DB-Datei: {e}")
+            return False
     
     async def test_sequential_database_manager(self):
         """
@@ -74,84 +123,91 @@ class SequentialWorkflowTester:
             engine = create_engine(self.database_url)
             Session = sessionmaker(bind=engine)
             session = Session()
-            
-            seq_db_manager = SequentialDatabaseManager(session)
-            
-            # Test 1: Create discovery session
-            discovery_session = seq_db_manager.create_discovery_session(
-                mine_name="Canadian Malartic",
-                models_list=["openrouter:deepseek-free", "tavily:search"],
-                country="Canada",
-                region="Quebec",
-                commodity="Gold"
-            )
-            
-            assert discovery_session.mine_name == "Canadian Malartic"
-            assert len(discovery_session.models_list) == 2
-            logger.info("✅ Discovery session creation successful")
-            
-            # Test 2: Add sources
-            source1, is_new1 = seq_db_manager.add_or_update_source(
-                url="https://canadianmalartic.com/info",
-                domain="canadianmalartic.com", 
-                model_id="openrouter:deepseek-free",
-                session_id=discovery_session.session_id,
-                source_type="industry",
-                country="Canada"
-            )
-            
-            source2, is_new2 = seq_db_manager.add_or_update_source(
-                url="https://agnicoeagle.com/canadian-malartic",
-                domain="agnicoeagle.com",
-                model_id="tavily:search", 
-                session_id=discovery_session.session_id,
-                source_type="industry",
-                country="Canada"
-            )
-            
-            assert is_new1 == True
-            assert is_new2 == True
-            logger.info("✅ Source addition successful")
-            
-            # Test 3: Get accumulated sources
-            accumulated_sources = seq_db_manager.get_accumulated_sources(discovery_session.session_id)
-            assert len(accumulated_sources) == 2
-            logger.info("✅ Source accumulation successful")
-            
-            # Test 4: Log field search result
-            field_result = seq_db_manager.log_field_search_result(
-                session_id=discovery_session.session_id,
-                model_id="openrouter:deepseek-free",
-                field_name="Eigentümer",
-                sources_used=[source1.id, source2.id],
-                field_value="Agnico Eagle Mines Limited",
-                confidence_score=85.0,
-                result_quality="high"
-            )
-            
-            assert field_result.field_value_found == "Agnico Eagle Mines Limited"
-            assert field_result.value_found == True
-            logger.info("✅ Field search result logging successful")
-            
-            # Test 5: Create consolidated result
-            consolidated_result = seq_db_manager.create_sequential_result(
-                session_id=discovery_session.session_id,
-                mine_name="Canadian Malartic",
-                final_data={"Eigentümer": "Agnico Eagle Mines Limited", "Betreiber": "Canadian Malartic Corporation"},
-                field_confidence={"Eigentümer": 85.0, "Betreiber": 78.0},
-                field_source_mapping={"Eigentümer": [{"source_id": source1.id, "url": source1.url}]},
-                quality_assessment={"overall_quality": 82.0},
-                performance_metrics={"total_duration_seconds": 45.0, "total_models_used": 2, "total_sources_discovered": 2},
-                country="Canada"
-            )
-            
-            assert consolidated_result.total_models_used == 2
-            assert consolidated_result.total_sources_discovered == 2
-            logger.info("✅ Consolidated result creation successful")
-            
-            session.close()
-            self.test_results['database_manager'] = True
-            logger.info("✅ Sequential Database Manager tests passed")
+            test_passed = False
+            try:
+                seq_db_manager = SequentialDatabaseManager(session)
+                
+                # Test 1: Create discovery session
+                discovery_session = seq_db_manager.create_discovery_session(
+                    mine_name="Canadian Malartic",
+                    models_list=["openrouter:deepseek-free", "tavily:search"],
+                    country="Canada",
+                    region="Quebec",
+                    commodity="Gold"
+                )
+                
+                assert discovery_session.mine_name == "Canadian Malartic"
+                assert len(discovery_session.models_list) == 2
+                logger.info("✅ Discovery session creation successful")
+                
+                # Test 2: Add sources
+                source1, is_new1 = seq_db_manager.add_or_update_source(
+                    url="https://canadianmalartic.com/info",
+                    domain="canadianmalartic.com", 
+                    model_id="openrouter:deepseek-free",
+                    session_id=discovery_session.session_id,
+                    source_type="industry",
+                    country="Canada"
+                )
+                
+                source2, is_new2 = seq_db_manager.add_or_update_source(
+                    url="https://agnicoeagle.com/canadian-malartic",
+                    domain="agnicoeagle.com",
+                    model_id="tavily:search", 
+                    session_id=discovery_session.session_id,
+                    source_type="industry",
+                    country="Canada"
+                )
+                
+                assert is_new1 == True
+                assert is_new2 == True
+                logger.info("✅ Source addition successful")
+                
+                # Test 3: Get accumulated sources
+                accumulated_sources = seq_db_manager.get_accumulated_sources(discovery_session.session_id)
+                assert len(accumulated_sources) == 2
+                logger.info("✅ Source accumulation successful")
+                
+                # Test 4: Log field search result
+                field_result = seq_db_manager.log_field_search_result(
+                    session_id=discovery_session.session_id,
+                    model_id="openrouter:deepseek-free",
+                    field_name="Eigentümer",
+                    sources_used=[source1.id, source2.id],
+                    field_value="Agnico Eagle Mines Limited",
+                    confidence_score=85.0,
+                    result_quality="high"
+                )
+                
+                assert field_result.field_value_found == "Agnico Eagle Mines Limited"
+                assert field_result.value_found == True
+                logger.info("✅ Field search result logging successful")
+                
+                # Test 5: Create consolidated result
+                consolidated_result = seq_db_manager.create_sequential_result(
+                    session_id=discovery_session.session_id,
+                    mine_name="Canadian Malartic",
+                    final_data={"Eigentümer": "Agnico Eagle Mines Limited", "Betreiber": "Canadian Malartic Corporation"},
+                    field_confidence={"Eigentümer": 85.0, "Betreiber": 78.0},
+                    field_source_mapping={"Eigentümer": [{"source_id": source1.id, "url": source1.url}]},
+                    quality_assessment={"overall_quality": 82.0},
+                    performance_metrics={"total_duration_seconds": 45.0, "total_models_used": 2, "total_sources_discovered": 2},
+                    country="Canada"
+                )
+                
+                assert consolidated_result.total_models_used == 2
+                assert consolidated_result.total_sources_discovered == 2
+                logger.info("✅ Consolidated result creation successful")
+                
+                test_passed = True
+            finally:
+                try:
+                    session.close()
+                except Exception as close_err:
+                    logger.warning(f"⚠️  Failed to close DB session: {close_err}")
+            if test_passed:
+                self.test_results['database_manager'] = True
+                logger.info("✅ Sequential Database Manager tests passed")
             
         except Exception as e:
             logger.error(f"❌ Sequential Database Manager test failed: {e}")
@@ -196,6 +252,62 @@ class SequentialWorkflowTester:
         except Exception as e:
             logger.error(f"❌ Sequential Orchestrator basic test failed: {e}")
             self.test_results['orchestrator_basic'] = False
+    
+    async def test_critical_fields_config_override(self):
+        """
+        Test: Kritische Felder werden aus ENV geladen, wenn gesetzt.
+        """
+        logger.info("🧪 Testing critical fields configuration override via ENV...")
+        prev_env_value = os.environ.get('SEQUENTIAL_CRITICAL_FIELDS')
+        try:
+            override_fields = [
+                "Country",
+                "Region",
+                "Eigentümer",
+                "Betreiber"
+            ]
+            os.environ['SEQUENTIAL_CRITICAL_FIELDS'] = json.dumps(override_fields)
+            orchestrator = SequentialFieldOrchestrator()
+            assert orchestrator.critical_fields == override_fields
+            logger.info("✅ Critical fields successfully loaded from ENV override")
+            self.test_results['orchestrator_config_override'] = True
+        except Exception as e:
+            logger.error(f"❌ Critical fields ENV override test failed: {e}")
+            self.test_results['orchestrator_config_override'] = False
+        finally:
+            # Restore previous ENV
+            if prev_env_value is None:
+                os.environ.pop('SEQUENTIAL_CRITICAL_FIELDS', None)
+            else:
+                os.environ['SEQUENTIAL_CRITICAL_FIELDS'] = prev_env_value
+    
+    async def test_orchestrator_settings_injection(self):
+        """
+        Test: Orchestrator akzeptiert Settings-Injektion und validiert/konvertiert Typen korrekt.
+        """
+        logger.info("🧪 Testing orchestrator settings injection and type validation...")
+        try:
+            overrides = {
+                'max_sources_per_model': '7',
+                'source_quality_threshold': '0.75',
+                'field_search_timeout': 12,
+                'max_concurrent_field_searches': '4',
+                'enable_source_ranking': 'false'
+            }
+            orchestrator = SequentialFieldOrchestrator(settings=overrides)
+
+            cfg = orchestrator.config
+            assert cfg['max_sources_per_model'] == 7
+            assert abs(cfg['source_quality_threshold'] - 0.75) < 1e-9
+            assert cfg['field_search_timeout'] == 12
+            assert cfg['max_concurrent_field_searches'] == 4
+            assert cfg['enable_source_ranking'] is False
+
+            logger.info("✅ Orchestrator settings injection validated successfully")
+            self.test_results['orchestrator_settings_injection'] = True
+        except Exception as e:
+            logger.error(f"❌ Orchestrator settings injection test failed: {e}")
+            self.test_results['orchestrator_settings_injection'] = False
     
     async def test_sequential_workflow_mock(self):
         """
@@ -457,6 +569,8 @@ class SequentialWorkflowTester:
         # Run tests
         await self.test_sequential_database_manager()
         await self.test_sequential_orchestrator_basic()
+        await self.test_critical_fields_config_override()
+        await self.test_orchestrator_settings_injection()
         await self.test_sequential_workflow_mock()
         await self.test_batch_integration_simulation()
         

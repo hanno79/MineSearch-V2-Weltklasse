@@ -209,13 +209,26 @@ function renderDatabaseTable(data) {
             sortIndicator = databaseViewer.sortOrder === 'asc' ? ' ↑' : ' ↓';
         }
         
-        th.innerHTML = `
-            <div class="header-content">
-                <span class="column-name">${formatColumnName(column)}</span>
-                <span class="sort-indicator">${sortIndicator}</span>
-                <span class="column-type">${data.column_types[column] || ''}</span>
-            </div>
-        `;
+        // Build header content without using innerHTML for dynamic values
+        const headerContent = document.createElement('div');
+        headerContent.className = 'header-content';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'column-name';
+        nameSpan.textContent = formatColumnName(column);
+        
+        const sortSpan = document.createElement('span');
+        sortSpan.className = 'sort-indicator';
+        sortSpan.textContent = sortIndicator;
+        
+        const typeSpan = document.createElement('span');
+        typeSpan.className = 'column-type';
+        typeSpan.textContent = data.column_types[column] || '';
+        
+        headerContent.appendChild(nameSpan);
+        headerContent.appendChild(sortSpan);
+        headerContent.appendChild(typeSpan);
+        th.appendChild(headerContent);
         
         headerRow.appendChild(th);
     });
@@ -230,7 +243,12 @@ function renderDatabaseTable(data) {
             const td = document.createElement('td');
             const value = row[column];
             
-            td.innerHTML = formatCellValue(value, data.column_types[column]);
+            const cell = formatCellValue(value, data.column_types[column]);
+            if (cell && typeof cell === 'object' && cell.type === 'html') {
+                td.innerHTML = cell.content;
+            } else {
+                td.textContent = cell && cell.content !== undefined ? cell.content : '';
+            }
             tr.appendChild(td);
         });
         
@@ -255,21 +273,25 @@ function formatColumnName(column) {
  */
 function formatCellValue(value, columnType) {
     if (value === null || value === undefined) {
-        return '<span class="null-value">NULL</span>';
+        return { type: 'html', content: '<span class="null-value">NULL</span>' };
     }
     
     // JSON Values
     if (typeof value === 'object' && value.type === 'json') {
-        return `
-            <div class="json-cell">
-                <button class="json-toggle" onclick="toggleJsonDisplay(this)">
-                    📄 JSON anzeigen
-                </button>
-                <div class="json-content" style="display: none;">
-                    <pre>${JSON.stringify(value.parsed, null, 2)}</pre>
+        const safeJson = escapeHtml(JSON.stringify(value.parsed, null, 2));
+        return {
+            type: 'html',
+            content: `
+                <div class="json-cell">
+                    <button class="json-toggle" onclick="toggleJsonDisplay(this)">
+                        📄 JSON anzeigen
+                    </button>
+                    <div class="json-content" style="display: none;">
+                        <pre>${safeJson}</pre>
+                    </div>
                 </div>
-            </div>
-        `;
+            `
+        };
     }
     
     // DateTime Values
@@ -277,13 +299,16 @@ function formatCellValue(value, columnType) {
         if (typeof value === 'string') {
             try {
                 const date = new Date(value);
-                return `
-                    <span class="datetime-value" title="${value}">
-                        ${date.toLocaleString('de-DE')}
-                    </span>
-                `;
+                return {
+                    type: 'html',
+                    content: `
+                        <span class="datetime-value" title="${escapeHtml(String(value))}">
+                            ${escapeHtml(date.toLocaleString('de-DE'))}
+                        </span>
+                    `
+                };
             } catch (e) {
-                return escapeHtml(String(value));
+                return { type: 'text', content: String(value) };
             }
         }
     }
@@ -291,17 +316,20 @@ function formatCellValue(value, columnType) {
     // Long text values
     const stringValue = String(value);
     if (stringValue.length > 100) {
-        return `
-            <div class="long-text">
-                <span class="text-preview">${escapeHtml(stringValue.substring(0, 100))}...</span>
-                <button class="text-expand" onclick="toggleTextDisplay(this)">mehr</button>
-                <div class="text-full" style="display: none;">${escapeHtml(stringValue)}</div>
-            </div>
-        `;
+        return {
+            type: 'html',
+            content: `
+                <div class="long-text">
+                    <span class="text-preview">${escapeHtml(stringValue.substring(0, 100))}...</span>
+                    <button class="text-expand" onclick="toggleTextDisplay(this)">mehr</button>
+                    <div class="text-full" style="display: none;">${escapeHtml(stringValue)}</div>
+                </div>
+            `
+        };
     }
     
     // Regular values
-    return escapeHtml(stringValue);
+    return { type: 'text', content: stringValue };
 }
 
 /**

@@ -280,7 +280,10 @@ class DataExtractor:
                         # PHASE 8: Template-Monitoring Integration
                         from minesearch.template_monitor import monitor_extraction_result
                         source_values = [s.get('value', '') for s in field_sources] if field_sources else []
-                        monitor_extraction_result(field, clean_value, mine_name, source_values)
+                        try:
+                            monitor_extraction_result(field, clean_value, mine_name, source_values)
+                        except Exception as e:
+                            logger.exception(f"[TEMPLATE MONITOR] Fehler beim Monitoring für Feld '{field}' in Mine '{mine_name}' mit Quellen {source_values}: {e}")
                         
                         # Wenn Feldquellen gefunden, zuordnen; sonst alle Response-Quellen verwenden
                         if field_sources:

@@ -46,6 +46,7 @@ async def get_all_tables():
     """Gibt eine Liste aller verfügbaren Tabellen zurück"""
     try:
         with db_manager.get_session() as session:
+            preparer = session.bind.dialect.identifier_preparer
             # Alle Tabellen aus sqlite_master
             result = session.execute(text("""
                 SELECT name, type FROM sqlite_master 
@@ -58,7 +59,8 @@ async def get_all_tables():
             table_info = []
             for table_name, table_type in all_tables:
                 try:
-                    count_result = session.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
+                    quoted_table = preparer.quote(table_name)
+                    count_result = session.execute(text(f"SELECT COUNT(*) FROM {quoted_table}"))
                     count = count_result.fetchone()[0]
                     
                     # Kategorisiere Tabellen
@@ -125,42 +127,63 @@ async def get_table_data(
             if not check_table.fetchone():
                 raise HTTPException(status_code=404, detail=f"Tabelle '{table_name}' nicht gefunden")
             
-            # Hole Spalten-Info
-            column_result = session.execute(text(f"PRAGMA table_info({table_name})"))
+            # Hole Spalten-Info (mit sicherem Quoting des Tabellennamens)
+            preparer = session.bind.dialect.identifier_preparer
+            quoted_table = preparer.quote(table_name)
+            column_result = session.execute(text(f"PRAGMA table_info({quoted_table})"))
             columns_info = column_result.fetchall()
             columns = [col[1] for col in columns_info]  # col[1] ist der Name
             column_types = {col[1]: col[2] for col in columns_info}  # col[2] ist der Typ
-            
-            # Baue Query
-            base_query = f"SELECT * FROM {table_name}"
-            count_query = f"SELECT COUNT(*) FROM {table_name}"
-            
-            # Filter hinzufügen
+
+            # Baue Mapping der sicher gequoteten Spaltennamen
+            quoted_columns = {name: preparer.quote(name) for name in columns}
+
+            # Validierung der übergebenen Identifier
+            if filter_column is not None and filter_column not in columns:
+                raise HTTPException(status_code=400, detail=f"Ungültige Spalte für Filter: '{filter_column}'")
+            if sort_by is not None and sort_by not in columns:
+                raise HTTPException(status_code=400, detail=f"Ungültige Spalte für Sortierung: '{sort_by}'")
+
+            # Sortierreihenfolge normalisieren/validieren
+            sort_order_value = (sort_order or "asc").lower()
+            if sort_order_value not in ("asc", "desc"):
+                raise HTTPException(status_code=400, detail="Ungültige Sortierreihenfolge. Erlaubt: 'asc' oder 'desc'")
+            sort_order_sql = "ASC" if sort_order_value == "asc" else "DESC"
+
+            # Baue Basis-Queries mit sicher gequoteten Identifiern
+            base_query = f"SELECT * FROM {quoted_table}"
+            count_query = f"SELECT COUNT(*) FROM {quoted_table}"
+
+            # Filter hinzufügen (gebundener Parameter nur für Werte)
             where_clause = ""
-            params = {}
-            if filter_column and filter_value and filter_column in columns:
-                where_clause = f" WHERE {filter_column} LIKE :filter_value"
-                params["filter_value"] = f"%{filter_value}%"
+            filter_params = {}
+            if filter_column and filter_value is not None:
+                quoted_filter_col = quoted_columns[filter_column]
+                where_clause = f" WHERE {quoted_filter_col} LIKE :filter_value"
+                filter_params["filter_value"] = f"%{filter_value}%"
                 base_query += where_clause
                 count_query += where_clause
-            
-            # Sortierung hinzufügen
-            if sort_by and sort_by in columns:
-                base_query += f" ORDER BY {sort_by} {sort_order.upper()}"
-            elif "id" in columns:
-                base_query += f" ORDER BY id {sort_order.upper()}"
-            elif "created_at" in columns:
-                base_query += f" ORDER BY created_at {sort_order.upper()}"
-            
-            # Pagination
+
+            # Sortierung hinzufügen (nur gültige/whitelistete Spalten, sicher gequotet)
+            if sort_by:
+                quoted_sort_col = quoted_columns[sort_by]
+                base_query += f" ORDER BY {quoted_sort_col} {sort_order_sql}"
+            else:
+                if "id" in columns:
+                    base_query += f" ORDER BY {quoted_columns['id']} {sort_order_sql}"
+                elif "created_at" in columns:
+                    base_query += f" ORDER BY {quoted_columns['created_at']} {sort_order_sql}"
+
+            # Pagination mittels gebundener Parameter (sichere Integers)
             offset = (page - 1) * limit
-            base_query += f" LIMIT {limit} OFFSET {offset}"
+            base_query += " LIMIT :limit OFFSET :offset"
             
             # Führe Queries aus
-            total_result = session.execute(text(count_query), params)
+            total_result = session.execute(text(count_query), filter_params)
             total_count = total_result.fetchone()[0]
             
-            data_result = session.execute(text(base_query), params)
+            data_params = {**filter_params, "limit": int(limit), "offset": int(offset)}
+            data_result = session.execute(text(base_query), data_params)
             rows = data_result.fetchall()
             
             # Konvertiere zu Dictionary und formatiere Daten
@@ -296,6 +319,7 @@ async def export_table_csv(
         import csv
         
         with db_manager.get_session() as session:
+            preparer = session.bind.dialect.identifier_preparer
             # Validiere Tabelle
             check_table = session.execute(text("""
                 SELECT name FROM sqlite_master 
@@ -306,14 +330,21 @@ async def export_table_csv(
                 raise HTTPException(status_code=404, detail=f"Tabelle '{table_name}' nicht gefunden")
             
             # Hole Spalten
-            column_result = session.execute(text(f"PRAGMA table_info({table_name})"))
+            quoted_table = preparer.quote(table_name)
+            column_result = session.execute(text(f"PRAGMA table_info({quoted_table})"))
             columns = [col[1] for col in column_result.fetchall()]
+            quoted_columns = {name: preparer.quote(name) for name in columns}
+            
+            # Validiere Filterspalte
+            if filter_column is not None and filter_column not in columns:
+                raise HTTPException(status_code=400, detail=f"Ungültige Spalte für Filter: '{filter_column}'")
             
             # Baue Query mit optionalem Filter
-            query = f"SELECT * FROM {table_name}"
+            query = f"SELECT * FROM {quoted_table}"
             params = {}
-            if filter_column and filter_value and filter_column in columns:
-                query += f" WHERE {filter_column} LIKE :filter_value"
+            if filter_column and filter_value is not None:
+                quoted_filter_col = quoted_columns[filter_column]
+                query += f" WHERE {quoted_filter_col} LIKE :filter_value"
                 params["filter_value"] = f"%{filter_value}%"
             
             # Daten laden (max 10000 Einträge für CSV)

@@ -8,6 +8,15 @@ Beschreibung: Provider-Registry für dynamische Verwaltung aller Search-Provider
 import logging
 from typing import Dict, List, Optional, Type, Any
 from importlib import import_module
+import threading
+import os
+import tempfile
+try:
+    import fcntl  # Unix file locking for process-safety
+    _HAS_FCNTL = True
+except Exception:
+    fcntl = None
+    _HAS_FCNTL = False
 
 from .base_provider import AbstractProvider, ModelConfig
 from minesearch.config.base import config as Config
@@ -36,15 +45,59 @@ class ProviderRegistry:
             'grok': 'GrokProvider',
             'deepseek': 'DeepSeekProvider'
         }
+        # Thread-/Prozess-sichere Initialisierung
+        self._init_lock = threading.Lock()
+        self._initialized: bool = False
+        self._init_lock_file_path = os.path.join(tempfile.gettempdir(), 'minesearch_provider_registry.init.lock')
         
-    def initialize(self, config: Dict[str, Any]):
+    def initialize(self, config: Dict[str, Any], force_refresh: bool = False):
         """
-        Initialisiere alle konfigurierten Provider
+        Initialisiere alle konfigurierten Provider.
+        
+        - Idempotent: Wenn bereits initialisiert und force_refresh=False, wird übersprungen.
+        - Thread-/Prozess-sicher: Verwendet Thread-Lock und (falls verfügbar) Dateisperre.
         
         Args:
             config: Provider-Konfiguration aus config.py
+            force_refresh: Erzwingt Neuaufbau der Registry
         """
-        logger.info(f"[REGISTRY] 🚀 Starte Provider-Initialisierung für {len(config)} Provider")
+        # Early check (erste Prüfung ohne Lock)
+        if not force_refresh and self._initialized and self._providers and self._available_models:
+            logger.info("[REGISTRY] ⏭️  Initialisierung übersprungen (bereits initialisiert)")
+            return
+
+        lock_file = None
+        # Thread-Lock + optional Prozess-Lock
+        with self._init_lock:
+            try:
+                if _HAS_FCNTL:
+                    # Erzeuge/öffne Lock-Datei für prozessweite Exklusivität
+                    lock_file = open(self._init_lock_file_path, 'w')
+                    fcntl.flock(lock_file, fcntl.LOCK_EX)
+                    logger.debug("[REGISTRY] 🔒 Prozessweite Initialisierungs-Sperre erworben")
+            except Exception as e:
+                logger.warning(f"[REGISTRY] ⚠️  Konnte Prozess-Lock nicht setzen: {e}")
+
+            # Double-Checked Locking: zweite Prüfung unter Lock
+            if not force_refresh and self._initialized and self._providers and self._available_models:
+                logger.info("[REGISTRY] ⏭️  Initialisierung unter Lock übersprungen (bereits initialisiert)")
+                if lock_file and _HAS_FCNTL:
+                    try:
+                        fcntl.flock(lock_file, fcntl.LOCK_UN)
+                        lock_file.close()
+                    except Exception:
+                        pass
+                return
+
+            # Ab hier: tatsächliche Initialisierung
+            if force_refresh:
+                logger.info("[REGISTRY] 🔄 Force-Refresh angefordert – Registry wird neu aufgebaut")
+            
+            logger.info(f"[REGISTRY] 🚀 Starte Provider-Initialisierung für {len(config)} Provider")
+            
+            # Für deterministisches Verhalten: leeren vor Neuaufbau
+            self._providers = {}
+            self._available_models = {}
         
         # Zähle erwartete Modelle pro Provider
         expected_models = {}
@@ -113,6 +166,7 @@ class ProviderRegistry:
         # Final Summary
         total_models = len(self._available_models)
         total_providers = len(self._providers)
+        self._initialized = (total_providers > 0) or (total_models > 0)
         logger.info(f"[REGISTRY] 🏁 INITIALIZATION COMPLETE: {total_providers} Provider, {total_models} Modelle registriert")
         
         if total_models == 0:
@@ -121,6 +175,15 @@ class ProviderRegistry:
             logger.info(f"[REGISTRY] 📋 Registrierte Modelle:")
             for model_id in sorted(self._available_models.keys()):
                 logger.info(f"[REGISTRY]   ✅ {model_id}")
+
+        # Sperre lösen (Prozess-Lock)
+        try:
+            if lock_file and _HAS_FCNTL:
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
+                lock_file.close()
+                logger.debug("[REGISTRY] 🔓 Prozessweite Initialisierungs-Sperre freigegeben")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] ⚠️  Freigabe der Prozess-Sperre fehlgeschlagen: {e}")
     
     def _load_provider_class(self, provider_name: str) -> Optional[Type[AbstractProvider]]:
         """

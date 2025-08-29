@@ -11,6 +11,8 @@ import json
 import time
 import sys
 import os
+import pytest
+import tempfile
 
 def test_single_search():
     """Teste eine Einzelsuche für Éléonore"""
@@ -143,30 +145,30 @@ def test_batch_csv_upload():
     print('\n🔧 TESTE BATCH CSV UPLOAD PIPELINE...')
     
     try:
-        # Erstelle Test-CSV Datei
+        # Erstelle Test-CSV Datei in eindeutigem temporärem Verzeichnis
         csv_content = "mine_name,country,region,commodity\nÉléonore,Canada,Quebec,Gold\nAubelle,Canada,Quebec,\n"
-        csv_file = "/tmp/test_batch_debug.csv"
-        
-        with open(csv_file, 'w') as f:
-            f.write(csv_content)
-        
-        print('   ✅ Test-CSV erstellt')
-        
-        # Upload CSV
-        with open(csv_file, 'rb') as f:
-            files = {'file': ('test_batch_debug.csv', f, 'text/csv')}
-            data = {
-                'models': 'openrouter:deepseek-free',
-                'search_type': 'standard',
-                'count': '1'
-            }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_file = os.path.join(tmpdir, 'test_batch_debug.csv')
+            with open(csv_file, 'w', encoding='utf-8') as f:
+                f.write(csv_content)
             
-            response = requests.post(
-                "http://localhost:8000/api/batch/upload",
-                files=files,
-                data=data,
-                timeout=60
-            )
+            print('   ✅ Test-CSV erstellt')
+            
+            # Upload CSV
+            with open(csv_file, 'rb') as f:
+                files = {'file': ('test_batch_debug.csv', f, 'text/csv')}
+                data = {
+                    'models': 'openrouter:deepseek-free',
+                    'search_type': 'standard',
+                    'count': '1'
+                }
+                
+                response = requests.post(
+                    "http://localhost:8000/api/batch/upload",
+                    files=files,
+                    data=data,
+                    timeout=60
+                )
         
         if response.status_code == 200:
             data = response.json()
@@ -256,21 +258,39 @@ def test_database_consistency():
     """Teste Database-Konsistenz direkt"""
     print('\n🗄️ TESTE DATABASE-KONSISTENZ...')
     
+    # Direkte Database-Abfrage
+    sys.path.append('/app/backend')
+
+    # Import mit Fehlerbehandlung (inkl. möglicher Initialisierung beim Import)
     try:
-        # Direkte Database-Abfrage
-        sys.path.append('/app/backend')
         from minesearch.database import db_manager
         from minesearch.database.models import SearchResult
-        
+    except Exception as e:
+        # Wenn der Import fehlschlägt (z. B. wegen DB-Init), Test sauber überspringen
+        is_pytest = ("PYTEST_CURRENT_TEST" in os.environ) or ("pytest" in sys.modules)
+        if is_pytest:
+            pytest.skip(f'Datenbank nicht verfügbar (Import/Initialisierung): {e}')
+        print(f'   ⚠️ Datenbank-Import fehlgeschlagen: {e}')
+        return False
+
+    # Öffnen der Verbindung/Session mit gezielter Fehlerbehandlung
+    try:
+        # Typische Verbindungsfehler aus SQLAlchemy/DB-API
+        try:
+            from sqlalchemy.exc import OperationalError, InterfaceError, DBAPIError
+            connection_errors = (OperationalError, InterfaceError, DBAPIError)
+        except Exception:
+            connection_errors = tuple()
+
         with db_manager.get_session() as session:
             # Suche nach Éléonore Einträgen
             results = session.query(SearchResult).filter(SearchResult.mine_name == 'Éléonore').all()
-            
+
             print(f'   📊 Database-Einträge für Éléonore: {len(results)}')
-            
+
             data_count = 0
             empty_count = 0
-            
+
             for result in results:
                 structured_data = result.structured_data or {}
                 if structured_data:
@@ -284,12 +304,27 @@ def test_database_consistency():
                 else:
                     empty_count += 1
                     print(f'   ❌ {result.model_used}: NULL structured_data')
-            
+
             print(f'   📈 Zusammenfassung: {data_count} mit Daten, {empty_count} leer')
             return data_count > 0
-            
+
     except Exception as e:
-        print(f'   ❌ Fehler bei Database-Test: {str(e)}')
+        # Prüfe auf typische Verbindungsfehler und skippe den Test sauber
+        is_connection_error = False
+        try:
+            from sqlalchemy.exc import OperationalError, InterfaceError, DBAPIError
+            is_connection_error = isinstance(e, (OperationalError, InterfaceError, DBAPIError))
+        except Exception:
+            pass
+
+        if is_connection_error:
+            is_pytest = ("PYTEST_CURRENT_TEST" in os.environ) or ("pytest" in sys.modules)
+            if is_pytest:
+                pytest.skip(f'Datenbank nicht verfügbar (Verbindung): {e}')
+            print(f'   ⚠️ Datenbankverbindung nicht verfügbar: {e}')
+            return False
+
+        print(f'   ❌ Fehler bei Database-Test: {e}')
         return False
 
 if __name__ == "__main__":
@@ -303,16 +338,8 @@ if __name__ == "__main__":
     
     # Phase 2: Pipeline-Tests  
     print('\n🔹 PHASE 2: PIPELINE-TESTS')
-    try:
-        result = test_batch_csv_upload()
-        if isinstance(result, tuple) and len(result) == 2:
-            test3_ok, batch_id = result
-        else:
-            print(f'   ❌ test_batch_csv_upload gab unerwartetes Ergebnis zurück: {result}')
-            test3_ok, batch_id = False, None
-    except (ValueError, TypeError) as e:
-        print(f'   ❌ Fehler beim Unpacking von test_batch_csv_upload: {e}')
-        test3_ok, batch_id = False, None
+    result = test_batch_csv_upload()
+    test3_ok, batch_id = result
     
     # Phase 3: Debug-Analyse
     print('\n🔹 PHASE 3: DEBUG-ANALYSE')

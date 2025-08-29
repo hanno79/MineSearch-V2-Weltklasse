@@ -172,13 +172,14 @@ class AbstractProvider(ABC):
         field_name: str,
         mine_name: str,
         sources: List[Dict[str, Any]],
-        options: Dict[str, Any]
+        options: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         Erstellt eine fokussierte Query für ein einzelnes Feld
         """
-        country = options.get('country', '')
-        commodity = options.get('commodity', '')
+        opts = options or {}
+        country = opts.get('country', '')
+        commodity = opts.get('commodity', '')
         
         # Basis Query
         query = f"Suche AUSSCHLIESSLICH nach '{field_name}' für die Mine '{mine_name}'"

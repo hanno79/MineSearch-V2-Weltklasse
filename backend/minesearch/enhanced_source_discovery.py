@@ -13,6 +13,8 @@ from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import urllib.parse
 import asyncio
+import time
+from collections.abc import Iterable
 
 from minesearch.config import config, Config, COUNTRY_CONFIG
 from minesearch.source_discovery import SourceDiscovery
@@ -93,7 +95,22 @@ class EnhancedSourceDiscovery(SourceDiscovery):
                 self.session.add_discovered_source(source['url'])
         
         # ÄNDERUNG 25.08.2025: Persistiere neue Quellen in Datenbank
-        self._persist_discovered_sources(unique_sources, mine_name, country, region)
+        # Fehlerbehandlung mit begrenztem Retry, damit Aufrufer bei Persistenzfehlern informiert werden
+        max_attempts = 2
+        for attempt in range(1, max_attempts + 1):
+            try:
+                self._persist_discovered_sources(unique_sources, mine_name, country, region)
+                break
+            except Exception as e:
+                logger.error(
+                    f"[ACTIVE DISCOVERY][PERSIST-ERROR] Versuch {attempt}/{max_attempts} fehlgeschlagen "
+                    f"für Mine='{mine_name}', Country='{country}', Region='{region}': {e}"
+                )
+                if attempt == max_attempts:
+                    # Letzter Versuch fehlgeschlagen → nach oben propagieren, damit Caller es erkennt
+                    raise
+                # kurzer Backoff vor erneutem Versuch
+                time.sleep(1 * attempt)
         
         logger.info(f"[ACTIVE DISCOVERY] Gesamt: {len(unique_sources)} unique Quellen entdeckt")
         
@@ -183,7 +200,19 @@ class EnhancedSourceDiscovery(SourceDiscovery):
             if 'gestim' not in domain:  # GESTIM bereits hinzugefügt
                 # Generiere verschiedene spezifische URLs für bessere Datenqualität
                 specific_searches = self._generate_specific_search_urls(mine_name, domain)
-                sources.extend(specific_searches)
+                if specific_searches is None:
+                    logger.debug(f"[ACTIVE DISCOVERY] _generate_specific_search_urls gab None zurück für Domain {domain}; überspringe Erweiterung")
+                    continue
+                if isinstance(specific_searches, Iterable) and not isinstance(specific_searches, (str, bytes, dict)):
+                    specific_list = list(specific_searches)
+                    if len(specific_list) == 0:
+                        logger.debug(f"[ACTIVE DISCOVERY] _generate_specific_search_urls gab eine leere Liste/Iterable zurück für Domain {domain}; nichts zu erweitern")
+                        continue
+                    sources.extend(specific_list)
+                else:
+                    logger.warning(
+                        f"[ACTIVE DISCOVERY] Ungültiger Rückgabewert von _generate_specific_search_urls für Domain {domain}: Typ {type(specific_searches).__name__}; erwarte Liste/Iterable"
+                    )
         
         return sources
     
@@ -813,11 +842,31 @@ class IncrementalSourceDiscovery(EnhancedSourceDiscovery):
     """
     ÄNDERUNG 27.08.2025: Erweiterung für Sequential Field Orchestrator
     Implementiert inkrementelle/additive Quellensammlung für optimalen Workflow
+
+    REFAKTOR 29.08.2025:
+    - Dünne Fassade: Orchestrierung, Persistenz und Statistik ausgelagert
+    - Abhängigkeiten via Konstruktor injiziert (kein harter DB-Import)
     """
     
-    def __init__(self):
+    def __init__(
+        self,
+        orchestrator: Optional['IncrementalDiscoveryOrchestrator'] = None,
+        accumulator: Optional['SourceAccumulator'] = None,
+        persistence_manager: Optional['SourcePersistenceManager'] = None,
+        statistics_calculator: Optional['SourceStatisticsCalculator'] = None,
+        db_manager: Optional[object] = None
+    ):
         super().__init__()
-        self.source_accumulator = SourceAccumulator()
+        self.source_accumulator = accumulator or SourceAccumulator()
+        self.persistence_manager = persistence_manager or SourcePersistenceManager(db_manager=db_manager)
+        self.statistics_calculator = statistics_calculator or SourceStatisticsCalculator()
+        # Orchestrator zuletzt erzeugen, nachdem Abhängigkeiten stehen
+        self.orchestrator = orchestrator or IncrementalDiscoveryOrchestrator(
+            discovery_service=self,
+            accumulator=self.source_accumulator,
+            persistence_manager=self.persistence_manager,
+            statistics_calculator=self.statistics_calculator
+        )
     
     async def discover_incremental_sources(
         self,
@@ -846,30 +895,18 @@ class IncrementalSourceDiscovery(EnhancedSourceDiscovery):
         """
         logger.info(f"[INCREMENTAL-DISCOVERY] {model_id} sucht neue Quellen für {mine_name}")
         
-        # Führe standard Discovery durch
-        all_discovered_sources = self.discover_sources_for_mine(
+        # Delegiere an Orchestrator
+        new_sources = self.orchestrator.run_incremental_discovery(
             mine_name=mine_name,
+            model_id=model_id,
+            existing_sources=existing_sources,
             country=country,
             region=region,
             commodity=commodity,
             priority_focus=priority_focus
         )
-        
-        # Filtere nur neue Quellen
-        new_sources = self._filter_new_sources(all_discovered_sources, existing_sources)
-        
-        # Füge Metadaten hinzu
-        for source in new_sources:
-            source['discovered_by_model'] = model_id
-            source['discovered_at'] = datetime.now().isoformat()
-            source['discovery_round'] = priority_focus or 'sequential_discovery'
-            source['incremental_discovery'] = True
-        
         # Persistiere neue Quellen
         await self._persist_incremental_sources(new_sources, mine_name, model_id)
-        
-        logger.info(f"[INCREMENTAL-DISCOVERY] {model_id} fand {len(new_sources)} neue von {len(all_discovered_sources)} gesamt Quellen")
-        
         return new_sources
     
     def _filter_new_sources(
@@ -877,77 +914,12 @@ class IncrementalSourceDiscovery(EnhancedSourceDiscovery):
         discovered_sources: List[Dict[str, Any]],
         existing_sources: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """
-        Filtert nur neue Quellen die noch nicht in existing_sources enthalten sind
-        """
-        existing_urls = set()
-        existing_domains = set()
-        
-        # Sammle bestehende URLs und Domains
-        for source in existing_sources:
-            url = source.get('url', '').strip().lower()
-            domain = source.get('domain', '').strip().lower()
-            if url:
-                existing_urls.add(url)
-            if domain:
-                existing_domains.add(domain)
-        
-        new_sources = []
-        
-        for source in discovered_sources:
-            source_url = source.get('url', '').strip().lower()
-            source_domain = source.get('domain', '').strip().lower()
-            
-            # Prüfe URL-Dubletten
-            if source_url and source_url not in existing_urls:
-                # Zusätzlich Domain-basierte Dubletten-Prüfung für ähnliche URLs
-                is_duplicate = False
-                
-                if source_domain in existing_domains:
-                    # Prüfe ob es eine sehr ähnliche URL auf derselben Domain gibt
-                    for existing_source in existing_sources:
-                        existing_url = existing_source.get('url', '').strip().lower()
-                        if existing_url and source_domain in existing_url:
-                            # Simple Similarity Check basierend auf Pfad-Komponenten
-                            if self._are_urls_similar(source_url, existing_url):
-                                is_duplicate = True
-                                break
-                
-                if not is_duplicate:
-                    new_sources.append(source)
-        
-        return new_sources
+        # Adapter: delegiert an Orchestrator-Utility
+        return IncrementalDiscoveryOrchestrator.filter_new_sources_static(discovered_sources, existing_sources)
     
     def _are_urls_similar(self, url1: str, url2: str, similarity_threshold: float = 0.8) -> bool:
-        """
-        Prüft ob zwei URLs zu ähnlich sind (um Dubletten zu vermeiden)
-        """
-        try:
-            from urllib.parse import urlparse
-            
-            parsed1 = urlparse(url1)
-            parsed2 = urlparse(url2)
-            
-            # Gleiche Domain
-            if parsed1.netloc != parsed2.netloc:
-                return False
-            
-            # Prüfe Pfad-Ähnlichkeit
-            path1_parts = set(parsed1.path.split('/'))
-            path2_parts = set(parsed2.path.split('/'))
-            
-            if path1_parts and path2_parts:
-                intersection = len(path1_parts.intersection(path2_parts))
-                union = len(path1_parts.union(path2_parts))
-                similarity = intersection / union if union > 0 else 0
-                
-                return similarity >= similarity_threshold
-            
-            return False
-            
-        except Exception as e:
-            logger.debug(f"[URL-SIMILARITY] Fehler beim Vergleichen von URLs: {str(e)}")
-            return False
+        # Adapter: delegiert an Orchestrator-Utility
+        return IncrementalDiscoveryOrchestrator.are_urls_similar_static(url1, url2, similarity_threshold)
     
     async def _persist_incremental_sources(
         self,
@@ -959,34 +931,8 @@ class IncrementalSourceDiscovery(EnhancedSourceDiscovery):
         Persistiert neue Quellen in die Datenbank
         """
         try:
-            from minesearch.database import db_manager
-            
-            for source in sources:
-                try:
-                    # Erweiterte Source-Daten für Datenbank
-                    source_data = {
-                        'url': source.get('url'),
-                        'domain': source.get('domain'),
-                        'type': source.get('type'),
-                        'priority': source.get('priority', 2),
-                        'description': source.get('description'),
-                        'discovered_by_model': model_id,
-                        'discovered_for_mine': mine_name,
-                        'discovered_at': source.get('discovered_at'),
-                        'discovery_round': source.get('discovery_round'),
-                        'reliability_score': source.get('reliability_score'),
-                        'incremental_discovery': True
-                    }
-                    
-                    # Speichere in Datenbank (nutzt bestehende source persistence)
-                    # db_manager hat bereits source persistence logic
-                    logger.debug(f"[INCREMENTAL-PERSIST] Persistiere {source.get('url')} für {model_id}")
-                    
-                except Exception as e:
-                    logger.warning(f"[INCREMENTAL-PERSIST] Fehler beim Persistieren einer Quelle: {str(e)}")
-            
+            self.persistence_manager.save_sources(sources=sources, mine_name=mine_name, model_id=model_id)
             logger.info(f"[INCREMENTAL-PERSIST] {len(sources)} neue Quellen für {model_id} persistiert")
-            
         except Exception as e:
             logger.error(f"[INCREMENTAL-PERSIST] Kritischer Fehler beim Persistieren: {str(e)}")
     
@@ -1066,11 +1012,70 @@ class SourceAccumulator:
         return dict(self.model_contributions)
     
     def rank_sources_by_quality(self) -> List[Dict[str, Any]]:
-        """
-        Sortiert akkumulierte Quellen nach Qualität/Priorität
-        """
-        def source_quality_score(source):
-            # Basis-Score basierend auf Typ
+        """Delegiert Ranking an SourceStatisticsCalculator."""
+        calculator = SourceStatisticsCalculator()
+        return calculator.rank_sources_by_quality(self.accumulated_sources)
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """Delegiert Statistiken an SourceStatisticsCalculator."""
+        calculator = SourceStatisticsCalculator()
+        return calculator.get_statistics(self.accumulated_sources, self.model_contributions)
+
+
+# =========================
+# Neue fokussierte Komponenten
+# =========================
+
+class SourcePersistenceManager:
+    """
+    Verantwortlich für die Persistenz von Quellen mit injizierbarem db_manager.
+    """
+
+    def __init__(self, db_manager: Optional[object] = None):
+        self.db_manager = db_manager
+
+    def save_sources(self, sources: List[Dict[str, Any]], mine_name: str, model_id: str) -> int:
+        if not sources:
+            return 0
+        if self.db_manager is None:
+            try:
+                from minesearch.database import db_manager as default_db
+                self.db_manager = default_db
+            except Exception as e:
+                logger.warning(f"[PERSISTENCE] Kein db_manager injiziert: {e}")
+                return 0
+
+        persisted = 0
+        for source in sources:
+            try:
+                self.db_manager.add_or_update_source(
+                    url=source.get('url'),
+                    domain=source.get('domain'),
+                    country=source.get('country'),
+                    region=source.get('region'),
+                    source_type=source.get('type'),
+                    metadata={
+                        'discovered_for': mine_name,
+                        'discovered_by_model': model_id,
+                        'discovered_at': source.get('discovered_at') or datetime.now().isoformat(),
+                        'discovery_round': source.get('discovery_round'),
+                        'priority': source.get('priority', 2),
+                        'description': source.get('description', ''),
+                        'incremental_discovery': True,
+                    }
+                )
+                persisted += 1
+            except Exception as e:
+                logger.warning(f"[PERSISTENCE] Fehler beim Speichern von {source.get('url')}: {e}")
+
+        return persisted
+
+
+class SourceStatisticsCalculator:
+    """Berechnet Rankings und Statistiken für Quellen."""
+
+    def rank_sources_by_quality(self, sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        def source_quality_score(source: Dict[str, Any]) -> float:
             type_scores = {
                 'government': 0.9,
                 'database': 0.8,
@@ -1079,44 +1084,138 @@ class SourceAccumulator:
                 'document': 0.5,
                 'general': 0.3
             }
-            
             base_score = type_scores.get(source.get('type', 'general'), 0.3)
-            
-            # Prioritäts-Bonus
             priority = source.get('priority', 2)
-            priority_bonus = (4 - priority) * 0.1 if priority <= 3 else 0
-            
-            # Reliability Score wenn verfügbar
-            reliability = source.get('reliability_score', 0)
-            reliability_bonus = reliability * 0.1 if reliability else 0
-            
-            return base_score + priority_bonus + reliability_bonus
-        
-        ranked_sources = sorted(
-            self.accumulated_sources,
-            key=source_quality_score,
-            reverse=True
-        )
-        
-        return ranked_sources
-    
-    def get_statistics(self) -> Dict[str, Any]:
-        """Gibt Statistiken über die Akkumulation zurück"""
+            priority_bonus = (4 - priority) * 0.1 if isinstance(priority, int) and priority <= 3 else 0
+            reliability = source.get('reliability_score', 0) or 0
+            reliability_bonus = float(reliability) * 0.1 if reliability else 0.0
+            return float(base_score) + float(priority_bonus) + float(reliability_bonus)
+
+        return sorted(list(sources or []), key=source_quality_score, reverse=True)
+
+    def get_statistics(
+        self,
+        sources: List[Dict[str, Any]],
+        model_contributions: Optional[Dict[str, int]] = None
+    ) -> Dict[str, Any]:
         type_distribution = defaultdict(int)
         priority_distribution = defaultdict(int)
-        
-        for source in self.accumulated_sources:
+
+        for source in sources or []:
             type_distribution[source.get('type', 'unknown')] += 1
             priority_distribution[source.get('priority', 'unknown')] += 1
-        
+
         return {
-            'total_sources': len(self.accumulated_sources),
-            'model_contributions': dict(self.model_contributions),
+            'total_sources': len(sources or []),
+            'model_contributions': dict(model_contributions or {}),
             'type_distribution': dict(type_distribution),
             'priority_distribution': dict(priority_distribution),
-            'unique_domains': len(set(s.get('domain') for s in self.accumulated_sources if s.get('domain')))
+            'unique_domains': len(set(s.get('domain') for s in (sources or []) if s.get('domain')))
         }
 
 
-# Global instances für einfache Verwendung
+class IncrementalDiscoveryOrchestrator:
+    """
+    Koordiniert den inkrementellen Discovery-Flow und entkoppelt die Verantwortlichkeiten.
+    """
+
+    def __init__(
+        self,
+        discovery_service: EnhancedSourceDiscovery,
+        accumulator: SourceAccumulator,
+        persistence_manager: SourcePersistenceManager,
+        statistics_calculator: SourceStatisticsCalculator
+    ):
+        self.discovery_service = discovery_service
+        self.accumulator = accumulator
+        self.persistence_manager = persistence_manager
+        self.statistics_calculator = statistics_calculator
+
+    def run_incremental_discovery(
+        self,
+        mine_name: str,
+        model_id: str,
+        existing_sources: List[Dict[str, Any]],
+        country: Optional[str] = None,
+        region: Optional[str] = None,
+        commodity: Optional[str] = None,
+        priority_focus: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        all_discovered = self.discovery_service.discover_sources_for_mine(
+            mine_name=mine_name,
+            country=country,
+            region=region,
+            commodity=commodity,
+            priority_focus=priority_focus
+        )
+        new_sources = self.filter_new_sources_static(all_discovered, existing_sources)
+        annotated = self._annotate_sources(new_sources, model_id, priority_focus)
+        self.accumulator.add_sources(annotated, model_id)
+        return annotated
+
+    def _annotate_sources(
+        self,
+        sources: List[Dict[str, Any]],
+        model_id: str,
+        priority_focus: Optional[str]
+    ) -> List[Dict[str, Any]]:
+        for source in sources:
+            source['discovered_by_model'] = model_id
+            source['discovered_at'] = datetime.now().isoformat()
+            source['discovery_round'] = priority_focus or 'sequential_discovery'
+            source['incremental_discovery'] = True
+        return sources
+
+    @staticmethod
+    def filter_new_sources_static(
+        discovered_sources: List[Dict[str, Any]],
+        existing_sources: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        existing_urls = set()
+        existing_domains = set()
+        for source in existing_sources:
+            url = (source.get('url') or '').strip().lower()
+            domain = (source.get('domain') or '').strip().lower()
+            if url:
+                existing_urls.add(url)
+            if domain:
+                existing_domains.add(domain)
+        new_sources: List[Dict[str, Any]] = []
+        for source in discovered_sources or []:
+            source_url = (source.get('url') or '').strip().lower()
+            source_domain = (source.get('domain') or '').strip().lower()
+            if source_url and source_url not in existing_urls:
+                is_duplicate = False
+                if source_domain in existing_domains:
+                    for existing_source in existing_sources:
+                        existing_url = (existing_source.get('url') or '').strip().lower()
+                        if existing_url and source_domain in existing_url:
+                            if IncrementalDiscoveryOrchestrator.are_urls_similar_static(source_url, existing_url):
+                                is_duplicate = True
+                                break
+                if not is_duplicate:
+                    new_sources.append(source)
+        return new_sources
+
+    @staticmethod
+    def are_urls_similar_static(url1: str, url2: str, similarity_threshold: float = 0.8) -> bool:
+        try:
+            from urllib.parse import urlparse
+            parsed1 = urlparse(url1)
+            parsed2 = urlparse(url2)
+            if parsed1.netloc != parsed2.netloc:
+                return False
+            path1_parts = set(filter(None, parsed1.path.split('/')))
+            path2_parts = set(filter(None, parsed2.path.split('/')))
+            if path1_parts and path2_parts:
+                intersection = len(path1_parts.intersection(path2_parts))
+                union = len(path1_parts.union(path2_parts))
+                similarity = (intersection / union) if union > 0 else 0.0
+                return similarity >= similarity_threshold
+            return False
+        except Exception as e:
+            logger.debug(f"[URL-SIMILARITY] Fehler beim Vergleichen von URLs: {str(e)}")
+            return False
+
+# Global instances für einfache Verwendung (nach Definition der neuen Klassen)
 incremental_source_discovery = IncrementalSourceDiscovery()

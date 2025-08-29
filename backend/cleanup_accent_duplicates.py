@@ -7,9 +7,17 @@ Beschreibung: Bereinigung von Akzent-Duplikaten in der Datenbank
 
 import sys
 import os
+from pathlib import Path
 
-# Add the backend directory to Python path
-sys.path.append('/app/backend')
+# Backend-Pfad dynamisch ermitteln (Env BACKEND_PATH oder relativ zu dieser Datei)
+_backend_env = os.getenv("BACKEND_PATH")
+if _backend_env and os.path.isdir(_backend_env):
+    _backend_path = os.path.abspath(_backend_env)
+else:
+    _backend_path = str(Path(__file__).resolve().parent)
+
+if _backend_path not in sys.path:
+    sys.path.append(_backend_path)
 
 from minesearch.database import db_manager
 from minesearch.utils import normalize_accents, generate_name_variants

@@ -23,7 +23,7 @@ async def test_category_selection():
             
             # Warte auf vollständiges Laden der Progressive Model Selection
             print("⏳ Waiting for Progressive Model Selection to load...")
-            await asyncio.sleep(5)
+            await page.wait_for_selector('.quick-model-pill', state='visible', timeout=15000)
             
             # Browser Console Logs aktivieren
             page.on("console", lambda msg: print(f"[CONSOLE] {msg.type}: {msg.text}"))

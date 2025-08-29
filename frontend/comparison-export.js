@@ -244,7 +244,7 @@ class ComparisonExporter {
     <div class="summary-grid">
         <div class="metric-card">
             <div class="metric-value">${Math.round(comparison.consensus.overallScore * 100)}%</div>
-            <div class="metric-label">Consensus Score</div>
+            <div class="metric-label">Konsens-Score</div>
         </div>
         <div class="metric-card">
             <div class="metric-value">${Math.round(comparison.metadata.overallQuality * 100)}%</div>
@@ -252,16 +252,16 @@ class ComparisonExporter {
         </div>
         <div class="metric-card">
             <div class="metric-value">${comparison.metadata.consensusFields}</div>
-            <div class="metric-label">Consensus Fields</div>
+            <div class="metric-label">Konsens-Felder</div>
         </div>
         <div class="metric-card">
             <div class="metric-value">${comparison.metadata.discrepancyCount}</div>
-            <div class="metric-label">Discrepancies</div>
+            <div class="metric-label">Diskrepanzen</div>
         </div>
     </div>
     
     <div class="section">
-        <h2>📊 Models Analyzed</h2>
+        <h2>📊 Analysierte Modelle</h2>
         <div class="model-performance">
             ${comparison.models.map(modelId => {
                 const performance = comparison.analysis.modelPerformance[modelId];
@@ -276,13 +276,13 @@ class ComparisonExporter {
                             </div>
                         </div>
                         <div>
-                            Data Completeness: ${Math.round(performance.dataCompleteness * 100)}%
+                            Datenvollständigkeit: ${Math.round(performance.dataCompleteness * 100)}%
                             <div class="progress-bar">
                                 <div class="progress-fill" style="width: ${Math.round(performance.dataCompleteness * 100)}%"></div>
                             </div>
                         </div>
                         <div>
-                            Confidence: ${Math.round(performance.confidence * 100)}%
+                            Vertrauen: ${Math.round(performance.confidence * 100)}%
                             <div class="progress-bar">
                                 <div class="progress-fill" style="width: ${Math.round(performance.confidence * 100)}%"></div>
                             </div>
@@ -294,7 +294,7 @@ class ComparisonExporter {
     </div>
     
     <div class="section">
-        <h2>✅ Strong Consensus (${comparison.consensus.strongConsensus.length} fields)</h2>
+        <h2>✅ Starker Konsens (${comparison.consensus.strongConsensus.length} fields)</h2>
         ${comparison.consensus.strongConsensus.map(fieldName => {
             const fieldData = comparison.consensus.fields[fieldName];
             return `
@@ -308,7 +308,7 @@ class ComparisonExporter {
     
     ${comparison.discrepancies.length > 0 ? `
     <div class="section">
-        <h2>⚠️ Significant Discrepancies (${comparison.discrepancies.length})</h2>
+        <h2>⚠️ Signifikante Diskrepanzen (${comparison.discrepancies.length})</h2>
         ${comparison.discrepancies.slice(0, 10).map(disc => `
             <div class="discrepancy-item">
                 <strong>${disc.field}</strong> (Impact: ${Math.round(disc.impact * 100)})<br>
@@ -416,11 +416,11 @@ class ComparisonExporter {
 Comparison ID,${comparison.id}
 Timestamp,${comparison.timestamp}
 Models,${comparison.models.join('; ')}
-Consensus Score,${Math.round(comparison.consensus.overallScore * 100)}%
+Konsens-Score,${Math.round(comparison.consensus.overallScore * 100)}%
 Datenqualität,${Math.round(comparison.metadata.overallQuality * 100)}%
 Total Fields,${comparison.metadata.totalFields}
-Consensus Fields,${comparison.metadata.consensusFields}
-Discrepancies,${comparison.metadata.discrepancyCount}`;
+Konsens-Felder,${comparison.metadata.consensusFields}
+Diskrepanzen,${comparison.metadata.discrepancyCount}`;
     }
     
     generateConsensusSheet(comparison) {
@@ -451,7 +451,7 @@ Discrepancies,${comparison.metadata.discrepancyCount}`;
     }
     
     generatePerformanceSheet(comparison) {
-        const rows = ['Model,Data Completeness,Confidence,Source Quality,Overall Score'];
+        const rows = ['Model,Datenvollständigkeit,Vertrauen,Source Quality,Overall Score'];
         
         Object.entries(comparison.analysis.modelPerformance).forEach(([modelId, performance]) => {
             const overall = Math.round((performance.dataCompleteness + performance.confidence + performance.sourceQuality) / 3 * 100);
@@ -550,10 +550,10 @@ window.showAllDiscrepancies = (comparisonId) => {
         `).join('')}
         <div style="text-align: center; margin-top: 20px;">
             <button onclick="this.closest('.modal').remove()" style="background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
-                Close
+                Schließen
             </button>
             <button onclick="window.exportComparison('${comparisonId}', 'detailed')" style="background: #16a34a; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin-left: 10px;">
-                Export Details
+                Details exportieren
             </button>
         </div>
     `;

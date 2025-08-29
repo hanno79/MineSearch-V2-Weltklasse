@@ -13,8 +13,28 @@ def test_15_mines_batch():
     # Teste zuerst ob Server läuft
     try:
         response = requests.get("http://localhost:8000/api/results/stats", timeout=5)
-        print(f"✅ Server Status: {response.status_code}")
-    except Exception as e:
+        response.raise_for_status()
+        try:
+            stats_data = response.json()
+        except ValueError as je:
+            print(f"❌ Server antwortete nicht mit gültigem JSON: {je}")
+            print(f"Antwort (gekürzt): {response.text[:200]}...")
+            return
+        if not isinstance(stats_data, dict):
+            print(f"❌ Unerwartetes Schema: JSON-Objekt erwartet, erhalten: {type(stats_data).__name__}")
+            print(f"Antwort (gekürzt): {str(stats_data)[:200]}...")
+            return
+        if 'status' not in stats_data and 'data' not in stats_data:
+            print(f"❌ Unerwartetes Schema: Schlüssel 'status' oder 'data' fehlt")
+            print(f"Antwort-Schlüssel: {list(stats_data.keys())}")
+            return
+        fields = [k for k in ('status', 'data') if k in stats_data]
+        fields_str = ", ".join(fields) if fields else "keine"
+        print(f"✅ Server OK: {response.status_code} | Felder: {fields_str}")
+    except requests.exceptions.HTTPError as he:
+        print(f"❌ Server HTTP-Fehler: {he} | Body: {response.text[:200]}...")
+        return
+    except requests.exceptions.RequestException as e:
         print(f"❌ Server nicht erreichbar: {e}")
         return
     

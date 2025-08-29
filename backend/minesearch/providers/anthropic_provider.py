@@ -170,12 +170,18 @@ class AnthropicProvider(AbstractProvider):
                 # PHASE 1: Verwende discovered_sources als Basis-Quellen (wie Abacus Provider)
                 final_sources = []
                 for source in discovered_sources:
+                    # Bestimme, ob die Quelle tatsächlich durchsucht wurde
+                    searched_flag = bool(
+                        source.get('searched', False)
+                        or source.get('was_searched', False)
+                        or source.get('results')
+                    )
                     final_sources.append({
                         'url': source.get('url', ''),
                         'title': source.get('title', source.get('url', '')),
                         'type': source.get('type', 'discovered'),
                         'reliability': source.get('reliability_score'),
-                        'searched': True  # Markiere als durchsucht
+                        'searched': searched_flag
                     })
                 
                 # PHASE 2: Zusätzliche Quellen aus Content
@@ -437,8 +443,6 @@ Die Dokumente können technische Reports, Spreadsheets, Präsentationen oder reg
         """
         currency = options.get('currency', 'USD')
         
-        # Importiere spezialisierte Anti-Template-Anweisungen
-        from minesearch.specialized_prompts_impl import SpecializedPrompts
         universal_instructions = SpecializedPrompts.get_universal_anti_template_instructions()
         
         return f"""🚫 RULE 10 COMPLIANCE - CLAUDE TECHNICAL DOCUMENT PARSER (NO ESTIMATION) 🚫

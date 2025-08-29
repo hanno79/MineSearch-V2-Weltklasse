@@ -13,6 +13,7 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+from .field_constants import PROHIBITED_FIELD_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -34,16 +35,8 @@ class DatabaseConstraintManager:
         
         self.db_path = db_path
         
-        # Kritische Feldnamen die nicht als Werte erscheinen dürfen
-        self.prohibited_field_names = [
-            'x-koordinate', 'y-koordinate', 'x-Koordinate', 'y-Koordinate',
-            'restaurationskosten', 'Restaurationskosten', 'kostenjahr', 'Kostenjahr',
-            'dokumentenjahr', 'Dokumentenjahr', 'produktionsstart', 'Produktionsstart',
-            'produktionsende', 'Produktionsende', 'betreiber', 'Betreiber',
-            'eigentümer', 'Eigentümer', 'rohstoffe', 'Rohstoffe',
-            'minentyp', 'Minentyp', 'aktivitätsstatus', 'Aktivitätsstatus',
-            'region', 'Region', 'country', 'Country', 'land', 'Land'
-        ]
+        # Kritische Feldnamen die nicht als Werte erscheinen dürfen (zentral definiert)
+        self.prohibited_field_names = list(PROHIBITED_FIELD_NAMES)
     
     def create_validation_functions(self) -> List[str]:
         """
@@ -121,42 +114,62 @@ class DatabaseConstraintManager:
         
         triggers = []
         
-        # SQLite Trigger für structured_data Validierung
-        # Da wir keine komplexe JSON-Validierung in SQLite haben, 
-        # implementieren wir grundlegende Prüfungen
+        # Vorherige Trigger löschen, damit neue Definitionen sicher übernommen werden
+        triggers.append("""
+            DROP TRIGGER IF EXISTS prevent_field_contamination_insert;
+        """)
+        triggers.append("""
+            DROP TRIGGER IF EXISTS prevent_field_contamination_update;
+        """)
+        
+        # SQLite Trigger für structured_data Validierung über Lookup-Tabelle
+        # Nutzt json_tree für rekursive Inspektion und prüft mittels EXISTS gegen
+        # Einträge in prohibited_field_patterns statt hartkodierter LIKEs
         
         triggers.append("""
-            -- Trigger: Prevents obvious field name contamination in structured_data
+            -- Trigger: Prevents field name contamination in structured_data (INSERT)
             CREATE TRIGGER IF NOT EXISTS prevent_field_contamination_insert
             BEFORE INSERT ON search_results
-            WHEN NEW.structured_data IS NOT NULL
+            WHEN NEW.structured_data IS NOT NULL AND json_valid(NEW.structured_data) = 1
             BEGIN
-                -- Verhindere offensichtliche Feldnamen als Werte
+                -- Verhindere Feldnamen als Werte via Lookup-Tabelle
                 SELECT CASE
-                    WHEN NEW.structured_data LIKE '%"Country": "Region"%' OR
-                         NEW.structured_data LIKE '%"Region": "Eigentümer"%' OR
-                         NEW.structured_data LIKE '%"Betreiber": "x-Koordinate"%' OR
-                         NEW.structured_data LIKE '%"Eigentümer": "y-Koordinate"%' OR
-                         NEW.structured_data LIKE '%"Aktivitätsstatus": "Rohstoffe"%'
-                    THEN RAISE(ABORT, 'FIELD_CONTAMINATION: Field names detected as values in structured_data')
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM json_tree(NEW.structured_data) AS jt
+                        JOIN prohibited_field_patterns p
+                          ON p.enabled = 1
+                         AND jt.type = 'text'
+                         AND (
+                              (p.match_mode = 'equals' AND jt.value = p.pattern_value)
+                           OR (p.match_mode = 'like'   AND jt.value LIKE p.pattern_value)
+                           OR (p.match_mode = 'glob'   AND jt.value GLOB p.pattern_value)
+                         )
+                    ) THEN RAISE(ABORT, 'FIELD_CONTAMINATION: Field names detected as values in structured_data')
                 END;
             END;
         """)
         
         triggers.append("""
-            -- Trigger: Prevents field name contamination on updates
+            -- Trigger: Prevents field name contamination (UPDATE)
             CREATE TRIGGER IF NOT EXISTS prevent_field_contamination_update
             BEFORE UPDATE ON search_results
-            WHEN NEW.structured_data IS NOT NULL
+            WHEN NEW.structured_data IS NOT NULL AND json_valid(NEW.structured_data) = 1
             BEGIN
-                -- Verhindere offensichtliche Feldnamen als Werte
+                -- Verhindere Feldnamen als Werte via Lookup-Tabelle
                 SELECT CASE
-                    WHEN NEW.structured_data LIKE '%"Country": "Region"%' OR
-                         NEW.structured_data LIKE '%"Region": "Eigentümer"%' OR
-                         NEW.structured_data LIKE '%"Betreiber": "x-Koordinate"%' OR
-                         NEW.structured_data LIKE '%"Eigentümer": "y-Koordinate"%' OR
-                         NEW.structured_data LIKE '%"Aktivitätsstatus": "Rohstoffe"%'
-                    THEN RAISE(ABORT, 'FIELD_CONTAMINATION: Field names detected as values in structured_data')
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM json_tree(NEW.structured_data) AS jt
+                        JOIN prohibited_field_patterns p
+                          ON p.enabled = 1
+                         AND jt.type = 'text'
+                         AND (
+                              (p.match_mode = 'equals' AND jt.value = p.pattern_value)
+                           OR (p.match_mode = 'like'   AND jt.value LIKE p.pattern_value)
+                           OR (p.match_mode = 'glob'   AND jt.value GLOB p.pattern_value)
+                         )
+                    ) THEN RAISE(ABORT, 'FIELD_CONTAMINATION: Field names detected as values in structured_data')
                 END;
             END;
         """)
@@ -184,6 +197,55 @@ class DatabaseConstraintManager:
         """)
         
         return triggers
+
+    def create_prohibited_patterns_table(self) -> List[str]:
+        """
+        REGEL-TABELLE 25.08.2025: Erstellt Tabelle für verbotene Feldmuster
+        
+        Returns:
+            Liste von SQL-Statements für die Regeln-Tabelle
+        """
+        return [
+            """
+            CREATE TABLE IF NOT EXISTS prohibited_field_patterns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pattern_value TEXT NOT NULL,
+                match_mode TEXT NOT NULL DEFAULT 'equals', -- 'equals' | 'like' | 'glob'
+                description TEXT,
+                enabled INTEGER NOT NULL DEFAULT 1
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_prohibited_patterns_value
+            ON prohibited_field_patterns(pattern_value)
+            """,
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_prohibited_patterns_value_mode
+            ON prohibited_field_patterns(pattern_value, match_mode)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_prohibited_patterns_enabled
+            ON prohibited_field_patterns(enabled)
+            """
+        ]
+
+    def seed_prohibited_patterns(self, cursor: sqlite3.Cursor) -> None:
+        """
+        SEEDING 25.08.2025: Befüllt die Tabelle prohibited_field_patterns mit Standardwerten.
+        """
+        try:
+            for field_name in self.prohibited_field_names:
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO prohibited_field_patterns
+                        (pattern_value, match_mode, description, enabled)
+                    VALUES
+                        (?, 'equals', 'Verhindert Feldname-als-Wert', 1)
+                    """,
+                    (field_name,)
+                )
+        except sqlite3.Error as e:
+            logger.warning(f"[CONSTRAINTS] Seed für prohibited_field_patterns übersprungen: {e}")
     
     def create_constraint_log_table(self) -> List[str]:
         """
@@ -237,7 +299,13 @@ class DatabaseConstraintManager:
                 cursor.execute(statement)
                 logger.debug("[CONSTRAINTS] Log-Tabelle Statement ausgeführt")
             
-            # 2. Validierungs-Constraints erstellen (falls unterstützt)
+            # 2. Regeln-Tabelle für verbotene Muster erstellen und seeden
+            logger.info("[CONSTRAINTS] Erstelle Tabelle für verbotene Feldmuster...")
+            for statement in self.create_prohibited_patterns_table():
+                cursor.execute(statement)
+            self.seed_prohibited_patterns(cursor)
+            
+            # 3. Validierungs-Constraints erstellen (falls unterstützt)
             logger.info("[CONSTRAINTS] Erstelle Validierungs-Constraints...")
             validation_constraints = self.create_validation_functions()
             
@@ -251,7 +319,7 @@ class DatabaseConstraintManager:
                     # Manche Constraints sind möglicherweise nicht in allen SQLite-Versionen verfügbar
                     logger.warning(f"[CONSTRAINTS] Constraint übersprungen (nicht unterstützt): {e}")
             
-            # 3. Trigger erstellen
+            # 4. Trigger erstellen (inkl. vorherigem Drop in SQL)
             logger.info("[CONSTRAINTS] Erstelle Feldkontamination-Trigger...")
             triggers = self.create_field_contamination_triggers()
             
@@ -304,6 +372,7 @@ class DatabaseConstraintManager:
                 """)
                 logger.warning("[CONSTRAINT-TEST] JSON-Constraint nicht aktiv (erwartet)")
             except sqlite3.Error as e:
+                conn.rollback()
                 logger.info(f"[CONSTRAINT-TEST] ✅ JSON-Constraint funktioniert: {e}")
                 test_passed += 1
             
@@ -315,6 +384,7 @@ class DatabaseConstraintManager:
                 """)
                 logger.warning("[CONSTRAINT-TEST] Mine-Name-Constraint nicht aktiv")
             except sqlite3.Error as e:
+                conn.rollback()
                 logger.info(f"[CONSTRAINT-TEST] ✅ Mine-Name-Constraint funktioniert: {e}")
                 test_passed += 1
             
@@ -345,6 +415,26 @@ class DatabaseConstraintManager:
             else:
                 logger.error("[CONSTRAINT-TEST] ❌ Constraint-Log-Tabelle fehlt")
                 test_failed += 1
+
+            # Test 5: Negativtest - verbotener Wert in structured_data soll Trigger auslösen
+            # Wir verwenden einen bekannten verbotenen Feldnamen als Wert, z.B. 'Region'
+            try:
+                cursor.execute("DELETE FROM search_results")
+            except sqlite3.Error:
+                pass
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO search_results (mine_name, structured_data)
+                    VALUES ('Mine A', '{"some_key": "Region"}')
+                    """
+                )
+                logger.error("[CONSTRAINT-TEST] ❌ Trigger hat verbotenen Wert nicht verhindert")
+                test_failed += 1
+            except sqlite3.Error as e:
+                conn.rollback()
+                logger.info(f"[CONSTRAINT-TEST] ✅ Trigger hat korrekt abgebrochen: {e}")
+                test_passed += 1
             
             conn.close()
             
@@ -370,10 +460,10 @@ class DatabaseConstraintManager:
             
             cursor.execute("""
                 SELECT * FROM constraint_log 
-                WHERE severity IN ('WARNING', 'ERROR')
+                WHERE severity IN (?, ?)
                 ORDER BY timestamp DESC
                 LIMIT 100
-            """)
+            """, ("WARNING", "ERROR"))
             
             violations = []
             for row in cursor.fetchall():

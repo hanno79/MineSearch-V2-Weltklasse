@@ -62,14 +62,9 @@ const { chromium } = require('playwright');
         
         // Prüfe ob Loading-Text verschwunden ist
         console.log('🔄 Checking if loading completed...');
-        const loadingText = page.locator('text=Lade Modell-Statistiken...');
-        
-        // Warte bis Loading weg ist (max 10 Sekunden)
+        // Warte bis der Lade-Text verschwunden ist (max 10 Sekunden)
         try {
-            await page.waitForFunction(() => {
-                const loadingEl = document.querySelector('*:has-text("Lade Modell-Statistiken...")');
-                return !loadingEl || !loadingEl.offsetParent;
-            }, { timeout: 10000 });
+            await page.locator('text="Lade Modell-Statistiken..."').waitFor({ state: 'hidden', timeout: 10000 });
             console.log('✅ Loading completed!');
         } catch (e) {
             console.warn('⚠️ Loading timeout, continuing...');
@@ -135,6 +130,37 @@ const { chromium } = require('playwright');
     with open('/tmp/statistics_test.js', 'w') as f:
         f.write(test_script)
     
+    # Vorab-Checks: Node.js und Playwright verfügbar?
+    try:
+        node_version = subprocess.run(['node', '--version'], capture_output=True, text=True, timeout=5)
+        out = (node_version.stdout or node_version.stderr or '').strip()
+        if out:
+            print(f"🧩 Node.js gefunden: {out}")
+    except FileNotFoundError:
+        print("❌ Node.js nicht gefunden. Bitte installieren Sie Node.js und versuchen Sie es erneut.")
+        return False
+    except subprocess.TimeoutExpired:
+        print("⏰ Node.js Versionsabfrage hat zu lange gedauert. Ist Node.js korrekt installiert?")
+        return False
+
+    try:
+        pw_check = subprocess.run(['node', '-e', 'require("playwright")'], capture_output=True, text=True, timeout=5)
+        if pw_check.returncode != 0:
+            print("❌ Playwright-Paket nicht verfügbar. Installieren Sie es mit: npm install playwright")
+            if pw_check.stderr:
+                print("📋 [PLAYWRIGHT-STDERR]:")
+                print(pw_check.stderr)
+            return False
+    except subprocess.TimeoutExpired:
+        print("⏰ Playwright-Check hat zu lange gedauert. Prüfen Sie die Node/npm-Installation.")
+        return False
+    except FileNotFoundError:
+        print("❌ Node.js nicht gefunden. Bitte installieren Sie Node.js.")
+        return False
+    except Exception as e:
+        print(f"❌ Unerwarteter Fehler beim Playwright-Check: {e}")
+        return False
+
     # Führe Test aus
     try:
         result = subprocess.run([

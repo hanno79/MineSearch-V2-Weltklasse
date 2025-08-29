@@ -8,6 +8,30 @@ import asyncio
 import time
 import sys
 from playwright.async_api import async_playwright
+import os
+from pathlib import Path
+import tempfile
+
+def get_screenshot_dir() -> Path:
+    """Ermittelt ein beschreibbares Screenshot-Verzeichnis.
+    Priorität: $SCREENSHOT_DIR -> ./screenshots -> $TMPDIR/screenshots
+    """
+    env_dir = os.environ.get("SCREENSHOT_DIR")
+    candidates = []
+    if env_dir:
+        candidates.append(Path(env_dir).expanduser())
+    candidates.append(Path.cwd() / "screenshots")
+    candidates.append(Path(tempfile.gettempdir()) / "screenshots")
+
+    for candidate in candidates:
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            if os.access(candidate, os.W_OK):
+                return candidate
+        except Exception:
+            continue
+
+    return Path.cwd()
 
 async def comprehensive_eleonore_test():
     print("🚀 STARTE UMFASSENDEN ELEONORE MINE TEST")
@@ -23,6 +47,7 @@ async def comprehensive_eleonore_test():
             viewport={'width': 1920, 'height': 1080}
         )
         page = await context.new_page()
+        screenshot_dir = get_screenshot_dir()
         
         try:
             # SCHRITT 1: Navigation zur MineSearch Oberfläche
@@ -140,6 +165,46 @@ async def comprehensive_eleonore_test():
                     break
                 
                 await asyncio.sleep(3)
+            else:
+                # Timeout erreicht: aussagekräftig abbrechen
+                loading_selectors = [
+                    '.loading', '.spinner', '[class*="loading"]', 
+                    '[class*="spinner"]', '.progress'
+                ]
+
+                final_loading_active = False
+                for selector in loading_selectors:
+                    if await page.locator(selector).count() > 0:
+                        final_loading_active = True
+                        break
+
+                result_selectors = [
+                    '#results', '.results-container', '.mine-card',
+                    '.field-based-card', '.result-card'
+                ]
+
+                final_results_len = 0
+                final_results_snippet = ""
+                for selector in result_selectors:
+                    if await page.locator(selector).count() > 0:
+                        text_content = await page.locator(selector).first.text_content()
+                        text_content = text_content or ""
+                        final_results_len = len(text_content)
+                        final_results_snippet = text_content[:200].replace("\n", " ")
+                        break
+
+                elapsed = int(time.time() - start_time)
+                if final_results_len > 0:
+                    raise TimeoutError(
+                        f"Suche nicht abgeschlossen nach {elapsed}s (max {max_wait}s). "
+                        f"Loading aktiv: {final_loading_active}, Ergebnislänge: {final_results_len}. "
+                        f"Snippet: '{final_results_snippet[:180]}...'"
+                    )
+                else:
+                    raise TimeoutError(
+                        f"Suche nicht abgeschlossen nach {elapsed}s (max {max_wait}s). "
+                        f"Loading aktiv: {final_loading_active}, keine Ergebnisse gefunden."
+                    )
             
             # SCHRITT 7: Detaillierte Ergebnis-Analyse
             print("\n" + "=" * 60)
@@ -147,8 +212,9 @@ async def comprehensive_eleonore_test():
             print("=" * 60)
             
             # Screenshot erstellen
-            await page.screenshot(path='/app/eleonore_search_complete.png', full_page=True)
-            print("📸 Screenshot gespeichert: /app/eleonore_search_complete.png")
+            screenshot_path = screenshot_dir / "eleonore_search_complete.png"
+            await page.screenshot(path=str(screenshot_path), full_page=True)
+            print(f"📸 Screenshot gespeichert: {screenshot_path}")
             
             # Analysiere Suchergebnisse
             await analyze_search_results_detailed(page)
@@ -177,7 +243,16 @@ async def comprehensive_eleonore_test():
             
         except Exception as e:
             print(f"❌ FEHLER: {e}")
-            await page.screenshot(path='/app/error_eleonore_test.png')
+            error_screenshot_path = screenshot_dir / "error_eleonore_test.png"
+            await page.screenshot(path=str(error_screenshot_path))
+            try:
+                html = await page.content()
+                error_html_path = screenshot_dir / "error_eleonore_test.html"
+                with open(error_html_path, 'w', encoding='utf-8') as f:
+                    f.write(html)
+                print(f"📝 HTML gespeichert: {error_html_path}")
+            except Exception as dump_err:
+                print(f"⚠️ Konnte HTML nicht speichern: {dump_err}")
             raise
 
 async def analyze_search_results_detailed(page):

@@ -11,6 +11,12 @@ import time
 import json
 import sys
 
+# Konfigurierbare Validierungsregeln für 'structured_data'
+# Leere Liste bedeutet: keine Pflichtfelder; alle vorhandenen werden validiert
+EXPECTED_STRUCTURED_KEYS = []
+# Zahlenbereiche pro Feldname, z.B. {'score': (0, 1), 'year': (1900, 2100)}
+NUMERIC_FIELD_RANGES = {}
+
 class MineSearchE2ETest:
     def __init__(self):
         self.api_base = "http://localhost:8000"
@@ -71,14 +77,87 @@ class MineSearchE2ETest:
             
             # 2. Ergebnis prüfen
             data = result.get('data', {})
-            if 'structured_data' in data:
-                structured = data['structured_data']
-                filled_fields = sum(1 for v in structured.values() if v and v != "")
-                self.log(f"Search erfolgreich: {filled_fields} Felder ausgefüllt", "SUCCESS")
-                return True
-            else:
-                self.log("Search: Keine strukturierten Daten erhalten", "WARNING")
+            structured = data.get('structured_data')
+
+            # Validierung 'structured_data'
+            if not isinstance(structured, dict):
+                self.log("Search: 'structured_data' fehlt oder ist kein Objekt", "WARNING")
                 return False
+
+            if len(structured) == 0:
+                self.log("Search: 'structured_data' ist leer", "WARNING")
+                return False
+
+            expected_keys = EXPECTED_STRUCTURED_KEYS
+            numeric_ranges = NUMERIC_FIELD_RANGES
+
+            def _is_valid_value(field_name, value):
+                if value is None:
+                    return False, "ist None"
+                if isinstance(value, str):
+                    if value.strip() == "":
+                        return False, "leerer/Whitespace-String"
+                    return True, ""
+                if isinstance(value, (list, tuple)):
+                    if len(value) == 0:
+                        return False, "leere Liste"
+                    return True, ""
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    if field_name in numeric_ranges:
+                        min_v, max_v = numeric_ranges[field_name]
+                        if value < min_v or value > max_v:
+                            return False, f"Wert {value} außerhalb Bereich [{min_v}, {max_v}]"
+                    return True, ""
+                # Für andere Typen: Wahrheitswert prüfen
+                if not value:
+                    return False, f"ungültiger Wert vom Typ {type(value).__name__}"
+                return True, ""
+
+            invalid_fields = []
+            filled_fields = 0
+
+            # Validierung aller vorhandenen Felder
+            for key, val in structured.items():
+                ok, reason = _is_valid_value(key, val)
+                if ok:
+                    filled_fields += 1
+                else:
+                    invalid_fields.append(f"{key} ({reason})")
+
+            # Pflichtfelder prüfen
+            missing_required = []
+            invalid_required = []
+            if expected_keys:
+                for key in expected_keys:
+                    if key not in structured:
+                        missing_required.append(key)
+                    else:
+                        ok, reason = _is_valid_value(key, structured[key])
+                        if not ok:
+                            invalid_required.append(f"{key} ({reason})")
+
+            # Ergebnis entscheiden
+            # Regel:
+            # - Wenn EXPECTED_STRUCTURED_KEYS definiert: alle Pflichtfelder müssen vorhanden und gültig sein
+            # - Wenn nicht definiert: alle vorhandenen Felder müssen gültig sein
+            if expected_keys:
+                if missing_required:
+                    self.log(f"Search: Fehlende Pflichtfelder: {', '.join(missing_required)}", "WARNING")
+                if invalid_required:
+                    self.log(f"Search: Ungültige Pflichtfelder: {', '.join(invalid_required)}", "WARNING")
+                if invalid_fields:
+                    self.log(f"Search: Ungültige optionale Felder: {', '.join(invalid_fields)}", "WARNING")
+                if not missing_required and not invalid_required:
+                    self.log(f"Search erfolgreich: {filled_fields}/{len(structured)} Felder gültig", "SUCCESS")
+                    return True
+                else:
+                    return False
+            else:
+                if invalid_fields:
+                    self.log(f"Search: Ungültige Felder: {', '.join(invalid_fields)}", "WARNING")
+                    return False
+                self.log(f"Search erfolgreich: {filled_fields}/{len(structured)} Felder gültig", "SUCCESS")
+                return True
                 
         except Exception as e:
             self.log(f"Search-Workflow Fehler: {str(e)}", "ERROR")

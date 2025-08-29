@@ -182,7 +182,19 @@ CACHE_TTL_MINUTES=60
 REQUEST_TIMEOUT_SECONDS=30
 
 # Database
+# Hinweis: Für das Backend wird primär `DATABASE_URL` verwendet. 
+# Wartungs-/Analyse‑Skripte (z. B. `backend/analyze_database_contamination.py`) 
+# akzeptieren zusätzlich `DATABASE_PATH` (höchste Priorität) und 
+# `MINES_DB_PATH` (Kompatibilität für Tests/CI). 
+# Auflösung in Priorität: DATABASE_PATH → MINES_DB_PATH → DATABASE_URL (sqlite) → Fallback.
 DATABASE_PATH=data/minesearch.db
+# Optional für Tests/CI (falls gesetzt, sonst intern in conftest verwaltet)
+MINES_DB_PATH=/absolute/pfad/zur/mines.db
+ 
+# Monitoring‑Status‑Skript
+# `backend/monitoring_status.py` verwendet dieselbe Auflösung und validiert den Pfad
+# vor Nutzung. Falls die Datei nicht existiert, wird eine klare Fehlermeldung mit
+# Hinweis auf `DATABASE_PATH`/`MINES_DB_PATH`/`DATABASE_URL` ausgegeben.
 ```
 
 ## 📊 Features im Detail

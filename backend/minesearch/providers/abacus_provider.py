@@ -367,7 +367,6 @@ KRITISCH: KEINE Platzhalter, KEINE "$1-3 CAD" Werte, NUR verifizierte Daten!"""
         currency = options.get('currency', 'USD')
         
         # Importiere spezialisierte Anti-Template-Anweisungen
-        from minesearch.specialized_prompts_impl import SpecializedPrompts
         universal_instructions = SpecializedPrompts.get_universal_anti_template_instructions()
         
         return f"""🚫 RULE 10 COMPLIANCE - ABACUS AI ULTRA-STRICT DEEP RESEARCHER 🚫

@@ -6,7 +6,83 @@ Beschreibung: Refactored HTML-Utility-Funktionen für MineSearch Frontend (CLAUD
 """
 
 import os
+import logging
 from typing import Dict, List, Any, Optional
+
+logger = logging.getLogger(__name__)
+
+# Sichere Debug-Hilfsfunktion: nutzt Logger (DEBUG), respektiert Umgebungsflags und maskiert sensible Felder
+def html_debug_log(data: Optional[Dict], structured_data: Optional[Dict], result: Dict, mine_name: str, fallback_reason: Optional[str] = None) -> None:
+    """Schreibt eine kompakte, sichere Debug-Ausgabe über den App-Logger.
+
+    - Aktiv nur wenn MINES_HTML_DEBUG in ('1','true','yes')
+    - Unter Produktionsumgebung nur wenn MINES_HTML_DEBUG_ALLOW_PROD gesetzt ist
+    - Maskiert/unterdrückt sensible Felder
+    """
+    try:
+        debug_enabled = os.getenv('MINES_HTML_DEBUG', '').lower() in ('1', 'true', 'yes')
+        if not debug_enabled:
+            return
+
+        is_production = (
+            os.getenv('APP_ENV', '').lower() == 'production' or
+            os.getenv('ENVIRONMENT', '').lower() == 'production' or
+            os.getenv('IS_PROD', '').lower() in ('1', 'true', 'yes')
+        )
+        allow_prod_debug = os.getenv('MINES_HTML_DEBUG_ALLOW_PROD', '').lower() in ('1', 'true', 'yes')
+        if is_production and not allow_prod_debug:
+            return
+
+        # Helper: sichere Extraktion von Keys
+        def safe_keys(obj: Any) -> List[str]:
+            if isinstance(obj, dict):
+                try:
+                    return list(obj.keys())
+                except Exception:
+                    return []
+            return []
+
+        # Helper: sensible Felder erkennen/maskieren
+        sensitive_key_set = {
+            'api_key', 'apikey', 'token', 'access_token', 'secret', 'password', 'pass',
+            'owner', 'eigentümer', 'betreiber', 'email', 'phone', 'telefon', 'address', 'adresse'
+        }
+
+        def mask_value(value: Any) -> str:
+            s = str(value)
+            if len(s) <= 4:
+                return '***'
+            return s[:2] + '***' + s[-2:]
+
+        # Kompakte Schlüsselübersicht und Länge loggen
+        logger.debug(
+            "[HTML-DEBUG] Mine=%s | result_keys=%s | data_keys=%s | structured_data_keys=%s | structured_data_len=%s | fallback=%s",
+            mine_name,
+            safe_keys(result),
+            safe_keys(data),
+            safe_keys(structured_data),
+            len(structured_data) if isinstance(structured_data, dict) else 0,
+            fallback_reason,
+        )
+
+        # Beispielwerte aus strukturierten Daten – mit Maskierung sensibler Felder
+        if isinstance(structured_data, dict) and structured_data:
+            sample_fields = ['Country', 'Restaurationskosten', 'Eigentümer']
+            samples: Dict[str, Any] = {}
+            for field in sample_fields:
+                if field in structured_data:
+                    value = structured_data.get(field)
+                    if str(field).lower() in sensitive_key_set:
+                        samples[field] = mask_value(value)
+                    else:
+                        # Werte nicht aufblähen: auf 100 Zeichen begrenzen
+                        s = str(value)
+                        samples[field] = s[:97] + '...' if len(s) > 100 else s
+            if samples:
+                logger.debug("[HTML-DEBUG] Samples=%s", samples)
+    except Exception:
+        # Fail-safe: niemals Exceptions im Produktionspfad werfen
+        logger.debug("[HTML-DEBUG] Debug-Logger übersprungen (Exception in helper)")
 
 # FALLBACK FUNKTIONEN: Fehlende Module durch inline Funktionen ersetzen
 
@@ -111,33 +187,18 @@ def create_batch_results_table(results: List[Dict]) -> str:
             # CRITICAL DEBUG 23.08.2025: Finde heraus warum keine structured_data ankommen
             structured_data = data.get('structured_data', {})
             
-            # INTENSIVE DEBUG-LOGGING - nur wenn MINES_HTML_DEBUG gesetzt ist
-            if os.getenv('MINES_HTML_DEBUG', '').lower() in ('1', 'true', 'yes'):
-                with open("/tmp/html_debug.log", "a") as f:
-                    f.write(f"\n[HTML-DEBUG] Mine: {mine_name}\n")
-                    f.write(f"[HTML-DEBUG] result keys: {list(result.keys())}\n") 
-                    f.write(f"[HTML-DEBUG] data keys: {list(data.keys()) if data else 'None'}\n")
-                    f.write(f"[HTML-DEBUG] structured_data keys: {list(structured_data.keys()) if structured_data else 'None'}\n")
-                    f.write(f"[HTML-DEBUG] structured_data length: {len(structured_data)}\n")
-                    
-                    # Sample structured_data values
-                    if structured_data:
-                        sample_fields = ['Country', 'Restaurationskosten', 'Eigentümer']
-                        for field in sample_fields:
-                            if field in structured_data:
-                                f.write(f"[HTML-DEBUG] {field}: {structured_data[field]}\n")
+            # Kompakte, sichere Debug-Ausgabe über Logger (statt Datei-I/O)
+            html_debug_log(data, structured_data, result, mine_name)
             
             # FALLBACK: Wenn structured_data leer, nimm direkt aus data (häufiges Format)
             if not structured_data and data:
                 structured_data = data
-                with open("/tmp/html_debug.log", "a") as f:
-                    f.write(f"[HTML-DEBUG] FALLBACK: Using data directly, length: {len(data)}\n")
+                html_debug_log(data, structured_data, result, mine_name, fallback_reason="FALLBACK: Using data directly")
                 
             # FINAL FALLBACK: Für Legacy-Format direkt aus result
             if not structured_data:
                 structured_data = result
-                with open("/tmp/html_debug.log", "a") as f:
-                    f.write(f"[HTML-DEBUG] FINAL FALLBACK: Using result directly, length: {len(result)}\n")
+                html_debug_log(data, structured_data, result, mine_name, fallback_reason="FINAL FALLBACK: Using result directly")
                 
             # KRITISCHER FIX 23.08.2025: DIREKTER PROVIDER-AUFRUF für echte Daten
             if not structured_data or len([v for v in structured_data.values() if v and str(v).strip() and str(v).strip() != 'nichts gefunden']) < 3:
@@ -165,11 +226,9 @@ def create_batch_results_table(results: List[Dict]) -> str:
                     try:
                         loop = asyncio.get_event_loop()
                         if loop.is_running():
-                            # Im laufenden Loop - erstelle Task
-                            import concurrent.futures
-                            with concurrent.futures.ThreadPoolExecutor() as executor:
-                                future = executor.submit(asyncio.run, get_real_data())
-                                real_structured_data = future.result(timeout=10)
+                            # Im laufenden Loop - Coroutine sicher in Loop einreichen
+                            future = asyncio.run_coroutine_threadsafe(get_real_data(), loop)
+                            real_structured_data = future.result(timeout=10)
                         else:
                             # Neuer Loop
                             real_structured_data = asyncio.run(get_real_data())

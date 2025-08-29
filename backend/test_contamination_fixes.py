@@ -14,6 +14,7 @@ sys.path.insert(0, '.')
 import json
 import logging
 import sqlite3
+import os
 from typing import Dict, Any, List
 from pathlib import Path
 
@@ -39,7 +40,8 @@ class ContaminationTestSuite:
     
     def __init__(self):
         """Initialisiert Test-Suite"""
-        self.db_path = "/app/backend/minesearch/database/mines.db"
+        default_db_path = Path(__file__).resolve().parent / "minesearch" / "database" / "mines.db"
+        self.db_path = os.environ.get("MINES_DB_PATH", str(default_db_path))
         self.search_service = MineSearchService()
         self.null_normalizer = NullNormalizer()
         self.test_results = {
@@ -172,36 +174,64 @@ class ContaminationTestSuite:
         self.log_test_result("NULL Normalization", all_passed,
                            f"Tested {len(test_values)} values for correct NULL conversion")
     
+    def test_status_values_preserved(self):
+        """TEST 3b: Statuswerte bleiben erhalten (nicht NULL)"""
+        logger.info("\n🧪 TEST 3b: STATUS VALUES PRESERVATION")
+        
+        # Echte Statuswerte, die nicht zu NULL normalisiert werden dürfen
+        status_values = {
+            'noch aktiv': 'Aktivitätsstatus',
+            'Mine geschlossen': 'Aktivitätsstatus',
+            'nur Exploration': 'Aktivitätsstatus',
+            'noch geplant': 'Aktivitätsstatus',
+            'in Entwicklung': 'Aktivitätsstatus',
+            'still active': 'Aktivitätsstatus',
+            'mine closed': 'Aktivitätsstatus',
+            'only exploration': 'Aktivitätsstatus',
+            'still planned': 'Aktivitätsstatus',
+            'in development': 'Aktivitätsstatus'
+        }
+        
+        all_passed = True
+        for value, field in status_values.items():
+            normalized = self.null_normalizer.normalize_value(value, field)
+            if normalized is None:
+                logger.error(f"[TEST] FAILED: Statuswert '{value}' in Feld '{field}' wurde fälschlich zu NULL")
+                all_passed = False
+            else:
+                logger.debug(f"[TEST] OK: Statuswert '{value}' erhalten als '{normalized}'")
+        
+        self.log_test_result("Status Values Preservation", all_passed,
+                           f"Tested {len(status_values)} real status values remain non-NULL")
+    
     def test_database_constraints(self):
         """TEST 4: Database Constraints and Triggers"""
         logger.info("\n🧪 TEST 4: DATABASE CONSTRAINTS")
         
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Prüfe ob Trigger existieren
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='trigger'")
-            triggers = [row[0] for row in cursor.fetchall()]
-            
-            expected_triggers = [
-                'prevent_field_contamination_insert',
-                'prevent_field_contamination_update'
-            ]
-            
-            triggers_present = 0
-            for expected in expected_triggers:
-                if expected in triggers:
-                    triggers_present += 1
-                    logger.debug(f"[TEST] Trigger '{expected}' present")
-                else:
-                    logger.warning(f"[TEST] Trigger '{expected}' missing")
-            
-            # Prüfe Log-Tabelle
-            cursor.execute("SELECT name FROM sqlite_master WHERE name='constraint_log'")
-            log_table_exists = cursor.fetchone() is not None
-            
-            conn.close()
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Prüfe ob Trigger existieren
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='trigger'")
+                triggers = [row[0] for row in cursor.fetchall()]
+                
+                expected_triggers = [
+                    'prevent_field_contamination_insert',
+                    'prevent_field_contamination_update'
+                ]
+                
+                triggers_present = 0
+                for expected in expected_triggers:
+                    if expected in triggers:
+                        triggers_present += 1
+                        logger.debug(f"[TEST] Trigger '{expected}' present")
+                    else:
+                        logger.warning(f"[TEST] Trigger '{expected}' missing")
+                
+                # Prüfe Log-Tabelle
+                cursor.execute("SELECT name FROM sqlite_master WHERE name='constraint_log'")
+                log_table_exists = cursor.fetchone() is not None
             
             all_passed = (triggers_present == len(expected_triggers)) and log_table_exists
             
@@ -309,6 +339,7 @@ class ContaminationTestSuite:
         self.test_field_name_blacklist()
         self.test_template_detection()
         self.test_null_normalization()
+        self.test_status_values_preserved()
         self.test_database_constraints()
         self.test_search_service_quality_gate()
         self.test_end_to_end_protection()

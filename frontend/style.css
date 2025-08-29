@@ -953,11 +953,7 @@ body {
     color: var(--error-800);
 }
 
-.provider-status-pill.api_error {
-    background: var(--warning-100);
-    color: var(--warning-800);
-}
-
+.provider-status-pill.api_error,
 .provider-status-pill.budget_exceeded {
     background: var(--warning-100);
     color: var(--warning-800);

@@ -12,6 +12,41 @@
 // SEARCH EXECUTION FUNCTIONS
 // ============================================
 
+// Batch-Konstanten
+const BATCH_MAX_COUNT = 1000;
+const BATCH_WARNING_THRESHOLD = 200;
+const BATCH_STRONG_THRESHOLD = 500;
+const BATCH_DEFAULT_CHUNK_SIZE = 250;
+
+// UI-Handler für Batch Count Eingabe (global verfügbar)
+function handleBatchCountInput() {
+    const input = document.getElementById('batch-count');
+    const warn = document.getElementById('batch-count-warning');
+    if (!input) return;
+    let value = parseInt(input.value || '0');
+    if (isNaN(value) || value < 1) value = 1;
+    if (value > BATCH_MAX_COUNT) {
+        value = BATCH_MAX_COUNT;
+        if (typeof showNotification === 'function') {
+            showNotification(`Maximale Batch-Größe ist ${BATCH_MAX_COUNT}. Wert wurde angepasst.`, 'warning');
+        }
+    }
+    input.value = value;
+    if (warn) {
+        if (value > BATCH_STRONG_THRESHOLD) {
+            warn.style.display = 'block';
+            warn.style.color = '#b45309';
+            warn.textContent = '⚠️ Sehr große Batches können langsam sein oder Zeitüberschreitungen verursachen. Wir empfehlen Pagination in Teilpaketen.';
+        } else if (value > BATCH_WARNING_THRESHOLD) {
+            warn.style.display = 'block';
+            warn.style.color = '#92400e';
+            warn.textContent = 'ℹ️ Große Batches können länger dauern. Erwägen Sie Pagination in Teilpaketen.';
+        } else {
+            warn.style.display = 'none';
+        }
+    }
+}
+
 /**
  * SINGLE SEARCH: Startet eine Einzelsuche mit ausgewählten Modellen
  */
@@ -165,8 +200,8 @@ async function startBatchSearch() {
     const batchCount = batchCountElement ? parseInt(batchCountElement.value) : 3; // Default: 3
     
     // Validierung
-    if (batchMode === 'limited' && (isNaN(batchCount) || batchCount < 1 || batchCount > 10000)) {
-        showNotification('Die Anzahl der Minen muss zwischen 1 und 10000 liegen.', 'warning');
+    if (batchMode === 'limited' && (isNaN(batchCount) || batchCount < 1 || batchCount > BATCH_MAX_COUNT)) {
+        showNotification(`Die Anzahl der Minen muss zwischen 1 und ${BATCH_MAX_COUNT} liegen.`, 'warning');
         return;
     }
     
@@ -244,56 +279,109 @@ async function startBatchSearch() {
             false, true, 'cancelBatchSearch()' // Don't restart timer, continue from upload phase, show cancel button
         );
         
-        // SCHRITT 2: BATCH SEARCH mit Session ID
+        // SCHRITT 2: BATCH SEARCH mit Session ID (Chunking unterstützt)
         console.log('🔍 [BATCH-STEP-2] Starting batch search with session ID...');
-        
-        const batchFormData = new FormData();
-        batchFormData.append('session_id', sessionId);
-        batchFormData.append('search_type', comprehensiveSearchEnabled ? 'comprehensive' : 'standard');
-        batchFormData.append('search_all', batchMode === 'all' ? 'true' : 'false');
-        batchFormData.append('count', batchMode === 'limited' ? batchCount.toString() : '0');
-        
-        // Add selected models as comma-separated string
-        batchFormData.append('selected_models', selectedModels.join(','));
-        
-        // Add search options
-        batchFormData.append('twoPhase', twoPhaseEnabled.toString());
-        batchFormData.append('smartSearch', smartSearchEnabled.toString());
-        batchFormData.append('comprehensive', comprehensiveSearchEnabled.toString());
-        
-        const batchResponse = await fetch(`${window.API_BASE_URL}/api/batch-search`, {
-            method: 'POST',
-            body: batchFormData,
-            signal: signal  // Add abort support
-        });
-        
-        if (!batchResponse.ok) {
-            const errorText = await batchResponse.text();
-            console.error(`❌ [BATCH-STEP-2] Batch search failed: ${batchResponse.status}`, errorText);
-            throw new Error(`Batch-Suche fehlgeschlagen (${batchResponse.status}): ${errorText}`);
-        }
-        
-        const batchResultsHtml = await batchResponse.text();
-        console.log(`✅ [BATCH-STEP-2] Batch search completed, HTML length: ${batchResultsHtml.length}`);
-        
-        // Stop timer
-        if (typeof window.searchTimer !== 'undefined' && window.searchTimer.stop) {
-            window.searchTimer.stop();
-        }
-        
-        // Display results using safeSetHTML for proper HTML rendering
-        safeSetHTML(resultsDiv, batchResultsHtml);
-        showNotification(`✅ ${searchTypeText} erfolgreich abgeschlossen`, 'success');
-        
-        // 🚀 CRITICAL FIX: Auto-Refresh alle Tabs nach erfolgreicher Batch-Suche
-        if (typeof window.smartRefreshAfterSearch === 'function') {
-            window.smartRefreshAfterSearch('batch');
-            console.log('📊 [BATCH-SUCCESS] Scheduled comprehensive tab refresh after successful batch search');
-        } else if (typeof window.scheduleAllTabsRefresh === 'function') {
-            window.scheduleAllTabsRefresh('batch');
-            console.log('📊 [BATCH-SUCCESS] Scheduled fallback tab refresh after successful batch search');
+
+        const desiredTotal = (batchMode === 'all')
+            ? (typeof mineCount === 'number' ? mineCount : Number(mineCount) || 0)
+            : Math.min(batchCount, (typeof mineCount === 'number' ? mineCount : Number(mineCount) || batchCount));
+
+        const chunkSize = Math.min(BATCH_DEFAULT_CHUNK_SIZE, BATCH_MAX_COUNT);
+        const needsChunking = desiredTotal > chunkSize || (batchMode === 'all' && mineCount > chunkSize);
+
+        if (needsChunking) {
+            console.log(`🧩 [BATCH-CHUNK] Processing in chunks of ${chunkSize}, total desired: ${desiredTotal}`);
+            // Initial progress area
+            resultsDiv.innerHTML = `
+                <div style="padding: 12px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; margin-bottom: 12px;">
+                    <strong>Pagination aktiv:</strong> Wir verarbeiten die Anfrage in Teilpaketen.
+                    <div id="batch-chunk-progress" style="margin-top: 6px; font-size: 0.9rem; color: #1e40af;">Chunk 0/0</div>
+                </div>
+                <div id="batch-chunk-results"></div>
+            `;
+            const progressEl = document.getElementById('batch-chunk-progress');
+            const resultsContainerEl = document.getElementById('batch-chunk-results');
+
+            let processed = 0;
+            let chunkIndex = 0;
+            const totalChunks = Math.ceil(desiredTotal / chunkSize);
+            if (progressEl) progressEl.textContent = `Chunk 0/${totalChunks} (0 verarbeitet)`;
+
+            for (let startIndex = 0; startIndex < desiredTotal; startIndex += chunkSize) {
+                if (batchSearchAbortController && batchSearchAbortController.signal.aborted) {
+                    throw new DOMException('Aborted', 'AbortError');
+                }
+
+                const currentCount = Math.min(chunkSize, desiredTotal - startIndex);
+                const chunkFormData = new FormData();
+                chunkFormData.append('session_id', sessionId);
+                chunkFormData.append('search_type', comprehensiveSearchEnabled ? 'comprehensive' : 'standard');
+                chunkFormData.append('search_all', 'false');
+                chunkFormData.append('count', currentCount.toString());
+                chunkFormData.append('start_index', startIndex.toString());
+                chunkFormData.append('selected_models', selectedModels.join(','));
+                chunkFormData.append('twoPhase', twoPhaseEnabled.toString());
+                chunkFormData.append('smartSearch', smartSearchEnabled.toString());
+                chunkFormData.append('comprehensive', comprehensiveSearchEnabled.toString());
+
+                const chunkResponse = await fetch(`${window.API_BASE_URL}/api/batch-search`, {
+                    method: 'POST',
+                    body: chunkFormData,
+                    signal: signal
+                });
+                if (!chunkResponse.ok) {
+                    const errorText = await chunkResponse.text();
+                    throw new Error(`Batch-Chunk fehlgeschlagen (${chunkResponse.status}): ${errorText}`);
+                }
+                const chunkHtml = await chunkResponse.text();
+                resultsContainerEl.insertAdjacentHTML('beforeend', chunkHtml);
+                processed += currentCount;
+                chunkIndex += 1;
+                if (progressEl) progressEl.textContent = `Chunk ${chunkIndex}/${totalChunks} (${processed} verarbeitet)`;
+            }
+
+            if (typeof window.searchTimer !== 'undefined' && window.searchTimer.stop) {
+                window.searchTimer.stop();
+            }
+            showNotification(`✅ ${searchTypeText} in ${totalChunks} Teilpaketen abgeschlossen`, 'success');
+
+            if (typeof window.smartRefreshAfterSearch === 'function') {
+                window.smartRefreshAfterSearch('batch');
+            } else if (typeof window.scheduleAllTabsRefresh === 'function') {
+                window.scheduleAllTabsRefresh('batch');
+            }
         } else {
-            console.warn('⚠️ [BATCH-SUCCESS] Post-search refresh functions not available');
+            const batchFormData = new FormData();
+            batchFormData.append('session_id', sessionId);
+            batchFormData.append('search_type', comprehensiveSearchEnabled ? 'comprehensive' : 'standard');
+            batchFormData.append('search_all', 'false');
+            batchFormData.append('count', desiredTotal.toString());
+            batchFormData.append('start_index', '0');
+            batchFormData.append('selected_models', selectedModels.join(','));
+            batchFormData.append('twoPhase', twoPhaseEnabled.toString());
+            batchFormData.append('smartSearch', smartSearchEnabled.toString());
+            batchFormData.append('comprehensive', comprehensiveSearchEnabled.toString());
+
+            const batchResponse = await fetch(`${window.API_BASE_URL}/api/batch-search`, {
+                method: 'POST',
+                body: batchFormData,
+                signal: signal
+            });
+            if (!batchResponse.ok) {
+                const errorText = await batchResponse.text();
+                throw new Error(`Batch-Suche fehlgeschlagen (${batchResponse.status}): ${errorText}`);
+            }
+            const batchResultsHtml = await batchResponse.text();
+            if (typeof window.searchTimer !== 'undefined' && window.searchTimer.stop) {
+                window.searchTimer.stop();
+            }
+            safeSetHTML(resultsDiv, batchResultsHtml);
+            showNotification(`✅ ${searchTypeText} erfolgreich abgeschlossen`, 'success');
+            if (typeof window.smartRefreshAfterSearch === 'function') {
+                window.smartRefreshAfterSearch('batch');
+            } else if (typeof window.scheduleAllTabsRefresh === 'function') {
+                window.scheduleAllTabsRefresh('batch');
+            }
         }
         
     } catch (error) {
@@ -1337,6 +1425,7 @@ window.cancelSingleSearch = cancelSingleSearch;
 window.loadModelsForFilter = loadModelsForFilter;
 window.validateSearchForm = validateSearchForm;
 window.handleSearchOptionsChange = handleSearchOptionsChange;
+window.handleBatchCountInput = handleBatchCountInput;
 window.SearchState = SearchState;
 
 // Export UI Revolution functions

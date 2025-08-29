@@ -7,6 +7,7 @@ Beschreibung: Database Manager für Sequential Field Orchestrator
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func, desc
+from sqlalchemy.exc import IntegrityError
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
 import logging
@@ -15,7 +16,7 @@ import json
 
 from .models import (
     Source, SourceDiscoverySession, ModelSourceContribution,
-    FieldSearchResult, SequentialSearchResult
+    FieldSearchResult, SequentialSearchResult, FieldSearchSourceUsage
 )
 
 logger = logging.getLogger(__name__)
@@ -192,60 +193,76 @@ class SequentialDatabaseManager:
         Returns:
             Tuple: (Source object, is_new_source)
         """
-        # Prüfe auf existierende Quelle
-        existing_source = self.session.query(Source).filter(Source.url == url).first()
-        
-        if existing_source:
-            # Update existierende Quelle
-            existing_source.update_discovery_tracking(model_id, session_id, is_new_discovery=False)
-            
-            # Update andere Felder falls nötig
-            if country and not existing_source.country:
-                existing_source.country = country
-            if region and not existing_source.region:
-                existing_source.region = region
-            if source_type and existing_source.source_type == 'unknown':
-                existing_source.source_type = source_type
-            
-            self.session.commit()
-            
-            # Log contribution
-            self._log_source_contribution(session_id, model_id, existing_source.id, is_unique=False)
-            
-            return existing_source, False
-        
-        else:
-            # Erstelle neue Quelle
-            if not source_type:
-                source_type = Source.classify_source_type(url, domain)
-            
-            if not country:
-                country = Source.get_country_from_domain(url, domain)
-            
-            new_source = Source(
-                url=url,
-                domain=domain,
-                country=country,
-                region=region,
-                source_type=source_type,
-                reliability_score=initial_quality,
-                first_discovered_by=model_id,
-                discovery_models=[model_id],
-                discovery_count=1,
-                last_discovery_session=session_id,
-                cumulative_quality_score=initial_quality
-            )
-            
-            self.session.add(new_source)
-            self.session.commit()
+        # Versuche atomisches Insert, fall-back auf Update bei Unique-Constraint-Verletzung
+        # Vorab: fehlende Felder ermitteln
+        resolved_source_type = source_type or Source.classify_source_type(url, domain)
+        resolved_country = country or Source.get_country_from_domain(url, domain)
+
+        try:
+            # Insert innerhalb einer Transaktion versuchen
+            with self.session.begin():
+                new_source = Source(
+                    url=url,
+                    domain=domain,
+                    country=resolved_country,
+                    region=region,
+                    source_type=resolved_source_type,
+                    reliability_score=initial_quality,
+                    first_discovered_by=model_id,
+                    discovery_models=[model_id],
+                    discovery_count=1,
+                    last_discovery_session=session_id,
+                    cumulative_quality_score=initial_quality
+                )
+                self.session.add(new_source)
+                # Flush für ID-Generierung vor dem Refresh/Return
+                self.session.flush()
+                # Optional die Tracking-Methode aufrufen, falls zusätzliche interne Felder gepflegt werden
+                # (bei neuem Insert als neue Entdeckung markieren)
+                if hasattr(new_source, 'update_discovery_tracking'):
+                    new_source.update_discovery_tracking(model_id, session_id, is_new_discovery=True)
+                # Sicherstellen, dass alle Änderungen in der Transaktion erfasst sind
+                self.session.flush()
+
+            # Nach Commit: Objekt frisch laden, dann Contribution loggen
             self.session.refresh(new_source)
-            
-            # Log contribution
             self._log_source_contribution(session_id, model_id, new_source.id, is_unique=True)
-            
             logger.info(f"[SequentialDatabaseManager] New source added: {domain} by {model_id}")
-            
             return new_source, True
+
+        except IntegrityError:
+            # Insert kollidierte (Unique-Constraint auf url) → bestehende Quelle updaten
+            self.session.rollback()
+
+            # Existierende Quelle neu laden und aktualisieren
+            existing_source = self.session.query(Source).filter(Source.url == url).first()
+            if not existing_source:
+                # Sollte äußerst selten vorkommen (Race mit weiterer Rollback-Situation) → erneut versuchen
+                # Alternativ: Exception erneut werfen
+                with self.session.begin():
+                    existing_source = self.session.query(Source).filter(Source.url == url).first()
+                    if not existing_source:
+                        raise
+
+            with self.session.begin():
+                # Update Discovery-Tracking innerhalb der Transaktion
+                if hasattr(existing_source, 'update_discovery_tracking'):
+                    existing_source.update_discovery_tracking(model_id, session_id, is_new_discovery=False)
+
+                # Fehlende Felder setzen (nur ergänzen, nichts überschreiben)
+                if resolved_country and not existing_source.country:
+                    existing_source.country = resolved_country
+                if region and not existing_source.region:
+                    existing_source.region = region
+                if resolved_source_type and existing_source.source_type == 'unknown':
+                    existing_source.source_type = resolved_source_type
+
+                self.session.flush()
+
+            # Nach Commit: Objekt aktualisieren und Contribution loggen
+            self.session.refresh(existing_source)
+            self._log_source_contribution(session_id, model_id, existing_source.id, is_unique=False)
+            return existing_source, False
     
     def _log_source_contribution(
         self,
@@ -411,35 +428,42 @@ class SequentialDatabaseManager:
         Returns:
             FieldSearchResult Objekt
         """
-        field_result = FieldSearchResult(
-            session_id=session_id,
-            model_id=model_id,
-            field_name=field_name,
-            sources_used_count=len(sources_used),
-            sources_used_ids=sources_used,
-            field_value_found=field_value,
-            confidence_score=confidence_score,
-            source_references=source_references or [],
-            search_duration_seconds=search_duration,
-            result_quality=result_quality,
-            search_successful=bool(field_value and str(field_value).strip()),
-            value_found=bool(field_value and str(field_value).strip() and str(field_value).strip().upper() != 'X'),
-            sources_matched=len(sources_used) > 0
-        )
+        # In einer Transaktion speichern, damit FieldSearchResult-ID für Assoziationen verfügbar ist
+        with self.session.begin():
+            field_result = FieldSearchResult(
+                session_id=session_id,
+                model_id=model_id,
+                field_name=field_name,
+                sources_used_count=len(sources_used),
+                sources_used_ids=[int(s) for s in (sources_used or [])],
+                field_value_found=field_value,
+                confidence_score=confidence_score,
+                source_references=source_references or [],
+                search_duration_seconds=search_duration,
+                result_quality=result_quality,
+                search_successful=bool(field_value and str(field_value).strip()),
+                value_found=bool(field_value and str(field_value).strip() and str(field_value).strip().upper() != 'X'),
+                sources_matched=len(sources_used or []) > 0
+            )
+            self.session.add(field_result)
+            # Flush, damit ID vergeben wird
+            self.session.flush()
+            # Assoziations-Einträge erstellen (UniqueConstraint verhindert Duplikate)
+            for sid in set(int(s) for s in (sources_used or []) if s is not None):
+                usage = FieldSearchSourceUsage(field_search_id=field_result.id, source_id=int(sid))
+                self.session.add(usage)
         
-        self.session.add(field_result)
-        self.session.commit()
+        # Nach Transaktion Objekt refreshen
         self.session.refresh(field_result)
         
         # Update source statistics
         if field_result.value_found:
-            for source_id in sources_used:
-                source = self.session.query(Source).get(source_id)
-                if source:
-                    quality = confidence_score or 50.0
-                    source.update_field_extraction_stats(field_name, True, quality)
-        
-        self.session.commit()
+            with self.session.begin():
+                for source_id in sources_used or []:
+                    source = self.session.query(Source).get(int(source_id))
+                    if source:
+                        quality = confidence_score or 50.0
+                        source.update_field_extraction_stats(field_name, True, quality)
         
         logger.info(f"[SequentialDatabaseManager] Field search result logged: {field_name} = {field_value}")
         
@@ -640,9 +664,12 @@ class SequentialDatabaseManager:
         
         stats = []
         for source in sources:
-            recent_usage = self.session.query(FieldSearchResult).filter(
+            recent_usage = self.session.query(FieldSearchSourceUsage).join(
+                FieldSearchResult,
+                FieldSearchSourceUsage.field_search_id == FieldSearchResult.id
+            ).filter(
                 FieldSearchResult.searched_at >= cutoff_date,
-                FieldSearchResult.sources_used_ids.contains(str(source.id))
+                FieldSearchSourceUsage.source_id == source.id
             ).count()
             
             stats.append({
@@ -683,20 +710,20 @@ class SequentialDatabaseManager:
         
         count = len(old_sessions)
         
-        for session in old_sessions:
-            # Lösche abhängige Datensätze
-            self.session.query(ModelSourceContribution).filter(
-                ModelSourceContribution.session_id == session.session_id
-            ).delete()
-            
-            self.session.query(FieldSearchResult).filter(
-                FieldSearchResult.session_id == session.session_id
-            ).delete()
-            
-            # Lösche Session
-            self.session.delete(session)
-        
-        self.session.commit()
+        # Alle Löschoperationen atomar in einer Transaktion ausführen
+        with self.session.begin():
+            for session in old_sessions:
+                # Lösche abhängige Datensätze
+                self.session.query(ModelSourceContribution).filter(
+                    ModelSourceContribution.session_id == session.session_id
+                ).delete()
+                
+                self.session.query(FieldSearchResult).filter(
+                    FieldSearchResult.session_id == session.session_id
+                ).delete()
+                
+                # Lösche Session
+                self.session.delete(session)
         
         logger.info(f"[SequentialDatabaseManager] Cleaned up {count} old sessions")
         

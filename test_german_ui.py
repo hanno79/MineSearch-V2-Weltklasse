@@ -9,16 +9,42 @@ ZWECK: Prüfe ob alle englischen Begriffe korrekt übersetzt wurden
 
 from playwright.sync_api import sync_playwright
 import time
+import os
 
 def test_german_ui():
     """Testet die deutsche UI nach den Übersetzungen"""
     
     print("🧪 [UI-TEST] Teste deutsche Übersetzungen...")
     
+    # Konfiguration: Headless/SLOW_MO via Umgebungsvariablen
+    # - In CI standardmäßig headless (schnell) und ohne Slow-Mo
+    # - Lokal kann per HEADLESS und SLOW_MO überschrieben werden
+    is_ci = any([
+        os.getenv("CI"),
+        os.getenv("GITHUB_ACTIONS"),
+        os.getenv("GITLAB_CI"),
+        os.getenv("BUILD_NUMBER"),
+    ])
+    headless_env = os.getenv("HEADLESS")
+    if headless_env is None:
+        headless = True if is_ci else False
+    else:
+        headless = headless_env.strip().lower() in ("1", "true", "yes", "on")
+
+    slow_mo_env = os.getenv("SLOW_MO")
+    try:
+        slow_mo = int(slow_mo_env) if slow_mo_env is not None else 0
+    except (TypeError, ValueError):
+        slow_mo = 0
+
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False, slow_mo=500)
+        browser = p.chromium.launch(headless=headless, slow_mo=slow_mo)
         context = browser.new_context()
         page = context.new_page()
+        
+        # Verwende relative Pfade für Screenshots (kein hartkodiertes /app/)
+        screenshot_path = "./german_ui_test.png"
+        error_screenshot_path = "./german_ui_error.png"
         
         try:
             # Lade die Seite
@@ -29,20 +55,21 @@ def test_german_ui():
             print("🔍 [TEST] Starte Beispielsuche für UI-Test...")
             
             # Gehe zur Einzelsuche
-            einzelsuche_tab = page.locator('[data-tab="search"]')
+            einzelsuche_tab = page.locator('[data-tab="single"]')
             if einzelsuche_tab.is_visible():
                 einzelsuche_tab.click()
                 time.sleep(1)
                 
                 # Eingabe: Eleonore
-                mine_input = page.locator('#mine-name')
+                mine_input = page.locator('input[name="mine_name"]')
                 if mine_input.is_visible():
                     mine_input.fill("Eleonore")
                     time.sleep(0.5)
                     
                     # Wähle 3 schnelle Modelle aus
-                    model_checkboxes = page.locator('input[type="checkbox"][id*="model"]')
-                    for i in range(min(3, model_checkboxes.count())):
+                    model_checkboxes = page.locator('input[name="models"]')
+                    num_to_check = min(3, model_checkboxes.count())
+                    for i in range(num_to_check):
                         model_checkboxes.nth(i).check()
                     
                     # Starte Suche
@@ -122,12 +149,13 @@ def test_german_ui():
                 print("❌ Einzelsuche Tab nicht gefunden")
             
             # Screenshot für Validierung
-            page.screenshot(path="/app/german_ui_test.png", full_page=True)
-            print("📸 Screenshot gespeichert: /app/german_ui_test.png")
+            page.screenshot(path=screenshot_path, full_page=True)
+            print(f"📸 Screenshot gespeichert: {screenshot_path}")
             
         except Exception as e:
             print(f"❌ [ERROR] Fehler beim UI-Test: {e}")
-            page.screenshot(path="/app/german_ui_error.png")
+            page.screenshot(path=error_screenshot_path)
+            print(f"📸 Fehler-Screenshot gespeichert: {error_screenshot_path}")
             
         finally:
             browser.close()
