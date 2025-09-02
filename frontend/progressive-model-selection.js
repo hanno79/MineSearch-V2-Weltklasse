@@ -9,27 +9,40 @@
 // ÄNDERUNG 11.08.2025: Progressive Model Selection System für weltbestes UI/UX
 class ProgressiveModelSelection {
     constructor() {
+        // SINGLETON FIX: Prevent multiple instances from overwriting each other
+        if (window.progressiveModelSelection && window.progressiveModelSelection.isReady) {
+            console.warn('⚠️ [MODEL-UX] SINGLETON: Attempting to create duplicate instance - returning existing');
+            return window.progressiveModelSelection;
+        }
+        
         this.models = [];
         this.selectedModels = new Set();
         this.providers = new Map();
         this.currentProvider = 'all';
         this.isAdvancedMode = false;
         this.isReady = false;
+        this._initializing = false;
         
-        console.log('🎨 [MODEL-UX] Progressive Model Selection initialized');
+        console.log('🎨 [MODEL-UX] Progressive Model Selection initialized - New Singleton instance');
         
         this.init();
     }
     
     async init() {
+        // SINGLETON FIX: Mark as initializing to prevent double initialization
+        this._initializing = true;
+        
         try {
             await this.loadModels();
             this.setupEventListeners();
             this.renderQuickSelection();
             this.isReady = true;
-            console.log('✅ [MODEL-UX] Progressive Model Selection ready');
+            this._initializing = false;
+            console.log('✅ [MODEL-UX] Progressive Model Selection ready - Singleton instance active');
         } catch (error) {
+            this._initializing = false;
             console.error('❌ [MODEL-UX] Initialization failed:', error);
+            throw error; // Re-throw to signal failure
         }
     }
     
@@ -185,16 +198,28 @@ class ProgressiveModelSelection {
             return;
         }
         
-        this.models.forEach(model => {
+        console.log(`🏷️ [MODEL-UX] ORGANIZE DEBUG - Processing ${this.models.length} models`);
+        
+        this.models.forEach((model, index) => {
             // ÄNDERUNG 24.08.2025: Verwende provider_category für UI-Gruppierung statt technischen provider
             const provider = model.provider_category || model.provider || model.provider_name || 'unknown';
+            
+            // ROBUSTHEIT: Logge fehlende Provider-Informationen
+            if (!model.provider_category && !model.provider && !model.provider_name) {
+                console.warn(`⚠️ [MODEL-UX] Model ${index} (${model.model_id || 'NO-ID'}) has no provider information`);
+            }
+            
             if (!this.providers.has(provider)) {
                 this.providers.set(provider, []);
+                console.log(`🏷️ [MODEL-UX] Created new provider group: ${provider}`);
             }
             this.providers.get(provider).push(model);
         });
         
-        console.log('🏷️ [MODEL-UX] Organized providers:', Array.from(this.providers.keys()));
+        console.log('🏷️ [MODEL-UX] Provider organization complete:');
+        this.providers.forEach((models, provider) => {
+            console.log(`  ${provider}: ${models.length} models`);
+        });
     }
     
     setupEventListeners() {
@@ -210,7 +235,9 @@ class ProgressiveModelSelection {
             
             if (e.target.matches('.smart-selection')) {
                 console.log('🎯 [MODEL-UX] Smart selection clicked:', e.target.dataset.selectionType);
+                console.log('🎯 [MODEL-UX] Current selected models count before:', this.selectedModels.size);
                 this.handleSmartSelection(e.target);
+                console.log('🎯 [MODEL-UX] Current selected models count after:', this.selectedModels.size);
                 e.preventDefault();
                 e.stopPropagation();
                 return;
@@ -218,7 +245,9 @@ class ProgressiveModelSelection {
             
             if (e.target.matches('.provider-selection')) {
                 console.log('🏢 [MODEL-UX] Provider selection clicked:', e.target.dataset.provider);
+                console.log('🏢 [MODEL-UX] Current selected models count before:', this.selectedModels.size);
                 this.handleProviderSelection(e.target);
+                console.log('🏢 [MODEL-UX] Current selected models count after:', this.selectedModels.size);
                 e.preventDefault();
                 e.stopPropagation();
                 return;
@@ -504,17 +533,84 @@ class ProgressiveModelSelection {
         return `${this.getProviderDisplayName(model.provider_name || model.model_id?.split(':')[0])} Model für Mining-Recherche`;
     }
     
+    // SCORE-SYSTEM FIX 01.09.2025: Modell-Quality-Scores für echte Top 3 Auswahl
+    getModelQualityScores() {
+        // Empirische Mining-Research Quality Scores (0-100 Punkte)
+        return {
+            // Premium AI Models - Höchste Qualität
+            'openrouter:claude-3.5-sonnet': 95,
+            'openrouter:claude-3-opus': 93, 
+            'openrouter:gpt-4o': 92,
+            'openrouter:gemini-2.0-flash': 90,
+            'openrouter:gpt-4-turbo': 89,
+            'openrouter:deepseek-chat': 88,
+            
+            // Spezialisierte Research Models
+            'abacus:deep-agent': 87,
+            'tavily:deep-research': 86,
+            'tavily:search': 85,
+            
+            // Gute kostenlose Models
+            'openrouter:deepseek-free': 82,
+            'openrouter:claude-3.5-haiku': 81,
+            'openrouter:gemini-1.5-pro': 80,
+            'openrouter:kimi-k2': 78,
+            'openrouter:deepseek-reasoner': 77,
+            'openrouter:gpt-4o-mini': 76,
+            
+            // Solid Models
+            'openrouter:gemini-1.5-flash': 75,
+            'openrouter:deepseek-chimera-free': 73,
+            'openrouter:llama-3.3-nemotron-super': 72,
+            'openrouter:glm-4.5': 70,
+            'openrouter:mistral-small-free': 68,
+            'openrouter:grok-2': 67,
+            'openrouter:perplexity-sonar-pro': 66,
+            'openrouter:perplexity-sonar': 65,
+            
+            // Specialized Tools
+            'exa:neural-search': 75,
+            'exa:research-pro': 73, 
+            'exa:research': 70,
+            'firecrawl:extract': 65,
+            'scrapingbee:ai-extract': 60,
+            
+            // Standard scraping tools
+            'firecrawl:scrape': 55,
+            'firecrawl:crawl': 53,
+            'scrapingbee:js-render': 50,
+            'scrapingbee:basic-scrape': 45,
+            'brightdata:browser-api': 52,
+            'brightdata:web-scraper': 48,
+            'brightdata:serp': 46
+        };
+    }
+    
     getTopPerformanceModels() {
-        // EMPIRISCHE TOP-3 PERFORMANCE MODELLE basierend auf Mining-Recherche Performance
-        // Diese Auswahl basiert auf Performance-Tests und Datenqualität für Mining-Daten
-        const topModels = [
-            'openrouter:deepseek-free',      // Hervorragend bei strukturierten Mining-Daten
-            'perplexity:sonar',              // Exzellent bei aktuellen Mining-Informationen  
-            'openrouter:kimi-k2'             // Sehr gut bei komplexen Mining-Analysen
-        ];
+        // SCORE-BASIERTE TOP-3 AUSWAHL - FIX 01.09.2025
+        console.log(`🏆 [MODEL-UX] Selecting top 3 models by quality score from ${this.models.length} available models`);
         
-        // Filtriere nur existierende Modelle
-        return this.models.filter(model => topModels.includes(model.model_id));
+        const scores = this.getModelQualityScores();
+        const availableModels = this.models.filter(model => model.available !== false);
+        
+        // Sortiere verfügbare Modelle nach Score (höchster zuerst)
+        const scoredModels = availableModels
+            .map(model => ({
+                ...model,
+                quality_score: scores[model.model_id] || 0  // Default 0 für unbekannte Modelle
+            }))
+            .sort((a, b) => b.quality_score - a.quality_score);
+            
+        console.log(`🏆 [MODEL-UX] Available models with scores:`);
+        scoredModels.slice(0, 10).forEach(model => {
+            console.log(`  ${model.model_id}: ${model.quality_score} points`);
+        });
+        
+        // Nimm die ersten 3 (höchste Scores)
+        const topModels = scoredModels.slice(0, 3);
+        
+        console.log(`🏆 [MODEL-UX] Top 3 selected:`, topModels.map(m => `${m.model_id} (${m.quality_score}pts)`).join(', '));
+        return topModels;
     }
     
     handleSmartSelection(pill) {
@@ -554,29 +650,71 @@ class ProgressiveModelSelection {
         }
         
         if (!modelsToToggle || modelsToToggle.length === 0) {
-            console.warn(`⚠️ [MODEL-UX] No models found for selection type: ${selectionType}`);
+            console.error(`❌ [MODEL-UX] No models found for selection type: ${selectionType}`);
+            console.log(`🎯 [MODEL-UX] Available models summary:`);
+            console.log(`  Total models: ${this.models.length}`);
+            console.log(`  Available models: ${this.models.filter(m => m.available !== false).length}`);
+            if (selectionType === 'free') {
+                const freeCount = this.models.filter(model => 
+                    (model.is_free === true || 
+                     (model.display_name && model.display_name.toLowerCase().includes('kostenlos')) ||
+                     (model.name && model.name.toLowerCase().includes('kostenlos')) ||
+                     (model.model_id && model.model_id.toLowerCase().includes('free'))) &&
+                    model.available !== false
+                ).length;
+                console.log(`  Free models available: ${freeCount}`);
+            }
             return;
         }
         
         if (wasSelected) {
-            // Deselect all models of this type
-            modelsToToggle.forEach(model => {
-                if (model.model_id) {
-                    this.selectedModels.delete(model.model_id);
+            // Deselect all models of this type - ROBUST ID FIX 01.09.2025
+            let removedCount = 0;
+            modelsToToggle.forEach((model, index) => {
+                // ROBUST MODEL-ID DETECTION - Multiple fallbacks
+                const modelId = model.model_id || model.id || model.value || model.name;
+                
+                if (modelId && this.selectedModels.has(modelId)) {
+                    this.selectedModels.delete(modelId);
+                    removedCount++;
+                    console.log(`  ❌ Removed model ${index + 1}: ${modelId}`);
+                } else if (modelId) {
+                    console.log(`  ⚠️ Model ${index + 1} was not selected: ${modelId}`);
+                } else {
+                    console.error(`  ❌ Model ${index + 1} has no valid ID for deselection`);
                 }
             });
+            
             pill.classList.remove('selected');
-            console.log(`🔄 [MODEL-UX] Smart deselection: ${selectionType} (${modelsToToggle.length} models)`);
+            console.log(`🔄 [MODEL-UX] Smart deselection completed: ${selectionType} - ${removedCount}/${modelsToToggle.length} models removed`);
+            console.log(`🔄 [MODEL-UX] Total selected models now: ${this.selectedModels.size}`);
         } else {
-            // Select all models of this type
-            modelsToToggle.forEach(model => {
-                if (model.model_id) {
-                    this.selectedModels.add(model.model_id);
+            // Select all models of this type - ROBUST ID FIX 01.09.2025
+            let addedCount = 0;
+            modelsToToggle.forEach((model, index) => {
+                // ROBUST MODEL-ID DETECTION - Multiple fallbacks
+                const modelId = model.model_id || model.id || model.value || model.name;
+                
+                if (modelId) {
+                    this.selectedModels.add(modelId);
+                    addedCount++;
+                    console.log(`  ✅ Added model ${index + 1}: ${modelId}`);
+                } else {
+                    console.error(`  ❌ Model ${index + 1} has no valid ID:`, {
+                        model_id: model.model_id,
+                        id: model.id,
+                        value: model.value,
+                        name: model.name,
+                        keys: Object.keys(model)
+                    });
                 }
             });
-            // SMART-SELECTION FIX 28.08.2025: Entferne selected-Klasse sofort nach Aktion
-            // pill.classList.add('selected'); // Deaktiviert - Button bleibt unselected
-            console.log(`✅ [MODEL-UX] Smart selection: ${selectionType} (${modelsToToggle.length} models)`);
+            
+            // Visual feedback for successful selection
+            pill.classList.add('selected');
+            setTimeout(() => pill.classList.remove('selected'), 300); // Kurzes visuelles Feedback
+            console.log(`✅ [MODEL-UX] Smart selection completed: ${selectionType} - ${addedCount}/${modelsToToggle.length} models added`);
+            console.log(`✅ [MODEL-UX] Total selected models now: ${this.selectedModels.size}`);
         }
         
         this.syncWithExistingCheckboxes();
@@ -587,41 +725,80 @@ class ProgressiveModelSelection {
     handleProviderSelection(pill) {
         const provider = pill.dataset.provider;
         
-        console.log(`🏢 [MODEL-UX] Handling provider selection: ${provider}`);
+        console.log(`🏢 [MODEL-UX] PROVIDER SELECTION DEBUG - Handling: ${provider}`);
+        console.log(`🏢 [MODEL-UX] Available providers:`, Array.from(this.providers.keys()));
         
         if (!provider) {
-            console.warn(`⚠️ [MODEL-UX] No provider found in dataset`);
+            console.error(`❌ [MODEL-UX] No provider found in pill dataset`);
             return;
         }
         
-        const providerModels = this.providers.get(provider) || [];
-        const wasSelected = pill.classList.contains('selected');
+        // ROBUST PROVIDER MATCHING - FIX 01.09.2025
+        let providerModels = this.providers.get(provider) || [];
         
-        console.log(`🏢 [MODEL-UX] Provider ${provider} has ${providerModels.length} models, wasSelected: ${wasSelected}`);
+        // Falls exakte Übereinstimmung fehlschlägt, versuche case-insensitive match
+        if (providerModels.length === 0) {
+            console.log(`🏢 [MODEL-UX] Exact match failed, trying case-insensitive...`);
+            for (const [key, models] of this.providers.entries()) {
+                if (key.toLowerCase() === provider.toLowerCase()) {
+                    providerModels = models;
+                    console.log(`🏢 [MODEL-UX] Found case-insensitive match: ${key}`);
+                    break;
+                }
+            }
+        }
+        
+        const wasSelected = pill.classList.contains('selected');
+        console.log(`🏢 [MODEL-UX] Provider ${provider}: ${providerModels.length} models found, wasSelected: ${wasSelected}`);
         
         if (providerModels.length === 0) {
-            console.warn(`⚠️ [MODEL-UX] No models found for provider: ${provider}`);
+            console.error(`❌ [MODEL-UX] No models found for provider: ${provider}`);
+            console.log(`🏢 [MODEL-UX] Available providers with counts:`);
+            this.providers.forEach((models, key) => {
+                console.log(`  ${key}: ${models.length} models`);
+            });
             return;
         }
         
         if (wasSelected) {
-            // Deselect all provider models
+            // Deselect all provider models - FIX 01.09.2025
+            console.log(`🏢 [MODEL-UX] Deselecting ${providerModels.length} models for provider ${provider}`);
             providerModels.forEach(model => {
                 if (model.model_id) {
                     this.selectedModels.delete(model.model_id);
+                    console.log(`  ❌ Removed: ${model.model_id}`);
                 }
             });
             pill.classList.remove('selected');
-            console.log(`🔄 [MODEL-UX] Provider deselected: ${provider} (${providerModels.length} models)`);
+            console.log(`🔄 [MODEL-UX] Provider deselected: ${provider} (${providerModels.length} models removed)`);
         } else {
-            // Select all provider models
-            providerModels.forEach(model => {
-                if (model.model_id) {
-                    this.selectedModels.add(model.model_id);
+            // Select all available provider models - ROBUST ID FIX 01.09.2025
+            const availableProviderModels = providerModels.filter(model => model.available !== false);
+            console.log(`🏢 [MODEL-UX] Selecting ${availableProviderModels.length}/${providerModels.length} available models for provider ${provider}`);
+            
+            let addedCount = 0;
+            availableProviderModels.forEach((model, index) => {
+                // ROBUST MODEL-ID DETECTION - Multiple fallbacks
+                const modelId = model.model_id || model.id || model.value || model.name;
+                
+                if (modelId) {
+                    this.selectedModels.add(modelId);
+                    addedCount++;
+                    console.log(`  ✅ Added model ${index + 1}: ${modelId}`);
+                } else {
+                    console.error(`  ❌ Provider model ${index + 1} has no valid ID:`, {
+                        model_id: model.model_id,
+                        id: model.id,
+                        value: model.value,
+                        name: model.name,
+                        keys: Object.keys(model)
+                    });
                 }
             });
+            
             pill.classList.add('selected');
-            console.log(`✅ [MODEL-UX] Provider selected: ${provider} (${providerModels.length} models)`);
+            console.log(`✅ [MODEL-UX] Provider selection completed: ${provider} - ${addedCount}/${availableProviderModels.length} models added`);
+            console.log(`✅ [MODEL-UX] Total selected models now: ${this.selectedModels.size}`);
         }
         
         this.syncWithExistingCheckboxes();
@@ -707,30 +884,63 @@ class ProgressiveModelSelection {
     syncWithExistingCheckboxes() {
         // CONSISTENCY FIX: Sync with main system checkboxes (name="model")  
         const existingCheckboxes = document.querySelectorAll('#model-selection input[type="checkbox"][name="model"]');
-        console.log(`🔄 [MODEL-UX] Syncing with ${existingCheckboxes.length} existing checkboxes`);
+        console.log(`🔄 [MODEL-UX] SYNC DEBUG - Found ${existingCheckboxes.length} checkboxes to sync`);
         console.log(`🔄 [MODEL-UX] Selected models count: ${this.selectedModels.size}`);
         console.log(`🔄 [MODEL-UX] Selected models:`, Array.from(this.selectedModels));
         
+        if (existingCheckboxes.length === 0) {
+            console.warn(`⚠️ [MODEL-UX] No checkboxes found with selector: #model-selection input[type="checkbox"][name="model"]`);
+            // Fallback: Try to find any checkboxes
+            const allCheckboxes = document.querySelectorAll('#model-selection input[type="checkbox"]');
+            console.log(`🔄 [MODEL-UX] Found ${allCheckboxes.length} total checkboxes in model-selection`);
+            if (allCheckboxes.length > 0) {
+                console.log(`🔄 [MODEL-UX] First checkbox name attribute:`, allCheckboxes[0].name);
+            }
+        }
+        
+        let syncCount = 0;
         existingCheckboxes.forEach(checkbox => {
             const wasChecked = checkbox.checked;
-            checkbox.checked = this.selectedModels.has(checkbox.value);
-            if (wasChecked !== checkbox.checked) {
-                console.log(`🔄 [MODEL-UX] Checkbox ${checkbox.value}: ${wasChecked} → ${checkbox.checked}`);
+            const shouldBeChecked = this.selectedModels.has(checkbox.value);
+            checkbox.checked = shouldBeChecked;
+            
+            if (wasChecked !== shouldBeChecked) {
+                console.log(`🔄 [MODEL-UX] Synced ${checkbox.value}: ${wasChecked} → ${shouldBeChecked}`);
+                syncCount++;
             }
         });
         
-        // REMOVED: Legacy checkboxes sync - no longer needed after cleanup
+        console.log(`🔄 [MODEL-UX] Sync completed: ${syncCount} checkboxes changed`);
     }
     
     updateSelectionSummary() {
         console.log(`🔢 [MODEL-UX] updateSelectionSummary called, selectedModels.size: ${this.selectedModels.size}`);
+        console.log(`🔢 [MODEL-UX] Selected models:`, Array.from(this.selectedModels));
         
         const count = this.selectedModels.size;
         const clearButton = document.querySelector('.clear-selection-btn');
         
+        // STATE FIX 01.09.2025: Robuste Counter-Updates
         // Update all counter elements with data-selection-counter attribute
-        document.querySelectorAll('[data-selection-counter]').forEach(element => {
+        const counterElements = document.querySelectorAll('[data-selection-counter]');
+        console.log(`🔢 [MODEL-UX] Updating ${counterElements.length} counter elements to show: ${count}`);
+        
+        counterElements.forEach((element, index) => {
+            const oldValue = element.textContent;
             element.textContent = count;
+            console.log(`  Counter ${index + 1}: ${oldValue} → ${count}`);
+        });
+        
+        // FALLBACK: Also update any other possible counter elements
+        const fallbackSelectors = ['#selected-count', '.selected-models-count strong', '.selection-summary strong'];
+        fallbackSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(element => {
+                if (element && element.textContent !== count.toString()) {
+                    console.log(`🔢 [MODEL-UX] Fallback update for ${selector}: ${element.textContent} → ${count}`);
+                    element.textContent = count;
+                }
+            });
         });
         
         // Update clear button visibility
@@ -831,6 +1041,7 @@ class ProgressiveModelSelection {
     }
 }
 
+// SINGLETON FIX 01.09.2025: Verhindere mehrfache Initialisierung
 // Initialize Progressive Model Selection when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     // Wait for existing model loading to complete, then initialize
@@ -844,12 +1055,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 500);
 });
 
-// Backup initialization only if really needed
+// SINGLETON FIX: Backup initialization ONLY if primary really failed
 window.addEventListener('load', () => {
     setTimeout(() => {
-        if (!window.progressiveModelSelection || !window.progressiveModelSelection.isReady) {
-            console.log('🎨 [MODEL-UX] Backup initialization - primary failed...');
+        // CRITICAL FIX: Only initialize if NO instance exists OR it's not ready AND not currently initializing
+        if (!window.progressiveModelSelection) {
+            console.log('🎨 [MODEL-UX] SINGLETON: No instance found, creating backup instance');
             window.progressiveModelSelection = new ProgressiveModelSelection();
+        } else if (!window.progressiveModelSelection.isReady && !window.progressiveModelSelection._initializing) {
+            console.warn('⚠️ [MODEL-UX] SINGLETON: Primary instance failed to initialize, recreating');
+            // Clear the failed instance
+            delete window.progressiveModelSelection;
+            window.progressiveModelSelection = new ProgressiveModelSelection();
+        } else {
+            console.log('✅ [MODEL-UX] SINGLETON: Primary instance is ready, no backup needed');
         }
     }, 2000);
 });

@@ -182,17 +182,16 @@ def validate_coordinate(value: str, coord_type: str) -> Optional[str]:
         # Versuche als Float zu parsen
         coord_float = float(cleaned)
         
-        # RULE 10 COMPLIANCE 26.08.2025: Verschärfte Präzisions-Prüfung
-        # Echte GPS-Koordinaten haben mindestens 4-6 Nachkommastellen
+        # FIX 02.09.2025: Lockere Präzisions-Prüfung für unlabeled data
+        # Echte GPS-Koordinaten haben meist 4-6 Nachkommastellen, aber 2-3 sind auch akzeptabel
         if '.' in str(value):
             decimal_places = len(str(value).split('.')[-1])
-            if decimal_places < 4:  # Mindestens 4 Nachkommastellen für echte GPS-Daten
-                logger.warning(f"[RULE 10] Koordinate hat zu wenig Präzision ({decimal_places} Nachkommastellen): {value}")
+            if decimal_places < 2:  # Mindestens 2 Nachkommastellen
+                logger.warning(f"[COORD-VALIDATION] Koordinate hat zu wenig Präzision ({decimal_places} Nachkommastellen): {value}")
                 return None
         else:
-            # Ganzzahl-Koordinaten sind verdächtig ungenau
-            logger.warning(f"[RULE 10] Ganzzahl-Koordinate blockiert (keine Nachkommastellen): {value}")
-            return None
+            # Ganzzahl-Koordinaten sind verdächtig ungenau, aber nicht automatisch blockiert
+            logger.info(f"[COORD-VALIDATION] Ganzzahl-Koordinate gefunden (keine Nachkommastellen): {value}")
         
         # RULE 10 COMPLIANCE 26.08.2025: Erkenne "Dummy-Koordinaten"
         # Typische Patterns die AI-Modelle für unbekannte Standorte verwenden
@@ -208,27 +207,44 @@ def validate_coordinate(value: str, coord_type: str) -> Optional[str]:
             (43.0, -79.0),   # Toronto-Nähe
         ]
         
+        # FIX 02.09.2025: Lockerere Dummy-Koordinaten-Erkennung
+        # Nur exakte Matches (0.001° Toleranz) als Dummy erkennen, nicht 0.01°
         for lat, lon in dummy_patterns:
-            if coord_type == 'x' and abs(coord_float - lat) < 0.01:
-                logger.warning(f"[RULE 10] Verdächtige Dummy-Koordinate erkannt: {value} (Pattern-Match)")
+            if coord_type == 'x' and abs(coord_float - lat) < 0.001:
+                logger.warning(f"[RULE 10] Verdächtige Dummy-Koordinate erkannt: {value} (Exakter Pattern-Match)")
                 return None
-            elif coord_type == 'y' and abs(coord_float - lon) < 0.01:
-                logger.warning(f"[RULE 10] Verdächtige Dummy-Koordinate erkannt: {value} (Pattern-Match)")
+            elif coord_type == 'y' and abs(coord_float - lon) < 0.001:
+                logger.warning(f"[RULE 10] Verdächtige Dummy-Koordinate erkannt: {value} (Exakter Pattern-Match)")
                 return None
         
-        # Validiere Bereiche
+        # FIX 02.09.2025: Verbesserte Koordinaten-Validierung mit regionalen Kontexten
+        # Globale Bereiche mit Mining-Region-Spezifischen Plausibilitätschecks
         if coord_type == 'x':  # Latitude
-            if -90 <= coord_float <= 90:
-                return f"{coord_float:.6f}"
-            else:
+            if not (-90 <= coord_float <= 90):
                 logger.warning(f"Latitude außerhalb gültigen Bereichs: {coord_float}")
                 return None
+            
+            # Zusätzliche Plausibilitätschecks für Mining-Regionen
+            # Warne vor unwahrscheinlichen Mining-Koordinaten, aber blockiere sie nicht
+            if coord_float > 75:  # Arktis
+                logger.info(f"[COORD-CHECK] Ungewöhnliche Arktis-Latitude: {coord_float}")
+            elif coord_float < -65:  # Antarktis
+                logger.info(f"[COORD-CHECK] Ungewöhnliche Antarktis-Latitude: {coord_float}")
+            
+            return str(coord_float)
+            
         else:  # Longitude
-            if -180 <= coord_float <= 180:
-                return f"{coord_float:.6f}"
-            else:
+            if not (-180 <= coord_float <= 180):
                 logger.warning(f"Longitude außerhalb gültigen Bereichs: {coord_float}")
                 return None
+            
+            # Plausibilitätschecks für bekannte Mining-Regionen
+            # Amerika: -170° bis -30°, Europa/Afrika: -20° bis 60°, Asien/Ozeanien: 60° bis 180°
+            mining_region = _identify_mining_region(coord_float)
+            if mining_region:
+                logger.debug(f"[COORD-CHECK] Longitude {coord_float} in Mining-Region: {mining_region}")
+            
+            return str(coord_float)
                 
     except ValueError:
         # Versuche DMS Format zu parsen
@@ -248,11 +264,30 @@ def validate_coordinate(value: str, coord_type: str) -> Optional[str]:
             
             # Validiere und gib zurück
             if coord_type == 'x' and -90 <= decimal <= 90:
-                return f"{decimal:.6f}"
+                return str(decimal)
             elif coord_type == 'y' and -180 <= decimal <= 180:
-                return f"{decimal:.6f}"
+                return str(decimal)
     
     return None
+
+def _identify_mining_region(longitude: float) -> Optional[str]:
+    """
+    FIX 02.09.2025: Identifiziert Mining-Regionen basierend auf Longitude
+    
+    Args:
+        longitude: Longitude-Wert
+        
+    Returns:
+        Name der Mining-Region oder None
+    """
+    if -170 <= longitude <= -30:
+        return "Americas"
+    elif -20 <= longitude <= 60:
+        return "Europe/Africa"
+    elif 60 <= longitude <= 180:
+        return "Asia/Oceania"
+    else:
+        return "Unknown"
 
 
 def validate_restoration_cost(value: str, currency: str = 'USD') -> Optional[str]:

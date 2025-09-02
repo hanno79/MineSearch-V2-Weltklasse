@@ -30,53 +30,88 @@ router = APIRouter()
 from minesearch.services_container import services
 
 @router.post("/search", response_model=MineSearchResponse)
-async def search_mine(request: MineSearchRequest):
+async def search_mine(
+    request: MineSearchRequest,
+    use_sequential: bool = Query(False, description="Verwende Sequential Field Search für alternative Provider")
+):
     """
     Sucht nach Mining-Informationen über Multi-Provider System.
     ÄNDERUNG 12.07.2025: Erweitert um model_statistics und field_statistics Tracking
     FIXED 14.07.2025: Explizite Query Parameter für model
+    TIMEOUT-FIX 01.09.2025: Sequential Field Search für alternative Provider
     """
     search_start_time = datetime.now()
     
     try:
         model = request.model  # Model aus Request Body holen
-        logger.info(f"[SEARCH API] Received request: model='{model}', mine='{request.mine_name}', country='{request.country}'")
+        logger.info(f"[SEARCH API] Received request: model='{model}', mine='{request.mine_name}', country='{request.country}', sequential={use_sequential}")
         
-        # DEFENSIVE-FIX 19.07.2025: Verwende robusten Wrapper
-        # BUGFIX 20.07.2025: Async Wrapper Call
-        try:
-            from minesearch.api_fix_wrapper import defensive_search
-            logger.info(f"[SEARCH API] Verwende defensiven Wrapper für {model}")
-            result = await defensive_search.safe_search(
-                mine_name=request.mine_name,
-                country=request.country or "Canada",
-                provider=model.split(':')[0] if ':' in model else "perplexity",
-                model=model
-            )
-        except Exception as wrapper_error:
-            logger.warning(f"[SEARCH API] Wrapper-Fehler, versuche Original-Logic: {wrapper_error}")
+        # STABILITÄT WIEDERHERGESTELLT 01.09.2025: Sequential nur wenn explizit angefordert
+        if use_sequential:
+            logger.info(f"[SEARCH API] Verwende Sequential Field Search für {model}")
+            from minesearch.sequential_field_orchestrator import SequentialFieldOrchestrator
             
-            # Fallback auf Original-Logic
-            if ":" in model:  # Provider:Model Format (z.B. anthropic:claude-3.7-sonnet)
-                logger.info(f"[SEARCH API] Verwende Enhanced Service für {model}")
-                # Nutze Enhanced Service für Provider-basierte Suche
-                result = await services.enhanced_search_service.search_single_model(
-                    model_id=model,
+            orchestrator = SequentialFieldOrchestrator()  # Normaler Modus ohne Test-Beschränkung
+            sequential_result = await orchestrator.orchestrate_sequential_search(
+                mine_name=request.mine_name,
+                models=[model],  # Nur das eine Modell
+                country=request.country,
+                region=request.region,
+                commodity=request.commodity,
+                session_id=f"single_search_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
+            
+            # Konvertiere Sequential Result in Standard Format
+            result = {
+                'success': sequential_result.success if hasattr(sequential_result, 'success') else True,
+                'data': {
+                    'structured_data': sequential_result.consolidated_data,
+                    'sources': [],  # Sequential gibt keine separaten Sources zurück
+                    'search_duration': sequential_result.total_search_duration,
+                    'metadata': {
+                        'search_strategy': 'sequential_field_orchestrator',
+                        'models_used': sequential_result.total_models_used,
+                        'quality_score': sequential_result.quality_score,
+                        'sources_discovered': sequential_result.total_sources_discovered
+                    }
+                }
+            }
+        else:
+            # DEFENSIVE-FIX 19.07.2025: Verwende robusten Wrapper
+            # BUGFIX 20.07.2025: Async Wrapper Call
+            try:
+                from minesearch.api_fix_wrapper import defensive_search
+                logger.info(f"[SEARCH API] Verwende defensiven Wrapper für {model}")
+                result = await defensive_search.safe_search(
                     mine_name=request.mine_name,
-                    country=request.country,
-                    commodity=request.commodity,
-                    region=request.region
+                    country=request.country or "Canada",
+                    provider=model.split(':')[0] if ':' in model else "perplexity",
+                    model=model
                 )
-            else:
-                logger.info(f"[SEARCH API] Verwende Legacy Service für {model}")
-                # Legacy Support für Perplexity-Modelle
-                result = await services.mine_search_service.search_mine(
-                    mine_name=request.mine_name,
-                    country=request.country,
-                    commodity=request.commodity,
-                    model=model,
-                    region=request.region
-                )
+            except Exception as wrapper_error:
+                logger.warning(f"[SEARCH API] Wrapper-Fehler, versuche Original-Logic: {wrapper_error}")
+                
+                # Fallback auf Original-Logic
+                if ":" in model:  # Provider:Model Format (z.B. anthropic:claude-3.7-sonnet)
+                    logger.info(f"[SEARCH API] Verwende Enhanced Service für {model}")
+                    # Nutze Enhanced Service für Provider-basierte Suche
+                    result = await services.enhanced_search_service.search_single_model(
+                        model_id=model,
+                        mine_name=request.mine_name,
+                        country=request.country,
+                        commodity=request.commodity,
+                        region=request.region
+                    )
+                else:
+                    logger.info(f"[SEARCH API] Verwende Legacy Service für {model}")
+                    # Legacy Support für Perplexity-Modelle
+                    result = await services.mine_search_service.search_mine(
+                        mine_name=request.mine_name,
+                        country=request.country,
+                        commodity=request.commodity,
+                        model=model,
+                        region=request.region
+                    )
         
         # Berechne Response-Zeit
         response_time_ms = (datetime.now() - search_start_time).total_seconds() * 1000

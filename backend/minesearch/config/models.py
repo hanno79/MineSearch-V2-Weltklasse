@@ -233,32 +233,32 @@ OPENROUTER_MODELS = {
     },
     
     # ÄNDERUNG 24.08.2025: Premium-Modelle über OpenRouter - Google Gemini
-    'gemini-2.0-flash': {
-        'id': 'google/gemini-2.0-flash-thinking-exp-1219',
-        'name': 'Gemini 2.0 Flash',
-        'timeout': 120,
-        'max_tokens': 8000,
-        'description': 'Google Gemini 2.0 Flash - Neueste Generation mit verbesserter Mining-Datenextraktion',
-        'supports_web_search': False,
-        'is_free': False,
-        'provider_category': 'gemini'
-    },
-    'gemini-1.5-pro': {
-        'id': 'google/gemini-1.5-pro',
-        'name': 'Gemini 1.5 Pro',
+    'gemini-2.5-pro': {
+        'id': 'google/gemini-2.5-pro',
+        'name': 'Gemini 2.5 Pro',
         'timeout': 180,
         'max_tokens': 10000,
-        'description': 'Google Gemini 1.5 Pro - Hochleistungsmodell für umfassende Mining-Analysen',
+        'description': 'Google Gemini 2.5 Pro - Neueste Generation für umfassende Mining-Analysen',
         'supports_web_search': False,
         'is_free': False,
         'provider_category': 'gemini'
     },
-    'gemini-1.5-flash': {
-        'id': 'google/gemini-1.5-flash',
-        'name': 'Gemini 1.5 Flash',
-        'timeout': 90,
+    'gemini-2.5-flash': {
+        'id': 'google/gemini-2.5-flash',
+        'name': 'Gemini 2.5 Flash',
+        'timeout': 120,
         'max_tokens': 8000,
-        'description': 'Google Gemini 1.5 Flash - Schnelle und präzise Mining-Datenverarbeitung',
+        'description': 'Google Gemini 2.5 Flash - Schnelle und präzise Mining-Datenverarbeitung',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'gemini'
+    },
+    'gemini-2.5-flash-lite': {
+        'id': 'google/gemini-2.5-flash-lite',
+        'name': 'Gemini 2.5 Flash Lite',
+        'timeout': 90,
+        'max_tokens': 6000,
+        'description': 'Google Gemini 2.5 Flash Lite - Leichtgewichtig und effizient für Mining-Daten',
         'supports_web_search': False,
         'is_free': False,
         'provider_category': 'gemini'
@@ -297,22 +297,22 @@ OPENROUTER_MODELS = {
     },
     
     # ÄNDERUNG 24.08.2025: Premium-Modelle über OpenRouter - xAI Grok
-    'grok-2': {
-        'id': 'x-ai/grok-2',
-        'name': 'Grok 2',
+    'grok-3': {
+        'id': 'x-ai/grok-3',
+        'name': 'Grok 3',
         'timeout': 180,
-        'max_tokens': 8000,
-        'description': 'xAI Grok 2 - Fortgeschrittenes Modell mit Echtzeitdaten für Mining-Analysen',
+        'max_tokens': 10000,
+        'description': 'xAI Grok 3 - Neueste Generation mit verbesserter Mining-Datenextraktion',
         'supports_web_search': False,
         'is_free': False,
         'provider_category': 'grok'
     },
-    'grok-beta': {
-        'id': 'x-ai/grok-beta',
-        'name': 'Grok Beta',
-        'timeout': 150,
-        'max_tokens': 6000,
-        'description': 'xAI Grok Beta - Experimentelles Modell mit erweiterten Fähigkeiten',
+    'grok-4': {
+        'id': 'x-ai/grok-4',
+        'name': 'Grok 4',
+        'timeout': 200,
+        'max_tokens': 12000,
+        'description': 'xAI Grok 4 - Fortschrittlichstes Modell für komplexe Mining-Analysen',
         'supports_web_search': False,
         'is_free': False,
         'provider_category': 'grok'
@@ -348,26 +348,19 @@ _apply_defaults_to_models(
     default_supports_web_search=False
 )
 
-# Abacus Modelle
-ABACUS_MODELS = {
-    'deep-agent': {
-        'id': 'deep-agent',
-        'name': 'Deep Agent Research',
-        'timeout': 300,
-        'max_tokens': 10000,
-        'description': 'Deep Research Agent für umfassende Mining-Analysen',
-        'supports_web_search': True,
-        'supports_deep_research': True,
-        'is_free': False
-    }
-}
-
-# Normalisierung: fehlende Standardfelder für Abacus-Modelle setzen
-_apply_defaults_to_models(
-    ABACUS_MODELS,
-    provider_category_default='abacus',
-    default_supports_web_search=True
-)
+# Abacus Modelle - ENTFERNT 02.09.2025: Abacus Provider komplett aus dem System entfernt
+# ABACUS_MODELS = {
+#     'deep-agent': {
+#         'id': 'deep-agent',
+#         'name': 'Deep Agent Research',
+#         'timeout': 300,
+#         'max_tokens': 10000,
+#         'description': 'Deep Research Agent für umfassende Mining-Analysen',
+#         'supports_web_search': True,
+#         'supports_deep_research': True,
+#         'is_free': False
+#     }
+# }
 
 # Tavily Modelle
 # WICHTIG: Tavily hat ein Query-Limit von 400 Zeichen
@@ -792,44 +785,7 @@ _apply_defaults_to_models(
 
 # xAI Grok Modelle
 GROK_MODELS = {
-    'grok-4': {
-        'id': 'grok-4',
-        'name': 'Grok 4 (Flagship)',
-        'timeout': 180,
-        'max_tokens': 12000,
-        'description': 'Neuestes xAI Flaggschiff-Modell - führend in allen Benchmarks',
-        'supports_web_search': True,
-        'supports_deep_research': True,
-        'is_free': False
-    },
-    'grok-3': {
-        'id': 'grok-3',
-        'name': 'Grok 3',
-        'timeout': 120,
-        'max_tokens': 8000,
-        'description': 'Real-time Informationen mit X/Twitter Integration',
-        'supports_web_search': True,
-        'supports_deep_research': False,
-        'is_free': False
-    },
-    'grok-3-mini': {
-        'id': 'grok-3-mini',
-        'name': 'Grok 3 Mini',
-        'timeout': 60,
-        'max_tokens': 4000,
-        'description': 'Kosteneffiziente Version',
-        'supports_web_search': True,
-        'is_free': False
-    },
-    'grok-3-fast': {
-        'id': 'grok-3-fast',
-        'name': 'Grok 3 Fast',
-        'timeout': 30,
-        'max_tokens': 2000,
-        'description': 'Ultra-schnelle Suche mit Web-Zugriff',
-        'supports_web_search': True,
-        'is_free': False
-    },
+# ENTFERNT 02.09.2025: Doppelte Grok-Einträge mit falschen IDs - siehe Zeilen 300-319 für korrekte Konfiguration
     # DEPRECATED 11.08.2025: grok-2 entfernt - Modell deprecated
     # DEPRECATED 11.08.2025: grok-2-mini entfernt - Modell deprecated
     # DEPRECATED 11.08.2025: grok-beta entfernt - Modell deprecated
@@ -851,7 +807,7 @@ _apply_defaults_to_models(
 MODELS_CONFIG = {
     'perplexity': PERPLEXITY_MODELS,
     'openrouter': OPENROUTER_MODELS,
-    'abacus': ABACUS_MODELS,
+    # 'abacus': ABACUS_MODELS,  # ENTFERNT 02.09.2025: Abacus Provider komplett entfernt
     'tavily': TAVILY_MODELS,
     'exa': EXA_MODELS,
     'scrapingbee': SCRAPINGBEE_MODELS,

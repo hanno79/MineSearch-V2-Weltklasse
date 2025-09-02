@@ -30,7 +30,7 @@ except ImportError as e:
 from minesearch.config.models import (
     PERPLEXITY_MODELS,
     OPENROUTER_MODELS,
-    ABACUS_MODELS,
+    # ABACUS_MODELS,  # ENTFERNT 02.09.2025: Abacus Provider komplett entfernt
     TAVILY_MODELS,
     EXA_MODELS,
     SCRAPINGBEE_MODELS,
@@ -64,22 +64,21 @@ PROVIDERS_CONFIG = {
         'retry_attempts': 3,
         'retry_delay': 10
     },
-    'abacus': {
-        # PROVIDER-FIX 15.07.2025: Aktiviert für Abacus Deep Agent Testing
-        'enabled': True,
-        'api_key': APIKeysConfig.ABACUS_API_KEY,
-        'base_url': 'https://api.abacus.ai',
-        'models': ABACUS_MODELS,
-        'timeout': 180,
-        'retry_attempts': 2,
-        'retry_delay': 10
-    },
+    # 'abacus': {  # ENTFERNT 02.09.2025: Abacus Provider komplett aus dem System entfernt
+    #     'enabled': False,
+    #     'api_key': APIKeysConfig.ABACUS_API_KEY,
+    #     'base_url': 'https://api.abacus.ai',
+    #     'models': ABACUS_MODELS,
+    #     'timeout': 600,
+    #     'retry_attempts': 2,
+    #     'retry_delay': 10
+    # },
     'tavily': {
         'enabled': True,  # Aktiviert für umfassende Tests
         'api_key': APIKeysConfig.TAVILY_API_KEY,
         'base_url': 'https://api.tavily.com',
         'models': TAVILY_MODELS,
-        'timeout': 80,  # Schnell für Search Provider
+        'timeout': 600,  # REALISTISCHE TIMEOUTS 01.09.2025: 10 Minuten für umfangreiche Mining-Recherchen
         'retry_attempts': 2,
         'retry_delay': 5
     },
@@ -89,7 +88,7 @@ PROVIDERS_CONFIG = {
         'api_key': APIKeysConfig.EXA_API_KEY,
         'base_url': 'https://api.exa.ai',
         'models': EXA_MODELS,
-        'timeout': 120,
+        'timeout': 600,  # REALISTISCHE TIMEOUTS 01.09.2025: 10 Minuten für umfangreiche Neural Search
         'retry_attempts': 2,
         'retry_delay': 10
     },

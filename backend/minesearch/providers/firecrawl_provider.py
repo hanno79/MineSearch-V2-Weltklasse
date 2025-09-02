@@ -156,7 +156,7 @@ class FirecrawlProvider(AbstractProvider):
         Extrahiere alle relevanten Zahlen mit Einheiten und Jahresangaben."""
     
     async def search(self, query: str, model_id: str, options: Dict[str, Any]) -> SearchResult:
-        """Führt Web-Crawling mit Firecrawl durch"""
+        """Führt Web-Crawling mit Firecrawl durch - OPENROUTER WORKFLOW"""
         start_time = datetime.now()
         
         try:
@@ -180,6 +180,19 @@ class FirecrawlProvider(AbstractProvider):
                     metadata={},
                     error=f"Unbekanntes Modell: {model_id}"
                 )
+            
+            mine_name = options.get('mine_name', query)
+            country = options.get('country', '')
+            commodity = options.get('commodity', '')
+            
+            # OPENROUTER WORKFLOW STEP 1: Source Discovery (wie OpenRouter)
+            from minesearch.source_manager import EnhancedSourceDiscovery
+            source_discovery = EnhancedSourceDiscovery()
+            discovered_sources = options.get('discovered_sources', [])
+            
+            if not discovered_sources and not options.get('skip_discovery', False):
+                logger.info(f"[FIRECRAWL] Starte Source Discovery für {mine_name}")
+                discovered_sources = source_discovery.discover_sources_for_mine(mine_name, country, commodity, limit=15)
             
             # Erstelle Mining-spezifische URLs
             urls = await self._build_target_urls(options)
@@ -228,25 +241,69 @@ class FirecrawlProvider(AbstractProvider):
                                 'title': 'Structured Data'
                             })
             
-            # Verarbeite Ergebnisse
-            structured_data = await self._process_results(results, options)
+            # OPENROUTER WORKFLOW STEP 2: Content durch AI-Modell schicken
+            raw_content = self._combine_markdown_content(results)
             
-            # Kombiniere Markdown-Inhalte
-            combined_content = self._combine_markdown_content(results)
+            logger.info(f"[FIRECRAWL] Sende Crawling-Ergebnisse durch AI-Modell für strukturierte Extraktion")
+            ai_response = await self._send_to_ai_model(
+                content=raw_content,
+                mine_name=mine_name,
+                country=country,
+                commodity=commodity,
+                region=options.get('region'),
+                discovered_sources=discovered_sources
+            )
+            
+            # OPENROUTER WORKFLOW STEP 3: DataExtractor auf AI-Response anwenden (wie OpenRouter)
+            from minesearch.data_extraction import DataExtractor
+            data_extractor = DataExtractor()
+            extracted_data = data_extractor.extract_structured_data_with_sources(ai_response, mine_name, country)
+            
+            # OPENROUTER WORKFLOW STEP 4: Quality Gates (wie OpenRouter)
+            extracted_data = self._apply_quality_gates(extracted_data, mine_name)
+            
+            # REGEL 10 COMPLIANCE: Prüfe auf None (keine Dummy-Werte)
+            if not extracted_data.get('data'):
+                return SearchResult(
+                    success=False,
+                    content="",
+                    structured_data={},
+                    sources=[],
+                    metadata={
+                        'provider': 'firecrawl',
+                        'model': model_id,
+                        'error': 'Keine echten Daten gefunden - REGEL 10: Keine Dummy-Werte verwendet',
+                        'unified_workflow': True
+                    },
+                    error="Keine strukturierten Daten extrahiert"
+                )
+            
+            # Konvertiere discovered_sources zu standardisierten Source-Format (wie OpenRouter)
+            all_sources = sources  # Firecrawl-Crawling-Quellen
+            for source in discovered_sources:  # Alle Discovery-Quellen hinzufügen
+                all_sources.append({
+                    'url': source.get('url', ''),
+                    'title': source.get('title', source.get('url', '')),
+                    'type': source.get('type', 'unknown'),
+                    'reliability': source.get('reliability_score')  # REGEL 10: Keine 0.5 Fallbacks
+                })
             
             search_duration = (datetime.now() - start_time).total_seconds()
             
             return SearchResult(
                 success=True,
-                content=combined_content,
-                structured_data=structured_data,
-                sources=sources,
+                content=raw_content,
+                structured_data=extracted_data['data'],  # AI-extrahierte Daten (wie OpenRouter)
+                sources=all_sources,
                 metadata={
                     'provider': 'firecrawl',
                     'model': model_id,
                     'search_duration': search_duration,
                     'pages_processed': len(results),
-                    'markdown_length': len(combined_content)
+                    'markdown_length': len(raw_content),
+                    'unified_workflow': True,  # Markierung für neuen Workflow
+                    'ai_model': 'claude-3-haiku',  # Standard AI-Modell
+                    'sources_discovered': len(discovered_sources)
                 }
             )
             
@@ -518,3 +575,146 @@ class FirecrawlProvider(AbstractProvider):
             'results': crawled_results,
             'mine_name': mine_name
         }
+    
+    # OPENROUTER WORKFLOW HELPER METHODS (wie in Tavily/EXA/BrightData/ScrapingBee)
+    async def _send_to_ai_model(
+        self,
+        content: str,
+        mine_name: str,
+        country: str,
+        commodity: str = None,
+        region: str = None,
+        discovered_sources: List[Dict[str, Any]] = None
+    ) -> str:
+        """Sendet Firecrawl Content durch AI-Modell für strukturierte Extraktion (wie OpenRouter)"""
+        
+        try:
+            from minesearch.specialized_prompts_impl import SpecializedPrompts
+            from minesearch.config.models import OPENROUTER_MODELS
+            import httpx
+            
+            # Standard AI-Modell für alternative Provider
+            model_name = "anthropic/claude-3-haiku-20240307"
+            
+            # Erstelle strukturierten Prompt (wie OpenRouter)
+            system_prompt = SpecializedPrompts.get_universal_anti_template_instructions()
+            system_prompt += f"""
+
+🎯 FIRECRAWL MINING DATENEXTRAKTION
+=============================================
+
+Analysiere die folgenden Firecrawl Markdown-Crawling Ergebnisse und extrahiere strukturierte Mining-Daten für die Mine "{mine_name}" in {country}.
+
+AUSGABEFORMAT (JSON):
+{{
+    "Name": "{mine_name}",
+    "Country": "{country} (normalisiert)",
+    "Region": "spezifische Region",
+    "Eigentümer": "aktueller Eigentümer",
+    "Betreiber": "aktueller Betreiber",
+    "x-Koordinate": "präzise Dezimalzahl",
+    "y-Koordinate": "präzise Dezimalzahl",
+    "Aktivitätsstatus": "Aktiv/Geschlossen/Geplant",
+    "Restaurationskosten": "Betrag mit Währung",
+    "Jahr der Aufnahme der Kosten": "YYYY",
+    "Rohstoffabbau": "Gold, Kupfer, etc.",
+    "Minentyp": "Untertage/Tagebau",
+    "Produktionsstart": "YYYY",
+    "Produktionsende": "YYYY",
+    "Fördermenge/Jahr": "Menge mit Einheit",
+    "Fläche der Mine in qkm": "Fläche mit Einheit"
+}}
+
+KRITISCHE REGELN:
+- NUR echte, verifizierbare Daten verwenden
+- KEINE Template-Werte oder Schätzungen
+- Bei Unsicherheit: Feld leer lassen
+- Numerische Werte: Volle Präzision beibehalten
+- Länder normalisieren (Canada → Kanada)
+- Nutze Markdown-Struktur für präzise Navigation
+"""
+            
+            user_prompt = f"""Analysiere die Firecrawl Markdown-Crawling-Ergebnisse und extrahiere Mining-Daten für "{mine_name}" in {country}.
+
+{f"Rohstoff: {commodity}" if commodity else ""}
+{f"Region: {region}" if region else ""}
+
+Gib NUR das JSON-Objekt zurück.
+
+FIRECRAWL MARKDOWN CONTENT:
+{content}"""
+            
+            # Sende an OpenRouter (wie andere AI-Provider)
+            openrouter_key = self.config.get('openrouter_api_key')
+            if not openrouter_key:
+                logger.error("[FIRECRAWL-AI] OpenRouter API Key fehlt für AI-Extraktion")
+                return content  # Fallback auf Raw Content
+            
+            async with httpx.AsyncClient(timeout=120) as client:
+                response = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {openrouter_key}",
+                        "HTTP-Referer": "https://mining-data-extraction.com",
+                        "X-Title": "MineSearch Firecrawl AI Extraction",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": model_name,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                        "max_tokens": 4000,
+                        "temperature": 0.1
+                    }
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    ai_response = result["choices"][0]["message"]["content"]
+                    logger.info(f"[FIRECRAWL-AI] Erfolgreiche AI-Extraktion mit {model_name}")
+                    return ai_response
+                else:
+                    logger.error(f"[FIRECRAWL-AI] AI-API Fehler: {response.status_code}")
+                    
+        except Exception as e:
+            logger.error(f"[FIRECRAWL-AI] AI-Extraktion fehlgeschlagen: {e}")
+        
+        # Fallback: Originaler Content
+        return content
+    
+    def _apply_quality_gates(self, extracted_data: Dict[str, Any], mine_name: str) -> Dict[str, Any]:
+        """Wendet OpenRouter-ähnliche Quality Gates auf Firecrawl-Ergebnisse an"""
+        
+        if not extracted_data or not extracted_data.get('data'):
+            return extracted_data
+            
+        data = extracted_data['data']
+        
+        # Basis Quality Gate: Name sollte immer gesetzt sein
+        if not data.get('Name'):
+            data['Name'] = mine_name
+            logger.debug(f"[FIRECRAWL-QG] Name ergänzt: {mine_name}")
+        
+        # Template-Detection für numerische Felder (wie in consolidated_field_utils.py)
+        numeric_fields = ['Restaurationskosten', 'x-Koordinate', 'y-Koordinate', 'Fördermenge/Jahr', 'Fläche der Mine in qkm']
+        
+        for field in numeric_fields:
+            if field in data and data[field]:
+                value_str = str(data[field])
+                # Schutz vor Template-Detection für numerische Werte
+                if any(char.isdigit() for char in value_str) or '$' in value_str or '€' in value_str:
+                    logger.debug(f"[FIRECRAWL-QG] Numerisches Feld geschützt: {field} = {data[field]}")
+                    continue  # Numerische Felder nicht durch Template-Detection entfernen
+        
+        # Entferne None-Werte und leere Strings (REGEL 10)
+        cleaned_data = {}
+        for key, value in data.items():
+            if value is not None and str(value).strip():
+                cleaned_data[key] = value
+        
+        extracted_data['data'] = cleaned_data
+        
+        logger.info(f"[FIRECRAWL-QG] Quality Gates angewendet für {mine_name}")
+        return extracted_data

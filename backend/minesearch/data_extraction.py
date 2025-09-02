@@ -299,6 +299,12 @@ class DataExtractor:
             # Spezielle Behandlung für Koordinaten mit erweiterten Patterns
             data = self._extract_coordinates(content, data)
             
+            # FIX 02.09.2025: Fallback-Extraction für unlabeled/slash-getrennte Daten
+            data = self._extract_unlabeled_data(content, data)
+            
+            # FIX 02.09.2025: Post-Processing für verpasste Daten - Raw Content nochmal durchsuchen
+            data = self._post_process_missed_data(content, data, mine_name)
+            
             # Post-Processing
             data = post_process_data(data, content, country_config)
             
@@ -445,6 +451,429 @@ class DataExtractor:
                         break
         
         return data
+    
+    def _extract_unlabeled_data(self, content: str, data: Dict[str, str]) -> Dict[str, str]:
+        """
+        FIX 02.09.2025: Fallback-Extraction für unlabeled/slash-getrennte Formate
+        
+        Verarbeitet Formate wie:
+        "Casa Berardi Mine / Kanada / Quebec / 49.5731083 / -79.2369972 / $61.4M restoration costs"
+        
+        Args:
+            content: Roher Content
+            data: Bisherige extrahierte Daten
+            
+        Returns:
+            Ergänzte Daten mit unlabeled Extraktion
+        """
+        logger.debug("[UNLABELED] Starte Fallback-Extraktion für unlabeled/slash-getrennte Formate")
+        
+        # Pattern für typische slash-getrennte Formate (Perplexity-Style)
+        slash_patterns = [
+            # Format: Mine / Land / Region / Latitude / Longitude / weitere Infos
+            r'([^/]+\s*(?:mine|Mine))\s*/\s*([^/]+)\s*/\s*([^/]+)\s*/\s*([-+]?\d{2}\.?\d+)\s*/\s*([-+]?\d{2,3}\.?\d+)(?:\s*/\s*(.*))?',
+            # Format ohne "Mine": Name / Land / Region / Lat / Long / Info
+            r'([^/]+)\s*/\s*([Kk]anada|[Cc]anada|[Cc]hile|[Pp]eru|[Mm]exico|[Uu]SA)\s*/\s*([^/]+)\s*/\s*([-+]?\d{2}\.?\d+)\s*/\s*([-+]?\d{2,3}\.?\d+)(?:\s*/\s*(.*))?',
+            # Nur Koordinaten mit zusätzlichen Infos
+            r'([-+]?\d{2}\.?\d+)\s*/\s*([-+]?\d{2,3}\.?\d+)\s*/\s*(.+?)(?:\$\s*[\d,]+(?:\.\d+)?(?:M|million))?'
+        ]
+        
+        extracted_data = {}
+        
+        for i, pattern in enumerate(slash_patterns):
+            matches = re.finditer(pattern, content, re.IGNORECASE | re.MULTILINE)
+            for match in matches:
+                groups = match.groups()
+                logger.debug(f"[UNLABELED] Pattern {i+1} gefunden: {groups}")
+                
+                try:
+                    if i == 0:  # Vollständiges Format mit Mine-Name
+                        mine_name, country, region, lat, lng = groups[:5]
+                        extra_info = groups[5] if len(groups) > 5 and groups[5] else ""
+                        
+                        if not data.get('Country'):
+                            extracted_data['Country'] = country.strip()
+                        if not data.get('Region'):
+                            extracted_data['Region'] = region.strip()
+                        if not data.get('x-Koordinate'):
+                            validated_lat = validate_coordinate(lat.strip(), 'x')
+                            if validated_lat:
+                                extracted_data['x-Koordinate'] = validated_lat
+                        if not data.get('y-Koordinate'):
+                            validated_lng = validate_coordinate(lng.strip(), 'y')
+                            if validated_lng:
+                                extracted_data['y-Koordinate'] = validated_lng
+                        
+                        # Extrahiere Restaurationskosten aus extra_info
+                        if extra_info and not data.get('Restaurationskosten'):
+                            cost_match = re.search(r'\$\s*([\d,]+(?:\.\d+)?)\s*(?:M|million)', extra_info, re.IGNORECASE)
+                            if cost_match:
+                                extracted_data['Restaurationskosten'] = f"${cost_match.group(1)}M"
+                    
+                    elif i == 1:  # Format ohne expliziten "Mine"
+                        name, country, region, lat, lng = groups[:5]
+                        extra_info = groups[5] if len(groups) > 5 and groups[5] else ""
+                        
+                        if not data.get('Country'):
+                            extracted_data['Country'] = country.strip()
+                        if not data.get('Region'):
+                            extracted_data['Region'] = region.strip()
+                        if not data.get('x-Koordinate'):
+                            validated_lat = validate_coordinate(lat.strip(), 'x')
+                            if validated_lat:
+                                extracted_data['x-Koordinate'] = validated_lat
+                        if not data.get('y-Koordinate'):
+                            validated_lng = validate_coordinate(lng.strip(), 'y')
+                            if validated_lng:
+                                extracted_data['y-Koordinate'] = validated_lng
+                    
+                    elif i == 2:  # Nur Koordinaten mit Infos
+                        lat, lng, info = groups
+                        if not data.get('x-Koordinate'):
+                            validated_lat = validate_coordinate(lat.strip(), 'x')
+                            if validated_lat:
+                                extracted_data['x-Koordinate'] = validated_lat
+                        if not data.get('y-Koordinate'):
+                            validated_lng = validate_coordinate(lng.strip(), 'y')
+                            if validated_lng:
+                                extracted_data['y-Koordinate'] = validated_lng
+                        
+                        # Extrahiere weitere Infos aus info
+                        if info and not data.get('Restaurationskosten'):
+                            cost_match = re.search(r'\$\s*([\d,]+(?:\.\d+)?)\s*(?:M|million)', info, re.IGNORECASE)
+                            if cost_match:
+                                extracted_data['Restaurationskosten'] = f"${cost_match.group(1)}M"
+                
+                except Exception as e:
+                    logger.debug(f"[UNLABELED] Fehler bei Pattern {i+1}: {e}")
+                    continue
+        
+        # Weitere unlabeled Patterns für spezifische Felder
+        self._extract_unlabeled_restoration_costs(content, extracted_data, data)
+        self._extract_unlabeled_ownership(content, extracted_data, data)
+        
+        # Übertrage extrahierte Daten
+        for field, value in extracted_data.items():
+            if value and self._is_valid_data_value(value, field):
+                data[field] = value
+                logger.info(f"[UNLABELED] Feld '{field}' ergänzt: '{value}'")
+        
+        return data
+    
+    def _extract_unlabeled_restoration_costs(self, content: str, extracted_data: Dict[str, str], existing_data: Dict[str, str]):
+        """Extrahiert Restaurationskosten aus unlabeled Textstellen"""
+        if existing_data.get('Restaurationskosten'):
+            return
+            
+        # Pattern für unlabeled Millionen-Beträge in Kontexten
+        patterns = [
+            r'([\d,]+(?:\.\d+)?)\s*(?:M|million)\s*(?:CAD|USD)?\s*(?:for|zur|pour|para)?\s*(?:restoration|closure|reclamation|fermeture|cierre)',
+            r'(?:restoration|closure|reclamation)\s*(?:costs?|coûts?)?\s*(?:of|de)?\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:M|million)',
+            r'\$\s*([\d,]+(?:\.\d+)?)\s*(?:M|million)\s*(?:environmental|restoration|closure)',
+            # Direkte Beträge nach Koordinaten
+            r'[-+]?\d{2}\.?\d+\s*/\s*[-+]?\d{2,3}\.?\d+.*?\$\s*([\d,]+(?:\.\d+)?)\s*(?:M|million)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                cost_value = match.group(1)
+                # Validiere den Betrag
+                if cost_value and cost_value.replace(',', '').replace('.', '').isdigit():
+                    extracted_data['Restaurationskosten'] = f"${cost_value}M"
+                    logger.debug(f"[UNLABELED] Restaurationskosten unlabeled gefunden: ${cost_value}M")
+                    break
+    
+    def _extract_unlabeled_ownership(self, content: str, extracted_data: Dict[str, str], existing_data: Dict[str, str]):
+        """Extrahiert Eigentümer/Betreiber aus unlabeled Kontexten"""
+        # Pattern für Unternehmensstrukturen in unlabeled Texten
+        company_patterns = [
+            r'(?:owned|operated|managed)\s+by\s+([A-Z][A-Za-z\s&]+(?:Inc|Corp|Ltd|SA|Ltda)\.?)',
+            r'([A-Z][A-Za-z\s&]+(?:Inc|Corp|Ltd|SA|Ltda)\.?)\s+(?:owns|operates|manages)',
+            r'subsidiary\s+of\s+([A-Z][A-Za-z\s&]+(?:Inc|Corp|Ltd|SA|Ltda)\.?)',
+            # Französische Patterns für Quebec
+            r'(?:détenu|exploité|géré)\s+par\s+([A-Z][A-Za-z\s&]+(?:Inc|Corp|Ltée|SA)\.?)',
+            r'filiale\s+(?:de|d\')\s+([A-Z][A-Za-z\s&]+(?:Inc|Corp|Ltée|SA)\.?)'
+        ]
+        
+        if not existing_data.get('Eigentümer'):
+            for pattern in company_patterns:
+                match = re.search(pattern, content, re.IGNORECASE)
+                if match:
+                    owner = match.group(1).strip()
+                    if len(owner) > 3 and not any(word in owner.lower() for word in ['mining', 'mine', 'minerals']):
+                        extracted_data['Eigentümer'] = owner
+                        logger.debug(f"[UNLABELED] Eigentümer unlabeled gefunden: {owner}")
+                        break
+        
+        if not existing_data.get('Betreiber'):
+            operator_patterns = [
+                r'operated\s+by\s+([A-Z][A-Za-z\s&]+(?:Inc|Corp|Ltd|SA|Ltda)\.?)',
+                r'operator:\s*([A-Z][A-Za-z\s&]+(?:Inc|Corp|Ltd|SA|Ltda)\.?)',
+                r'exploité\s+par\s+([A-Z][A-Za-z\s&]+(?:Inc|Corp|Ltée|SA)\.?)'
+            ]
+            
+            for pattern in operator_patterns:
+                match = re.search(pattern, content, re.IGNORECASE)
+                if match:
+                    operator = match.group(1).strip()
+                    if len(operator) > 3:
+                        extracted_data['Betreiber'] = operator
+                        logger.debug(f"[UNLABELED] Betreiber unlabeled gefunden: {operator}")
+                        break
+    
+    def _post_process_missed_data(self, content: str, data: Dict[str, str], mine_name: str) -> Dict[str, str]:
+        """
+        FIX 02.09.2025: Post-Processing für verpasste Daten - Raw Content nochmal durchsuchen
+        
+        Sucht systematisch nach Daten die in ersten Extraction-Runden verpasst wurden.
+        Konzentriert sich auf kritische Felder wie Restaurationskosten.
+        
+        Args:
+            content: Raw Content
+            data: Bereits extrahierte Daten
+            mine_name: Name der Mine
+            
+        Returns:
+            Ergänzte Daten mit verpassten Informationen
+        """
+        logger.debug("[POST-PROCESS] Starte systematische Nachsuche nach verpassten Daten")
+        
+        # Kritische Felder priorisiert nachbearbeiten
+        critical_fields = [
+            'Restaurationskosten',
+            'Eigentümer', 
+            'Betreiber',
+            'x-Koordinate',
+            'y-Koordinate',
+            'Aktivitätsstatus',
+            'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)'
+        ]
+        
+        recovered_data = {}
+        
+        for field in critical_fields:
+            if not data.get(field) or data[field] in ['', 'X']:
+                logger.debug(f"[POST-PROCESS] Feld '{field}' ist leer - starte Nachsuche")
+                
+                # Spezialisierte Nachsuche je Feld
+                if field == 'Restaurationskosten':
+                    recovery_value = self._recover_restoration_costs(content, mine_name)
+                    if recovery_value:
+                        recovered_data[field] = recovery_value
+                        
+                elif field in ['Eigentümer', 'Betreiber']:
+                    recovery_value = self._recover_ownership_data(content, field)
+                    if recovery_value:
+                        recovered_data[field] = recovery_value
+                        
+                elif field in ['x-Koordinate', 'y-Koordinate']:
+                    recovery_value = self._recover_coordinates(content, field)
+                    if recovery_value:
+                        recovered_data[field] = recovery_value
+                        
+                elif field == 'Aktivitätsstatus':
+                    recovery_value = self._recover_activity_status(content)
+                    if recovery_value:
+                        recovered_data[field] = recovery_value
+                        
+                elif field == 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)':
+                    recovery_value = self._recover_commodity_data(content)
+                    if recovery_value:
+                        recovered_data[field] = recovery_value
+        
+        # Brute-Force-Ansatz für verpasste numerische Daten
+        if not data.get('Fördermenge/Jahr'):
+            production_data = self._recover_production_data(content)
+            if production_data:
+                recovered_data['Fördermenge/Jahr'] = production_data
+        
+        if not data.get('Fläche der Mine in qkm'):
+            area_data = self._recover_area_data(content)
+            if area_data:
+                recovered_data['Fläche der Mine in qkm'] = area_data
+        
+        # Übertrage alle erfolgreichen Wiederherstellungen
+        for field, value in recovered_data.items():
+            if value and self._is_valid_data_value(value, field):
+                data[field] = value
+                logger.info(f"[POST-PROCESS] Verpasste Daten wiederhergestellt - {field}: '{value}'")
+        
+        return data
+    
+    def _recover_restoration_costs(self, content: str, mine_name: str) -> Optional[str]:
+        """Aggressive Wiederherstellung von Restaurationskosten"""
+        logger.debug("[RECOVERY] Suche aggressiv nach Restaurationskosten...")
+        
+        # Sehr breite Pattern für Zahlen + Währung + Kontext
+        broad_patterns = [
+            # Millionen-Beträge mit Mining-Kontext
+            r'\$\s*([\d,]+(?:\.\d+)?)\s*(?:M|million|Mio)\s*(?:CAD|USD|EUR)?.*?(?:mine|mining|closure|restoration|environmental|rehabilitation|reclamation)',
+            r'(?:mine|mining|closure|restoration|environmental|rehabilitation|reclamation).*?\$\s*([\d,]+(?:\.\d+)?)\s*(?:M|million|Mio)',
+            # ARO/Asset Retirement in beliebigem Kontext
+            r'(?:ARO|Asset.*?Retirement|environmental.*?liability).*?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:M|million)',
+            r'\$\s*([\d,]+(?:\.\d+)?)\s*(?:M|million).*?(?:ARO|Asset.*?Retirement|environmental.*?liability)',
+            # Zahlen mit Mine-Name-Verbindung
+            fr'{re.escape(mine_name)}.*?\$\s*([\d,]+(?:\.\d+)?)\s*(?:M|million)',
+            r'\$\s*([\d,]+(?:\.\d+)?)\s*(?:M|million).*?' + re.escape(mine_name),
+            # Sehr allgemeine Pattern für große Beträge in Mining-Kontexten
+            r'(?:costs?|coûts?|costos?).*?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:M|million|Mio)',
+            r'\$\s*([\d,]+(?:\.\d+)?)\s*(?:M|million|Mio).*?(?:costs?|coûts?|costos?)',
+            # Französische Patterns (Quebec)
+            r'(?:fermeture|restauration|réhabilitation).*?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:M|millions?|Mio)',
+            # Patterns für kleinere Beträge (Tausende)
+            r'\$\s*([\d,]+)\s*(?:k|K|thousand).*?(?:closure|restoration|rehabilitation|environmental)',
+            r'(?:closure|restoration|rehabilitation|environmental).*?\$\s*([\d,]+)\s*(?:k|K|thousand)'
+        ]
+        
+        for pattern in broad_patterns:
+            try:
+                matches = re.finditer(pattern, content, re.IGNORECASE | re.DOTALL)
+                for match in matches:
+                    cost_value = match.group(1)
+                    # Validiere, dass es eine sinnvolle Zahl ist
+                    if cost_value and cost_value.replace(',', '').replace('.', '').isdigit():
+                        # Konvertiere zu Standard-Format
+                        cost_float = float(cost_value.replace(',', ''))
+                        if cost_float > 0.1 and cost_float < 10000:  # Zwischen 100k und 10 Milliarden
+                            unit = "M" if "k" not in pattern.lower() else "k" 
+                            result = f"${cost_value}{unit}"
+                            logger.info(f"[RECOVERY] Restaurationskosten aggressive gefunden: {result}")
+                            return result
+            except Exception as e:
+                logger.debug(f"[RECOVERY] Pattern-Fehler bei Restaurationskosten: {e}")
+                continue
+        
+        return None
+    
+    def _recover_ownership_data(self, content: str, field: str) -> Optional[str]:
+        """Wiederherstellung von Eigentümer/Betreiber-Daten"""
+        # Breite Unternehmens-Pattern ohne Feldlabels
+        company_patterns = [
+            r'([A-Z][A-Za-z\s&,.-]+(?:Inc|Corp|Corporation|Ltd|Limited|SA|Ltée|LLC|GmbH|AG)\.?)(?:\s+(?:owns|operates|manages|controls))?',
+            r'(?:owned|operated|managed|controlled)\s+by\s+([A-Z][A-Za-z\s&,.-]+)',
+            r'([A-Z][A-Za-z\s&,.-]+)\s+(?:is the|owns|operates|manages|controls)',
+            # Französische Pattern
+            r'([A-Z][A-Za-z\s&,.-]+(?:Inc|Corp|Ltée|SA)\.?)\s+(?:détient|exploite|gère)',
+            r'(?:détenu|exploité|géré)\s+par\s+([A-Z][A-Za-z\s&,.-]+)',
+        ]
+        
+        for pattern in company_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                company = match.group(1).strip().rstrip('.,')
+                # Filter out generic terms
+                if (len(company) > 5 and 
+                    not any(word in company.lower() for word in ['mining', 'mine', 'project', 'property', 'site', 'area']) and
+                    any(suffix in company for suffix in ['Inc', 'Corp', 'Ltd', 'SA', 'Ltée', 'LLC', 'GmbH', 'AG'])):
+                    logger.info(f"[RECOVERY] {field} aggressiv gefunden: {company}")
+                    return company
+        
+        return None
+    
+    def _recover_coordinates(self, content: str, coord_type: str) -> Optional[str]:
+        """Aggressive Koordinaten-Wiederherstellung"""
+        # Sehr breite Pattern für Zahlen die wie Koordinaten aussehen
+        if coord_type == 'x-Koordinate':
+            coord_patterns = [
+                r'(4[0-9]\.[\d]+)',    # 40-49.xxx (Nordamerika)
+                r'(5[0-9]\.[\d]+)',    # 50-59.xxx (Kanada)
+                r'([+-]?[4-6]\d\.[\d]{4,})',  # Präzise Latitude-Range
+            ]
+        else:  # y-Koordinate
+            coord_patterns = [
+                r'(-[6-9]\d\.[\d]+)',  # -60 bis -99 (Nordamerika West)
+                r'(-1[0-2]\d\.[\d]+)', # -100 bis -129 (Westkanada)
+                r'([+-]?[6-9]\d\.[\d]{4,})',  # Präzise Longitude-Range
+            ]
+        
+        for pattern in coord_patterns:
+            match = re.search(pattern, content)
+            if match:
+                coord_value = match.group(1)
+                # Validiere mit bestehender Funktion
+                validated = validate_coordinate(coord_value, 'x' if coord_type == 'x-Koordinate' else 'y')
+                if validated:
+                    logger.info(f"[RECOVERY] {coord_type} aggressiv gefunden: {validated}")
+                    return validated
+        
+        return None
+    
+    def _recover_activity_status(self, content: str) -> Optional[str]:
+        """Wiederherstellung des Aktivitätsstatus"""
+        status_patterns = [
+            r'((?:currently\s+)?(?:active|operational|operating|in\s+operation))',
+            r'((?:temporarily\s+)?(?:closed|shut\s+down|suspended))',
+            r'((?:under\s+)?(?:development|construction))',
+            r'((?:in\s+)?(?:exploration|planning\s+stage))',
+            # Deutsch
+            r'((?:derzeit\s+)?(?:aktiv|in\s+Betrieb|operativ))',
+            r'((?:temporär\s+)?(?:geschlossen|stillgelegt|eingestellt))',
+            r'((?:in\s+)?(?:Entwicklung|Bau|Planung))',
+            r'((?:in\s+)?(?:Exploration|Erkundung))'
+        ]
+        
+        for pattern in status_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                status = match.group(1).strip()
+                logger.info(f"[RECOVERY] Aktivitätsstatus aggressiv gefunden: {status}")
+                return status
+        
+        return None
+    
+    def _recover_commodity_data(self, content: str) -> Optional[str]:
+        """Wiederherstellung von Rohstoff-Daten"""
+        commodity_patterns = [
+            r'((?:gold|copper|silver|zinc|lead|iron|nickel|coal)(?:\s+(?:and|und|,)\s+(?:gold|copper|silver|zinc|lead|iron|nickel|coal))*)',
+            r'((?:Gold|Kupfer|Silber|Zink|Blei|Eisen|Nickel|Kohle)(?:\s+(?:und|,)\s+(?:Gold|Kupfer|Silber|Zink|Blei|Eisen|Nickel|Kohle))*)',
+            r'(?:primary|main|haupt)\s+(?:commodity|mineral|rohstoff):\s*([^.\n]+)',
+            r'(?:produces|produziert|fördert):\s*([^.\n]+(?:gold|copper|silver|zinc|lead|iron|nickel|coal)[^.\n]*)'
+        ]
+        
+        for pattern in commodity_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                commodity = match.group(1).strip()
+                if len(commodity) > 3 and len(commodity) < 100:
+                    logger.info(f"[RECOVERY] Rohstoffabbau aggressiv gefunden: {commodity}")
+                    return commodity
+        
+        return None
+    
+    def _recover_production_data(self, content: str) -> Optional[str]:
+        """Wiederherstellung von Produktionsdaten"""
+        production_patterns = [
+            r'([\d,]+(?:\.\d+)?)\s*(?:oz|ounces|tonnes?|tons?|pounds?)\s*(?:of\s+)?(?:gold|copper|silver|zinc|lead)',
+            r'(?:annual\s+)?(?:production|output):\s*([\d,]+(?:\.\d+)?)\s*(?:oz|ounces|tonnes?|tons?|pounds?)',
+            r'(?:produces|produziert)\s*(?:jährlich\s+)?([\d,]+(?:\.\d+)?)\s*(?:oz|ounces|tonnes?|tons?|pounds?)'
+        ]
+        
+        for pattern in production_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                production = match.group(0)  # Full match for context
+                logger.info(f"[RECOVERY] Fördermenge aggressiv gefunden: {production}")
+                return production
+        
+        return None
+    
+    def _recover_area_data(self, content: str) -> Optional[str]:
+        """Wiederherstellung von Flächen-Daten"""
+        area_patterns = [
+            r'([\d,]+(?:\.\d+)?)\s*(?:km²|qkm|km2|square\s+kilometers)',
+            r'(?:area|fläche):\s*([\d,]+(?:\.\d+)?)\s*(?:km²|qkm|km2|square\s+kilometers)',
+            r'(?:covers|umfasst)\s*([\d,]+(?:\.\d+)?)\s*(?:km²|qkm|km2|square\s+kilometers)'
+        ]
+        
+        for pattern in area_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                area = f"{match.group(1)} km²"
+                logger.info(f"[RECOVERY] Fläche aggressiv gefunden: {area}")
+                return area
+        
+        return None
     
     def _validate_fields(self, data: Dict[str, str], currency: str) -> Dict[str, str]:
         """Validiere spezifische Felder"""

@@ -73,7 +73,11 @@ def _normalize_placeholder_value(value):
         'Kostenjahr', 'Dokumentenjahr', 'Aktivitätsstatus',  # Feldnamen
         'leer [1]', 'FlM-CM-$che der Mine in qkm',  # Spezielle Problemwerte
         'Fläche der Mine in qkm', 'Mine geschlossen',  # Weitere Problemwerte
-        'noch aktiv'  # Status-Werte die falsch zugeordnet werden
+        'noch aktiv',  # Status-Werte die falsch zugeordnet werden
+        # CSV-FIX 29.08.2025: "Keine Dokumentierten" als Leer behandeln
+        'Keine Dokumentierten Eigentumsverhaltnisse',
+        'Keine dokumentierten Eigentumsverhaltnisse',
+        'keine dokumentierten Eigentumsverhaltnisse'
     ]
     
     if value_str in exact_placeholders:
@@ -96,6 +100,8 @@ def _normalize_placeholder_value(value):
         r'^LEER\s*-\s*.*',                              # "LEER - [Text]"
         r'^Leer\s*-\s*.*',                              # "Leer - [Text]"
         r'^leer\s*-\s*.*',                              # "leer - [Text]"
+        # CSV-FIX 29.08.2025: "Keine Dokumentierten" Pattern erkennen
+        r'.*[Kk]eine [Dd]okumentierten.*',              # Alle Varianten von "Keine dokumentierten [...]"
         # CSV-FIX 25.08.2025: Feldnamen mit Quellenreferenzen erkennen
         r'^x-Koordinate\s*\[[^\]]*\]$',                 # "x-Koordinate [1]" 
         r'^y-Koordinate\s*\[[^\]]*\]$',                 # "y-Koordinate [1]"
@@ -483,8 +489,40 @@ async def get_consolidated_results(
             # Basis-Informationen setzen - wähle häufigsten Namen für Anzeige
             if not mine_data['mine_name']:
                 mine_data['mine_name'] = mine_name  # Erster Name als Initial
-            mine_data['country'] = result.country or ''
-            mine_data['region'] = result.region or ''
+            
+            # FIX: Hole Länder-Daten aus mines_normalized falls nicht in SearchResult verfügbar
+            # Prüfe ob SearchResult-Daten leer oder 'Unknown' sind
+            search_country = result.country or ''
+            search_region = result.region or ''
+            
+            # Wenn SearchResult keine gültigen Daten hat, hole sie aus mines_normalized
+            if not search_country or search_country.lower() in ['unknown', 'nicht verfügbar']:
+                try:
+                    # Direkte DB-Abfrage für mines_normalized ohne zirkuläre Abhängigkeiten
+                    from sqlalchemy import text
+                    normalized_query = session.execute(text("""
+                        SELECT country, region 
+                        FROM mines_normalized 
+                        WHERE name = :mine_name OR normalized_name = :mine_name
+                        LIMIT 1
+                    """), {"mine_name": mine_name})
+                    normalized_result = normalized_query.fetchone()
+                    
+                    if normalized_result and normalized_result[0]:
+                        mine_data['country'] = normalized_result[0] or search_country
+                        mine_data['region'] = normalized_result[1] or search_region
+                        logger.info(f"[COUNTRY-FIX] Loaded location for {mine_name}: {normalized_result[0]}, {normalized_result[1]}")
+                    else:
+                        mine_data['country'] = search_country
+                        mine_data['region'] = search_region
+                except Exception as e:
+                    logger.warning(f"Could not fetch normalized location for {mine_name}: {e}")
+                    # Fallback auf SearchResult-Daten
+                    mine_data['country'] = search_country
+                    mine_data['region'] = search_region
+            else:
+                mine_data['country'] = search_country
+                mine_data['region'] = search_region
             
             # PHASE 4 FIX: Count ALL model results, not just unique models
             # The model_count should match the actual length of model_results array
@@ -927,7 +965,14 @@ async def get_consolidated_results(
                 'mine_name': mine_data['mine_name'],  # Verwende Display-Name statt normalisierten Key
                 'country': mine_data['country'], 
                 'region': mine_data['region'],
-                'best_values': best_values,  # Maintained for backward compatibility
+                'best_values': {
+                    # FELDFIX 29.08.2025: Meta-Felder filtern und kritische Felder hinzufügen
+                    **{k: v for k, v in best_values.items() if not k.startswith('_')},  # Filter Meta-Felder
+                    # Kritische Felder aus detailed_breakdown zu best_values kopieren
+                    **{field_name: field_data['best_value']['display_value']
+                       for field_name, field_data in detailed_breakdown.items()
+                       if field_name in ['Land', 'Region'] and field_data['best_value']['display_value'] != 'Nichts gefunden'}
+                },  # Enhanced for critical fields
                 'detailed_breakdown': detailed_breakdown,  # Für Details-Modal
                 'ai_model_legend': ai_model_legend,
                 'model_results': mine_data['model_results'],
@@ -1262,7 +1307,14 @@ async def get_mine_consolidated_details(
                 "mine_name": mine_name,
                 "country": mine_data['country'],
                 "region": mine_data['region'],
-                "best_values": best_values,
+                "best_values": {
+                    # FELDFIX 29.08.2025: Meta-Felder filtern und kritische Felder hinzufügen
+                    **{k: v for k, v in best_values.items() if not k.startswith('_')},  # Filter Meta-Felder
+                    # Kritische Felder aus detailed_breakdown zu best_values kopieren
+                    **{field_name: field_data['best_value']['display_value']
+                       for field_name, field_data in detailed_breakdown.items()
+                       if field_name in ['Land', 'Region'] and field_data['best_value']['display_value'] != 'Nichts gefunden'}
+                },
                 "detailed_breakdown": detailed_breakdown,
                 "overall_confidence": round(overall_confidence, 1),
                 "source_summary": source_summary,
@@ -1379,7 +1431,8 @@ class CSVFieldProcessor:
 
     @staticmethod
     def _escape_for_csv(value: str) -> str:
-        escaped_value = str(value).replace("|", ";")
+        # CSV-FIX 29.08.2025: Ersetze Pipe-Zeichen mit Schrägstrich gemäß User-Anforderung
+        escaped_value = str(value).replace("|", "/")
         return escaped_value.strip() and escaped_value or ""
 
 @router.get("/results/export/csv")
@@ -1597,9 +1650,9 @@ async def export_consolidated_csv(
                                 exact_sources.append(f"[{i}] {title}: {url}")
                         break  # Verwende nur das erste gefundene model_result mit sources
         
-        # Falls immer noch keine Quellen, zeige Platzhalter
+        # REGEL 10 FIX 29.08.2025: Keine Dummy-Werte - lasse Quellen leer wenn keine gefunden
         if not exact_sources:
-            exact_sources.append("Keine detaillierten Quellenangaben verfügbar")
+            exact_sources.append("")  # Leerer String statt Dummy-Text
         
         # Kombiniere Quellen zu einem String (Semikolon-getrennt für CSV)
         exact_sources_text = "; ".join(exact_sources)
@@ -1956,3 +2009,178 @@ async def compare_schemas():
             }
         }
     }
+
+@router.get("/mine/{mine_name}/statistics")
+async def get_mine_historical_statistics(
+    mine_name: str,
+    days_back: int = Query(90, description="Tage zurück für historische Analyse"),
+    exclude_exa: bool = Query(True, description="Exa-Modelle ausblenden")
+):
+    """
+    🆕 NEUE API für detaillierte Mine-Statistiken über ALLE historischen Suchen
+    
+    Für das neue Detail-Modal: Zeigt aggregierte Statistiken einer Mine
+    über alle bisherigen Suchen hinweg, nicht nur die aktuelle Session.
+    
+    FEATURES:
+    - Durchschnittliche Konfidenz pro Feld über Zeit
+    - Häufigste Werte und deren Konsistenz
+    - Modell-Performance-Vergleich für diese Mine
+    - Zeitbasierte Trends (wann welche Werte gefunden)
+    - Template-Wert Erkennung und Qualitätsscore
+    """
+    from minesearch.database import db_manager
+    from sqlalchemy import desc as sql_desc, func, distinct
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+    import json
+    
+    logger.info(f"[STATISTICS] Getting historical stats for mine: {mine_name}")
+    
+    try:
+        with db_manager.get_session() as session:
+            # Zeitfilter
+            cutoff = datetime.now() - timedelta(days=days_back)
+            
+            # Basis-Query für diese Mine
+            query = session.query(SearchResult).filter(
+                SearchResult.mine_name == mine_name,
+                SearchResult.search_timestamp >= cutoff
+            )
+            
+            if exclude_exa:
+                query = query.filter(~SearchResult.model_used.like('exa:%'))
+            
+            results = query.order_by(sql_desc(SearchResult.search_timestamp)).all()
+            
+            if not results:
+                return {
+                    'success': False,
+                    'error': f'Keine historischen Daten für Mine "{mine_name}" gefunden',
+                    'mine_name': mine_name
+                }
+            
+            # STATISTIK-AGGREGATION
+            field_stats = defaultdict(lambda: {
+                'values': [],
+                'sources': defaultdict(int),
+                'confidences': [],
+                'timestamps': [],
+                'models': defaultdict(int)
+            })
+            
+            total_searches = len(results)
+            models_used = set()
+            search_dates = []
+            
+            # Durchlaufe alle Ergebnisse für diese Mine
+            for result in results:
+                models_used.add(result.model_used)
+                search_dates.append(result.search_timestamp)
+                
+                if result.structured_data:
+                    try:
+                        data = json.loads(result.structured_data) if isinstance(result.structured_data, str) else result.structured_data
+                        
+                        for field, value in data.items():
+                            if value and str(value).strip() and not str(value).startswith('TEMPLATE:'):
+                                field_stats[field]['values'].append(str(value))
+                                field_stats[field]['models'][result.model_used] += 1
+                                field_stats[field]['timestamps'].append(result.search_timestamp)
+                                
+                                # Pseudo-Konfidenz basierend auf Modell und Häufigkeit
+                                confidence = 0.8 if 'gpt-4' in result.model_used.lower() else 0.7
+                                field_stats[field]['confidences'].append(confidence)
+                    except json.JSONDecodeError:
+                        continue
+            
+            # ANALYSIERE JEDES FELD
+            analyzed_fields = {}
+            for field, stats in field_stats.items():
+                if not stats['values']:
+                    continue
+                    
+                # Häufigkeitsanalyse
+                value_counts = defaultdict(int)
+                for value in stats['values']:
+                    value_counts[value] += 1
+                
+                # Sortiere nach Häufigkeit
+                sorted_values = sorted(value_counts.items(), key=lambda x: x[1], reverse=True)
+                most_common_value = sorted_values[0][0] if sorted_values else None
+                consistency_rate = (sorted_values[0][1] / len(stats['values'])) * 100 if sorted_values else 0
+                
+                analyzed_fields[field] = {
+                    'field_name': field,
+                    'total_occurrences': len(stats['values']),
+                    'unique_values': len(set(stats['values'])),
+                    'most_common_value': most_common_value,
+                    'consistency_rate': round(consistency_rate, 1),
+                    'all_values': sorted_values[:5],  # Top 5 Werte
+                    'avg_confidence': round(sum(stats['confidences']) / len(stats['confidences']), 2) if stats['confidences'] else 0,
+                    'models_found_by': list(stats['models'].keys()),
+                    'model_agreement': len(stats['models']) / len(models_used) * 100 if models_used else 0,
+                    'first_found': min(stats['timestamps']).strftime('%Y-%m-%d') if stats['timestamps'] else None,
+                    'last_updated': max(stats['timestamps']).strftime('%Y-%m-%d') if stats['timestamps'] else None
+                }
+            
+            # MODELL-PERFORMANCE ANALYSE
+            model_performance = {}
+            for model in models_used:
+                model_results = [r for r in results if r.model_used == model]
+                total_fields = sum(len(json.loads(r.structured_data) if isinstance(r.structured_data, str) else r.structured_data if r.structured_data else {}) for r in model_results)
+                avg_response_time = sum(r.search_duration for r in model_results if r.search_duration) / len(model_results)
+                
+                model_performance[model] = {
+                    'searches': len(model_results),
+                    'avg_fields_found': round(total_fields / len(model_results), 1) if model_results else 0,
+                    'avg_response_time': round(avg_response_time, 2) if avg_response_time else 0,
+                    'success_rate': round(len([r for r in model_results if r.structured_data]) / len(model_results) * 100, 1)
+                }
+            
+            # QUALITÄTSSCORE BERECHNUNG
+            quality_indicators = []
+            for field_data in analyzed_fields.values():
+                # Punkte für Konsistenz
+                if field_data['consistency_rate'] > 80:
+                    quality_indicators.append(1.0)
+                elif field_data['consistency_rate'] > 60:
+                    quality_indicators.append(0.7)
+                else:
+                    quality_indicators.append(0.3)
+            
+            overall_quality = round(sum(quality_indicators) / len(quality_indicators) * 100, 1) if quality_indicators else 0
+            
+            return {
+                'success': True,
+                'data': {
+                    'mine_name': mine_name,
+                    'analysis_period': {
+                        'days_back': days_back,
+                        'from_date': cutoff.strftime('%Y-%m-%d'),
+                        'to_date': datetime.now().strftime('%Y-%m-%d'),
+                        'total_searches': total_searches
+                    },
+                    'field_statistics': analyzed_fields,
+                    'model_performance': model_performance,
+                    'quality_metrics': {
+                        'overall_quality_score': overall_quality,
+                        'total_fields_analyzed': len(analyzed_fields),
+                        'models_used_count': len(models_used),
+                        'consistency_rating': 'Hoch' if overall_quality > 80 else 'Mittel' if overall_quality > 60 else 'Niedrig'
+                    },
+                    'timeline': {
+                        'first_search': min(search_dates).strftime('%Y-%m-%d %H:%M') if search_dates else None,
+                        'last_search': max(search_dates).strftime('%Y-%m-%d %H:%M') if search_dates else None,
+                        'search_frequency': f"{len(search_dates) / days_back:.1f} Suchen pro Tag"
+                    }
+                }
+            }
+    
+    except Exception as e:
+        logger.error(f"[STATISTICS] Error getting mine statistics: {e}")
+        return {
+            'success': False,
+            'error': f'Fehler beim Laden der Mine-Statistiken: {str(e)}',
+            'mine_name': mine_name
+        }

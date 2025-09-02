@@ -409,15 +409,3 @@ Anwendungsbereich:
 - Allgemeine Softwareentwicklungsprojekte
 
 Letzte Aktualisierung: 15.06.2025
-
-========================================
-ÄNDERUNG 25.08.2025: CSV-Sicherheitslimit MAX_MINES_LIMIT
-========================================
-
-- Hintergrund: Hartes 100er Demo-Limit entfernt; Schutz vor ungebremsten CSV-Verarbeitungen notwendig.
-- Lösung: Konfigurierbares Sicherheitslimit via Umgebungsvariable `MAX_MINES_LIMIT` (Default: 10000).
-- Wirkung: CSV-Verarbeitung bricht ab, sobald i+1 >= `MAX_MINES_LIMIT`. Es wird ein WARN-Log mit Limitwert und Begründung ausgegeben.
-- Konfiguration: Wert per Prozess-Umgebung oder `.env` setzen (siehe `.env.example`).
-- Betroffene Dateien: `backend/minesearch/api/routes/batch.py`, `backend/minesearch/batch_service.py`, `backend/batch_route_fixed.py`.
-- Monitoring: Auf Häufung von Warnungen mit Text „MAX_MINES_LIMIT erreicht (...)“ achten.
-

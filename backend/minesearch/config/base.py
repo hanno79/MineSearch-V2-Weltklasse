@@ -15,16 +15,25 @@ from minesearch.config.models import MODELS_CONFIG
 
 # CSV-Spalten Definition
 # ÄNDERUNG 13.07.2025: ID-Feld entfernt - wird systemseitig generiert, nicht aus Quellen extrahiert
+# REGEL 10 FIX 29.08.2025: Entfernung von Template-auslösenden "/ usw." Patterns aus Feldnamen
+# Diese Patterns haben AI-Modelle dazu verleitet, Template-Antworten zu generieren!
 CSV_COLUMNS = [
     'Name', 'Country', 'Region', 'Eigentümer', 'Betreiber', 'x-Koordinate', 
     'y-Koordinate', 'Aktivitätsstatus',
     'Restaurationskosten', 'Jahr der Aufnahme der Kosten',
     'Jahr der Erstellung des Dokumentes', 
-    'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)',
-    'Minentyp (Untertage/ Open-Pit/ usw.)', 'Produktionsstart',
+    'Rohstoffabbau',  # GEÄNDERT: Entfernt "(Gold/ Kupfer/ Kohle/ usw.)"
+    'Minentyp',       # GEÄNDERT: Entfernt "(Untertage/ Open-Pit/ usw.)"
+    'Produktionsstart',
     'Produktionsende', 'Fördermenge/Jahr', 'Fläche der Mine in qkm',
     'Quellenangaben'
 ]
+
+# Batch-Suche Konfiguration - TRANSPARENCY FIX 30.08.2025
+BATCH_USE_CACHE_DEFAULT = False     # Batch-Suchen nutzen standardmäßig keinen Cache  
+BATCH_CACHE_HOURS_DEFAULT = 0       # Keine alten Daten für Batch-Suchen verwenden
+BATCH_SHOW_DATA_SOURCE = True       # Zeige Datenherkunft in Tabellen
+BATCH_FORCE_NEW_SESSION = True      # Erzwinge neue Session für Isolation
 
 # Felder die KEINE Quellennummern brauchen
 # ÄNDERUNG 13.07.2025: ID entfernt da nicht mehr in CSV_COLUMNS
@@ -74,9 +83,9 @@ class Config(APIKeysConfig):
     API_TIMEOUT = int(os.getenv('API_TIMEOUT', 30))  # Sekunden
     MAX_RETRIES = int(os.getenv('MAX_RETRIES', 3))
     
-    # Default Modell - ENTFERNT: Keine automatische Perplexity-Auswahl mehr
-    # ÄNDERUNG 14.07.2025: Kimi K2 als explizites Default-Modell für Kostenkontrolle
-    DEFAULT_MODEL = os.getenv('DEFAULT_MODEL', 'openrouter:kimi-k2')
+    # Default Modell - FIX 02.09.2025: Zurück zu OpenRouter Standard
+    # BrightData-Fallback entfernt - echte Fehler sollen sichtbar werden
+    DEFAULT_MODEL = os.getenv('DEFAULT_MODEL', 'openrouter:deepseek-free')
     PERPLEXITY_TEMPERATURE = float(os.getenv('PERPLEXITY_TEMPERATURE', 0.2))
     
     # Provider Konfiguration

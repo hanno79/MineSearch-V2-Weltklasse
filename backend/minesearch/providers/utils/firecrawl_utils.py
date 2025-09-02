@@ -81,7 +81,8 @@ class FirecrawlExtractor:
             match = re.search(pattern, content, re.IGNORECASE)
             if match:
                 cost_str = match.group(1).replace(',', '')
-                unit = match.group(0).lower()
+                # FIX 02.09.2025: Robust type checking für match.group(0).lower()
+                unit = match.group(0).lower() if match.group(0) is not None else ""
                 if 'billion' in unit or ' b' in unit:
                     cost = float(cost_str) * 1000  # Convert to millions
                 else:
@@ -100,8 +101,10 @@ class FirecrawlExtractor:
             if matches:
                 commodities = []
                 for match in matches:
+                    # FIX 02.09.2025: Robust type checking vor .lower() call
+                    match_str = str(match) if match is not None else ""
                     for commodity in ['gold', 'silver', 'copper', 'coal', 'iron', 'zinc', 'lead', 'nickel', 'uranium', 'lithium']:
-                        if commodity in match.lower():
+                        if commodity in match_str.lower():
                             commodities.append(commodity.capitalize())
                 if commodities:
                     extracted_data['commodities'] = list(set(commodities))

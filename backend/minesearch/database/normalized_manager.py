@@ -362,16 +362,17 @@ class NormalizedDatabaseManager(DatabaseManager):
         if not structured_data:
             return
         
+        # KRITISCHER FIX 29.08.2025: Stelle sicher dass field_definitions initialisiert ist
+        self._ensure_field_definitions_initialized()
+        
         source_name = None
         if sources and len(sources) > 0:
             source_name = sources[0].get('name') or sources[0].get('url')
         
+        # KRITISCHER FIX 29.08.2025: Logik-Reparatur für Session-Handling
         if db_session is not None:
+            # Mit externer Session (wird von aufrufender Funktion committed)
             session = db_session
-        else:
-            session = None
-        
-        if session is not None:
             for field_name, field_value in structured_data.items():
                 if not field_value or field_value in ['Nicht gefunden', 'Not found', 'X']:
                     continue
@@ -676,8 +677,13 @@ class NormalizedDatabaseManager(DatabaseManager):
         """
         try:
             # 1. Hole oder erstelle Mine
+            # REGEL 10 COMPLIANCE: Keine Dummy-Werte - Skip bei fehlendem Country
             if not country:
-                country = structured_data.get('Country') or structured_data.get('country') or 'Unknown'
+                extracted_country = structured_data.get('Country') or structured_data.get('country')
+                if not extracted_country:
+                    logger.warning(f"[NORMALIZED-DB] Keine Country-Daten für {mine_name} - REGEL 10: Skip ohne Dummy-Werte")
+                    raise ValueError(f"Fehlende Country-Daten für {mine_name}")
+                country = extracted_country
             
             mine_id = self.get_or_create_mine(mine_name, country, structured_data, db_session=db_session)
             
@@ -767,3 +773,45 @@ class NormalizedDatabaseManager(DatabaseManager):
             import traceback
             traceback.print_exc()
             raise
+    
+    def _ensure_field_definitions_initialized(self) -> None:
+        """
+        KRITISCHER FIX 29.08.2025: Stelle sicher, dass field_definitions Tabelle 
+        mit allen Standard-Feldnamen gefüllt ist
+        """
+        try:
+            with self.get_session() as session:
+                # Importiere CSV_COLUMNS aus config
+                from minesearch.config import CSV_COLUMNS
+                
+                # Zusätzliche dynamische Feldnamen die bei Batch-Suchen auftreten können
+                additional_fields = [
+                    # Test-Felder
+                    'TEST_Country', 'TEST_Region', 'TEST_Owner', 'DIRECT_TEST',
+                    # Häufige Variationen
+                    'Mine Name', 'Company', 'Owner', 'Operator', 'Location',
+                    'Status', 'Type', 'Commodity', 'Production', 'Capacity'
+                ]
+                
+                # Kombiniere alle Feldnamen
+                all_field_names = list(CSV_COLUMNS) + additional_fields
+                
+                # Füge alle Feldnamen hinzu (OR IGNORE für Duplikate)
+                for field_name in all_field_names:
+                    session.execute(text("""
+                        INSERT OR IGNORE INTO field_definitions (field_name, display_name, data_type)
+                        VALUES (:field_name, :display_name, 'text')
+                    """), {
+                        'field_name': field_name, 
+                        'display_name': field_name
+                    })
+                
+                session.commit()
+                
+                # Prüfe finalen Status
+                count_result = session.execute(text('SELECT COUNT(*) FROM field_definitions')).fetchone()
+                logger.info(f"✅ field_definitions initialisiert: {count_result[0]} Feldnamen verfügbar")
+                
+        except Exception as e:
+            logger.error(f"❌ Fehler bei field_definitions Initialisierung: {e}")
+            # Nicht re-raise, damit der Hauptprozess weiterläuft

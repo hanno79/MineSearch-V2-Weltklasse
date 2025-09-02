@@ -86,7 +86,7 @@ class ProviderStatusChecker:
             # Andere Provider haben meist weniger strenge Format-Regeln
             'tavily': len(api_key) > 15,
             'exa': len(api_key) > 15,
-            'abacus': len(api_key) > 10,
+            # 'abacus': len(api_key) > 10,  # ENTFERNT 02.09.2025: Abacus Provider entfernt
             'scrapingbee': len(api_key) > 20,
             'firecrawl': api_key.startswith('fc-'),
             'brightdata': len(api_key) > 30
@@ -152,6 +152,36 @@ class ProviderStatusChecker:
                     "max_tokens": 1
                 },
                 'budget_check': lambda r: 'insufficient_quota' not in str(r)
+            },
+            # API-TEST-FIX 29.08.2025: Füge Tavily, Abacus und Exa Test-Konfigurationen hinzu
+            'tavily': {
+                'url': 'https://api.tavily.com/search',
+                'headers': {'Content-Type': 'application/json'},
+                'method': 'POST',
+                'data': {
+                    'api_key': api_key,
+                    'query': 'test mining',
+                    'max_results': 1,
+                    'search_depth': 'basic'
+                },
+                'budget_check': lambda r: 'pay-as-you-go limit' not in str(r) and 'quota' not in str(r)
+            },
+            # 'abacus': {  # ENTFERNT 02.09.2025: Abacus Provider entfernt
+            #     'url': 'https://api.abacus.ai/api/v0/listProjects',
+            #     'headers': {'apiKey': api_key, 'Content-Type': 'application/json'},
+            #     'method': 'GET',
+            #     'budget_check': lambda r: 'insufficient_quota' not in str(r) and 'rate_limit' not in str(r) and 'authentication' not in str(r).lower()
+            # },
+            'exa': {
+                'url': 'https://api.exa.ai/search',  # EXA-TEST-FIX 29.08.2025: Exa Neural Search API
+                'headers': {'x-api-key': api_key, 'Content-Type': 'application/json'},
+                'method': 'POST',
+                'data': {
+                    'query': 'test mining data',
+                    'num_results': 1,
+                    'type': 'neural'
+                },
+                'budget_check': lambda r: 'quota' not in str(r).lower() and 'limit' not in str(r).lower()
             }
         }
         
@@ -179,6 +209,11 @@ class ProviderStatusChecker:
                             return {'accessible': False, 'budget_ok': False, 'error': 'Invalid API key'}
                         elif response.status == 429:
                             return {'accessible': True, 'budget_ok': False, 'error': 'Rate limit exceeded'}
+                        elif response.status in [402, 433]:  # BUDGET-FIX 29.08.2025: Erkenne Budget-Limits auch bei GET
+                            budget_ok = provider_config['budget_check'](text)
+                            if not budget_ok:
+                                return {'accessible': True, 'budget_ok': False, 'error': f'Budget exceeded (HTTP {response.status})'}
+                            return {'accessible': False, 'budget_ok': False, 'error': f'HTTP {response.status}'}
                         else:
                             return {'accessible': False, 'budget_ok': False, 'error': f'HTTP {response.status}'}
                 
@@ -197,6 +232,11 @@ class ProviderStatusChecker:
                             return {'accessible': False, 'budget_ok': False, 'error': 'Invalid API key'}
                         elif response.status == 429:
                             return {'accessible': True, 'budget_ok': False, 'error': 'Rate limit exceeded'}
+                        elif response.status in [402, 433]:  # BUDGET-FIX 29.08.2025: Erkenne Budget-Limits
+                            budget_ok = provider_config['budget_check'](text)
+                            if not budget_ok:
+                                return {'accessible': True, 'budget_ok': False, 'error': f'Budget exceeded (HTTP {response.status})'}
+                            return {'accessible': False, 'budget_ok': False, 'error': f'HTTP {response.status}: {text[:200]}'}
                         else:
                             return {'accessible': False, 'budget_ok': False, 'error': f'HTTP {response.status}: {text[:200]}'}
                         
@@ -210,21 +250,23 @@ class ProviderStatusChecker:
         
         logger.info("[PROVIDER-STATUS] 🔍 Starte umfassende Provider-Validierung...")
         
-        # Alle API-Keys aus Config
+        # API-Keys nur für aktive Provider (OpenRouter-geroutete Provider ausgeschlossen)
+        # PROVIDER-FIX-V3 29.08.2025: Entferne deaktivierte Provider die über OpenRouter laufen
         api_keys = {
-            'perplexity': config.PERPLEXITY_API_KEY,
-            'openrouter': config.OPENROUTER_API_KEY,
-            'abacus': config.ABACUS_API_KEY,
-            'tavily': config.TAVILY_API_KEY,
-            'exa': config.EXA_API_KEY,
-            'scrapingbee': config.SCRAPINGBEE_API_KEY,
-            'firecrawl': config.FIRECRAWL_API_KEY,
-            'brightdata': config.BRIGHTDATA_API_KEY,
-            'openai': config.OPENAI_API_KEY,
-            'anthropic': config.ANTHROPIC_API_KEY,
-            'gemini': config.GEMINI_API_KEY,
-            'grok': config.GROK_API_KEY,
-            'deepseek': config.DEEPSEEK_API_KEY
+            'openrouter': config.OPENROUTER_API_KEY,  # Hauptprovider für alle Premium-Modelle
+            # 'abacus': config.ABACUS_API_KEY,       # ENTFERNT 02.09.2025: Abacus Provider entfernt
+            'tavily': config.TAVILY_API_KEY,          # Web-Search Provider
+            'exa': config.EXA_API_KEY,                # Neural Search Provider
+            'scrapingbee': config.SCRAPINGBEE_API_KEY,  # Scraping Provider
+            'firecrawl': config.FIRECRAWL_API_KEY,      # Crawling Provider
+            'brightdata': config.BRIGHTDATA_API_KEY,    # Data Provider
+            # Die folgenden Provider sind DEAKTIVIERT und laufen über OpenRouter:
+            # 'perplexity': über OpenRouter geroutet
+            # 'openai': über OpenRouter geroutet  
+            # 'anthropic': über OpenRouter geroutet
+            # 'gemini': über OpenRouter geroutet
+            # 'grok': über OpenRouter geroutet
+            # 'deepseek': über OpenRouter geroutet
         }
         
         # Parallel-Tests für alle Provider
@@ -270,7 +312,15 @@ class ProviderStatusChecker:
             'check_timestamp': time.time()
         }
         
+        # API-KEY-LOGGING FIX 29.08.2025: Detaillierteres Logging für fehlende API-Keys
+        missing_keys = len([r for r in self.test_results.values() if r['status'] == 'no_api_key'])
+        api_errors = len([r for r in self.test_results.values() if r['status'] in ['api_error', 'invalid_key', 'connection_error']])
+        
         logger.info(f"[PROVIDER-STATUS] ✅ Validierung abgeschlossen: {healthy_providers}/{total_providers} Provider funktionsfähig")
+        if missing_keys > 0:
+            logger.warning(f"[PROVIDER-STATUS] ⚠️ {missing_keys} Provider ohne API-Key: {[k for k, v in self.test_results.items() if v['status'] == 'no_api_key']}")
+        if api_errors > 0:
+            logger.warning(f"[PROVIDER-STATUS] ❌ {api_errors} Provider mit API-Fehlern: {[k for k, v in self.test_results.items() if v['status'] in ['api_error', 'invalid_key', 'connection_error']]}")
         
         return summary
 
@@ -284,10 +334,38 @@ async def get_provider_status():
     try:
         status_report = await provider_checker.check_all_providers()
         
+        # PROVIDER-DISPLAY-FIX-V3 29.08.2025: Verbesserte Status-Anzeige mit OpenRouter-Info
+        missing_keys_count = len([r for r in status_report['provider_details'].values() if r['status'] == 'no_api_key'])
+        api_error_count = len([r for r in status_report['provider_details'].values() if r['status'] in ['api_error', 'invalid_key', 'connection_error']])
+        budget_issues_count = len([r for r in status_report['provider_details'].values() if r['status'] == 'budget_exceeded'])
+        
+        # Berechne OpenRouter-geroutete Provider
+        openrouter_routed_models = ['perplexity', 'openai', 'anthropic', 'gemini', 'grok', 'deepseek']
+        openrouter_status = status_report['provider_details'].get('openrouter', {}).get('status', 'unknown')
+        openrouter_models_available = len(openrouter_routed_models) if openrouter_status == 'healthy' else 0
+        
+        status_message = f"{status_report['healthy_providers']}/{status_report['total_providers']} Provider verfügbar"
+        
+        # Füge OpenRouter-Info hinzu
+        if openrouter_models_available > 0:
+            status_message += f" (inkl. {openrouter_models_available} über OpenRouter)"
+        
+        # Füge Problem-Info hinzu
+        problems = []
+        if budget_issues_count > 0:
+            problems.append(f"{budget_issues_count} Budget-Limit")
+        if api_error_count > 0:
+            problems.append(f"{api_error_count} API-Fehler")
+        if missing_keys_count > 0:
+            problems.append(f"{missing_keys_count} ohne API-Key")
+            
+        if problems:
+            status_message += f" | Probleme: {', '.join(problems)}"
+        
         return {
             "success": True,
             "data": status_report,
-            "message": f"{status_report['healthy_providers']}/{status_report['total_providers']} Provider sind verfügbar"
+            "message": status_message
         }
         
     except Exception as e:

@@ -21,34 +21,37 @@ class FirecrawlURLBuilder:
         
         urls = []
         
-        # Länderspezifische Domains
-        if country.lower() in ['kanada', 'canada']:
-            if region.lower() == 'quebec':
+        # Länderspezifische Domains - FIX 02.09.2025: None-safe .lower() calls
+        country_lower = country.lower() if country else ""
+        region_lower = region.lower() if region else ""
+        
+        if country_lower in ['kanada', 'canada']:
+            if region_lower == 'quebec':
                 urls.extend([
                     f"https://mern.gouv.qc.ca",
                     f"https://gestim.mines.gouv.qc.ca"
                 ])
             urls.append("https://www.nrcan.gc.ca/mining")
         
-        elif country.lower() in ['australien', 'australia']:
+        elif country_lower in ['australien', 'australia']:
             urls.extend([
                 "https://www.ga.gov.au",
                 "https://minedex.dmirs.wa.gov.au"
             ])
         
-        elif country.lower() in ['südafrika', 'south africa']:
+        elif country_lower in ['südafrika', 'south africa']:
             urls.extend([
                 "https://www.dmre.gov.za",
                 "https://www.mineralscouncil.org.za"
             ])
         
-        elif country.lower() in ['peru']:
+        elif country_lower in ['peru']:
             urls.extend([
                 "https://www.minem.gob.pe",
                 "https://www.ingemmet.gob.pe"
             ])
         
-        elif country.lower() in ['chile']:
+        elif country_lower in ['chile']:
             urls.extend([
                 "https://www.sernageomin.cl",
                 "https://www.cochilco.cl"

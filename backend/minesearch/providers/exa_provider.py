@@ -14,13 +14,14 @@ from datetime import datetime
 from .base_provider import AbstractProvider, ModelConfig, SearchResult
 
 from minesearch.data_extraction import DataExtractor
-from minesearch.source_discovery import extract_sources_from_content
+from minesearch.source_discovery import EnhancedSourceDiscovery, extract_sources_from_content
 from minesearch.utils import (
     generate_name_variants,
     get_country_config,
     generate_multilingual_search_terms,
 )
 from minesearch.specialized_prompts import SpecializedPrompts
+from minesearch.specialized_prompts_impl import SpecializedPrompts as SpecializedPromptsImpl
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +78,32 @@ class ExaProvider(AbstractProvider):
         commodity = options.get('commodity')
         region = options.get('region')
         
-        # ÄNDERUNG 08.07.2025: Nutze discovered_sources wenn vorhanden
+        # OPENROUTER WORKFLOW STEP 1: Source Discovery (wie OpenRouter)
         discovered_sources = options.get('discovered_sources', [])
+        use_all_sources = options.get('use_all_sources', False)
+        skip_discovery = options.get('skip_discovery', False)
+        
+        source_discovery = EnhancedSourceDiscovery()
+        
+        if not discovered_sources and not skip_discovery and mine_name:
+            # Nur wenn keine Quellen übergeben wurden, führe eigene Discovery durch
+            logger.info(f"[EXA] Starte eigene Source Discovery für {mine_name}")
+            discovered_sources = source_discovery.discover_sources_for_mine(
+                mine_name=mine_name,
+                country=country,
+                region=region
+            )
+            logger.info(f"[EXA] {len(discovered_sources)} Quellen selbst entdeckt")
+        else:
+            if use_all_sources:
+                logger.info(f"[EXA] 🔥 2-PHASEN WORKFLOW: Nutze ALLE {len(discovered_sources)} übergebenen DB-Quellen ohne Filter")
+            else:
+                logger.info(f"[EXA] Nutze {len(discovered_sources)} übergebene Quellen")
+        
+        # Generiere Sprachvarianten (wie OpenRouter)
+        name_variants = generate_name_variants(mine_name) if mine_name else []
+        country_config = get_country_config(country) if country else {}
+        multilingual_terms = generate_multilingual_search_terms(country_config)
         
         # ÄNDERUNG 05.07.2025: Nutze Specialized Prompts für bessere Ergebnisse
         # Erstelle semantische Query für Mining-Recherche
@@ -176,23 +201,49 @@ class ExaProvider(AbstractProvider):
                 content = self._build_content_from_results(result, mine_name)
                 sources = self._extract_exa_sources(result)
                 
-                # Extrahiere strukturierte Daten
-                extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
+                # OPENROUTER WORKFLOW STEP 2: Content durch AI-Modell schicken
+                logger.info(f"[EXA] Sende EXA-Ergebnisse durch AI-Modell für strukturierte Extraktion")
+                ai_response = await self._send_to_ai_model(
+                    content=content,
+                    mine_name=mine_name,
+                    country=country,
+                    commodity=commodity,
+                    region=region,
+                    discovered_sources=discovered_sources
+                )
+                
+                # OPENROUTER WORKFLOW STEP 3: DataExtractor auf AI-Response anwenden (wie OpenRouter)
+                extracted_data = self.data_extractor.extract_structured_data_with_sources(ai_response, mine_name, country)
+                
+                # OPENROUTER WORKFLOW STEP 4: Quality Gates (wie OpenRouter)
+                extracted_data = self._apply_quality_gates(extracted_data, mine_name)
+                
+                # Konvertiere discovered_sources zu standardisierten Source-Format (wie OpenRouter)
+                all_sources = sources  # EXA-Quellen
+                for source in discovered_sources:  # Alle Discovery-Quellen hinzufügen
+                    all_sources.append({
+                        'url': source.get('url', ''),
+                        'title': source.get('title', source.get('url', '')),
+                        'type': source.get('type', 'unknown'),
+                        'reliability': source.get('reliability_score')  # REGEL 10: Keine 0.5 Fallbacks
+                    })
                 
                 duration = (datetime.now() - start_time).total_seconds()
                 
                 return SearchResult(
                     success=True,
-                    content=content,
+                    content=ai_response,  # AI-Response als Content
                     structured_data=extracted_data['data'],
-                    sources=sources,
+                    sources=all_sources,  # Alle Quellen (EXA + Discovery)
                     metadata={
                         'model': model_id,
                         'provider': 'exa',
                         'structured_data_with_sources': extracted_data['data_with_sources'],
                         'source_index': extracted_data['source_index'],
                         'results_count': len(result.get('results', [])),
-                        'search_type': 'neural' if model_id == 'neural-search' else 'similarity'
+                        'search_type': 'neural' if model_id == 'neural-search' else 'similarity',
+                        'discovery_sources': len(discovered_sources),
+                        'unified_workflow': True  # Markierung für neuen Workflow
                     },
                     search_duration=duration
                 )
@@ -421,3 +472,98 @@ Fokussiere dich auf:
 - Detaillierte Betreiber- und Kostendaten
 
 Nutze Exa's neuronale Suchfähigkeiten für tiefgehende semantische Analysen."""
+    
+    # OPENROUTER WORKFLOW HELPER METHODS
+    
+    async def _send_to_ai_model(
+        self,
+        content: str,
+        mine_name: str,
+        country: str,
+        commodity: str = None,
+        region: str = None,
+        discovered_sources: List[Dict] = None
+    ) -> str:
+        """Sendet EXA-Ergebnisse an AI-Modell für strukturierte Extraktion (wie OpenRouter)"""
+        
+        # Nutze unified_extraction_service
+        from minesearch.unified_extraction_service import get_unified_extractor
+        import os
+        
+        try:
+            # Hole API-Key aus Environment
+            openrouter_key = os.getenv('OPENROUTER_API_KEY')
+            if not openrouter_key:
+                logger.error("[EXA] OPENROUTER_API_KEY nicht gefunden - verwende Fallback")
+                return content  # Fallback: Return raw content
+            
+            # Nutze Unified Extractor für AI-Verarbeitung
+            extractor = get_unified_extractor(openrouter_key)
+            
+            # AI-Extraktion durchführen
+            result = await extractor.extract_from_raw_content(
+                raw_content=content,
+                mine_name=mine_name,
+                country=country,
+                commodity=commodity,
+                region=region
+            )
+            
+            # Konvertiere strukturierte Daten zurück zu Text für DataExtractor
+            ai_response = self._convert_structured_to_text(result, mine_name)
+            
+            logger.info(f"[EXA] AI-Verarbeitung erfolgreich für {mine_name}")
+            return ai_response
+            
+        except Exception as e:
+            logger.error(f"[EXA] Fehler bei AI-Verarbeitung: {e}")
+            # Fallback: Return raw content
+            return content
+    
+    def _convert_structured_to_text(self, structured_data: Dict[str, Any], mine_name: str) -> str:
+        """Konvertiert strukturierte Daten zurück zu Text für DataExtractor"""
+        
+        text_parts = [f"Mining Information for {mine_name}:"]
+        
+        for field, value in structured_data.items():
+            if field.startswith('_'):
+                continue  # Skip metadata
+            
+            if value and str(value).strip():
+                text_parts.append(f"{field}: {value}")
+        
+        return "\n".join(text_parts)
+    
+    def _apply_quality_gates(self, extracted_data: Dict[str, Any], mine_name: str) -> Dict[str, Any]:
+        """Anwendung der Quality Gates (wie OpenRouter)"""
+        
+        # Kopiere OpenRouter Quality Gates
+        data = extracted_data.get('data', {})
+        
+        # Verhindere "Koordinaten" als Betreiber (wie OpenRouter)
+        if data.get('Betreiber'):
+            betreiber = str(data['Betreiber']).strip()
+            if betreiber.lower() in ['koordinaten', 'coordinates', 'coords', 'koordinate'] or 'koordinaten:' in betreiber.lower():
+                logger.warning(f"[EXA] Ungültiger Betreiber entfernt: {betreiber}")
+                data['Betreiber'] = ""
+                # Entferne auch aus data_with_sources
+                if 'Betreiber' in extracted_data.get('data_with_sources', {}):
+                    extracted_data['data_with_sources']['Betreiber'] = {"value": "", "sources": []}
+        
+        # Validiere Restaurationskosten (wie OpenRouter)
+        if data.get('Restaurationskosten'):
+            resto = data['Restaurationskosten']
+            logger.info(f"[EXA-DEBUG] Restaurationskosten extrahiert: '{resto}'")
+            
+            # Prüfe auf verdächtige Werte
+            suspicious_values = ['USD$1.0 million', 'CAD$1.0 million', '$1.0 million', '1.0 million', 
+                               'USD$1 million', 'CAD$1 million', '$1 million', '1 million',
+                               'CAD$10000.0 million', 'USD$10000.0 million']
+            if resto in suspicious_values or (isinstance(resto, str) and any(sv in resto for sv in suspicious_values)):
+                logger.warning(f"[EXA] Verdächtiger Restaurationswert entfernt: {resto}")
+                data['Restaurationskosten'] = ""
+                # Entferne auch aus data_with_sources
+                if 'Restaurationskosten' in extracted_data.get('data_with_sources', {}):
+                    extracted_data['data_with_sources']['Restaurationskosten'] = {"value": "", "sources": []}
+        
+        return extracted_data

@@ -574,14 +574,15 @@ class DatabaseManager:
                 session.rollback()
                 raise
     
-    def get_recent_search_results(self, mine_name: str, hours_back: int = 24, limit: int = 10) -> List[SearchResult]:
+    def get_recent_search_results(self, mine_name: str, hours_back: int = 24, limit: int = 10, session_id: Optional[str] = None) -> List[SearchResult]:
         """
-        KRITISCHER FIX 23.08.2025: Hole existierende Suchergebnisse aus der Datenbank
+        SESSION-ISOLATION FIX 30.08.2025: Hole existierende Suchergebnisse mit optionaler Session-Filterung
         
         Args:
             mine_name: Name der Mine
             hours_back: Anzahl Stunden zurück zu suchen
             limit: Maximale Anzahl Ergebnisse
+            session_id: Optional - Filter nach spezifischer Session für Batch-Isolation
             
         Returns:
             Liste von SearchResult-Objekten
@@ -592,16 +593,26 @@ class DatabaseManager:
             # Use timezone-aware datetime and convert to naive for consistent DB comparison
             cutoff_time = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours_back)
             
+            # BASIS-FILTER: Mine, Zeit, Erfolg, structured_data
+            filters = [
+                SearchResult.mine_name == mine_name,
+                SearchResult.created_at >= cutoff_time,
+                SearchResult.success == True,
+                SearchResult.structured_data.isnot(None)
+            ]
+            
+            # SESSION-ISOLATION FIX: Füge Session-Filter hinzu wenn angegeben
+            if session_id:
+                filters.append(SearchResult.session_id == session_id)
+                logger.info(f"[SESSION-ISOLATION] Filtering results for session: {session_id}")
+            else:
+                logger.warning(f"[SESSION-ISOLATION] NO session filter - will return results from ALL sessions!")
+            
             results = session.query(SearchResult).filter(
-                and_(
-                    SearchResult.mine_name == mine_name,
-                    SearchResult.created_at >= cutoff_time,
-                    SearchResult.success == True,
-                    SearchResult.structured_data.isnot(None)
-                )
+                and_(*filters)
             ).order_by(
                 SearchResult.created_at.desc()
             ).limit(limit).all()
             
-            logger.info(f"[DB-RECENT] Gefunden {len(results)} existierende Ergebnisse für {mine_name} in letzten {hours_back}h")
+            logger.info(f"[SESSION-ISOLATION] Found {len(results)} results for mine='{mine_name}', session='{session_id or 'ALL'}'")
             return results

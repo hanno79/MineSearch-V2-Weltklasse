@@ -75,6 +75,14 @@ function switchToTab(tabName) {
     // Update navigation state
     NavigationState.setCurrentTab(tabName);
     
+    // MODELL-AUSWAHL SICHTBARKEIT: Nur in Suche/Batch-Tabs anzeigen
+    const modelSelectionSection = document.querySelector('.global-model-selection');
+    if (modelSelectionSection) {
+        const shouldShowModels = tabName === 'single' || tabName === 'csv';
+        modelSelectionSection.style.display = shouldShowModels ? 'block' : 'none';
+        console.log(`🤖 [MODEL-SELECTION] ${shouldShowModels ? 'Angezeigt' : 'Versteckt'} für Tab: ${tabName}`);
+    }
+    
     // Integrate with TabAutoLoader system instead of old radio buttons
     if (window.TabAutoLoader && typeof TabAutoLoader.handleTabChange === 'function') {
         TabAutoLoader.handleTabChange(`${tabName}-tab`);
@@ -704,12 +712,17 @@ function initializeHeaderNavigation() {
     // FIX: Explizite Initialisierung auf 'single' als default
     // Initialize from URL hash only if hash exists, otherwise default to 'single'
     const hash = window.location.hash.substring(1);
-    if (hash && ['single', 'csv', 'consolidated', 'statistics', 'sources'].includes(hash)) {
-        console.log(`🧭 [NAVIGATION] Initializing from URL hash: ${hash}`);
-        NavigationState.setCurrentTab(hash);
-    } else {
-        console.log('🧭 [NAVIGATION] No valid hash - initializing to single tab');
-        NavigationState.setCurrentTab('single'); // Explicit default initialization
+    const initialTab = (hash && ['single', 'csv', 'consolidated', 'statistics', 'sources', 'database'].includes(hash)) ? hash : 'single';
+    
+    console.log(`🧭 [NAVIGATION] Initializing to tab: ${initialTab}`);
+    NavigationState.setCurrentTab(initialTab);
+    
+    // MODELL-AUSWAHL INITIALISIERUNG: Setze initiale Sichtbarkeit
+    const modelSelectionSection = document.querySelector('.global-model-selection');
+    if (modelSelectionSection) {
+        const shouldShowModels = initialTab === 'single' || initialTab === 'csv';
+        modelSelectionSection.style.display = shouldShowModels ? 'block' : 'none';
+        console.log(`🤖 [MODEL-SELECTION] Initial visibility: ${shouldShowModels ? 'Angezeigt' : 'Versteckt'} für Tab: ${initialTab}`);
     }
     
     // Close mobile menu on outside click

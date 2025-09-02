@@ -192,7 +192,7 @@ class StatisticsCalculator:
         provider_costs = {
             'openrouter': 0.002,  # $0.002 per successful query
             'perplexity': 0.001,  # $0.001 per successful query
-            'abacus': 0.003,      # $0.003 per successful query
+            # 'abacus': 0.003,   # ENTFERNT 02.09.2025: Abacus Provider entfernt
             'anthropic': 0.005    # $0.005 per successful query
         }
         

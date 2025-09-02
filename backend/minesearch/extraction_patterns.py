@@ -71,6 +71,11 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'Lat\.?:\s*([-+]?\d+\.?\d+)', 
             r'Breitengrad:\s*([-+]?\d+\.?\d+)',
             r'(?:GPS-)?Koordinaten:\s*([-+]?\d+\.?\d+)\s*[,/]\s*[-+]?\d+\.?\d+',
+            # FIX 02.09.2025: Neue Patterns für Perplexity slash-getrennte Formate
+            r'(?:mine|Mine).*?/.*?/.*?/\s*(4[0-9]|5[0-9]\.?\d+)\s*/',  # Latitude 40-59° für Nordamerika
+            r'/\s*([+-]?\d{2}\.?\d+)\s*/\s*[+-]?\d+\.?\d+',  # Slash-getrennt ohne Labels
+            # Inline Koordinaten ohne Labels (typische kanadische Ranges)
+            r'(?:bei|at|near|coordinates?)\s+(4[5-9]|5[0-5]\.?\d+)[,\s°]+',  # Lat 45-55° Kanada
             # Grad-Minuten-Sekunden Format
             r'(\d+)°\s*\d+[\'′]\s*\d+(?:\.\d+)?[\"″]\s*[NS]',
             # In Tabellen oder Listen
@@ -90,6 +95,11 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'Long?\.?:\s*([-+]?\d+\.?\d+)', 
             r'Längengrad:\s*([-+]?\d+\.?\d+)',
             r'(?:GPS-)?Koordinaten:\s*[-+]?\d+\.?\d+\s*[,/]\s*([-+]?\d+\.?\d+)',
+            # FIX 02.09.2025: Neue Patterns für Perplexity slash-getrennte Formate
+            r'(?:mine|Mine).*?/.*?/.*?/\s*[-+]?\d+\.?\d+\s*/\s*(-?[6-9]\d\.?\d+)',  # Longitude -60 bis -99° für Nordamerika
+            r'/\s*[-+]?\d{2}\.?\d+\s*/\s*([+-]?\d{2,3}\.?\d+)',  # Slash-getrennt, Longitude 2.-3. Position
+            # Inline Koordinaten ohne Labels (typische kanadische/nordamerikanische Ranges)
+            r'(?:bei|at|near|coordinates?)\s+\d+\.?\d+[,\s°]+(-?[6-9]\d\.?\d+)',  # Long -60 bis -99° Kanada/USA
             # Grad-Minuten-Sekunden Format
             r'(\d+)°\s*\d+[\'′]\s*\d+(?:\.\d+)?[\"″]\s*[EW]',
             # In Tabellen oder Listen
@@ -286,7 +296,21 @@ def get_restoration_cost_patterns() -> List[str]:
         r'(?:environmental\s+)?liabilit(?:y|ies)\s+of\s+\$?\s*([\d,]+(?:\.\d+)?)\s*(?:million|thousand|k)?',
         # Financial guarantee patterns
         r'(?:financial\s+)?guarantee[\s:]+\$?\s*([\d,]+(?:\.\d+)?)',
-        r'(?:Konzession|concession|permit)\s+requires?\s+\$?\s*([\d,]+(?:\.\d+)?)\s*(?:financial\s+)?guarantee'
+        r'(?:Konzession|concession|permit)\s+requires?\s+\$?\s*([\d,]+(?:\.\d+)?)\s*(?:financial\s+)?guarantee',
+        
+        # FIX 02.09.2025: Neue Patterns für unlabeled/slash-getrennte Formate
+        # Format: "Casa Berardi Mine / Kanada / Quebec / 49.5731083 / -79.2369972 / $61.4M restoration costs"
+        r'(?:mine|Mine)\s*/.*?/.*?/.*?/.*?/\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:M|million|k|thousand)?\s*(?:restoration|closure|ARO|environmental)',
+        # Format ohne Mine-Name: "/ Kanada / Quebec / coords / coords / $61.4M restoration"
+        r'/\s*[^/]+\s*/\s*[^/]+\s*/\s*[\d.+-]+\s*/\s*[\d.+-]+\s*/\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:M|million)?\s*(?:restoration|closure)',
+        # Flexible slash-getrennte Patterns mit Restaurationskosten am Ende
+        r'(?:.*?/\s*){4,6}\$?\s*([\d,]+(?:\.\d+)?)\s*(?:M|million)?\s*(?:restoration|closure|ARO)',
+        # Koordinaten gefolgt von Restaurationskosten
+        r'[-+]?\d+\.?\d+\s*/\s*[-+]?\d+\.?\d+\s*/?\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:M|million)?\s*(?:restoration|closure)',
+        # Perplexity-typische Formate mit zusätzlichen Informationen
+        r'(?:coordinates?|GPS|location).*?[-+]?\d+\.?\d+.*?[-+]?\d+\.?\d+.*?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:M|million)?\s*(?:restoration|closure|ARO)',
+        # Einfache Patterns für unlabeled Millionen-Beträge nach Koordinaten
+        r'[-+]?\d{2}\.?\d+.*?[-+]?\d{2,3}\.?\d+.*?\$?\s*([\d,]+(?:\.\d+)?)\s*(?:M|million)\s*(?:CAD|USD)?'
     ]
 
 

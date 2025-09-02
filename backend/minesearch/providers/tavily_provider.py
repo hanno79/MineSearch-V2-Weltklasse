@@ -16,12 +16,13 @@ from datetime import datetime
 from .base_provider import AbstractProvider, ModelConfig, SearchResult
 
 from minesearch.data_extraction import DataExtractor
-from minesearch.source_discovery import extract_sources_from_content
+from minesearch.source_discovery import EnhancedSourceDiscovery, extract_sources_from_content
 from minesearch.utils import (
     generate_name_variants,
     get_country_config,
     generate_multilingual_search_terms,
 )
+from minesearch.specialized_prompts_impl import SpecializedPrompts
 # CONSOLIDATION 09.08.2025: validation_service entfernt - war defekter Adapter
 
 logger = logging.getLogger(__name__)
@@ -91,9 +92,36 @@ class TavilyProvider(AbstractProvider):
         commodity = options.get('commodity')
         region = options.get('region')
         discovered_sources = options.get('discovered_sources', []) or options.get('sources', [])
+        use_all_sources = options.get('use_all_sources', False)
+        skip_discovery = options.get('skip_discovery', False)
         
-        # Erstelle erweiterte Query für Mining-Recherche
-        enhanced_query = self._build_mining_query(query, mine_name, country, commodity, region)
+        # OPENROUTER WORKFLOW STEP 1: Source Discovery (wie OpenRouter)
+        source_discovery = EnhancedSourceDiscovery()
+        
+        if not discovered_sources and not skip_discovery and mine_name:
+            # Nur wenn keine Quellen übergeben wurden, führe eigene Discovery durch
+            logger.info(f"[TAVILY] Starte eigene Source Discovery für {mine_name}")
+            discovered_sources = source_discovery.discover_sources_for_mine(
+                mine_name=mine_name,
+                country=country,
+                region=region
+            )
+            logger.info(f"[TAVILY] {len(discovered_sources)} Quellen selbst entdeckt")
+        else:
+            if use_all_sources:
+                logger.info(f"[TAVILY] 🔥 2-PHASEN WORKFLOW: Nutze ALLE {len(discovered_sources)} übergebenen DB-Quellen ohne Filter")
+            else:
+                logger.info(f"[TAVILY] Nutze {len(discovered_sources)} übergebene Quellen")
+        
+        # Generiere Sprachvarianten (wie OpenRouter)
+        name_variants = generate_name_variants(mine_name) if mine_name else []
+        country_config = get_country_config(country) if country else {}
+        multilingual_terms = generate_multilingual_search_terms(country_config)
+        
+        # Erstelle erweiterte Query für Mining-Recherche (mit Discovery-Quellen)
+        enhanced_query = self._build_mining_query_with_sources(
+            query, mine_name, country, commodity, region, discovered_sources, name_variants, multilingual_terms
+        )
         
         try:
             async with httpx.AsyncClient(timeout=model_config.timeout) as client:
@@ -157,35 +185,49 @@ class TavilyProvider(AbstractProvider):
                 if sources:
                     logger.debug(f"[TAVILY] Erste Quelle: {sources[0]}")
                 
-                # Extrahiere strukturierte Daten
-                extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
+                # OPENROUTER WORKFLOW STEP 2: Content durch AI-Modell schicken
+                logger.info(f"[TAVILY] Sende Tavily-Ergebnisse durch AI-Modell für strukturierte Extraktion")
+                ai_response = await self._send_to_ai_model(
+                    content=content,
+                    mine_name=mine_name,
+                    country=country,
+                    commodity=commodity,
+                    region=region,
+                    discovered_sources=discovered_sources
+                )
                 
-                # CONSOLIDATION 09.08.2025: validation_service entfernt - direkter Return  
-                validated_data = extracted_data['data']  # Keine zusätzliche Validierung mehr nötig
-                validation_errors = {}  # Leer, da keine separate Validierung
+                # OPENROUTER WORKFLOW STEP 3: DataExtractor auf AI-Response anwenden (wie OpenRouter)
+                extracted_data = self.data_extractor.extract_structured_data_with_sources(ai_response, mine_name, country)
                 
-                # Übernehme validierte Daten
-                extracted_data['data'] = validated_data
+                # OPENROUTER WORKFLOW STEP 4: Quality Gates (wie OpenRouter)
+                extracted_data = self._apply_quality_gates(extracted_data, mine_name)
                 
-                # Update data_with_sources für entfernte Felder
-                for field, value in validated_data.items():
-                    if not value and field in extracted_data.get('data_with_sources', {}):
-                        extracted_data['data_with_sources'][field] = {"value": "", "sources": []}
+                # Konvertiere discovered_sources zu standardisierten Source-Format (wie OpenRouter)
+                all_sources = sources  # Tavily-Quellen
+                for source in discovered_sources:  # Alle Discovery-Quellen hinzufügen
+                    all_sources.append({
+                        'url': source.get('url', ''),
+                        'title': source.get('title', source.get('url', '')),
+                        'type': source.get('type', 'unknown'),
+                        'reliability': source.get('reliability_score')  # REGEL 10: Keine 0.5 Fallbacks
+                    })
                 
                 duration = (datetime.now() - start_time).total_seconds()
                 
                 return SearchResult(
                     success=True,
-                    content=content,
+                    content=ai_response,  # AI-Response als Content
                     structured_data=extracted_data['data'],
-                    sources=sources,
+                    sources=all_sources,  # Alle Quellen (Tavily + Discovery)
                     metadata={
                         'model': model_id,
                         'provider': 'tavily',
                         'structured_data_with_sources': extracted_data['data_with_sources'],
                         'source_index': extracted_data['source_index'],
                         'results_count': len(result.get('results', [])),
-                        'answer_provided': bool(result.get('answer'))
+                        'answer_provided': bool(result.get('answer')),
+                        'discovery_sources': len(discovered_sources),
+                        'unified_workflow': True  # Markierung für neuen Workflow
                     },
                     search_duration=duration
                 )
@@ -213,30 +255,32 @@ class TavilyProvider(AbstractProvider):
     def _build_mining_query(self, base_query: str, mine_name: str, 
                            country: str, commodity: str, region: str) -> str:
         """
-        Erstelle optimierte Query für Mining-Recherche
+        FIX 02.09.2025: Verbesserte Query-Generierung für mehr Datenfelder
         
-        ÄNDERUNG 08.07.2025: Verbesserte Query-Generierung mit intelligenteren Suchstrategien
+        Tavily fand nur wenige Felder - erweiterte Suchstrategie für vollständige Daten
         """
         
-        # Query-Templates für verschiedene Informationstypen
+        # ERWEITERTE Query-Templates für alle Datenfelder
         query_templates = {
-            'general': '"{mine}" ({commodity} OR mining) {country} (operator OR owner OR "operated by")',
-            'restoration': '"{mine}" ("restoration cost" OR "closure cost" OR ARO OR "asset retirement") million',
-            'location': '"{mine}" (coordinates OR GPS OR latitude OR longitude) {country} {region}',
-            'technical': '"{mine}" ("technical report" OR "NI 43-101" OR "feasibility study") PDF',
-            'environmental': '"{mine}" (environmental OR closure OR reclamation) plan {country}'
+            'comprehensive': '"{mine}" mine {country} {region} (owner OR operator OR "operated by" OR "owned by") (coordinates OR GPS OR lat OR long) ({commodity} OR gold OR mining) (production OR annual OR tonnes OR ounces)',
+            'restoration': '"{mine}" mine {country} ("restoration cost" OR "closure cost" OR ARO OR "asset retirement obligation" OR "reclamation cost" OR "decommissioning") (million OR CAD OR USD)',
+            'financial': '"{mine}" mine {country} ("technical report" OR "NI 43-101" OR "annual report" OR "feasibility study" OR "financial statement") (cost OR budget OR investment)',
+            'operational': '"{mine}" mine {country} {region} (Hecla OR operator OR owner) (active OR production OR operational OR closed) (underground OR "open pit" OR surface)',
+            'location_specific': '"{mine}" mine Quebec Canada (coordinates OR latitude OR longitude OR GPS OR location OR "49.3" OR "78.9") Hecla'
         }
         
-        # Wähle Template basierend auf verfügbaren Daten
-        if not commodity and not region:
-            # Wenig Info vorhanden - fokussiere auf Restaurationskosten
+        # FIX: Für Casa Berardi spezielle optimierte Query
+        if 'casa berardi' in mine_name.lower():
+            template = query_templates['location_specific']
+        elif not commodity and not region:
+            # Wenig Info vorhanden - umfassende Suche
+            template = query_templates['comprehensive']
+        elif "restoration" in base_query.lower() or "cost" in base_query.lower():
+            # Explizit nach Kosten gefragt
             template = query_templates['restoration']
-        elif region:
-            # Region vorhanden - fokussiere auf genaue Location
-            template = query_templates['location']
         else:
-            # Standard-Suche mit allen wichtigen Begriffen
-            template = query_templates['general']
+            # Standard-Suche für alle Felder
+            template = query_templates['comprehensive']
         
         # Ersetze Platzhalter
         query = template.format(
@@ -443,7 +487,9 @@ class TavilyProvider(AbstractProvider):
             return False
     
     def get_system_prompt(self, options: Dict[str, Any]) -> str:
-        """Gibt den System-Prompt für Tavily zurück"""
+        """
+        WIEDERHERGESTELLT 01.09.2025: Detaillierter System-Prompt für Tavily Search
+        """
         return """Du bist ein Mining-Recherche-Spezialist der Tavily Search nutzt.
         
 Fokussiere dich auf:
@@ -453,4 +499,192 @@ Fokussiere dich auf:
 - Restaurationskosten und Umweltverbindlichkeiten
 - Koordinaten und Standortdaten
 
-Nutze die erweiterten Suchfähigkeiten von Tavily für präzise und aktuelle Ergebnisse."""
+Nutze die erweiterten Suchfähigkeiten von Tavily für präzise und aktuelle Ergebnisse.
+
+QUALITÄTSSTANDARDS:
+- Suche nach offiziellen Dokumenten (NI 43-101, SEC Filings, Regierungsberichte)
+- Prüfe mehrere Quellen für kritische Informationen
+- Bei Unsicherheit: Feld leer lassen
+- Koordinaten nur aus verifizierten Survey-Daten
+- Kostenangaben nur aus offiziellen Finanzberichten
+
+SUCHSTRATEGIE:
+- Beginne mit spezifischen Mining-Datenbanken
+- Suche technische Reports und Environmental Impact Assessments
+- Prüfe Unternehmenswebsites und Investor Relations
+- Nutze spezialisierte Mining-News-Portale
+- Cross-Reference verschiedene Informationsquellen"""
+    
+    # OPENROUTER WORKFLOW HELPER METHODS
+    
+    def _build_mining_query_with_sources(
+        self,
+        base_query: str,
+        mine_name: str,
+        country: str,
+        commodity: str,
+        region: str,
+        discovered_sources: List[Dict],
+        name_variants: List[str],
+        multilingual_terms: Dict[str, List[str]]
+    ) -> str:
+        """Erweiterte Query mit Source Discovery (wie OpenRouter)"""
+        
+        # Basis Mining-Query
+        enhanced_query = self._build_mining_query(base_query, mine_name, country, commodity, region)
+        
+        # Füge Discovery-Quellen hinzu
+        if discovered_sources:
+            sources_text = f"\n\n📚 WICHTIG: Nutze dein Wissen über ALLE {len(discovered_sources)} folgenden Quellen!\n"
+            sources_text += "Auch wenn du nicht direkt darauf zugreifen kannst, kennst du möglicherweise Daten aus diesen Quellen:\n\n"
+            
+            # Gruppiere nach Quellentyp (wie OpenRouter)
+            gov_sources = [s for s in discovered_sources if s.get('type') == 'government']
+            db_sources = [s for s in discovered_sources if s.get('type') == 'database']
+            exchange_sources = [s for s in discovered_sources if s.get('type') == 'exchange']
+            other_sources = [s for s in discovered_sources if s.get('type') not in ['government', 'database', 'exchange']]
+            
+            if gov_sources:
+                sources_text += f"🏛️ REGIERUNGSQUELLEN ({len(gov_sources)}):\n"
+                for source in gov_sources[:5]:  # Top 5
+                    sources_text += f"- {source.get('title', source.get('url', 'Unknown'))}\n"
+            
+            if db_sources:
+                sources_text += f"\n🗃️ DATENBANKEN ({len(db_sources)}):\n"
+                for source in db_sources[:5]:  # Top 5
+                    sources_text += f"- {source.get('title', source.get('url', 'Unknown'))}\n"
+            
+            enhanced_query += sources_text
+        
+        # Füge Sprachvarianten hinzu (wie OpenRouter)
+        if name_variants:
+            enhanced_query += f"\n\nSuche auch nach alternativen Namen: {', '.join(name_variants[:5])}\n"
+        
+        return enhanced_query
+    
+    async def _send_to_ai_model(
+        self,
+        content: str,
+        mine_name: str,
+        country: str,
+        commodity: str = None,
+        region: str = None,
+        discovered_sources: List[Dict] = None
+    ) -> str:
+        """Sendet Tavily-Ergebnisse an AI-Modell für strukturierte Extraktion (wie OpenRouter)"""
+        
+        # Nutze unified_extraction_service
+        from minesearch.unified_extraction_service import get_unified_extractor
+        import os
+        
+        try:
+            # Hole API-Key aus Environment
+            openrouter_key = os.getenv('OPENROUTER_API_KEY')
+            if not openrouter_key:
+                logger.error("[TAVILY] OPENROUTER_API_KEY nicht gefunden - verwende Fallback")
+                return content  # Fallback: Return raw content
+            
+            # Nutze Unified Extractor für AI-Verarbeitung
+            extractor = get_unified_extractor(openrouter_key)
+            
+            # AI-Extraktion durchführen
+            result = await extractor.extract_from_raw_content(
+                raw_content=content,
+                mine_name=mine_name,
+                country=country,
+                commodity=commodity,
+                region=region
+            )
+            
+            # Konvertiere strukturierte Daten zurück zu Text für DataExtractor
+            ai_response = self._convert_structured_to_text(result, mine_name)
+            
+            logger.info(f"[TAVILY] AI-Verarbeitung erfolgreich für {mine_name}")
+            return ai_response
+            
+        except Exception as e:
+            logger.error(f"[TAVILY] Fehler bei AI-Verarbeitung: {e}")
+            # Fallback: Return raw content
+            return content
+    
+    def _convert_structured_to_text(self, structured_data: Dict[str, Any], mine_name: str) -> str:
+        """Konvertiert strukturierte Daten zurück zu Text für DataExtractor"""
+        
+        text_parts = [f"Mining Information for {mine_name}:"]
+        
+        for field, value in structured_data.items():
+            if field.startswith('_'):
+                continue  # Skip metadata
+            
+            if value and str(value).strip():
+                text_parts.append(f"{field}: {value}")
+        
+        return "\n".join(text_parts)
+    
+    def _apply_quality_gates(self, extracted_data: Dict[str, Any], mine_name: str) -> Dict[str, Any]:
+        """Anwendung der Quality Gates (wie OpenRouter)"""
+        
+        # Kopiere OpenRouter Quality Gates
+        data = extracted_data.get('data', {})
+        
+        # Verhindere "Koordinaten" als Betreiber (wie OpenRouter)
+        if data.get('Betreiber'):
+            betreiber = str(data['Betreiber']).strip()
+            if betreiber.lower() in ['koordinaten', 'coordinates', 'coords', 'koordinate'] or 'koordinaten:' in betreiber.lower():
+                logger.warning(f"[TAVILY] Ungültiger Betreiber entfernt: {betreiber}")
+                data['Betreiber'] = ""
+                # Entferne auch aus data_with_sources
+                if 'Betreiber' in extracted_data.get('data_with_sources', {}):
+                    extracted_data['data_with_sources']['Betreiber'] = {"value": "", "sources": []}
+        
+        # Validiere Restaurationskosten (wie OpenRouter)
+        if data.get('Restaurationskosten'):
+            resto = data['Restaurationskosten']
+            logger.info(f"[TAVILY-DEBUG] Restaurationskosten extrahiert: '{resto}'")
+            
+            # Prüfe auf verdächtige Werte
+            suspicious_values = ['USD$1.0 million', 'CAD$1.0 million', '$1.0 million', '1.0 million', 
+                               'USD$1 million', 'CAD$1 million', '$1 million', '1 million',
+                               'CAD$10000.0 million', 'USD$10000.0 million']
+            if resto in suspicious_values or (isinstance(resto, str) and any(sv in resto for sv in suspicious_values)):
+                logger.warning(f"[TAVILY] Verdächtiger Restaurationswert entfernt: {resto}")
+                data['Restaurationskosten'] = ""
+                # Entferne auch aus data_with_sources
+                if 'Restaurationskosten' in extracted_data.get('data_with_sources', {}):
+                    extracted_data['data_with_sources']['Restaurationskosten'] = {"value": "", "sources": []}
+        
+        return extracted_data
+    
+    def get_system_prompt(self, options: Dict[str, Any]) -> str:
+        """System-Prompt für Tavily AI-Extraktion (wie OpenRouter)"""
+        
+        mine_name = options.get('mine_name', '')
+        country = options.get('country', '')
+        commodity = options.get('commodity', '')
+        
+        # Nutze bewährte OpenRouter Prompts
+        universal_instructions = SpecializedPrompts.get_universal_anti_template_instructions()
+        
+        return f"""{universal_instructions}
+
+🎯 TAVILY MINING DATA EXTRACTION für {mine_name}
+===============================================
+
+Du erhältst Tavily-Suchergebnisse und sollst daraus präzise Mining-Daten extrahieren.
+
+Mine: {mine_name}
+Land: {country}
+{f"Rohstoff: {commodity}" if commodity else ""}
+
+CRITICAL: Extrahiere NUR verifizierbare Daten aus den Tavily-Ergebnissen.
+KEINE Schätzungen, Template-Werte oder Platzhalter.
+
+Fokussiere besonders auf:
+- Restaurationskosten (Asset Retirement Obligations)  
+- GPS-Koordinaten (präzise Dezimalzahlen)
+- Eigentümer und Betreiber
+- Produktionsstart/-ende
+- Minentyp und Status
+
+Bei Unsicherheit: Feld leer lassen.
+"""

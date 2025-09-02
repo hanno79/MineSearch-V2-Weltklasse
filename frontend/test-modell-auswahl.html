@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Modell-Auswahl</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .selected { background-color: #4CAF50 !important; color: white; }
+        .quick-model-pill { 
+            display: inline-block; 
+            padding: 8px 16px; 
+            margin: 4px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            background: #f5f5f5;
+        }
+        .model-card { 
+            border: 1px solid #ddd; 
+            margin: 4px; 
+            padding: 8px; 
+            border-radius: 4px; 
+        }
+        #results { margin-top: 20px; padding: 10px; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Test Modell-Auswahl Fix</h1>
+    
+    <div id="model-selection">
+        <!-- Wird von JavaScript gefüllt -->
+    </div>
+    
+    <div id="results">
+        <strong>Ausgewählte Modelle: <span id="count">0</span></strong>
+        <div id="selected-list"></div>
+    </div>
+
+    <script>
+        window.API_BASE_URL = 'http://localhost:8000';
+        
+        // Lade das progressive-model-selection Script
+        const script = document.createElement('script');
+        script.src = '/static/progressive-model-selection.js?v=' + Date.now();
+        document.head.appendChild(script);
+        
+        // Test nach 2 Sekunden
+        setTimeout(() => {
+            console.log('🧪 [TEST] Testing model selection...');
+            if (window.progressiveModelSelection) {
+                console.log('✅ [TEST] Progressive Model Selection loaded');
+                
+                // Debug-Button hinzufügen
+                const debugBtn = document.createElement('button');
+                debugBtn.textContent = 'Debug Provider Info';
+                debugBtn.onclick = () => {
+                    console.log('🔍 [TEST] Debug Info:');
+                    console.log('  Available providers:', Array.from(window.progressiveModelSelection.providers.keys()));
+                    console.log('  Total models:', window.progressiveModelSelection.models.length);
+                    console.log('  Selected models:', Array.from(window.progressiveModelSelection.selectedModels));
+                };
+                document.body.appendChild(debugBtn);
+                
+                // Test Top 3 Button simulieren
+                const testTop3Btn = document.createElement('button');
+                testTop3Btn.textContent = 'Test Top 3 Selection';
+                testTop3Btn.onclick = () => {
+                    console.log('🏆 [TEST] Simulating Top 3 click...');
+                    const top3Models = window.progressiveModelSelection.getTopPerformanceModels();
+                    console.log('🏆 [TEST] Top 3 models:', top3Models.map(m => m.model_id));
+                };
+                document.body.appendChild(testTop3Btn);
+                
+                // Real-time Updates
+                setInterval(() => {
+                    const selected = window.progressiveModelSelection.getSelectedModels();
+                    document.getElementById('count').textContent = selected.length;
+                    document.getElementById('selected-list').innerHTML = 
+                        selected.map(model => `<div>- ${model}</div>`).join('');
+                }, 1000);
+                
+            } else {
+                console.log('❌ [TEST] Progressive Model Selection not loaded');
+            }
+        }, 2000);
+    </script>
+</body>
+</html>

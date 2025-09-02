@@ -45,7 +45,9 @@ def is_template_or_dummy_value(value: str, field: str = None) -> bool:
         'n/a', 'na', 'tbd', 'to be determined', 'keine angabe',
         'keine angaben', 'keine daten', 'nicht ermittelbar',
         'nicht spezifiziert', 'not specified', 'not applicable',
-        'keine information', 'no info', 'nichts gefunden'
+        'keine information', 'no info', 'nichts gefunden',
+        # REGEL 10 FIX 29.08.2025: Spezifische DB-Dummy-Werte
+        'keine spezifischen quellen dokumentiert', 'keine spezifischen quellen gefunden'
     ]
     
     if value_lower in unknown_patterns:
@@ -527,7 +529,8 @@ def process_sources(data: Dict[str, str], all_sources: List[Dict[str, Any]]) -> 
         Aktualisiertes Dictionary mit formatierten Quellen
     """
     if not all_sources:
-        data['Quellenangaben'] = 'Keine spezifischen Quellen gefunden'
+        # REGEL 10 FIX 29.08.2025: Keine Dummy-Werte - lasse Feld leer wenn keine Quellen
+        data['Quellenangaben'] = ''
         return data
     
     # Formatiere Quellen
@@ -741,11 +744,32 @@ def extract_core_value(value: str, field: str) -> str:
         parts = cleaned.split(',')[0].split('/')[0].split('(')[0].strip()
         return parts.title()
     
-    # DEFAULT: Ersten sinnvollen Teil nehmen
+    # DEFAULT: Vorsichtige Bereinigung ohne Datenverlust
     else:
-        # Entferne Quellenreferenzen, Klammern am Ende, nehme ersten Satz/Teil
-        cleaned = value.split('.')[0].split(',')[0].split('(')[0].strip()
-        return cleaned
+        # DATENVERLUST-FIX 02.09.2025: Keine aggressive Truncation mehr!
+        # Alte Zeile war: cleaned = value.split('.')[0].split(',')[0].split('(')[0].strip()
+        # Problem: "75.6 Millionen CAD" wurde zu "75" durch .split('.')[0]
+        
+        # Identifiziere numerische Felder die NIE getruncated werden sollen
+        NUMERIC_PRESERVATION_FIELDS = [
+            'restaurationskosten', 'restoration', 'cost', 'kosten',
+            'koordinate', 'coordinate', 'latitude', 'longitude',
+            'fördermenge', 'production', 'produktions', 'förder',
+            'fläche', 'area', 'size', 'jahr', 'year'
+        ]
+        
+        field_lower = field.lower()
+        is_numeric_field = any(keyword in field_lower for keyword in NUMERIC_PRESERVATION_FIELDS)
+        
+        if is_numeric_field:
+            # KEINE TRUNCATION für numerische Felder - nur Quellenreferenzen entfernen
+            # Behalte Dezimalzahlen, Währungen und Einheiten
+            return value  # Bereits in Zeile 616 wurden Quellenreferenzen entfernt
+        else:
+            # Für Text-Felder: Moderate Bereinigung
+            # Entferne nur Klammern am Ende, keine Truncation bei Punkten/Kommas
+            cleaned = re.sub(r'\s*\([^)]*\)\s*$', '', value)  # Nur Klammern am Ende
+            return cleaned.strip()
 
 
 def clean_field_value(value: str, field: str) -> str:

@@ -149,7 +149,7 @@ class ScrapingBeeProvider(AbstractProvider):
         Gib die Daten im JSON-Format zurück."""
     
     async def search(self, query: str, model_id: str, options: Dict[str, Any]) -> SearchResult:
-        """Führt Web-Scraping mit ScrapingBee durch"""
+        """Führt Web-Scraping mit ScrapingBee durch - OPENROUTER WORKFLOW"""
         start_time = datetime.now()
         
         try:
@@ -174,6 +174,19 @@ class ScrapingBeeProvider(AbstractProvider):
                     error=f"Unbekanntes Modell: {model_id}"
                 )
             
+            mine_name = options.get('mine_name', query)
+            country = options.get('country', '')
+            commodity = options.get('commodity', '')
+            
+            # OPENROUTER WORKFLOW STEP 1: Source Discovery (wie OpenRouter)
+            from minesearch.source_manager import EnhancedSourceDiscovery
+            source_discovery = EnhancedSourceDiscovery()
+            discovered_sources = options.get('discovered_sources', [])
+            
+            if not discovered_sources and not options.get('skip_discovery', False):
+                logger.info(f"[SCRAPINGBEE] Starte Source Discovery für {mine_name}")
+                discovered_sources = source_discovery.discover_sources_for_mine(mine_name, country, commodity, limit=15)
+            
             # Baue Suchquery für Mining-Daten
             search_urls = await self._build_search_urls(query, options)
             
@@ -196,25 +209,69 @@ class ScrapingBeeProvider(AbstractProvider):
                     except Exception as e:
                         logger.error(f"[ScrapingBee] Fehler beim Scrapen von {url}: {e}")
             
-            # Verarbeite extrahierte Daten
-            structured_data = await self._process_scraped_data(scraped_data, options)
+            # OPENROUTER WORKFLOW STEP 2: Content durch AI-Modell schicken
+            raw_content = "\n\n---\n\n".join(scraped_data)
             
-            # Kombiniere Inhalte
-            combined_content = "\n\n---\n\n".join(scraped_data)
+            logger.info(f"[SCRAPINGBEE] Sende Scraping-Ergebnisse durch AI-Modell für strukturierte Extraktion")
+            ai_response = await self._send_to_ai_model(
+                content=raw_content,
+                mine_name=mine_name,
+                country=country,
+                commodity=commodity,
+                region=options.get('region'),
+                discovered_sources=discovered_sources
+            )
+            
+            # OPENROUTER WORKFLOW STEP 3: DataExtractor auf AI-Response anwenden (wie OpenRouter)
+            from minesearch.data_extraction import DataExtractor
+            data_extractor = DataExtractor()
+            extracted_data = data_extractor.extract_structured_data_with_sources(ai_response, mine_name, country)
+            
+            # OPENROUTER WORKFLOW STEP 4: Quality Gates (wie OpenRouter)
+            extracted_data = self._apply_quality_gates(extracted_data, mine_name)
+            
+            # REGEL 10 COMPLIANCE: Prüfe auf None (keine Dummy-Werte)
+            if not extracted_data.get('data'):
+                return SearchResult(
+                    success=False,
+                    content="",
+                    structured_data={},
+                    sources=[],
+                    metadata={
+                        'provider': 'scrapingbee',
+                        'model': model_id,
+                        'error': 'Keine echten Daten gefunden - REGEL 10: Keine Dummy-Werte verwendet',
+                        'unified_workflow': True
+                    },
+                    error="Keine strukturierten Daten extrahiert"
+                )
+            
+            # Konvertiere discovered_sources zu standardisierten Source-Format (wie OpenRouter)
+            all_sources = sources  # ScrapingBee-Scraping-Quellen
+            for source in discovered_sources:  # Alle Discovery-Quellen hinzufügen
+                all_sources.append({
+                    'url': source.get('url', ''),
+                    'title': source.get('title', source.get('url', '')),
+                    'type': source.get('type', 'unknown'),
+                    'reliability': source.get('reliability_score')  # REGEL 10: Keine 0.5 Fallbacks
+                })
             
             search_duration = (datetime.now() - start_time).total_seconds()
             
             return SearchResult(
                 success=True,
-                content=combined_content,
-                structured_data=structured_data,
-                sources=sources,
+                content=raw_content,
+                structured_data=extracted_data['data'],  # AI-extrahierte Daten (wie OpenRouter)
+                sources=all_sources,
                 metadata={
                     'provider': 'scrapingbee',
                     'model': model_id,
                     'search_duration': search_duration,
                     'urls_scraped': len(sources),
-                    'credits_used': len(sources) * model_config.get('credits_cost', 1)
+                    'credits_used': len(sources) * model_config.get('credits_cost', 1),
+                    'unified_workflow': True,  # Markierung für neuen Workflow
+                    'ai_model': 'claude-3-haiku',  # Standard AI-Modell
+                    'sources_discovered': len(discovered_sources)
                 }
             )
             
@@ -276,18 +333,22 @@ class ScrapingBeeProvider(AbstractProvider):
             params['render_js'] = 'true'
             params['stealth_proxy'] = 'true'  # Beste Erfolgsrate für schwierige Seiten
         
-        # Spezielle Parameter für AI-Extract
+        # Spezielle Parameter für AI-Extract - FIX 02.09.2025
         if model_id == 'ai-extract':
+            # ScrapingBee AI-Extract mit korrekten Parametern
             params['extract_rules'] = json.dumps({
-                'title': 'h1',
-                'content': 'body',
-                'tables': {
-                    'selector': 'table',
-                    'type': 'table'
-                }
+                'mine_name': {'type': 'text', 'selector': 'body'},
+                'coordinates': {'type': 'text', 'selector': 'body'},
+                'owner': {'type': 'text', 'selector': 'body'},
+                'operator': {'type': 'text', 'selector': 'body'},
+                'costs': {'type': 'text', 'selector': 'body'},
+                'production': {'type': 'text', 'selector': 'body'}
             })
             params['ai_extract'] = 'true'
-            params['ai_query'] = self.get_system_prompt(options)
+            # FIX: 'instruction' Parameter statt 'ai_query' für ScrapingBee API
+            params['instruction'] = f"""Extract structured mining data for the mine "{options.get('mine_name', '')}" from this webpage. 
+            Find: GPS coordinates, owner/operator, restoration costs, production data, mine type, status.
+            Return as JSON with fields: name, coordinates, owner, operator, costs, production, status."""
         
         # Entferne None-Werte
         params = {k: v for k, v in params.items() if v is not None}
@@ -312,21 +373,35 @@ class ScrapingBeeProvider(AbstractProvider):
                         'pdf_size': len(pdf_content)
                     }
                 elif model_id == 'ai-extract':
-                    # JSON Response erwartet
+                    # JSON Response erwartet - FIX 02.09.2025: Verbesserte Extraktion
                     try:
                         data = response.json()
+                        # ScrapingBee AI-Extract kann verschiedene Formate zurückgeben
+                        extracted_data = {}
+                        if isinstance(data, dict):
+                            # Direkte AI-Extract Ergebnisse verwenden
+                            if 'extracted_data' in data:
+                                extracted_data = data['extracted_data']
+                            elif 'ai_extract' in data:
+                                extracted_data = data['ai_extract'] 
+                            else:
+                                extracted_data = data
+                                
                         return {
                             'url': url,
-                            'content': json.dumps(data) if isinstance(data, dict) else str(data),
-                            'title': data.get('title', '') if isinstance(data, dict) else 'Mining Data'
+                            'content': response.text,  # Original HTML für Fallback-Parsing
+                            'extracted': extracted_data,  # Strukturierte AI-Daten
+                            'title': extracted_data.get('title', '') if extracted_data else 'Mining Data',
+                            'has_ai_extraction': bool(extracted_data)
                         }
                     except json.JSONDecodeError:
-                        # Fallback auf Text
+                        # Fallback: HTML mit lokalem NLP verarbeiten
                         text_content = response.text
                         return {
                             'url': url,
                             'content': text_content,
-                            'title': 'Mining Data'
+                            'title': 'Mining Data (HTML Fallback)',
+                            'needs_local_processing': True
                         }
                 else:
                     # Standard Text/HTML Response
@@ -360,32 +435,74 @@ class ScrapingBeeProvider(AbstractProvider):
     
     async def _process_scraped_data(self, scraped_data: List[str], 
                                    options: Dict[str, Any]) -> Dict[str, Any]:
-        """Verarbeitet die gescrapten Daten zu strukturierten Mining-Informationen"""
+        """Verarbeitet die gescrapten Daten zu strukturierten Mining-Informationen - FIX 02.09.2025"""
         
-        # Basis-Struktur
+        # REGEL 10 FIX: Keine Dummy-Werte "-" verwenden - None statt Placeholder
         result = {
             'Name': options.get('mine_name', ''),
             'Country': options.get('country', ''),
-            'Region': options.get('region', '-'),
-            'Eigentümer': '-',
-            'Betreiber': '-',
-            'x-Koordinate': '-',
-            'y-Koordinate': '-',
-            'Aktivitätsstatus': '-',
-            'Restaurationskosten': '-',
-            'Jahr der Aufnahme der Kosten': '-',
-            'Jahr der Erstellung des Dokumentes': '-',
-            'Rohstoffabbau': options.get('commodity', '-'),
-            'Minentyp': '-',
-            'Produktionsstart': '-',
-            'Produktionsende': '-',
-            'Fördermenge/Jahr': '-',
-            'Fläche der Mine in qkm': '-',
-            'Quellenangaben': '-'
+            'Region': options.get('region'),  # None wenn nicht vorhanden
+            'Eigentümer': None,
+            'Betreiber': None,
+            'x-Koordinate': None,
+            'y-Koordinate': None,
+            'Aktivitätsstatus': None,
+            'Restaurationskosten': None,
+            'Jahr der Aufnahme der Kosten': None,
+            'Jahr der Erstellung des Dokumentes': None,
+            'Rohstoffabbau': options.get('commodity'),  # None wenn nicht vorhanden
+            'Minentyp': None,
+            'Produktionsstart': None,
+            'Produktionsende': None,
+            'Fördermenge/Jahr': None,
+            'Fläche der Mine in qkm': None,
+            'Quellenangaben': None
         }
         
-        # Kombiniere alle Daten
-        combined_text = "\n".join(scraped_data).lower()
+        # FIX 02.09.2025: Prüfe auf strukturierte AI-Extract Daten
+        ai_extracted_data = []
+        html_data = []
+        
+        for data in scraped_data:
+            # Wenn es ein Dictionary ist (von AI-Extract), verwende strukturierte Daten
+            if isinstance(data, dict) and data.get('extracted'):
+                ai_extracted_data.append(data['extracted'])
+                html_data.append(data.get('content', ''))
+            elif isinstance(data, dict) and data.get('has_ai_extraction'):
+                ai_extracted_data.append(data.get('extracted', {}))
+                html_data.append(data.get('content', ''))
+            else:
+                # Standard String-Daten
+                html_data.append(str(data) if not isinstance(data, str) else data)
+        
+        # Verarbeite AI-Extract Ergebnisse zuerst (höhere Qualität)
+        for ai_data in ai_extracted_data:
+            if isinstance(ai_data, dict):
+                if ai_data.get('coordinates'):
+                    coords = str(ai_data['coordinates'])
+                    if ',' in coords:
+                        parts = [p.strip() for p in coords.split(',')]
+                        if len(parts) >= 2:
+                            result['x-Koordinate'] = parts[1] if parts[1] != '-' else result['x-Koordinate'] 
+                            result['y-Koordinate'] = parts[0] if parts[0] != '-' else result['y-Koordinate']
+                
+                if ai_data.get('owner'):
+                    result['Eigentümer'] = str(ai_data['owner'])[:100]  # Begrenze Länge
+                    
+                if ai_data.get('operator'):
+                    result['Betreiber'] = str(ai_data['operator'])[:100]
+                    
+                if ai_data.get('costs'):
+                    result['Restaurationskosten'] = str(ai_data['costs'])[:50]
+                    
+                if ai_data.get('production'):
+                    result['Fördermenge/Jahr'] = str(ai_data['production'])[:50]
+                    
+                if ai_data.get('status'):
+                    result['Aktivitätsstatus'] = str(ai_data['status'])[:30]
+        
+        # Fallback: Kombiniere HTML-Daten für Pattern-Matching
+        combined_text = "\n".join(html_data).lower()
         
         # Extraktionsmuster
         patterns = {
@@ -500,3 +617,145 @@ class ScrapingBeeProvider(AbstractProvider):
                 })
         
         return scraped_results
+    
+    # OPENROUTER WORKFLOW HELPER METHODS (wie in Tavily/EXA/BrightData)
+    async def _send_to_ai_model(
+        self,
+        content: str,
+        mine_name: str,
+        country: str,
+        commodity: str = None,
+        region: str = None,
+        discovered_sources: List[Dict[str, Any]] = None
+    ) -> str:
+        """Sendet ScrapingBee Content durch AI-Modell für strukturierte Extraktion (wie OpenRouter)"""
+        
+        try:
+            from minesearch.specialized_prompts_impl import SpecializedPrompts
+            from minesearch.config.models import OPENROUTER_MODELS
+            import httpx
+            
+            # Standard AI-Modell für alternative Provider
+            model_name = "anthropic/claude-3-haiku-20240307"
+            
+            # Erstelle strukturierten Prompt (wie OpenRouter)
+            system_prompt = SpecializedPrompts.get_universal_anti_template_instructions()
+            system_prompt += f"""
+
+🎯 SCRAPINGBEE MINING DATENEXTRAKTION
+=============================================
+
+Analysiere die folgenden ScrapingBee Web-Scraping Ergebnisse und extrahiere strukturierte Mining-Daten für die Mine "{mine_name}" in {country}.
+
+AUSGABEFORMAT (JSON):
+{{
+    "Name": "{mine_name}",
+    "Country": "{country} (normalisiert)",
+    "Region": "spezifische Region",
+    "Eigentümer": "aktueller Eigentümer",
+    "Betreiber": "aktueller Betreiber",
+    "x-Koordinate": "präzise Dezimalzahl",
+    "y-Koordinate": "präzise Dezimalzahl",
+    "Aktivitätsstatus": "Aktiv/Geschlossen/Geplant",
+    "Restaurationskosten": "Betrag mit Währung",
+    "Jahr der Aufnahme der Kosten": "YYYY",
+    "Rohstoffabbau": "Gold, Kupfer, etc.",
+    "Minentyp": "Untertage/Tagebau",
+    "Produktionsstart": "YYYY",
+    "Produktionsende": "YYYY",
+    "Fördermenge/Jahr": "Menge mit Einheit",
+    "Fläche der Mine in qkm": "Fläche mit Einheit"
+}}
+
+KRITISCHE REGELN:
+- NUR echte, verifizierbare Daten verwenden
+- KEINE Template-Werte oder Schätzungen
+- Bei Unsicherheit: Feld leer lassen
+- Numerische Werte: Volle Präzision beibehalten
+- Länder normalisieren (Canada → Kanada)
+"""
+            
+            user_prompt = f"""Analysiere die ScrapingBee Scraping-Ergebnisse und extrahiere Mining-Daten für "{mine_name}" in {country}.
+
+{f"Rohstoff: {commodity}" if commodity else ""}
+{f"Region: {region}" if region else ""}
+
+Gib NUR das JSON-Objekt zurück.
+
+SCRAPINGBEE CONTENT:
+{content}"""
+            
+            # Sende an OpenRouter (wie andere AI-Provider)
+            openrouter_key = self.config.get('openrouter_api_key')
+            if not openrouter_key:
+                logger.error("[SCRAPINGBEE-AI] OpenRouter API Key fehlt für AI-Extraktion")
+                return content  # Fallback auf Raw Content
+            
+            async with httpx.AsyncClient(timeout=120) as client:
+                response = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {openrouter_key}",
+                        "HTTP-Referer": "https://mining-data-extraction.com",
+                        "X-Title": "MineSearch ScrapingBee AI Extraction",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": model_name,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                        "max_tokens": 4000,
+                        "temperature": 0.1
+                    }
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    ai_response = result["choices"][0]["message"]["content"]
+                    logger.info(f"[SCRAPINGBEE-AI] Erfolgreiche AI-Extraktion mit {model_name}")
+                    return ai_response
+                else:
+                    logger.error(f"[SCRAPINGBEE-AI] AI-API Fehler: {response.status_code}")
+                    
+        except Exception as e:
+            logger.error(f"[SCRAPINGBEE-AI] AI-Extraktion fehlgeschlagen: {e}")
+        
+        # Fallback: Originaler Content
+        return content
+    
+    def _apply_quality_gates(self, extracted_data: Dict[str, Any], mine_name: str) -> Dict[str, Any]:
+        """Wendet OpenRouter-ähnliche Quality Gates auf ScrapingBee-Ergebnisse an"""
+        
+        if not extracted_data or not extracted_data.get('data'):
+            return extracted_data
+            
+        data = extracted_data['data']
+        
+        # Basis Quality Gate: Name sollte immer gesetzt sein
+        if not data.get('Name'):
+            data['Name'] = mine_name
+            logger.debug(f"[SCRAPINGBEE-QG] Name ergänzt: {mine_name}")
+        
+        # Template-Detection für numerische Felder (wie in consolidated_field_utils.py)
+        numeric_fields = ['Restaurationskosten', 'x-Koordinate', 'y-Koordinate', 'Fördermenge/Jahr', 'Fläche der Mine in qkm']
+        
+        for field in numeric_fields:
+            if field in data and data[field]:
+                value_str = str(data[field])
+                # Schutz vor Template-Detection für numerische Werte
+                if any(char.isdigit() for char in value_str) or '$' in value_str or '€' in value_str:
+                    logger.debug(f"[SCRAPINGBEE-QG] Numerisches Feld geschützt: {field} = {data[field]}")
+                    continue  # Numerische Felder nicht durch Template-Detection entfernen
+        
+        # Entferne None-Werte und leere Strings (REGEL 10)
+        cleaned_data = {}
+        for key, value in data.items():
+            if value is not None and str(value).strip():
+                cleaned_data[key] = value
+        
+        extracted_data['data'] = cleaned_data
+        
+        logger.info(f"[SCRAPINGBEE-QG] Quality Gates angewendet für {mine_name}")
+        return extracted_data

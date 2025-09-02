@@ -5,6 +5,7 @@ Version: 2.0
 Beschreibung: Refactored MineSearchService (CLAUDE.md konform)
 """
 
+import asyncio
 import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
@@ -74,12 +75,13 @@ class MineSearchService:
         # Prüfe ob Modell verfügbar ist (mit Provider-Präfix)
         full_model_id = model if ':' in model else f"openrouter:{model}"
         
-        # Cache-Check - BUGFIX 20.07.2025: Temporär deaktiviert für Tests
+        # Cache-Check - WICHTIG: Cache bleibt deaktiviert für akkurate Testergebnisse
+        # Jede Suche muss neu ausgeführt werden um verfälschte Ergebnisse zu vermeiden
         # cached_result = await self._check_cache(mine_name, country or "", full_model_id, commodity=commodity, region=region)
         # if cached_result:
         #     logger.info(f"[SEARCH] Cache-Hit für {mine_name} mit Model {full_model_id}")
         #     return cached_result
-        logger.info(f"[SEARCH] Cache temporär deaktiviert - jede Suche wird frisch ausgeführt")
+        logger.info(f"[SEARCH] Cache deaktiviert - jede Suche wird frisch ausgeführt für akkurate Ergebnisse")
         if not self.registry.is_model_available(full_model_id):
             # Fallback auf Default-Modell
             logger.warning(f"Modell {full_model_id} nicht verfügbar, verwende Default: {config.DEFAULT_MODEL}")
@@ -99,7 +101,7 @@ class MineSearchService:
         try:
             result = await self._search_with_provider(mine_name, country, commodity, full_model_id, region)
             
-            # Cache das Ergebnis - BUGFIX 20.07.2025: Temporär deaktiviert für Tests
+            # Cache das Ergebnis - WICHTIG: Cache bleibt deaktiviert für akkurate Testergebnisse
             # if result.get('success'):
             #     await self._cache_result(mine_name, country or "", full_model_id, result, commodity=commodity, region=region)
             
@@ -187,10 +189,17 @@ class MineSearchService:
         provider_name = full_model_id.split(':')[0] if ':' in full_model_id else 'openrouter'
         provider = self.registry.get_provider(provider_name)
         if not provider:
-            logger.warning(f"Provider {provider_name} nicht verfügbar, verwende Default-Provider")
-            provider = self.registry.get_provider("openrouter")
-            if not provider:
-                raise Exception("Kein verfügbarer Provider gefunden")
+            error_msg = f"Provider '{provider_name}' für Modell '{full_model_id}' ist nicht verfügbar oder nicht korrekt konfiguriert"
+            logger.error(f"[PROVIDER ERROR] {error_msg}")
+            
+            # Prüfe spezifische Ursachen
+            available_providers = list(self.registry._providers.keys())
+            if provider_name not in available_providers:
+                error_msg += f". Verfügbare Provider: {available_providers}"
+            else:
+                error_msg += ". Provider ist registriert, aber Initialisierung fehlgeschlagen (möglicherweise fehlerhafte API-Keys)"
+            
+            raise Exception(error_msg)
         
         # Bereite Suchkontext vor
         name_variants = generate_name_variants(mine_name)
@@ -258,11 +267,17 @@ class MineSearchService:
         provider_name = legacy_full_model_id.split(':')[0]
         provider = self.registry.get_provider(provider_name)
         if not provider:
-            logger.warning(f"Provider {provider_name} nicht verfügbar, verwende Default-Provider")
-            provider = self.registry.get_provider("openrouter")
-            legacy_full_model_id = config.DEFAULT_MODEL  # Aktualisiere auf tatsächlich verwendetes Modell
-            if not provider:
-                raise Exception("Kein verfügbarer Provider gefunden")
+            error_msg = f"Provider '{provider_name}' für Modell '{legacy_full_model_id}' ist nicht verfügbar oder nicht korrekt konfiguriert"
+            logger.error(f"[PROVIDER ERROR] {error_msg}")
+            
+            # Prüfe spezifische Ursachen
+            available_providers = list(self.registry._providers.keys())
+            if provider_name not in available_providers:
+                error_msg += f". Verfügbare Provider: {available_providers}"
+            else:
+                error_msg += ". Provider ist registriert, aber Initialisierung fehlgeschlagen (möglicherweise fehlerhafte API-Keys)"
+            
+            raise Exception(error_msg)
         
         model_name = legacy_full_model_id.split(':')[1] if ':' in legacy_full_model_id else legacy_full_model_id
         
@@ -337,27 +352,24 @@ class MineSearchService:
             
             # 🆕 NORMALISIERTES SYSTEM: Entfernt - wird jetzt in _process_search_result erledigt
             
-            # 🚀 CRITICAL FIX: Update ModelStatisticsComprehensive für Legacy Search auch
+            # 🚀 PERFORMANCE FIX 02.09.2025: Async Model Statistics Update für bessere Performance
             try:
-                self.db_manager.update_model_statistics_comprehensive(legacy_full_model_id)
-                logger.info(f"[STATS-TRIGGER-LEGACY] Model statistics updated for {legacy_full_model_id}")
+                from minesearch.async_db_tasks import async_db_tasks
+                # Schedule async - blockiert nicht die Suche
+                asyncio.create_task(async_db_tasks.schedule_stats_update(legacy_full_model_id))
+                logger.info(f"[ASYNC-STATS-LEGACY] Model statistics update scheduled for {legacy_full_model_id}")
             except Exception as stats_error:
-                logger.error(f"[STATS-TRIGGER-LEGACY] Failed to update model statistics for {legacy_full_model_id}: {stats_error}")
+                logger.error(f"[ASYNC-STATS-LEGACY] Failed to schedule model statistics for {legacy_full_model_id}: {stats_error}")
                 # Don't fail the search if statistics update fails
             
-            # Aktualisiere Source-Statistiken in Database  
-            for source in sources:
-                if source.get('url'):
-                    self.db_manager.add_or_update_source(
-                        url=source.get('url'),
-                        domain=source.get('domain', ''),
-                        country=country,
-                        source_type=source.get('type', 'unknown'),
-                        metadata={
-                            'title': source.get('title', ''),
-                            'reliability': source.get('reliability')  # REGEL 10: Keine 0.5 Fallbacks
-                        }
-                    )
+            # 🚀 PERFORMANCE FIX 02.09.2025: Async Source Updates für bessere Performance
+            try:
+                from minesearch.async_db_tasks import async_db_tasks
+                # Schedule async source updates - blockiert nicht die Suche
+                asyncio.create_task(async_db_tasks.schedule_source_updates(sources, country))
+                logger.info(f"[ASYNC-SOURCES-LEGACY] Source updates scheduled for {len(sources)} sources")
+            except Exception as source_error:
+                logger.error(f"[ASYNC-SOURCES-LEGACY] Failed to schedule source updates: {source_error}")
                     
         except Exception as e:
             logger.error(f"[DB] Fehler beim Speichern des Legacy-Suchergebnisses: {e}")
@@ -517,27 +529,24 @@ class MineSearchService:
                 logger.error(f"❌ Atomic values save failed: {atomic_error}")
                 # Continue with legacy system if atomic save fails
             
-            # 🚀 CRITICAL FIX: Update ModelStatisticsComprehensive nach neuer Search
+            # 🚀 PERFORMANCE FIX 02.09.2025: Async Model Statistics Update für bessere Performance
             try:
-                self.db_manager.update_model_statistics_comprehensive(actual_model_used)
-                logger.info(f"[STATS-TRIGGER] Model statistics updated for {actual_model_used}")
+                from minesearch.async_db_tasks import async_db_tasks
+                # Schedule async - blockiert nicht die Suche
+                asyncio.create_task(async_db_tasks.schedule_stats_update(actual_model_used))
+                logger.info(f"[ASYNC-STATS] Model statistics update scheduled for {actual_model_used}")
             except Exception as stats_error:
-                logger.error(f"[STATS-TRIGGER] Failed to update model statistics for {actual_model_used}: {stats_error}")
+                logger.error(f"[ASYNC-STATS] Failed to schedule model statistics for {actual_model_used}: {stats_error}")
                 # Don't fail the search if statistics update fails
             
-            # Aktualisiere Source-Statistiken in Database  
-            for source in sources:
-                if source.get('url'):
-                    self.db_manager.add_or_update_source(
-                        url=source.get('url'),
-                        domain=source.get('domain', ''),
-                        country=country,
-                        source_type=source.get('type', 'unknown'),
-                        metadata={
-                            'title': source.get('title', ''),
-                            'reliability': source.get('reliability')  # REGEL 10: Keine 0.5 Fallbacks
-                        }
-                    )
+            # 🚀 PERFORMANCE FIX 02.09.2025: Async Source Updates für bessere Performance
+            try:
+                from minesearch.async_db_tasks import async_db_tasks
+                # Schedule async source updates - blockiert nicht die Suche
+                asyncio.create_task(async_db_tasks.schedule_source_updates(sources, country))
+                logger.info(f"[ASYNC-SOURCES] Source updates scheduled for {len(sources)} sources")
+            except Exception as source_error:
+                logger.error(f"[ASYNC-SOURCES] Failed to schedule source updates: {source_error}")
                     
         except Exception as e:
             logger.error(f"[DB] Fehler beim Speichern des Suchergebnisses: {e}")
@@ -579,13 +588,20 @@ class MineSearchService:
         provider_name = model.split(':')[0] if ':' in model else 'openrouter'
         provider = self.registry.get_provider(provider_name)
         if not provider:
-            logger.warning(f"Provider {provider_name} nicht verfügbar, verwende Default-Provider")
-            provider = self.registry.get_provider("openrouter")
-            if not provider:
-                raise Exception("Kein verfügbarer Provider gefunden")
+            error_msg = f"Provider '{provider_name}' für Modell '{model}' ist nicht verfügbar oder nicht korrekt konfiguriert"
+            logger.error(f"[PROVIDER ERROR] {error_msg}")
+            
+            # Prüfe spezifische Ursachen
+            available_providers = list(self.registry._providers.keys())
+            if provider_name not in available_providers:
+                error_msg += f". Verfügbare Provider: {available_providers}"
+            else:
+                error_msg += ". Provider ist registriert, aber Initialisierung fehlgeschlagen (möglicherweise fehlerhafte API-Keys)"
+            
+            raise Exception(error_msg)
         
         model_name = model.split(':')[1] if ':' in model else model
-        api_result = await provider.search(query, model_name)
+        api_result = await provider.search(query, model_name, {})
         
         if api_result.get('success'):
             content = api_result.get('content', '')

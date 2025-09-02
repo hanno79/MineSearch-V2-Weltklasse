@@ -426,11 +426,13 @@ function displayResultsTable(results, sortBy, order) {
  * Zeigt strukturierte Felder statt nur Metadaten in Cards
  */
 function displayConsolidatedResults(data, sortBy, order) {
-    console.log(`🎨 [PHASE 2.1] NEW FIELD-BASED DISPLAY: ${data.consolidated_results?.length || 0} mines with structured fields`);
+    console.log(`🎨 [TABLE VIEW] NEW TABLE-BASED DISPLAY: ${data.consolidated_results?.length || 0} mines`);
     
     const container = document.getElementById('consolidated-table-container');
+    const countElement = document.getElementById('results-count');
+    
     if (!container) {
-        console.error('[PHASE 2.1] Container not found: consolidated-table-container');
+        console.error('[TABLE VIEW] Container not found: consolidated-table-container');
         return;
     }
     
@@ -439,40 +441,239 @@ function displayConsolidatedResults(data, sortBy, order) {
             'Keine konsolidierten Ergebnisse verfügbar',
             'Es wurden keine konsolidierten Daten gefunden.'
         );
+        if (countElement) countElement.textContent = '0 Minen gefunden';
         return;
     }
     
-    // PHASE 2.1: Cache Global Source Index für Quellenreferenzen
+    // Cache Global Source Index für Quellenreferenzen
     window.globalSourceIndex = data.global_source_index || {};
-    console.log(`[PHASE 2.1] Cached ${Object.keys(window.globalSourceIndex).length} source references`);
+    window.currentConsolidatedData = data.consolidated_results; // For modal access
+    console.log(`[TABLE VIEW] Cached ${Object.keys(window.globalSourceIndex).length} source references`);
     
-    // PHASE 2.1: NEUE FIELD-BASED CARD GENERATION
-    const cards = data.consolidated_results.map(mine => generateFieldBasedCard(mine)).join('');
+    // Update results count
+    if (countElement) {
+        countElement.textContent = `${data.consolidated_results.length} Minen gefunden`;
+    }
     
-    // PHASE 2.1: Enhanced Container mit Field-Grid-System
+    // Check which view is active
+    const activeView = document.querySelector('.toggle-btn.active')?.getAttribute('data-view') || 'table';
+    
+    if (activeView === 'table') {
+        renderConsolidatedTable(data.consolidated_results, sortBy, order);
+    } else {
+        renderConsolidatedCards(data.consolidated_results, sortBy, order);
+    }
+    
+    console.log(`[TABLE VIEW] Successfully rendered ${data.consolidated_results.length} mines in ${activeView} view`);
+}
+
+/**
+ * NEUE TABELLEN-RENDERING FUNKTION
+ * Zeigt Minen in Tabellenform - CSV Export Vorschau
+ */
+function renderConsolidatedTable(mines, sortBy, order) {
+    const container = document.getElementById('consolidated-table-container');
+    
+    // Sammle alle verfügbaren Felder aus allen Minen
+    const allFields = new Set();
+    mines.forEach(mine => {
+        if (mine.best_values) {
+            Object.keys(mine.best_values).forEach(field => {
+                // FELDANZEIGE-FIX 29.08.2025: Nur Meta-Felder und englische Ursprungsfelder filtern
+                if (!field.startsWith('_') && // Meta-Felder wie _source_mapping ausschließen
+                    !['Mine', 'mine', 'mine_name', 'country', 'province'].includes(field)) {
+                    allFields.add(field);
+                }
+            });
+        }
+    });
+    
+    // SPALTENREIHENFOLGE-FIX 29.08.2025: Exakte User-Anforderung
+    // Mine, Land, Region sind feste Spalten (werden separat behandelt)
+    // Danach: Eigentümer, Betreiber, x-Koordinate, y-Koordinate, Rohstoffe, Minentyp, 
+    // Aktivitätsstatus, Produktionsstart, Produktionsende, Fördermenge, Minenfläche, 
+    // Restaurationskosten, Kostenjahr, Dokumentenjahr, Quellenangaben
+    const fieldOrder = [
+        'Eigentümer', 'Betreiber',
+        'x-Koordinate', 'y-Koordinate', 
+        'Rohstoffe', 'Minentyp', 'Aktivitätsstatus',
+        'Produktionsstart', 'Produktionsende', 'Fördermenge/Jahr',
+        'Minenfläche in qkm',
+        'Restaurationskosten', 'Kostenjahr', 'Dokumentenjahr'
+        // Quellenangaben wird separat ans Ende gesetzt
+    ];
+    
+    // Sortiere Felder nach logischer Reihenfolge
+    const orderedFields = [];
+    
+    // Erst bekannte Felder in gewünschter Reihenfolge
+    fieldOrder.forEach(orderField => {
+        if (allFields.has(orderField)) {
+            orderedFields.push(orderField);
+            allFields.delete(orderField); // Entferne aus Set für Fallback
+        }
+    });
+    
+    // Dann unbekannte Felder alphabetisch (außer Quellenangaben)
+    Array.from(allFields)
+        .filter(field => field !== 'Quellenangaben')
+        .sort()
+        .forEach(field => orderedFields.push(field));
+    
+    // Quellenangaben ans Ende
+    if (allFields.has('Quellenangaben')) {
+        orderedFields.push('Quellenangaben');
+    }
+    
+    const fieldArray = orderedFields;
+    console.log(`[TABLE VIEW] Found ${fieldArray.length} unique fields across all mines (filtered and ordered)`);
+    
+    // Erstelle Tabellenkopf
+    const headerCells = [
+        '<th class="mine-name-col">Mine Name</th>',
+        '<th class="country-col">Land</th>',
+        '<th class="region-col">Region</th>',
+        ...fieldArray.map(field => `<th class="field-col" title="${sanitizeHTML(field)}">${truncateFieldName(field)}</th>`),
+        '<th class="actions-col">Details</th>'
+    ];
+    
+    // Erstelle Tabellenzeilen
+    const tableRows = mines.map(mine => {
+        const mineName = sanitizeHTML(mine.mine_name || 'Unbekannt');
+        // FELDANZEIGE-FIX 29.08.2025: Nutze konsolidierte deutsche Feldnamen
+        const country = sanitizeHTML(mine.best_values?.['Land'] || 'Unbekannt');
+        const region = sanitizeHTML(mine.best_values?.['Region'] || 'Unbekannt');
+        
+        const fieldCells = fieldArray.map(field => {
+            const value = mine.best_values?.[field];
+            let displayValue;
+            
+            // EINHEITEN-FIX 29.08.2025: Spezielle Formatierung nach User-Anforderungen
+            if (field === 'Restaurationskosten' && value && value !== 'Nichts gefunden' && value !== '-') {
+                // Restaurationskosten immer in $
+                const numericValue = String(value).replace(/[^\d.,]/g, ''); // Entferne alles außer Zahlen und Komma/Punkt
+                displayValue = numericValue ? `$${numericValue}` : sanitizeHTML(String(value).substring(0, 30));
+            } else if (field === 'Minenfläche in qkm' && value && value !== 'Nichts gefunden' && value !== '-') {
+                // Minenfläche in ha (1 qkm = 100 ha)
+                const match = String(value).match(/(\d+(?:\.\d+)?)/);
+                if (match) {
+                    const qkmValue = parseFloat(match[1]);
+                    const haValue = (qkmValue * 100).toFixed(2);
+                    displayValue = `${haValue} ha`;
+                } else {
+                    displayValue = sanitizeHTML(String(value).substring(0, 30));
+                }
+            } else if ((field === 'x-Koordinate' || field === 'y-Koordinate') && value && value !== 'Nichts gefunden' && value !== '-') {
+                // Koordinaten als UTM (falls numerisch)
+                const match = String(value).match(/(-?\d+(?:\.\d+)?)/);
+                if (match) {
+                    displayValue = `${match[1]} UTM`;
+                } else {
+                    displayValue = sanitizeHTML(String(value).substring(0, 30));
+                }
+            } else {
+                displayValue = value ? sanitizeHTML(String(value).substring(0, 30)) : '-';
+            }
+            
+            const sources = mine.detailed_breakdown?.[field]?.sources || [];
+            const sourceText = sources.length > 0 ? `[${sources.slice(0, 2).join(', ')}${sources.length > 2 ? '...' : ''}]` : '';
+            
+            return `<td class="field-cell" title="${sanitizeHTML(value || '')}">${displayValue} <small class="source-ref">${sourceText}</small></td>`;
+        });
+        
+        return `
+            <tr class="mine-row" data-mine="${escapeJavaScriptString(mine.mine_name)}">
+                <td class="mine-name-cell"><strong>${mineName}</strong></td>
+                <td class="country-cell">${country}</td>
+                <td class="region-cell">${region}</td>
+                ${fieldCells.join('')}
+                <td class="actions-cell">
+                    <button class="details-btn" onclick="showMineDetailsModal('${escapeJavaScriptString(mine.mine_name)}')">
+                        📊 Details
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    // Render Tabelle
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table class="consolidated-results-table">
+                <thead>
+                    <tr>
+                        ${headerCells.join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+        </div>
+        <div class="table-footer">
+            <p class="table-info">
+                📊 Tabelle zeigt CSV-Export Format | 
+                🔍 Klicken Sie auf "Details" für umfassende Statistiken |
+                💡 Horizontal scrollen für alle Felder
+            </p>
+        </div>
+    `;
+}
+
+/**
+ * FALLBACK CARD-RENDERING (Legacy)
+ */
+function renderConsolidatedCards(mines, sortBy, order) {
+    const container = document.getElementById('consolidated-table-container');
+    
+    // Use existing field-based card generation
+    const cards = mines.map(mine => generateFieldBasedCard(mine)).join('');
+    
     container.innerHTML = `
         <div class="field-display-container">
             <div class="field-display-header">
                 <h3 class="field-display-title">
-                    📊 Mine-Ergebnisse mit strukturierten Feldern
-                    <span class="result-count">(${data.consolidated_results.length} Minen)</span>
+                    📋 Mine-Ergebnisse als Cards
+                    <span class="result-count">(${mines.length} Minen)</span>
                 </h3>
-                <div class="field-display-stats">
-                    <div class="stat-item">
-                        📈 ${data.total_sources || 0} Quellen gesamt
-                    </div>
-                    <div class="stat-item">  
-                        🎯 Durchschnittlich ${Math.round(data.consolidated_results.reduce((sum, mine) => sum + (mine.overall_confidence || 0), 0) / data.consolidated_results.length)} % Zuverlässigkeit
-                    </div>
-                </div>
             </div>
             <div class="field-display-grid">
                 ${cards}
             </div>
         </div>
     `;
+}
+
+/**
+ * HILFSFUNKTIONEN
+ */
+function truncateFieldName(fieldName) {
+    if (fieldName.length <= 15) return fieldName;
+    return fieldName.substring(0, 12) + '...';
+}
+
+/**
+ * VIEW TOGGLE HANDLER
+ */
+function switchConsolidatedView(viewType) {
+    console.log(`[VIEW TOGGLE] Switching to ${viewType} view`);
     
-    console.log(`[PHASE 2.1] Successfully rendered ${data.consolidated_results.length} field-based cards`);
+    // Update toggle buttons
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-view') === viewType) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // Re-render with current data
+    if (window.currentConsolidatedData) {
+        if (viewType === 'table') {
+            renderConsolidatedTable(window.currentConsolidatedData);
+        } else {
+            renderConsolidatedCards(window.currentConsolidatedData);
+        }
+    }
 }
 
 /**
@@ -484,10 +685,11 @@ function generateFieldBasedCard(mine) {
     
     // PHASE 2.1: Extract structured fields (neue API-Struktur)
     const structuredFields = mine.structured_fields || {};
+    // FIX: Land-Anzeige Problem - suche country/region sowohl auf Root- als auch Metadata-Ebene
     const metadata = mine.metadata || {
         mine_name: mine.mine_name,
-        country: mine.country,
-        region: mine.region
+        country: mine.country || mine.metadata?.country,
+        region: mine.region || mine.metadata?.region
     };
     
     // PHASE 2.1: Field Summary für Card-Header
@@ -855,7 +1057,7 @@ function showConsolidatedDetailModal(mineName, mineData) {
             <h4>📊 Zusammenfassung</h4>
             <div class="summary-grid">
                 <div class="summary-item">
-                    <strong>Land:</strong> ${mineData.country || 'Nicht verfügbar'}${mineData.region ? `, ${mineData.region}` : ''}
+                    <strong>Land:</strong> ${mineData.country || mineData.metadata?.country || 'Nicht verfügbar'}${mineData.region || mineData.metadata?.region ? `, ${mineData.region || mineData.metadata?.region}` : ''}
                 </div>
                 <div class="summary-item">
                     <strong>Gefundene Felder:</strong> ${mineData.best_values ? Object.keys(mineData.best_values).length : 0}
@@ -1958,6 +2160,219 @@ function splitCombinedModels(statisticsData) {
 }
 
 // ============================================
+// MINE DETAIL MODAL FUNCTIONS
+// ============================================
+
+/**
+ * NEUE MINE DETAILS MODAL: Zeigt umfassende Statistiken für eine Mine
+ */
+async function showMineDetailsModal(mineName) {
+    console.log(`[MINE MODAL] Opening details for: ${mineName}`);
+    
+    const modal = document.getElementById('mine-detail-modal');
+    const title = document.getElementById('mine-modal-title');
+    const body = document.getElementById('mine-modal-body');
+    
+    if (!modal || !title || !body) {
+        console.error('[MINE MODAL] Modal elements not found');
+        return;
+    }
+    
+    // Update modal title
+    title.textContent = `📊 ${mineName} - Detailstatistiken`;
+    
+    // Show loading state
+    body.innerHTML = createLoadingHTML('Lade historische Mine-Daten...', 'Analysiere alle bisherigen Suchen für diese Mine');
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    
+    try {
+        // Fetch historical statistics from new API
+        const response = await fetch(`${window.API_BASE_URL}/api/consolidated/mine/${encodeURIComponent(mineName)}/statistics?days_back=90&exclude_exa=true`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Unbekannter Fehler beim Laden der Mine-Statistiken');
+        }
+        
+        // Render detailed statistics
+        renderMineDetailModal(data.data, mineName);
+        
+    } catch (error) {
+        console.error('[MINE MODAL] Error loading statistics:', error);
+        body.innerHTML = createErrorHTML(
+            'Fehler beim Laden der Mine-Statistiken',
+            error.message
+        );
+    }
+}
+
+/**
+ * MINE DETAIL MODAL RENDERER
+ */
+function renderMineDetailModal(stats, mineName) {
+    const body = document.getElementById('mine-modal-body');
+    
+    if (!stats) {
+        body.innerHTML = createErrorHTML('Keine Daten verfügbar', 'Für diese Mine wurden keine Statistiken gefunden.');
+        return;
+    }
+    
+    const fields = stats.field_statistics || {};
+    const models = stats.model_performance || {};
+    const quality = stats.quality_metrics || {};
+    const timeline = stats.timeline || {};
+    
+    // Erstelle Field-Statistiken Cards
+    const fieldCards = Object.entries(fields).map(([fieldName, fieldData]) => {
+        const consistency = fieldData.consistency_rate || 0;
+        const consistencyClass = consistency > 80 ? 'high' : consistency > 60 ? 'medium' : 'low';
+        
+        return `
+            <div class="field-stat-card">
+                <div class="field-header">
+                    <h4>${sanitizeHTML(fieldName)}</h4>
+                    <span class="consistency-badge ${consistencyClass}">${consistency}% konsistent</span>
+                </div>
+                <div class="field-details">
+                    <div class="stat-item">
+                        <strong>Häufigster Wert:</strong> 
+                        <span class="value-highlight">${sanitizeHTML(fieldData.most_common_value || 'Unbekannt')}</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Gefunden von:</strong> ${fieldData.models_found_by?.join(', ') || 'Unbekannt'}
+                    </div>
+                    <div class="stat-item">
+                        <strong>Modell-Übereinstimmung:</strong> ${Math.round(fieldData.model_agreement || 0)}%
+                    </div>
+                    <div class="stat-item">
+                        <strong>Erste Entdeckung:</strong> ${fieldData.first_found || 'Unbekannt'}
+                    </div>
+                    ${fieldData.all_values && fieldData.all_values.length > 1 ? `
+                        <details class="value-variants">
+                            <summary>Alle gefundenen Werte (${fieldData.unique_values})</summary>
+                            <ul>
+                                ${fieldData.all_values.slice(0, 5).map(([value, count]) => 
+                                    `<li>${sanitizeHTML(value)} <small>(${count}x)</small></li>`
+                                ).join('')}
+                            </ul>
+                        </details>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // Erstelle Modell-Performance Übersicht
+    const modelCards = Object.entries(models).map(([modelId, modelData]) => `
+        <div class="model-performance-card">
+            <h4>${sanitizeHTML(modelId)}</h4>
+            <div class="model-stats">
+                <div class="model-stat">
+                    <span class="stat-label">Suchen:</span>
+                    <span class="stat-value">${modelData.searches}</span>
+                </div>
+                <div class="model-stat">
+                    <span class="stat-label">Ø Felder:</span>
+                    <span class="stat-value">${modelData.avg_fields_found}</span>
+                </div>
+                <div class="model-stat">
+                    <span class="stat-label">Erfolgsrate:</span>
+                    <span class="stat-value">${modelData.success_rate}%</span>
+                </div>
+                <div class="model-stat">
+                    <span class="stat-label">Ø Zeit:</span>
+                    <span class="stat-value">${modelData.avg_response_time}s</span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    body.innerHTML = `
+        <div class="mine-detail-content">
+            <!-- Qualitäts-Übersicht -->
+            <div class="quality-overview">
+                <div class="quality-card">
+                    <h3>📈 Gesamtqualität</h3>
+                    <div class="quality-score ${quality.overall_quality_score > 80 ? 'excellent' : quality.overall_quality_score > 60 ? 'good' : 'poor'}">
+                        ${quality.overall_quality_score}%
+                    </div>
+                    <p class="quality-rating">${quality.consistency_rating} Konsistenz</p>
+                </div>
+                <div class="timeline-card">
+                    <h3>⏱️ Zeitraum</h3>
+                    <div class="timeline-info">
+                        <div><strong>Erste Suche:</strong> ${timeline.first_search || 'Unbekannt'}</div>
+                        <div><strong>Letzte Suche:</strong> ${timeline.last_search || 'Unbekannt'}</div>
+                        <div><strong>Suchfrequenz:</strong> ${timeline.search_frequency || 'Unbekannt'}</div>
+                        <div><strong>Gesamt Suchen:</strong> ${stats.analysis_period?.total_searches || 0}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <h3>📊 Zusammenfassung</h3>
+                    <div class="summary-stats">
+                        <div><strong>Analysierte Felder:</strong> ${quality.total_fields_analyzed}</div>
+                        <div><strong>Verwendete Modelle:</strong> ${quality.models_used_count}</div>
+                        <div><strong>Analysezeit:</strong> ${stats.analysis_period?.days_back} Tage</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Field-Statistiken -->
+            <div class="section-header">
+                <h3>🔍 Feld-Analyse (${Object.keys(fields).length} Felder)</h3>
+            </div>
+            <div class="field-stats-grid">
+                ${fieldCards || '<p>Keine Feld-Daten verfügbar</p>'}
+            </div>
+            
+            <!-- Modell-Performance -->
+            <div class="section-header">
+                <h3>⚡ Modell-Performance (${Object.keys(models).length} Modelle)</h3>
+            </div>
+            <div class="model-performance-grid">
+                ${modelCards || '<p>Keine Modell-Daten verfügbar</p>'}
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * CLOSE MINE DETAIL MODAL
+ */
+function closeMineDetailModal() {
+    const modal = document.getElementById('mine-detail-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+}
+
+// ============================================
+// VIEW TOGGLE EVENT HANDLERS
+// ============================================
+
+// Add event listeners for view toggle when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up view toggle buttons
+    const toggleButtons = document.querySelectorAll('.toggle-btn');
+    toggleButtons.forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const viewType = this.getAttribute('data-view');
+            switchConsolidatedView(viewType);
+        });
+    });
+    
+    console.log('🔧 [VIEW TOGGLE] Event handlers set up for consolidated view switching');
+});
+
+// ============================================
 // DEFINITIVE GLOBAL EXPORTS - NUR HIER!
 // ============================================
 // Alle wichtigen Tab-Loading-Funktionen exportieren
@@ -1977,6 +2392,11 @@ window.displayResultsTable = displayResultsTable;
 window.displayConsolidatedResults = displayConsolidatedResults;
 window.displayComprehensiveModelStatistics = displayComprehensiveModelStatistics;
 window.displayBasicModelStatistics = displayBasicModelStatistics;
+
+// NEUE FUNKTIONEN: Tabellen-Ansicht und Mine-Details
+window.switchConsolidatedView = switchConsolidatedView;
+window.showMineDetailsModal = showMineDetailsModal;
+window.closeMineDetailModal = closeMineDetailModal;
 
 // loadModelStatistics ist bereits korrekt in Zeile 264 als window-Funktion definiert
 

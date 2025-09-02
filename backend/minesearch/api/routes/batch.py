@@ -27,6 +27,8 @@ from datetime import datetime
 from minesearch.config import CSV_COLUMNS
 from minesearch.batch_service import BatchService  # Adapter
 from minesearch.search_service import MineSearchService
+# 2-PHASEN WORKFLOW IMPORT (29.08.2025)
+from minesearch.batch_progress_manager import ProgressState
 # CONSOLIDATION 09.08.2025: MultiProviderSearchService entfernt - verwende MineSearchService direkt
 from minesearch.providers.registry import provider_registry
 from minesearch.database import db_manager
@@ -38,6 +40,8 @@ from minesearch.multi_model_search_orchestrator import MultiModelSearchOrchestra
 # ÄNDERUNG 27.08.2025: Import Sequential Field Orchestrator für neuen Workflow
 from minesearch.sequential_field_orchestrator import SequentialFieldOrchestrator
 from minesearch.database.sequential_manager import SequentialDatabaseManager
+# PROGRESS-FIX 29.08.2025: Import BatchProgressManager für detaillierte Fortschrittsanzeige
+from minesearch.batch_progress_manager import batch_progress_manager, ProgressState
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -511,14 +515,27 @@ async def batch_search(
     # PHASE 2.3: COMPREHENSIVE SEARCH Option
     comprehensive_search: Optional[str] = Form("false"),
     # ÄNDERUNG 27.08.2025: Sequential Field Orchestrator Option
-    sequential_workflow: Optional[str] = Form("false")
+    sequential_workflow: Optional[str] = Form("false"),
+    # BATCH-TRANSPARENCY FIX 30.08.2025: Session-Isolation und Cache-Control
+    use_cache: Optional[str] = Form("false", description="Use cached results from database"),
+    force_new_session: Optional[str] = Form("false", description="Force new unique session for isolation")
 ):
     """
     Batch-Suche für mehrere Minen aus CSV
     FIXED 19.07.2025: 500 Error consensus Variable behoben
     """
     try:
-        logger.info(f"[BATCH API] Received request: session_id='{session_id}', model='{model}', selected_models='{selected_models}'")
+        logger.info(f"[BATCH API] Received request: session_id='{session_id}', model='{model}', selected_models='{selected_models}', use_cache='{use_cache}', force_new_session='{force_new_session}'")
+        
+        # BATCH-TRANSPARENCY FIX 30.08.2025: Session-Isolation implementieren
+        original_session_id = session_id
+        if force_new_session == "true":
+            import uuid
+            batch_session_id = f"batch_{str(uuid.uuid4())}"
+            logger.info(f"[BATCH-SESSION] Neue Session erstellt für Isolation: {batch_session_id} (original: {original_session_id})")
+        else:
+            batch_session_id = session_id
+        
         # Hole Minen-Daten aus dem Cache
         if session_id not in uploaded_mines_cache:
             raise ValueError("Session abgelaufen. Bitte CSV erneut hochladen.")
@@ -526,7 +543,7 @@ async def batch_search(
         session_data = uploaded_mines_cache[session_id]
         mines = session_data['mines']
         columns = session_data['columns']
-        logger.info(f"Batch-Suche für Session {session_id} mit {len(mines)} Minen")
+        logger.info(f"Batch-Suche für Session {session_id} (batch_session: {batch_session_id}) mit {len(mines)} Minen")
         
         # Bestimme wie viele Minen gesucht werden - ERWEITERTE DEBUG-INFO 24.08.2025
         logger.info(f"[BATCH-MINE-SELECTION] Parameters - search_all: '{search_all}', count: {count}")
@@ -570,9 +587,9 @@ async def batch_search(
             models_to_use = [model.strip()]
             logger.info(f"[BATCH-MODELS] Legacy single model: {models_to_use}")
         
-        # 3. Default: Kimi K2 (beste Performance)
+        # 3. Default: FIX 02.09.2025 - OpenRouter DeepSeek statt BrightData
         else:
-            models_to_use = ["openrouter:kimi-k2"]
+            models_to_use = ["openrouter:deepseek-free"]
             logger.warning(f"[BATCH-MODELS] No models specified, using default: {models_to_use[0]}")
         
         # Final validation
@@ -593,6 +610,15 @@ async def batch_search(
                     status_code=400,
                     detail=f"Maximale Batch-Größe pro Anfrage ist {BATCH_REQUEST_MAX_COUNT}. Nutzen Sie Pagination über 'start_index'."
                 )
+        
+        # PROGRESS-FIX 29.08.2025: Erstelle Progress Session für detaillierte Fortschrittsanzeige
+        total_operations = len(mines_to_search) * len(models_to_use)
+        progress_session = batch_progress_manager.create_session(
+            session_id=session_id,
+            total_mines=len(mines_to_search),
+            total_models=len(models_to_use)
+        )
+        logger.info(f"[BATCH-PROGRESS] Progress Session erstellt: {total_operations} Operationen ({len(mines_to_search)} Minen × {len(models_to_use)} Modelle)")
         
         # DEBUG: Schaue erste Minen an
         logger.info(f"[BATCH-DEBUG] Erste 3 Minen: {mines_to_search[:3]}")
@@ -623,9 +649,85 @@ async def batch_search(
             comprehensive_search_orchestrator = None
             logger.warning(f"[BATCH] Unerwarteter Fehler beim Import des Orchestrators: {e}")
             
-        logger.info("[BATCH] Starte Mine-Processing-Schleife")
+        # =========================================================================
+        # 2-PHASEN BATCH-WORKFLOW IMPLEMENTATION (29.08.2025)
+        # =========================================================================
+        
+        # PHASE 1: GLOBALE QUELLEN-SAMMLUNG von ALLEN Modellen
+        logger.info("=" * 80)
+        logger.info("[BATCH-2-PHASE] 🚀 STARTE 2-PHASEN BATCH-WORKFLOW")
+        logger.info("[BATCH-2-PHASE] PHASE 1: Sammle Quellen von ALLEN Modellen")
+        logger.info("=" * 80)
+        
+        batch_progress_manager.update_progress(
+            session_id=session_id,
+            state=ProgressState.COLLECTING_SOURCES,
+            message=f"Sammle Quellen von {len(models_to_use)} Modellen für {len(mines_to_search)} Minen..."
+        )
+        
+        # Import und initialisiere BatchSourceCollector
+        from minesearch.batch_source_collector import BatchSourceCollector
+        
+        source_collector = BatchSourceCollector()
+        mine_names = [
+            (mine.get("mine_name", "") or 
+             mine.get("Name", "") or 
+             mine.get("name", "") or 
+             mine.get("Mine Name", "")).strip()
+            for mine in mines_to_search
+        ]
+        
+        # Filtere leere Namen
+        valid_mine_names = [name for name in mine_names if name]
+        logger.info(f"[BATCH-2-PHASE] Verarbeite {len(valid_mine_names)} gültige Minen-Namen")
+        
+        # Sammle Quellen von allen Modellen
+        source_collection_start = datetime.now()
+        collection_results = await source_collector.collect_sources_from_all_models(
+            mine_names=valid_mine_names,
+            models=models_to_use
+        )
+        source_collection_duration = (datetime.now() - source_collection_start).total_seconds()
+        
+        # Statistiken der Quellen-Sammlung
+        successful_models = [r for r in collection_results.values() if r.success]
+        total_new_sources = sum(r.new_sources_added for r in successful_models)
+        
+        logger.info(f"[BATCH-2-PHASE] 📊 PHASE 1 ABGESCHLOSSEN:")
+        logger.info(f"[BATCH-2-PHASE]   ✅ Erfolgreiche Modelle: {len(successful_models)}/{len(models_to_use)}")
+        logger.info(f"[BATCH-2-PHASE]   🔗 Neue Quellen hinzugefügt: {total_new_sources}")
+        logger.info(f"[BATCH-2-PHASE]   ⏱️ Dauer: {source_collection_duration:.2f}s")
+        
+        # PHASE 2: LADE ALLE QUELLEN aus DB für Daten-Extraktion
+        logger.info("=" * 80)
+        logger.info("[BATCH-2-PHASE] PHASE 2: Lade ALLE Quellen aus DB")
+        logger.info("=" * 80)
+        
+        all_db_sources = source_collector.get_all_sources_from_db()
+        logger.info(f"[BATCH-2-PHASE] 📚 {len(all_db_sources)} Quellen aus DB geladen")
+        
+        # Quellen-Statistiken für Transparenz
+        source_stats = source_collector.get_sources_stats()
+        logger.info(f"[BATCH-2-PHASE] 📈 QUELLEN-STATISTIKEN:")
+        logger.info(f"[BATCH-2-PHASE]   📄 Gesamt Quellen: {source_stats['total_sources']}")
+        logger.info(f"[BATCH-2-PHASE]   🌐 Einzigartige Domains: {source_stats['unique_domains']}")
+        logger.info(f"[BATCH-2-PHASE]   🤖 Beitragende Modelle: {source_stats['contributing_models']}")
+        
+        # Update Progress für Phase 2
+        batch_progress_manager.update_progress(
+            session_id=session_id,
+            state=ProgressState.EXTRACTING_DATA,
+            message=f"Extrahiere Daten mit {len(all_db_sources)} Quellen aus {len(models_to_use)} Modellen..."
+        )
+        
+        # =========================================================================
+        # PHASE 2: DATEN-EXTRAKTION mit ALLEN DB-Quellen
+        # =========================================================================
+        
+        logger.info("[BATCH] Starte Mine-Processing-Schleife mit ALLEN DB-Quellen")
         logger.info(f"[BATCH-DEBUG] mines_to_search count: {len(mines_to_search)}")
         logger.info(f"[BATCH-DEBUG] search_all: {search_all}, count: {count}")
+        logger.info(f"[BATCH-2-PHASE] 🔥 Jedes Modell wird ALLE {len(all_db_sources)} DB-Quellen durchsuchen!")
         
         # THREAD-SAFE DEBUG-LOGGING (using application logging infrastructure)
         batch_debug_logger.info(f"[BATCH-ROUTE] Batch-Route aufgerufen! mines_to_search: {len(mines_to_search)}")
@@ -648,34 +750,90 @@ async def batch_search(
                         mine.get("Mine", "") or
                         mine.get("Site", "")).strip()
             
+            # CSV-FIX 29.08.2025: Intelligente Fallback-Logik ohne harte Defaults
             country = (mine.get("country", "") or 
                       mine.get("Country", "") or 
                       mine.get("COUNTRY", "") or 
                       mine.get("Land", "") or
                       mine.get("Pays", "") or  # Französisch
-                      "Canada").strip()  # Quebec-Default
+                      mine.get("Staat", "") or  # Deutsch
+                      mine.get("Nation", "") or  # Deutsch
+                      mine.get("País", "")).strip()  # Spanisch/Portugiesisch
             
             commodity = (mine.get("commodity", "") or 
                         mine.get("Commodity", "") or 
                         mine.get("Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)", "") or
                         mine.get("Rohstoff", "") or
                         mine.get("Produit", "") or  # Französisch
-                        mine.get("Mineral", "")).strip()
+                        mine.get("Mineral", "") or
+                        mine.get("Producto", "")).strip()  # Spanisch
             
             region = (mine.get("region", "") or 
                      mine.get("Region", "") or 
                      mine.get("REGION", "") or
                      mine.get("Province", "") or
                      mine.get("État", "") or  # Französisch
-                     "Quebec").strip()  # Quebec-Default
+                     mine.get("Bundesland", "") or  # Deutsch
+                     mine.get("Provinz", "") or  # Deutsch
+                     mine.get("Estado", "")).strip()  # Spanisch/Portugiesisch
+            
+            # CSV-FIX 29.08.2025: Prüfe ob Land/Region aus CSV verfügbar sind
+            has_country_from_csv = bool(country)
+            has_region_from_csv = bool(region)
+            needs_location_search = not has_country_from_csv or not has_region_from_csv
+            
+            logger.info(f"[CSV-ANALYSIS] {mine_name}: Country='{country}' (from CSV: {has_country_from_csv}), Region='{region}' (from CSV: {has_region_from_csv}), needs search: {needs_location_search}")
             
             if not mine_name:
                 logger.warning(f"[BATCH] Mine {idx+1} hat keinen Namen, überspringe. Keys: {list(mine.keys())[:5]}...")
                 logger.debug(f"[BATCH-DEBUG] Mine {idx+1} Values: {dict(list(mine.items())[:3])}")
                 continue
                 
+            # BEDINGTE LAND/REGION-SUCHE - wenn nicht in CSV vorhanden
+            if needs_location_search:
+                logger.info(f"[LOCATION-SEARCH] Suche Land/Region für {mine_name}...")
+                try:
+                    # Verwende ersten verfügbaren Model für Location-Suche
+                    location_model = models_to_use[0] if models_to_use else "openrouter:deepseek-free"
+                    location_prompt = f"What country and region/province is the {mine_name} mine located in? Please respond with just: Country: [country name], Region: [region/province name]"
+                    
+                    # Simple Location Search mit erstem Model
+                    from minesearch.providers.registry import provider_registry
+                    provider = provider_registry.get_provider_for_model(location_model)
+                    if provider:
+                        location_response = await provider.search(location_prompt, mine_name)
+                        if location_response.get('success') and location_response.get('content'):
+                            content = location_response['content']
+                            # Parse Country/Region aus Response
+                            import re
+                            country_match = re.search(r'Country:\s*([^,\n]+)', content, re.IGNORECASE)
+                            region_match = re.search(r'Region:\s*([^,\n]+)', content, re.IGNORECASE)
+                            
+                            if not has_country_from_csv and country_match:
+                                country = country_match.group(1).strip()
+                                logger.info(f"[LOCATION-FOUND] Country: {country}")
+                            
+                            if not has_region_from_csv and region_match:
+                                region = region_match.group(1).strip()
+                                logger.info(f"[LOCATION-FOUND] Region: {region}")
+                                
+                except Exception as e:
+                    logger.warning(f"[LOCATION-SEARCH] Fehler bei Location-Suche für {mine_name}: {e}")
+                    # Fallback: Lass Land/Region leer, statt hardcodierte Werte zu verwenden
+                    if not has_country_from_csv:
+                        country = ""
+                    if not has_region_from_csv:
+                        region = ""
+            
             # SUCCESS: Mine erfolgreich geparst
-            logger.info(f"[BATCH-SUCCESS] Mine {idx+1}: '{mine_name}' in {country}, {region}")
+            logger.info(f"[BATCH-SUCCESS] Mine {idx+1}: '{mine_name}' in '{country}', '{region}'")
+            
+            # PROGRESS-FIX 29.08.2025: Progress-Update für Mine-Start
+            batch_progress_manager.mark_mine_started(
+                session_id=session_id,
+                mine_index=idx,
+                mine_name=mine_name
+            )
             
             # THREAD-SAFE DEBUG-LOGGING (using application logging infrastructure)
             batch_debug_logger.info(f"[BATCH-MINE] Processing mine {idx+1}: '{mine_name}'")
@@ -684,13 +842,14 @@ async def batch_search(
             
             try:
                 # PHASE 2.3: COMPREHENSIVE SEARCH Option
-                if comprehensive_search == "true" and comprehensive_search_orchestrator is not None:
+                # FIX 29.08.2025: Auch search_type="comprehensive" unterstützen
+                if (comprehensive_search == "true" or search_type == "comprehensive") and comprehensive_search_orchestrator is not None:
                     logger.info(f"[COMPREHENSIVE] Starte systematische Vollsuche für {mine_name}")
                     try:
                         comprehensive_result = await comprehensive_search_orchestrator.orchestrate_comprehensive_search(
                             mine_name=mine_name,
-                            country=country or "Canada",
-                            region=region or "Quebec", 
+                            country=country or "",
+                            region=region or "", 
                             commodity=commodity,
                             available_models=models_to_use
                         )
@@ -751,11 +910,24 @@ async def batch_search(
                             # Fallback auf Standard-Suche
                             logger.warning(f"[COMPREHENSIVE] Comprehensive search für {mine_name} fehlgeschlagen, verwende Standard-Suche")
                             comprehensive_search = "false"  # Fallback für diese Mine
+                            # Zusätzlich search_type zurücksetzen für DB-FIRST Fallback
+                            if search_type == "comprehensive":
+                                search_type = "standard"
                     
                     except Exception as e:
                         logger.error(f"[COMPREHENSIVE] Fehler bei comprehensive search für {mine_name}: {str(e)}")
                         # Fallback auf Standard-Suche
                         comprehensive_search = "false"
+                        # Zusätzlich search_type zurücksetzen für DB-FIRST Fallback
+                        if search_type == "comprehensive":
+                            search_type = "standard"
+                
+                # FIX 29.08.2025: Fallback wenn comprehensive requested aber Orchestrator nicht verfügbar
+                elif (comprehensive_search == "true" or search_type == "comprehensive") and comprehensive_search_orchestrator is None:
+                    logger.warning(f"[COMPREHENSIVE] Comprehensive search requested für {mine_name}, aber Orchestrator nicht verfügbar - fallback auf Standard-Suche")
+                    comprehensive_search = "false"
+                    if search_type == "comprehensive":
+                        search_type = "standard"
                 
                 # ÄNDERUNG 27.08.2025: SEQUENTIAL FIELD ORCHESTRATOR Option
                 elif search_type == "sequential" or sequential_workflow == "true":
@@ -850,46 +1022,61 @@ async def batch_search(
                         sequential_workflow = "false"
                 
                 # KRITISCHER FIX 23.08.2025: Verwende EXISTIERENDE Datenbank-Ergebnisse statt neue API-Calls
-                if comprehensive_search != "true" and (search_type != "sequential" and sequential_workflow != "true"):
-                    logger.info(f"[BATCH-DB-FIRST] Prüfe Datenbank für existierende {mine_name} Ergebnisse")
+                # FIX 29.08.2025: Auch search_type="comprehensive" berücksichtigen
+                # BATCH-TRANSPARENCY FIX 30.08.2025: Cache-Control Implementation
+                if (comprehensive_search != "true" and search_type != "comprehensive") and (search_type != "sequential" and sequential_workflow != "true"):
                     
-                    # 1. PRÜFE DATENBANK-ERGEBNISSE ZUERST
+                    # 1. PRÜFE CACHE-CONTROL PARAMETER
+                    use_cache_enabled = use_cache == "true"
+                    logger.info(f"[BATCH-CACHE-CONTROL] Mine: {mine_name} | use_cache: {use_cache_enabled} | force_new_session: {force_new_session}")
+                    
+                    # 2. PRÜFE DATENBANK-ERGEBNISSE NUR WENN CACHE AKTIVIERT
                     db_results = []
-                    try:
-                        # Hole existierende Ergebnisse für diese Mine aus der Datenbank
-                        existing_results = db_manager.get_recent_search_results(
-                            mine_name=mine_name, 
-                            hours_back=24,  # Suche in letzten 24 Stunden
-                            limit=5
-                        )
+                    if use_cache_enabled:
+                        logger.info(f"[BATCH-DB-CACHE] Prüfe Datenbank für existierende {mine_name} Ergebnisse")
+                        try:
+                            # SESSION-ISOLATION FIX 30.08.2025: Hole existierende Ergebnisse NUR für aktuelle Session
+                            existing_results = db_manager.get_recent_search_results(
+                                mine_name=mine_name, 
+                                hours_back=24,  # Suche in letzten 24 Stunden
+                                limit=5,
+                                session_id=batch_session_id  # KRITISCH: Session-Filter für Batch-Isolation
+                            )
                         
-                        logger.info(f"[BATCH-DB-FIRST] Gefunden: {len(existing_results)} existierende DB-Ergebnisse für {mine_name}")
-                        
-                        # Konvertiere DB-Ergebnisse zu Batch-Format
-                        for db_result in existing_results:
-                            if db_result.success and db_result.structured_data:
-                                structured_data = db_result.structured_data
-                                filled_fields = count_filled_fields(structured_data)
-                                
-                                if filled_fields >= 5:  # Nur gute Ergebnisse verwenden
-                                    db_results.append({
-                                        'model_id': db_result.model_used,
-                                        'success': True,
-                                        'data': {
-                                            'structured_data': structured_data,
-                                            'field_count': len(structured_data),
-                                            'filled_field_count': filled_fields,
-                                            'source': 'database_cache'
-                                        }
-                                    })
-                                    logger.info(f"[BATCH-DB-FIRST] Verwende DB-Ergebnis: {db_result.model_used} mit {filled_fields} Feldern")
-                        
-                    except Exception as e:
-                        logger.warning(f"[BATCH-DB-FIRST] DB-Abfrage fehlgeschlagen: {e}")
+                            logger.info(f"[BATCH-DB-CACHE] Gefunden: {len(existing_results)} existierende DB-Ergebnisse für {mine_name}")
+                            
+                            # Konvertiere DB-Ergebnisse zu Batch-Format mit Transparenz-Markierung
+                            for db_result in existing_results:
+                                if db_result.success and db_result.structured_data:
+                                    structured_data = db_result.structured_data
+                                    filled_fields = count_filled_fields(structured_data)
+                                    
+                                    if filled_fields >= 5:  # Nur gute Ergebnisse verwenden
+                                        db_results.append({
+                                            'model_id': db_result.model_used,
+                                            'success': True,
+                                            'data': {
+                                                'structured_data': structured_data,
+                                                'field_count': len(structured_data),
+                                                'filled_field_count': filled_fields,
+                                                'source': 'database_cache',
+                                                # TRANSPARENCY FIX 30.08.2025: Datenherkunft markieren
+                                                'data_source': 'cached',
+                                                'cache_timestamp': db_result.created_at.isoformat() if db_result.created_at else None,
+                                                'original_session': getattr(db_result, 'session_id', 'unknown')
+                                            }
+                                        })
+                                        logger.info(f"[BATCH-DB-CACHE] Verwende DB-Ergebnis: {db_result.model_used} mit {filled_fields} Feldern (cached from {db_result.created_at})")
+                            
+                        except Exception as e:
+                            logger.warning(f"[BATCH-DB-CACHE] DB-Abfrage fehlgeschlagen: {e}")
+                    else:
+                        logger.info(f"[BATCH-CACHE-CONTROL] Cache deaktiviert für {mine_name} - erzwinge neue Provider-Suche")
+                        db_results = []
                     
-                    # 2. WENN GUTE DB-ERGEBNISSE VORHANDEN: Verwende sie
-                    if db_results:
-                        logger.info(f"[BATCH-DB-FIRST] Verwende {len(db_results)} existierende DB-Ergebnisse statt neue API-Calls")
+                    # 3. VERWENDE DB-ERGEBNISSE NUR WENN VORHANDEN UND CACHE AKTIVIERT
+                    if db_results and use_cache_enabled:
+                        logger.info(f"[BATCH-DB-CACHE] Verwende {len(db_results)} existierende DB-Ergebnisse statt neue API-Calls")
                         individual_results = db_results
                         
                         # NORMALIZED SCHEMA FIX 28.08.2025: Speichere existierende Ergebnisse auch in normalized schema
@@ -920,32 +1107,57 @@ async def batch_search(
                                 if 'data' in db_result:
                                     logger.debug(f"[BATCH-DB-FIRST-NORMALIZED] Debug - data keys: {list(db_result['data'].keys())}")
                     else:
-                        # 3. FALLBACK: Nur wenn keine guten DB-Ergebnisse, dann neue Provider-Suche
-                        logger.info(f"[BATCH-FALLBACK] Keine ausreichenden DB-Ergebnisse - starte Provider-Suche für {mine_name}")
+                        # 4. FALLBACK: Neue Provider-Suche wenn kein Cache oder keine guten DB-Ergebnisse
+                        if use_cache_enabled:
+                            logger.info(f"[BATCH-FALLBACK] Keine ausreichenden DB-Ergebnisse - starte Provider-Suche für {mine_name}")
+                        else:
+                            logger.info(f"[BATCH-NEW-SEARCH] Cache deaktiviert - starte frische Provider-Suche für {mine_name}")
                         individual_results = []
                         
                         # BATCH-FIX 23.08.2025: Provider-Suche mit MultiModelSearchOrchestrator reaktiviert
                         try:
                             logger.info(f"[BATCH-ORCHESTRATOR] Starte Provider-Suche für {mine_name} mit {len(models_to_use)} Modellen")
+                            
+                            # PROGRESS-FIX 29.08.2025: Source Discovery Phase beginnt
+                            batch_progress_manager.update_progress(
+                                session_id=session_id,
+                                state=ProgressState.SOURCE_DISCOVERY,
+                                message=f"Suche Quellen für {mine_name}..."
+                            )
+                            
                             orchestrator = MultiModelSearchOrchestrator()
                             
+                            # 2-PHASEN WORKFLOW FIX (29.08.2025): Nutze ALLE DB-Quellen
                             orchestration_result = await orchestrator.orchestrate_multi_model_search(
                                 mine_name=mine_name,
                                 models=models_to_use,
                                 country=country,
                                 region=region,
-                                commodity=commodity
+                                commodity=commodity,
+                                # KRITISCH: Verwende alle gesammelten DB-Quellen
+                                use_all_db_sources=True,
+                                db_sources=all_db_sources
                             )
+                            
+                            logger.info(f"[BATCH-2-PHASE] ✅ {mine_name}: Orchestrator nutzte {len(all_db_sources)} DB-Quellen")
                             
                             # Konvertiere Orchestration-Ergebnisse zu individual_results Format
                             individual_results = []
                             
                             # Erfolgreiche Modelle
                             for model_result in orchestration_result.successful_models:
+                                result_data = model_result.data.copy() if model_result.data else {}
+                                # TRANSPARENCY FIX 30.08.2025: Markiere neue Suchergebnisse
+                                result_data.update({
+                                    'data_source': 'fresh_search',
+                                    'search_timestamp': datetime.now().isoformat(),
+                                    'batch_session_id': batch_session_id
+                                })
+                                
                                 individual_results.append({
                                     'model_id': model_result.model_id,
                                     'success': True,
-                                    'data': model_result.data,
+                                    'data': result_data,
                                     'sources': model_result.sources
                                 })
                             
@@ -954,10 +1166,27 @@ async def batch_search(
                                 individual_results.append({
                                     'model_id': model_result.model_id,
                                     'success': False,
-                                    'error': model_result.error or 'Search failed'
+                                    'error': model_result.error or 'Search failed',
+                                    'data_source': 'fresh_search',
+                                    'search_timestamp': datetime.now().isoformat(),
+                                    'batch_session_id': batch_session_id
                                 })
                             
                             logger.info(f"[BATCH-ORCHESTRATOR] Orchestrierung erfolgreich: {len(orchestration_result.successful_models)} erfolgreich, {len(orchestration_result.failed_models)} fehlgeschlagen")
+                            
+                            # PROGRESS-FIX 29.08.2025: Source Discovery abgeschlossen - Modell-Execution beginnt
+                            batch_progress_manager.mark_source_discovery_complete(
+                                session_id=session_id,
+                                sources_found=len(orchestration_result.shared_sources)
+                            )
+                            
+                            # PROGRESS-FIX 29.08.2025: Markiere Modell-Completions
+                            for idx, model_result in enumerate(orchestration_result.successful_models + orchestration_result.failed_models):
+                                batch_progress_manager.mark_model_complete(
+                                    session_id=session_id,
+                                    model_name=model_result.model_id,
+                                    success=model_result.success
+                                )
                         
                         except Exception as orchestrator_error:
                             logger.error(f"[BATCH-ORCHESTRATOR] Orchestrator fehler für {mine_name}: {str(orchestrator_error)}")
@@ -992,9 +1221,22 @@ async def batch_search(
                         
                         logger.info(f"[BATCH-CONSOLIDATION] Selected best model for {mine_name}: {best_model['model_id'] if best_model else 'None'} with {max_filled_fields} filled fields")
                         
+                        # LAND/REGION-ERGÄNZUNG: Stelle sicher, dass CSV/gefundene Werte in structured_data stehen
+                        if best_structured_data is None:
+                            best_structured_data = {}
+                            
+                        if country and country.strip():
+                            best_structured_data['Land'] = country.strip()
+                            best_structured_data['Country'] = country.strip()  # Beide Varianten für Kompatibilität
+                            logger.info(f"[LAND-ERGÄNZUNG] {mine_name}: Land/Country = '{country}'")
+                            
+                        if region and region.strip():
+                            best_structured_data['Region'] = region.strip()
+                            logger.info(f"[REGION-ERGÄNZUNG] {mine_name}: Region = '{region}'")
+                        
                         # DEBUG: Log sample fields from best model
                         if best_structured_data:
-                            sample_fields = ['Country', 'Region', 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)', 'Restaurationskosten', 'Eigentümer']
+                            sample_fields = ['Country', 'Land', 'Region', 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)', 'Restaurationskosten', 'Eigentümer']
                             for field in sample_fields:
                                 if field in best_structured_data:
                                     value = best_structured_data[field]
@@ -1053,6 +1295,56 @@ async def batch_search(
                     
                     results.append(result_data)
                     logger.info(f"[BATCH-INDIVIDUAL] Completed {mine_name}: {len(successful_models)}/{len(models_to_use)} models successful")
+                    
+                    # KRITISCHER FIX 29.08.2025: DB-Speicherung für Standard-Suchen hinzugefügt
+                    if batch_success and best_structured_data:
+                        try:
+                            # Bestimme bestes Modell für DB-Speicherung
+                            best_model_id = "multi_model_batch"
+                            if successful_models:
+                                # Verwende das beste Modell (das mit den meisten gefüllten Feldern)
+                                best_model = max(successful_models, key=lambda x: len([v for v in x.get('data', {}).get('structured_data', {}).values() if v and str(v).strip() and str(v).strip() not in ['-', '', 'None', 'null', 'nichts gefunden']]), default=None)
+                                if best_model:
+                                    best_model_id = best_model['model_id']
+                            
+                            # Legacy DB-Speicherung mit neuer session_id
+                            db_manager.save_search_result(
+                                mine_name=mine_name,
+                                model_used=best_model_id,
+                                structured_data=best_structured_data,
+                                sources=successful_models[0].get('sources', []) if successful_models else [],
+                                country=country,
+                                region=region,
+                                commodity=commodity,
+                                session_id=batch_session_id  # Use isolated batch session
+                            )
+                            logger.info(f"[BATCH-STANDARD-DB] ✅ Legacy save successful for {mine_name} using {best_model_id}")
+                            
+                            # Normalized DB-Speicherung
+                            try:
+                                normalized_result_id = normalized_db_manager.save_search_result_normalized(
+                                    mine_name=mine_name,
+                                    model_used=best_model_id,
+                                    structured_data=best_structured_data,
+                                    sources=successful_models[0].get('sources', []) if successful_models else [],
+                                    country=country,
+                                    region=region,
+                                    commodity=commodity,
+                                    session_id=batch_session_id  # Use isolated batch session
+                                )
+                                logger.info(f"[BATCH-STANDARD-NORMALIZED] ✅ Normalized save successful for {mine_name} using {best_model_id} (ID: {normalized_result_id})")
+                            except Exception as normalized_error:
+                                logger.error(f"[BATCH-STANDARD-NORMALIZED] ❌ Normalized save failed for {mine_name}: {normalized_error}")
+                        except Exception as db_error:
+                            logger.error(f"[BATCH-STANDARD-DB] ❌ Legacy save failed for {mine_name}: {db_error}")
+                    else:
+                        logger.warning(f"[BATCH-STANDARD-DB] ⚠️ No successful results to save for {mine_name} (batch_success: {batch_success}, has_data: {bool(best_structured_data)})")
+                
+                # PROGRESS-FIX 29.08.2025: Mine vollständig abgeschlossen
+                batch_progress_manager.mark_mine_complete(
+                    session_id=session_id,
+                    mine_name=mine_name
+                )
                 
             except Exception as e:
                 logger.error(f"Fehler bei Suche für {mine_name}: {str(e)}")
@@ -1085,18 +1377,25 @@ async def batch_search(
         except ImportError:
             logger.warning("[BATCH-VALIDATION] batch_validation module nicht verfügbar")
         
+        # PROGRESS-FIX 29.08.2025: Gesamte Batch-Suche abgeschlossen
+        batch_progress_manager.mark_batch_complete(session_id=session_id)
+        
         # OPTIMIERT: Fallback-Logik bereits in Hauptschleife integriert - keine doppelten Provider-Aufrufe mehr
         
         # Erstelle HTML-Antwort mit optimierten results (Fallback bereits in Hauptschleife integriert)
         # Note: create_batch_results_table is imported at module scope (line 26)
         html_content = create_batch_results_table(results)
         
-        # Speichere Ergebnisse im Cache für Download
-        batch_results_cache[session_id] = {
+        # SESSION-ISOLATION FIX 30.08.2025: Speichere Ergebnisse session-spezifisch
+        session_cache_key = f"{session_id}_{batch_session_id}"  # Eindeutiger Key pro Session+Batch
+        batch_results_cache[session_cache_key] = {
             'results': results,
             'columns': columns,
-            'timestamp': datetime.now()
+            'timestamp': datetime.now(),
+            'session_id': session_id,
+            'batch_session_id': batch_session_id  # Tracking für Debug
         }
+        logger.info(f"[SESSION-ISOLATION] Cached batch results under key: {session_cache_key}")
         
         # Debug: Log einen Teil des generierten HTML
         logger.info(f"[BATCH-DEBUG] HTML-Länge: {len(html_content)}")
@@ -1121,23 +1420,44 @@ async def process_batch(
 
 @router.get("/batch-results/{cache_key}")
 async def get_batch_results(cache_key: str):
-    """Batch-Ergebnisse abrufen"""
-    if cache_key not in batch_results_cache:
+    """SESSION-ISOLATION FIX 30.08.2025: Batch-Ergebnisse session-spezifisch abrufen"""
+    
+    # Suche nach session-spezifischen Cache-Keys (unterstützt alte und neue Formate)
+    matching_keys = [key for key in batch_results_cache.keys() if cache_key in key]
+    
+    if not matching_keys:
+        logger.warning(f"[SESSION-ISOLATION] No results found for cache_key: {cache_key}")
+        logger.debug(f"[SESSION-ISOLATION] Available keys: {list(batch_results_cache.keys())}")
         raise HTTPException(status_code=404, detail="Keine Ergebnisse gefunden")
     
+    # Verwende den neuesten/ersten passenden Key
+    actual_key = matching_keys[0]
+    logger.info(f"[SESSION-ISOLATION] Using cache key: {actual_key} for request: {cache_key}")
+    
     # Note: create_batch_results_table is imported at module scope (line 26)
-    results = batch_results_cache[cache_key]
+    cached_data = batch_results_cache[actual_key]
+    results = cached_data.get('results', cached_data)  # Backward compatibility
     html = create_batch_results_table(results)
     
     return {"html": html, "results": results}
 
 @router.get("/batch-results/{cache_key}/download")
 async def download_batch_results(cache_key: str):
-    """Batch-Ergebnisse als CSV herunterladen"""
-    if cache_key not in batch_results_cache:
+    """SESSION-ISOLATION FIX 30.08.2025: Batch-Ergebnisse session-spezifisch als CSV herunterladen"""
+    
+    # Suche nach session-spezifischen Cache-Keys (unterstützt alte und neue Formate)
+    matching_keys = [key for key in batch_results_cache.keys() if cache_key in key]
+    
+    if not matching_keys:
+        logger.warning(f"[SESSION-ISOLATION] No download results found for cache_key: {cache_key}")
         raise HTTPException(status_code=404, detail="Keine Ergebnisse gefunden")
     
-    results = batch_results_cache[cache_key]
+    # Verwende den neuesten/ersten passenden Key
+    actual_key = matching_keys[0]
+    logger.info(f"[SESSION-ISOLATION] Downloading from cache key: {actual_key}")
+    
+    cached_data = batch_results_cache[actual_key]
+    results = cached_data.get('results', cached_data)  # Backward compatibility
     
     # CSV erstellen
     output = io.StringIO()

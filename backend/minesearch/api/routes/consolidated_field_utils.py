@@ -251,18 +251,50 @@ def _process_field_value(field_value, field_name):
         logger.debug(f"[FIELD-FIX] Field '{field_name}': '-' treated as empty value, not template")
         return value_str  # Lass "-" als normalen Wert durch
     
-    for pattern in template_patterns:
-        if re.match(pattern, value_str, re.IGNORECASE):
-            logger.info(f"[TEMPLATE-FIX] Template pattern detected in field '{field_name}': '{value_str}' -> 'Nichts gefunden'")
-            # TEMPLATE-FIX 19.08.2025: Template-Werte direkt zu "Nichts gefunden" konvertieren
-            return "Nichts gefunden"
+    # DATENVERLUST-FIX 02.09.2025: Schutz für numerische Felder vor Template-Detection
+    NUMERIC_FIELDS = [
+        'Restaurationskosten', 'x-Koordinate', 'y-Koordinate',
+        'Fördermenge/Jahr', 'Fläche der Mine in qkm', 'Minenfläche in qkm',
+        'Jahr der Aufnahme der Kosten', 'Jahr der Erstellung des Dokumentes',
+        'Produktionsstart', 'Produktionsende'
+    ]
+    
+    # Für numerische Felder: Prüfe ob Wert numerische Komponenten enthält
+    if field_name in NUMERIC_FIELDS:
+        # Prüfe auf numerische Komponenten (Zahlen, Dezimalstellen, Währungen, Einheiten)
+        has_numbers = re.search(r'\d', value_str)
+        has_currency = re.search(r'(CAD|USD|EUR|Dollar|Million|Millionen|Milliarden|€|\$)', value_str, re.IGNORECASE)
+        has_coordinates = re.search(r'[-+]?\d*\.?\d+\s*[°]\s*\d*', value_str)  # Grad-Format
+        
+        if has_numbers or has_currency or has_coordinates:
+            logger.info(f"[NUMERIC-PROTECTION] Numerisches Feld '{field_name}' vor Template-Detection geschützt: '{value_str}'")
+            # Für numerische Felder direkt zur speziellen Verarbeitung springen
+            pass  # Keine Template-Detection für numerische Werte
+        else:
+            # Nur non-numerische Werte in numerischen Feldern durch Template-Detection prüfen
+            for pattern in template_patterns:
+                if re.match(pattern, value_str, re.IGNORECASE):
+                    logger.info(f"[TEMPLATE-FIX] Template pattern detected in numeric field '{field_name}': '{value_str}' -> 'Nichts gefunden'")
+                    return "Nichts gefunden"
+    else:
+        # Nicht-numerische Felder: Normale Template-Detection
+        for pattern in template_patterns:
+            if re.match(pattern, value_str, re.IGNORECASE):
+                logger.info(f"[TEMPLATE-FIX] Template pattern detected in field '{field_name}': '{value_str}' -> 'Nichts gefunden'")
+                # TEMPLATE-FIX 19.08.2025: Template-Werte direkt zu "Nichts gefunden" konvertieren
+                return "Nichts gefunden"
     
     # PHASE 1.3: Spezielle Feldverarbeitung
     if field_name in ['x-Koordinate', 'y-Koordinate']:
-        # Extract numeric coordinates from various formats
-        coord_match = re.search(r'(-?\d+\.?\d*)', value_str)
+        # KOORDINATEN-PRÄZISION-FIX 02.09.2025: Vollständige Dezimalstellen beibehalten
+        # Suche nach Koordinaten mit beliebiger Dezimalstellenanzahl
+        coord_match = re.search(r'(-?\d+\.?\d+)', value_str)  # Mindestens eine Nachkommastelle erfassen
         if coord_match:
             return coord_match.group(1)
+        # Fallback für ganze Zahlen ohne Dezimalstellen
+        coord_int_match = re.search(r'(-?\d+)', value_str)
+        if coord_int_match:
+            return coord_int_match.group(1)
     
     if field_name == 'Minenfläche in qkm':
         # Extract area values and normalize units

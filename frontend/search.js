@@ -51,7 +51,9 @@ function handleBatchCountInput() {
  * SINGLE SEARCH: Startet eine Einzelsuche mit ausgewählten Modellen
  */
 function startSingleSearch() {
-    const selectedModels = Array.from(document.querySelectorAll('input[name="model"]:checked')).map(cb => cb.value);
+    // PROGRESSIVE MODEL SELECTION FIX: Verwende neues Model Selection System
+    const selectedModels = window.progressiveModelSelection?.getSelectedModels() || 
+                           Array.from(document.querySelectorAll('input[name="model"]:checked')).map(cb => cb.value);
     
     if (selectedModels.length === 0) {
         showNotification('Bitte wählen Sie mindestens ein Modell aus.', 'warning');
@@ -171,7 +173,9 @@ async function startBatchSearch() {
     
     // Validiere Eingaben
     const csvFile = formData.get('file');
-    const selectedModels = Array.from(document.querySelectorAll('input[name="model"]:checked')).map(cb => cb.value);
+    // PROGRESSIVE MODEL SELECTION FIX: Verwende neues Model Selection System
+    const selectedModels = window.progressiveModelSelection?.getSelectedModels() || 
+                           Array.from(document.querySelectorAll('input[name="model"]:checked')).map(cb => cb.value);
     
     if (!csvFile || csvFile.size === 0) {
         showNotification('Bitte wählen Sie eine CSV-Datei aus.', 'warning');
@@ -225,10 +229,10 @@ async function startBatchSearch() {
     const signal = batchSearchAbortController.signal;
     
     const resultsDiv = document.getElementById('batch-results');
-    showLoadingMessage(resultsDiv, `CSV wird hochgeladen...`, 
-        `CSV-Datei: ${csvFile.name} | Verarbeitung: ${countText} mit ${selectedModels.length} Modellen`, 
-        true, true, 'cancelBatchSearch()'  // Show cancel button
-    );
+    
+    // PROGRESS-MERGE 29.08.2025: Zeige nur Progress-Container, keine doppelte Anzeige
+    showProgressContainer('uploading', 0, 0);
+    updateProgressActivity(`CSV wird hochgeladen: ${csvFile.name}`);
     
     try {
         // SCHRITT 1: CSV UPLOAD - Erstelle Session ID
@@ -273,11 +277,32 @@ async function startBatchSearch() {
             expectedResults = `Verarbeitung der ersten ${batchCount} von ${mineCount} Minen`;
         }
         
-        // Update UI for batch search phase with mine count feedback
-        showLoadingMessage(resultsDiv, `${searchTypeText} läuft...`, 
-            `✅ CSV verarbeitet: ${mineCount} Minen gefunden | ${expectedResults} mit ${selectedModels.length} Modellen`, 
-            false, true, 'cancelBatchSearch()' // Don't restart timer, continue from upload phase, show cancel button
-        );
+        // PROGRESS-MERGE 29.08.2025: Wechsel zu Session-basiertem Progress-Container
+        const totalOperations = typeof mineCount === 'number' ? mineCount * selectedModels.length : desiredTotal * selectedModels.length;
+        
+        // PROGRESS FIX: Clear old progress state before starting new session-based tracking
+        if (progressUpdateInterval) {
+            console.log('📊 [PROGRESS] Clearing old progress interval before starting session-based tracking');
+            clearInterval(progressUpdateInterval);
+            progressUpdateInterval = null;
+        }
+        
+        showProgressContainer(sessionId, typeof mineCount === 'number' ? mineCount : desiredTotal, selectedModels.length);
+        
+        // Update Progress mit CSV-Informationen
+        updateProgressState('processing_csv', `✅ CSV verarbeitet: ${mineCount} Minen gefunden | ${expectedResults} mit ${selectedModels.length} Modellen`, 10);
+        
+        // Zeige batch-results für finale Ergebnisse, aber verstecke Loading-Messages
+        resultsDiv.innerHTML = '<div id="batch-final-results" style="display: none;"></div>';
+        
+        // FRONTEND FIX: Populate selected_models hidden field before batch search
+        const hiddenModelsField = document.querySelector('input[name="selected_models"]');
+        if (hiddenModelsField) {
+            hiddenModelsField.value = selectedModels.join(',');
+            console.log('✅ [FRONTEND-FIX] selected_models field populated:', selectedModels.join(','));
+        } else {
+            console.warn('⚠️ [FRONTEND-FIX] selected_models hidden field not found!');
+        }
         
         // SCHRITT 2: BATCH SEARCH mit Session ID (Chunking unterstützt)
         console.log('🔍 [BATCH-STEP-2] Starting batch search with session ID...');
@@ -313,6 +338,13 @@ async function startBatchSearch() {
                 }
 
                 const currentCount = Math.min(chunkSize, desiredTotal - startIndex);
+                // TRANSPARENCY FIX 30.08.2025: Session und Cache Control Parameter hinzufügen (auch für Chunks)
+                const useCacheElement = document.getElementById('use_cache');
+                const forceNewSessionElement = document.getElementById('force_new_session');
+                
+                const useCacheEnabled = useCacheElement ? useCacheElement.checked : false;
+                const forceNewSessionEnabled = forceNewSessionElement ? forceNewSessionElement.checked : true;
+
                 const chunkFormData = new FormData();
                 chunkFormData.append('session_id', sessionId);
                 chunkFormData.append('search_type', comprehensiveSearchEnabled ? 'comprehensive' : 'standard');
@@ -323,6 +355,9 @@ async function startBatchSearch() {
                 chunkFormData.append('twoPhase', twoPhaseEnabled.toString());
                 chunkFormData.append('smartSearch', smartSearchEnabled.toString());
                 chunkFormData.append('comprehensive', comprehensiveSearchEnabled.toString());
+                // TRANSPARENCY FIX 30.08.2025: Neue Parameter
+                chunkFormData.append('use_cache', useCacheEnabled.toString());
+                chunkFormData.append('force_new_session', forceNewSessionEnabled.toString());
 
                 const chunkResponse = await fetch(`${window.API_BASE_URL}/api/batch-search`, {
                     method: 'POST',
@@ -351,6 +386,15 @@ async function startBatchSearch() {
                 window.scheduleAllTabsRefresh('batch');
             }
         } else {
+            // TRANSPARENCY FIX 30.08.2025: Session und Cache Control Parameter hinzufügen
+            const useCacheElement = document.getElementById('use_cache');
+            const forceNewSessionElement = document.getElementById('force_new_session');
+            
+            const useCacheEnabled = useCacheElement ? useCacheElement.checked : false;
+            const forceNewSessionEnabled = forceNewSessionElement ? forceNewSessionElement.checked : true;
+            
+            console.log(`🔍 [BATCH-TRANSPARENCY] use_cache: ${useCacheEnabled}, force_new_session: ${forceNewSessionEnabled}`);
+            
             const batchFormData = new FormData();
             batchFormData.append('session_id', sessionId);
             batchFormData.append('search_type', comprehensiveSearchEnabled ? 'comprehensive' : 'standard');
@@ -361,6 +405,9 @@ async function startBatchSearch() {
             batchFormData.append('twoPhase', twoPhaseEnabled.toString());
             batchFormData.append('smartSearch', smartSearchEnabled.toString());
             batchFormData.append('comprehensive', comprehensiveSearchEnabled.toString());
+            // TRANSPARENCY FIX 30.08.2025: Neue Parameter
+            batchFormData.append('use_cache', useCacheEnabled.toString());
+            batchFormData.append('force_new_session', forceNewSessionEnabled.toString());
 
             const batchResponse = await fetch(`${window.API_BASE_URL}/api/batch-search`, {
                 method: 'POST',
@@ -375,8 +422,18 @@ async function startBatchSearch() {
             if (typeof window.searchTimer !== 'undefined' && window.searchTimer.stop) {
                 window.searchTimer.stop();
             }
-            safeSetHTML(resultsDiv, batchResultsHtml);
-            showNotification(`✅ ${searchTypeText} erfolgreich abgeschlossen`, 'success');
+            
+            // PROGRESS-MERGE 29.08.2025: Zeige Ergebnisse und verstecke Progress-Container
+            updateProgressState('batch_complete', '✅ Batch-Suche erfolgreich abgeschlossen!', 100);
+            
+            // Warte 2 Sekunden und zeige dann Ergebnisse
+            setTimeout(() => {
+                hideProgressContainer();
+                resultsDiv.style.display = 'block';
+                safeSetHTML(resultsDiv, batchResultsHtml);
+                showNotification(`✅ ${searchTypeText} erfolgreich abgeschlossen`, 'success');
+            }, 2000);
+            
             if (typeof window.smartRefreshAfterSearch === 'function') {
                 window.smartRefreshAfterSearch('batch');
             } else if (typeof window.scheduleAllTabsRefresh === 'function') {
@@ -400,6 +457,15 @@ async function startBatchSearch() {
         } else {
             // Only log non-abort errors
             console.error(`❌ [BATCH-SEARCH] Error:`, error);
+            
+            // PROGRESS-MERGE 29.08.2025: Zeige Fehler im Progress-Container
+            updateProgressState('error', `⚠️ Fehler: ${error.message}`, 0);
+            
+            // Warte 3 Sekunden und verstecke dann Progress-Container
+            setTimeout(() => {
+                hideProgressContainer();
+                resultsDiv.style.display = 'block';
+            }, 3000);
             
             // Stop timer
             if (typeof window.searchTimer !== 'undefined' && window.searchTimer.stop) {
@@ -445,6 +511,9 @@ function cancelBatchSearch() {
             </div>
         `;
     }
+    
+    // PROGRESS-FIX 29.08.2025: Progress-Container verstecken
+    hideProgressContainer();
     
     // Show notification
     showNotification('🛑 Batch-Suche erfolgreich abgebrochen', 'info');
@@ -1458,4 +1527,346 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// ====================================== 
+// PROGRESS-FIX 29.08.2025: Progress Container Functions
+// ======================================
+
+let currentProgressSession = null;
+let progressUpdateInterval = null;
+
+/**
+ * Zeigt den Progress-Container an und startet die Progress-Überwachung
+ * PROGRESS-MERGE 29.08.2025: Unterstützt sowohl Session-basierte als auch direkte Updates
+ */
+function showProgressContainer(sessionIdOrState, totalMines, totalModels) {
+    const progressContainer = document.getElementById('batch-progress-container');
+    if (!progressContainer) return;
+    
+    // Container anzeigen
+    progressContainer.style.display = 'block';
+    
+    // Wenn erster Parameter ein State ist (z.B. 'uploading'), direkter Modus
+    if (typeof sessionIdOrState === 'string' && ['uploading', 'processing_csv', 'source_discovery', 'model_execution'].includes(sessionIdOrState)) {
+        // Direkter Modus - kein Session-Tracking
+        currentProgressSession = {
+            sessionId: null,
+            totalMines: totalMines || 0,
+            totalModels: totalModels || 0,
+            startTime: Date.now(),
+            directMode: true,
+            currentState: sessionIdOrState
+        };
+        
+        // Fortschritt zurücksetzen
+        resetProgressDisplay();
+        
+        // Direktes Status-Update
+        updateTextElement('progress-status', getStatusText(sessionIdOrState));
+        updateTextElement('current-activity', getActivityForState(sessionIdOrState));
+        
+        console.log(`📊 [PROGRESS] Progress-Container gestartet im Direct-Modus: ${sessionIdOrState}`);
+    } else {
+        // Session-basierter Modus
+        currentProgressSession = {
+            sessionId: sessionIdOrState,
+            totalMines,
+            totalModels,
+            startTime: Date.now(),
+            directMode: false
+        };
+        
+        // Fortschritt zurücksetzen
+        resetProgressDisplay();
+        
+        // Progress-Updates starten
+        startProgressUpdates();
+        
+        console.log(`📊 [PROGRESS] Progress-Container gestartet für Session ${sessionIdOrState}`);
+    }
+}
+
+/**
+ * Versteckt den Progress-Container und stoppt Updates
+ */
+function hideProgressContainer() {
+    const progressContainer = document.getElementById('batch-progress-container');
+    if (progressContainer) {
+        progressContainer.style.display = 'none';
+    }
+    
+    // Updates stoppen
+    if (progressUpdateInterval) {
+        clearInterval(progressUpdateInterval);
+        progressUpdateInterval = null;
+    }
+    
+    currentProgressSession = null;
+    console.log('📊 [PROGRESS] Progress-Container versteckt');
+}
+
+/**
+ * Setzt die Progress-Anzeige zurück
+ */
+function resetProgressDisplay() {
+    // Progress-Bars zurücksetzen
+    const overallBar = document.getElementById('overall-progress-bar');
+    const mineBar = document.getElementById('mine-progress-bar');
+    if (overallBar) overallBar.style.width = '0%';
+    if (mineBar) mineBar.style.width = '0%';
+    
+    // Text-Elemente zurücksetzen
+    const elements = {
+        'overall-progress-text': '0%',
+        'current-mine-text': '-',
+        'current-mine-name': 'Vorbereitung...',
+        'progress-status': 'Initialisiere...',
+        'sources-found': '0',
+        'successful-results': '0',
+        'failed-results': '0',
+        'progress-eta': 'Berechne...',
+        'current-activity': 'Batch-Suche wird vorbereitet...'
+    };
+    
+    Object.entries(elements).forEach(([id, text]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = text;
+    });
+}
+
+/**
+ * Startet regelmäßige Progress-Updates
+ */
+function startProgressUpdates() {
+    if (!currentProgressSession) {
+        console.warn('📊 [PROGRESS] startProgressUpdates: currentProgressSession ist null');
+        return;
+    }
+    
+    console.log(`📊 [PROGRESS] Starte Progress-Updates für Session: ${currentProgressSession.sessionId}`);
+    
+    // Alle 2 Sekunden Progress abrufen
+    progressUpdateInterval = setInterval(async () => {
+        if (!currentProgressSession) {
+            clearInterval(progressUpdateInterval);
+            return;
+        }
+        
+        try {
+            await updateProgressDisplay();
+        } catch (error) {
+            console.error('📊 [PROGRESS] Fehler beim Update:', error);
+        }
+    }, 2000);
+    
+    // Erstes Update sofort
+    updateProgressDisplay();
+}
+
+/**
+ * Aktualisiert die Progress-Anzeige
+ */
+async function updateProgressDisplay() {
+    if (!currentProgressSession) {
+        console.warn('📊 [PROGRESS] updateProgressDisplay: currentProgressSession ist null');
+        return;
+    }
+    
+    console.log(`📊 [PROGRESS] Updating display für Session: ${currentProgressSession.sessionId}`);
+    
+    try {
+        // Progress vom Backend abrufen 
+        const response = await fetch(`${window.API_BASE_URL}/api/progress/${currentProgressSession.sessionId}`);
+        if (!response.ok) {
+            console.warn('📊 [PROGRESS] Kein Progress verfügbar für Session, stoppe Updates');
+            // Stoppe Progress-Updates bei anhaltenden 404-Fehlern
+            clearInterval(progressUpdateInterval);
+            hideProgressContainer();
+            return;
+        }
+        
+        const data = await response.json();
+        if (!data.success || !data.data) {
+            console.warn('📊 [PROGRESS] Invalid progress data received');
+            return;
+        }
+        
+        const progress = data.data;
+        
+        // Bei 'completed' Status: Stoppe Updates und verstecke Container
+        if (progress.status === 'completed' || progress.status === 'finished') {
+            console.log('📊 [PROGRESS] Batch completed, stopping updates');
+            clearInterval(progressUpdateInterval);
+            setTimeout(() => hideProgressContainer(), 2000);
+            return;
+        }
+        
+        // Berechne Progress-Prozentsatz für einfache Progress-Daten
+        const totalProgress = progress.total ? Math.round((progress.completed / progress.total) * 100) : 0;
+        const currentMineProgress = progress.current_mine_progress || totalProgress;
+        
+        // Progress-Bars aktualisieren (kompatibel mit altem und neuem Format)
+        updateProgressBar('overall-progress-bar', progress.overall_progress || totalProgress);
+        updateProgressBar('mine-progress-bar', progress.mine_progress || currentMineProgress);
+        
+        // Text-Elemente aktualisieren (kompatibel mit altem und neuem Format)
+        updateTextElement('overall-progress-text', `${progress.overall_progress || totalProgress}%`);
+        updateTextElement('current-mine-text', progress.current_mine || `${progress.completed || 0}/${progress.total || 1}`);
+        updateTextElement('current-mine-name', progress.current_mine_name || progress.message || 'Verarbeite...');
+        updateTextElement('progress-status', getStatusText(progress.state || progress.status));
+        updateTextElement('sources-found', progress.sources_found || 0);
+        updateTextElement('successful-results', progress.successful_results || progress.completed || 0);
+        updateTextElement('failed-results', progress.failed_results || progress.failed || 0);
+        updateTextElement('progress-eta', progress.eta || 'Unbekannt');
+        
+        // Aktivität aktualisieren
+        updateCurrentActivity(progress);
+        
+        // Bei Abschluss: Container nach 3 Sekunden verstecken (unterstütze beide Status-Formate)
+        if (progress.state === 'batch_complete' || progress.state === 'error' || 
+            progress.status === 'completed' || progress.status === 'error') {
+            setTimeout(() => hideProgressContainer(), 3000);
+        }
+        
+    } catch (error) {
+        console.error('📊 [PROGRESS] Fehler beim Progress-Abruf:', error);
+    }
+}
+
+/**
+ * Aktualisiert eine Progress-Bar
+ */
+function updateProgressBar(elementId, percentage) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.style.width = `${Math.max(0, Math.min(100, percentage))}%`;
+    }
+}
+
+/**
+ * Aktualisiert ein Text-Element
+ */
+function updateTextElement(elementId, text) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.textContent = text;
+    }
+}
+
+/**
+ * Konvertiert Progress-Status zu benutzerfreundlichem Text
+ */
+function getStatusText(state) {
+    const statusMap = {
+        'uploading': 'CSV wird hochgeladen',
+        'processing_csv': 'CSV wird verarbeitet',
+        // 2-PHASEN WORKFLOW STATES (29.08.2025)
+        'collecting_sources': 'Sammle Quellen von allen Modellen',
+        'extracting_data': 'Extrahiere Daten mit allen Quellen',
+        // Legacy States (für Kompatibilität)
+        'source_discovery': 'Quellen werden gesucht',
+        'model_execution': 'Modelle werden ausgeführt',
+        'saving_results': 'Ergebnisse werden gespeichert',
+        'mine_complete': 'Mine abgeschlossen',
+        'batch_complete': 'Batch-Suche abgeschlossen',
+        'error': 'Fehler aufgetreten',
+        // Neue Status-Werte für Fallback-System
+        'running': 'Verarbeitung läuft',
+        'completed': 'Abgeschlossen',
+        'unknown': 'Status unbekannt'
+    };
+    
+    return statusMap[state] || state || 'Unbekannt';
+}
+
+/**
+ * Aktualisiert die aktuelle Aktivitäts-Anzeige
+ */
+function updateCurrentActivity(progress) {
+    let activity = 'Batch-Suche läuft...';
+    
+    if (progress.state === 'source_discovery') {
+        activity = `Suche Quellen für ${progress.current_mine_name || 'Mine'}...`;
+    } else if (progress.state === 'model_execution') {
+        activity = `Führe Modell ${progress.current_model || ''} aus...`;
+    } else if (progress.state === 'saving_results') {
+        activity = `Speichere Ergebnisse für ${progress.current_mine_name || 'Mine'}...`;
+    } else if (progress.state === 'mine_complete') {
+        activity = `Mine '${progress.current_mine_name || 'Mine'}' abgeschlossen`;
+    } else if (progress.state === 'batch_complete') {
+        activity = `✅ Batch-Suche erfolgreich abgeschlossen!`;
+    } else if (progress.state === 'error') {
+        activity = `⚠️ Fehler: ${progress.message || 'Unbekannter Fehler'}`;
+    }
+    
+    updateTextElement('current-activity', activity);
+}
+
+/**
+ * PROGRESS-MERGE 29.08.2025: Direkte Aktivitäts-Update-Funktion
+ */
+function updateProgressActivity(message) {
+    updateTextElement('current-activity', message);
+}
+
+/**
+ * PROGRESS-MERGE 29.08.2025: Gibt Aktivität für State zurück
+ */
+function getActivityForState(state) {
+    const activities = {
+        'uploading': 'CSV-Datei wird hochgeladen...',
+        'processing_csv': 'CSV-Daten werden verarbeitet...',
+        // 2-PHASEN WORKFLOW ACTIVITIES (29.08.2025)
+        'collecting_sources': '🔍 Sammle Quellen von allen Modellen...',
+        'extracting_data': '⚡ Extrahiere Daten mit allen gefundenen Quellen...',
+        // Legacy Activities (für Kompatibilität)
+        'source_discovery': 'Quellen werden gesucht...',
+        'model_execution': 'Modelle werden ausgeführt...',
+        'saving_results': 'Ergebnisse werden gespeichert...',
+        'batch_complete': '✅ Batch-Suche erfolgreich abgeschlossen!',
+        'error': '⚠️ Fehler bei der Verarbeitung'
+    };
+    
+    return activities[state] || 'Batch-Suche läuft...';
+}
+
+/**
+ * PROGRESS-MERGE 29.08.2025: Direkte Progress-Updates für nicht-Session-basierte Operationen
+ */
+function updateProgressState(state, message, percentage) {
+    if (!currentProgressSession) return;
+    
+    // PROGRESS FIX: Nicht überschreiben wenn im Session-basierten Modus
+    if (!currentProgressSession.directMode) {
+        console.log(`📊 [PROGRESS] Ignoring updateProgressState(${state}) because in session-based mode`);
+        return;
+    }
+    
+    currentProgressSession.currentState = state;
+    
+    updateTextElement('progress-status', getStatusText(state));
+    updateTextElement('current-activity', message || getActivityForState(state));
+    
+    if (percentage !== undefined) {
+        updateProgressBar('overall-progress-bar', percentage);
+        updateTextElement('overall-progress-text', `${percentage}%`);
+    }
+}
+
+/**
+ * Bricht die aktuelle Batch-Suche ab
+ */
+function cancelCurrentBatch() {
+    if (batchSearchAbortController) {
+        batchSearchAbortController.abort();
+        hideProgressContainer();
+        showNotification('Batch-Suche wurde abgebrochen', 'warning');
+    }
+}
+
+// Export Progress Functions
+window.showProgressContainer = showProgressContainer;
+window.hideProgressContainer = hideProgressContainer;
+window.cancelCurrentBatch = cancelCurrentBatch;
+
 console.log('🔍 MineSearch 2.0 - Search Functions loaded');
+console.log('📊 [PROGRESS] Progress Container Functions loaded');

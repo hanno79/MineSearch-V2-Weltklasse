@@ -27,10 +27,27 @@ def init_db():
     config = Config()
     database_url = config.get('DATABASE_URL', 'sqlite:///./mines.db')
     
-    engine = create_engine(
-        database_url,
-        connect_args={"check_same_thread": False} if database_url.startswith('sqlite') else {}
-    )
+    # PERFORMANCE FIX 02.09.2025: Connection Pooling konfiguriert für bessere Performance
+    engine_args = {
+        "pool_size": 10,  # Basis-Pool-Größe
+        "max_overflow": 20,  # Zusätzliche Connections bei Bedarf
+        "pool_timeout": 30,  # Timeout für Pool-Acquisition
+        "pool_pre_ping": True,  # Connection-Validierung
+        "pool_recycle": 3600,  # Connections recyceln nach 1h
+    }
+    
+    if database_url.startswith('sqlite'):
+        # SQLite-spezifische Optimierungen
+        engine_args.update({
+            "connect_args": {
+                "check_same_thread": False,
+                "timeout": 30,  # Connection timeout
+            },
+            "pool_size": 5,  # SQLite braucht weniger Connections
+            "max_overflow": 10,
+        })
+    
+    engine = create_engine(database_url, **engine_args)
     
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     

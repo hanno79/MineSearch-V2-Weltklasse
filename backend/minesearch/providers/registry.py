@@ -33,7 +33,7 @@ class ProviderRegistry:
         self._provider_classes: Dict[str, Type[AbstractProvider]] = {
             'perplexity': 'PerplexityProvider',
             'openrouter': 'OpenRouterProvider',
-            'abacus': 'AbacusProvider',
+            # 'abacus': 'AbacusProvider',  # ENTFERNT 02.09.2025: Abacus Provider komplett entfernt
             'tavily': 'TavilyProvider',
             'exa': 'ExaProvider',
             'scrapingbee': 'ScrapingBeeProvider',
@@ -223,7 +223,7 @@ class ProviderRegistry:
     
     def get_provider_for_model(self, model_id: str) -> Optional[AbstractProvider]:
         """
-        Hole Provider für ein bestimmtes Modell
+        Hole Provider für ein bestimmtes Modell mit verbesserter Fehlerbehandlung
         
         Args:
             model_id: Modell-ID im Format "provider:model"
@@ -232,11 +232,21 @@ class ProviderRegistry:
             Provider-Instanz oder None
         """
         if ':' not in model_id:
-            logger.error(f"[REGISTRY] Ungültiges Modell-ID Format: {model_id}")
+            logger.error(f"[REGISTRY] Ungültiges Modell-ID Format: {model_id} - erwartet 'provider:model'")
             return None
         
         provider_name = model_id.split(':')[0]
-        return self.get_provider(provider_name)
+        provider = self.get_provider(provider_name)
+        
+        if not provider:
+            # Detaillierte Diagnose für bessere Fehlermeldungen
+            available_providers = list(self._providers.keys())
+            if provider_name not in available_providers:
+                logger.error(f"[REGISTRY] Provider '{provider_name}' nicht registriert. Verfügbare Provider: {available_providers}")
+            else:
+                logger.error(f"[REGISTRY] Provider '{provider_name}' registriert aber nicht initialisiert - prüfen Sie API-Keys")
+        
+        return provider
     
     def get_all_models(self) -> Dict[str, ModelConfig]:
         """
@@ -344,19 +354,26 @@ class ProviderRegistry:
         """
         defaults = []
         
-        # ÄNDERUNG 14.07.2025: Kimi K2 als primäre Option für beste Performance
-        if 'openrouter:kimi-k2' in self._available_models:
-            defaults.append('openrouter:kimi-k2')
-        
-        # Weitere kostenlose OpenRouter Modelle als Fallback
+        # FIX 02.09.2025: OpenRouter-Modelle haben Priorität
+        # DeepSeek-Free als erste Option (kostenlos und zuverlässig)
         if 'openrouter:deepseek-free' in self._available_models:
             defaults.append('openrouter:deepseek-free')
         
+        # DeepSeek-Chat als zweite Option (besser als Free)
         if 'openrouter:deepseek-chat' in self._available_models:
             defaults.append('openrouter:deepseek-chat')
         
+        # Kimi K2 als dritte Option für beste Performance
+        if 'openrouter:kimi-k2' in self._available_models:
+            defaults.append('openrouter:kimi-k2')
+        
+        # Weitere kostenlose OpenRouter Modelle
         if 'openrouter:mistral-small-free' in self._available_models:
             defaults.append('openrouter:mistral-small-free')
+        
+        # BrightData nur als letzte Option, NICHT als Standard
+        if 'brightdata:web-scraper' in self._available_models:
+            defaults.append('brightdata:web-scraper')
         
         return defaults
 

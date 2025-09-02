@@ -18,6 +18,13 @@ class SpecializedPrompts:
 🚫 UNIVERSAL ANTI-TEMPLATE QUALITY REQUIREMENTS:
 ==============================================
 
+🎯 KRITISCHE REGEL: GIB NUR FELDER ZURÜCK, FÜR DIE DU ECHTE DATEN HAST!
+
+⚠️ DELIMITER RULE: Replace ALL pipe characters (|) with forward slash (/) in your output
+   - Example: "35|1|Mining" → "35/1/Mining"
+   - This prevents CSV field misalignment
+======================================================================
+
 ABSOLUT VERBOTEN - NIEMALS verwenden:
 - TEMPLATE: [beliebiger Text]
 - Not specified in available [sources/data/information]
@@ -30,17 +37,24 @@ ABSOLUT VERBOTEN - NIEMALS verwenden:
 - [Placeholder], [Example], [Company Name]
 - Any text in [square brackets] as placeholder
 
+🔥 NEUE NULL-DATA POLICY (29.08.2025):
+=====================================
+- IGNORIERE alle Felder ohne verifizierte Daten
+- ANTWORTE NUR mit Feldern die ECHTE Informationen enthalten
+- LASSE alle unbekannten Felder komplett WEG aus der Antwort
+- VERMEIDE leere Strings - überspringe das Feld komplett!
+
 QUALITY SELF-CHECK vor jeder Antwort:
 1. ❓ "Ist dies eine KONKRETE, echte Information?"
 2. ❓ "Oder ist es ein Template/Platzhalter/Beispiel?"
 3. ❓ "Kann ich diese Information mit einer Quelle belegen?"
 4. ❓ "Wäre ein Nutzer mit dieser Antwort zufrieden?"
 
-GOLDENE REGEL: LIEBER LEER ALS TEMPLATE!
-- Bei Unsicherheit: Feld komplett leer lassen
+GOLDENE REGEL: NUR ECHTE DATEN ZURÜCKGEBEN!
+- Bei Unsicherheit: Feld NICHT in der Antwort erwähnen
 - Keine Vermutungen oder Beispiele
 - Nur 100% verifizierte, echte Daten
-- Wenn keine Daten gefunden: "" (leer) zurückgeben
+- Leere/unbekannte Felder: KOMPLETT WEGLASSEN
 
 POSITIVE BEISPIELE echter Daten:
 ✅ Eigentümer: "Barrick Gold Corporation"
@@ -113,11 +127,13 @@ QUALITÄTSKONTROLLE:
 
 12. ROHSTOFFABBAU:
     ✅ Spezifische Mineralien: "Gold", "Kupfer", "Eisenerz", "Lithium"
-    ❌ NIEMALS: "Gold/ Kupfer/ Kohle/ usw.)", "[Commodity]", "/usw." Endungen
+    ❌ NIEMALS: Template-Listen, "[Commodity]", "/usw." Endungen
+    🔥 FELD GEÄNDERT 29.08.2025: Keine "(Gold/ Kupfer/ Kohle/ usw.)" Templates mehr!
 
 13. MINENTYP:
     ✅ Konkrete Typen: "Open-Pit", "Untertage", "Kombiniert"
-    ❌ NIEMALS: "Untertage/ Open-Pit/ usw.)", "[Mine Type]", Template-Typen
+    ❌ NIEMALS: Template-Listen, "[Mine Type]", Template-Typen
+    🔥 FELD GEÄNDERT 29.08.2025: Keine "(Untertage/ Open-Pit/ usw.)" Templates mehr!
 
 14. PRODUKTIONSSTART:
     ✅ Exakte Jahre: "1995", "2010", "2018"

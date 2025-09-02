@@ -22,36 +22,51 @@ class BrightdataExtractor:
         
         mine_name = options.get('mine_name', '')
         
+        # REGEL 10 COMPLIANCE 30.08.2025: Keine Fallback-Werte - nur None oder echte Daten
         extracted_data = {
             'Name': mine_name,
             'Country': options.get('country', ''),
-            'Region': options.get('region', '-'),
-            'Eigentümer': '-',
-            'Betreiber': '-',
-            'x-Koordinate': '-',
-            'y-Koordinate': '-',
-            'Aktivitätsstatus': '-',
-            'Restaurationskosten': '-',
-            'Jahr der Aufnahme der Kosten': '-',
-            'Jahr der Erstellung des Dokumentes': '-',
-            'Rohstoffabbau': options.get('commodity', '-'),
-            'Minentyp': '-',
-            'Produktionsstart': '-',
-            'Produktionsende': '-',
-            'Fördermenge/Jahr': '-',
-            'Fläche der Mine in qkm': '-',
-            'Quellenangaben': '-'
+            'Region': options.get('region', None),
+            'Eigentümer': None,
+            'Betreiber': None,
+            'x-Koordinate': None,
+            'y-Koordinate': None,
+            'Aktivitätsstatus': None,
+            'Restaurationskosten': None,
+            'Jahr der Aufnahme der Kosten': None,
+            'Jahr der Erstellung des Dokumentes': None,
+            'Rohstoffabbau': options.get('commodity', None),
+            'Minentyp': None,
+            'Produktionsstart': None,
+            'Produktionsende': None,
+            'Fördermenge/Jahr': None,
+            'Fläche der Mine in qkm': None,
+            'Quellenangaben': None
         }
         
         content_lower = content.lower()
         
-        # Koordinaten-Extraktion
+        # FLEXIBLERE Koordinaten-Extraktion 30.08.2025
         coord_patterns = [
+            # Standard Latitude/Longitude Pattern
             r'latitude[:\s]+(-?\d+\.?\d*)',
             r'longitude[:\s]+(-?\d+\.?\d*)',
             r'coordinates[:\s]+(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)',
             r'lat[:\s]+(-?\d+\.?\d*)',
-            r'lon[:\s]+(-?\d+\.?\d*)'
+            r'lon[:\s]+(-?\d+\.?\d*)',
+            # Deutsche Begriffe
+            r'breitengrad[:\s]+(-?\d+\.?\d*)',
+            r'längengrad[:\s]+(-?\d+\.?\d*)',
+            r'koordinaten[:\s]+(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)',
+            # Verschiedene Formate
+            r'(-?\d+\.?\d*)[°\s]*[n,s][,\s]*(-?\d+\.?\d*)[°\s]*[e,w]',
+            r'GPS[:\s]+(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)',
+            r'location[:\s]+(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)',
+            r'position[:\s]+(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)',
+            # Dezimalgrad-Muster
+            r'(-?\d{1,3}\.\d+)[,\s]+(-?\d{1,3}\.\d+)',
+            # In Tabellen
+            r'<td[^>]*>.*?(-?\d+\.?\d+).*?</td>.*?<td[^>]*>.*?(-?\d+\.?\d+).*?</td>'
         ]
         
         for pattern in coord_patterns:
@@ -65,12 +80,28 @@ class BrightdataExtractor:
                     extracted_data['y-Koordinate'] = match.group(1)
                     extracted_data['x-Koordinate'] = match.group(2)
         
-        # Eigentümer/Betreiber
+        # FLEXIBLERE Eigentümer/Betreiber Pattern 30.08.2025
         owner_patterns = [
-            r'owner[:\s]+([^,\n]+)',
-            r'owned by[:\s]+([^,\n]+)',
-            r'operator[:\s]+([^,\n]+)',
-            r'operated by[:\s]+([^,\n]+)'
+            # Standard English
+            r'owner[:\s]+([^,\n\.<>]{3,100})',
+            r'owned by[:\s]+([^,\n\.<>]{3,100})',
+            r'operator[:\s]+([^,\n\.<>]{3,100})',
+            r'operated by[:\s]+([^,\n\.<>]{3,100})',
+            # Deutsche Begriffe
+            r'eigentümer[:\s]+([^,\n\.<>]{3,100})',
+            r'betreiber[:\s]+([^,\n\.<>]{3,100})',
+            r'betrieben von[:\s]+([^,\n\.<>]{3,100})',
+            r'im besitz von[:\s]+([^,\n\.<>]{3,100})',
+            # Company mentions
+            r'([A-Z][a-z]+\s+(?:Corp|Corporation|Company|Ltd|Limited|Inc|Incorporated|AG|GmbH|SA|Holdings|Mining|Mines|Resources))',
+            r'([A-Z][a-zA-Z\s&]+(?:Corp|Corporation|Company|Ltd|Limited|Inc|Incorporated|AG|GmbH|SA|Holdings|Mining|Mines|Resources))',
+            # In Tabellen
+            r'<td[^>]*>.*?owner.*?</td>.*?<td[^>]*>([^<]{3,50})</td>',
+            r'<td[^>]*>.*?operator.*?</td>.*?<td[^>]*>([^<]{3,50})</td>',
+            # Verschiedene Formate
+            r'company[:\s]+([^,\n\.<>]{3,100})',
+            r'mining company[:\s]+([^,\n\.<>]{3,100})',
+            r'parent company[:\s]+([^,\n\.<>]{3,100})'
         ]
         
         for pattern in owner_patterns:
@@ -82,12 +113,26 @@ class BrightdataExtractor:
                 else:
                     extracted_data['Betreiber'] = company
         
-        # Restaurationskosten
+        # FLEXIBLERE Restaurationskosten Pattern 30.08.2025
         cost_patterns = [
-            r'closure cost[s]?[:\s]+\$?([0-9,\.]+)\s*(million|billion|m|b)?',
-            r'restoration cost[s]?[:\s]+\$?([0-9,\.]+)\s*(million|billion|m|b)?',
-            r'aro[:\s]+\$?([0-9,\.]+)\s*(million|billion|m|b)?',
-            r'environmental liability[:\s]+\$?([0-9,\.]+)\s*(million|billion|m|b)?'
+            # Standard English
+            r'closure cost[s]?[:\s]+\$?([0-9,\.]+)\s*(million|billion|m|b|mio|mrd)?',
+            r'restoration cost[s]?[:\s]+\$?([0-9,\.]+)\s*(million|billion|m|b|mio|mrd)?',
+            r'aro[:\s]+\$?([0-9,\.]+)\s*(million|billion|m|b|mio|mrd)?',
+            r'environmental liability[:\s]+\$?([0-9,\.]+)\s*(million|billion|m|b|mio|mrd)?',
+            r'reclamation cost[s]?[:\s]+\$?([0-9,\.]+)\s*(million|billion|m|b|mio|mrd)?',
+            r'rehabilitation cost[s]?[:\s]+\$?([0-9,\.]+)\s*(million|billion|m|b|mio|mrd)?',
+            # Deutsche Begriffe
+            r'schließungskosten[:\s]+([0-9,\.]+)\s*(millionen?|milliarden?|mio|mrd|euro|€|\$|dollar|usd)?',
+            r'restaurationskosten[:\s]+([0-9,\.]+)\s*(millionen?|milliarden?|mio|mrd|euro|€|\$|dollar|usd)?',
+            r'wiederherstellungskosten[:\s]+([0-9,\.]+)\s*(millionen?|milliarden?|mio|mrd|euro|€|\$|dollar|usd)?',
+            r'rückbaukosten[:\s]+([0-9,\.]+)\s*(millionen?|milliarden?|mio|mrd|euro|€|\$|dollar|usd)?',
+            # Verschiedene Währungen und Formate
+            r'([0-9,\.]+)\s*(million|billion|mio|mrd)?\s*(euro|€|\$|dollar|usd|cad|eur).*?(?:closure|restoration|aro|reclamation)',
+            r'([0-9,\.]+)\s*(€|\$)\s*(million|billion|mio|mrd)?.*?(?:closure|restoration|cost)',
+            # In Tabellen
+            r'<td[^>]*>.*?cost.*?</td>.*?<td[^>]*>([^<]{1,30})</td>',
+            r'<td[^>]*>.*?aro.*?</td>.*?<td[^>]*>([^<]{1,30})</td>'
         ]
         
         for pattern in cost_patterns:
@@ -161,35 +206,37 @@ class BrightdataDataProcessor:
     def process_search_results(results: List[Dict[str, Any]], options: Dict[str, Any]) -> Dict[str, Any]:
         """Verarbeitet Brightdata-Suchergebnisse zu strukturierten Daten"""
         
-        # Initialisiere Basis-Struktur
+        # REGEL 10 COMPLIANCE 30.08.2025: Basis-Struktur ohne Fallback-Werte
         mine_name = options.get('mine_name', '')
         structured_data = {
             'Name': mine_name,
             'Country': options.get('country', ''),
-            'Region': options.get('region', '-'),
-            'Eigentümer': '-',
-            'Betreiber': '-',
-            'x-Koordinate': '-',
-            'y-Koordinate': '-',
-            'Aktivitätsstatus': '-',
-            'Restaurationskosten': '-',
-            'Jahr der Aufnahme der Kosten': '-',
-            'Jahr der Erstellung des Dokumentes': '-',
-            'Rohstoffabbau': options.get('commodity', '-'),
-            'Minentyp': '-',
-            'Produktionsstart': '-',
-            'Produktionsende': '-',
-            'Fördermenge/Jahr': '-',
-            'Fläche der Mine in qkm': '-',
-            'Quellenangaben': '-'
+            'Region': options.get('region', None),
+            'Eigentümer': None,
+            'Betreiber': None,
+            'x-Koordinate': None,
+            'y-Koordinate': None,
+            'Aktivitätsstatus': None,
+            'Restaurationskosten': None,
+            'Jahr der Aufnahme der Kosten': None,
+            'Jahr der Erstellung des Dokumentes': None,
+            'Rohstoffabbau': options.get('commodity', None),
+            'Minentyp': None,
+            'Produktionsstart': None,
+            'Produktionsende': None,
+            'Fördermenge/Jahr': None,
+            'Fläche der Mine in qkm': None,
+            'Quellenangaben': None
         }
         
-        # Aggregiere Daten aus allen Ergebnissen
+        # REGEL 10 COMPLIANCE 30.08.2025: Aggregiere Daten nur mit echten Werten
         for result in results:
-            # Überschreibe nur wenn bessere Daten gefunden wurden
+            # Überschreibe nur wenn echte Daten gefunden wurden
             for key, value in result.items():
-                if key in structured_data and value != '-' and structured_data[key] == '-':
-                    structured_data[key] = value
+                if key in structured_data and value is not None and value != '' and structured_data[key] is None:
+                    # Zusätzliche Validierung: Keine versteckten Fallback-Werte
+                    if str(value).strip() not in ['-', 'N/A', 'Unknown', 'None', 'null']:
+                        structured_data[key] = value
         
         # Sammle Quellen
         sources = []
@@ -204,36 +251,84 @@ class BrightdataDataProcessor:
     
     @staticmethod
     def build_search_urls(mine_name: str, country: str = None, commodity: str = None) -> List[str]:
-        """Erstellt optimierte Such-URLs für Brightdata"""
+        """VERBESSERTE Mining-spezifische URLs 30.08.2025"""
         
         urls = []
+        from urllib.parse import quote
+        encoded_mine = quote(mine_name.replace(' ', '+'))
         
-        # Länderspezifische Mining-Portale
+        # 1. GOVERNMENT MINING DATABASES - Höchste Priorität für offizielle Daten
         if country:
             if country.lower() in ['kanada', 'canada']:
                 urls.extend([
-                    f"https://www.nrcan.gc.ca/search?search_api_views_fulltext={mine_name}",
-                    f"https://www.mining.ca/search?query={mine_name}"
+                    f"https://www.nrcan.gc.ca/mining-materials/mining/mining-data-statistics/8772",
+                    f"https://www.mindat.org/loc-5926.html",  # Canadian mines database
+                    f"https://geoscan.nrcan.gc.ca/geoscan_lite.php?search={encoded_mine}",
+                    f"https://mern.gouv.qc.ca/mines/industrie/sites-miniers/",
+                    f"https://www.snclavalin.com/en/beyond-engineering/mining-metals"
                 ])
             elif country.lower() in ['australien', 'australia']:
                 urls.extend([
-                    f"https://www.ga.gov.au/search?query={mine_name}",
-                    f"https://www.industry.gov.au/search?keys={mine_name}+mine"
+                    f"https://data.gov.au/dataset?q={encoded_mine}+mine",
+                    f"https://www.ga.gov.au/data-pubs/datastandards",
+                    f"https://minedex.dmirs.wa.gov.au/",
+                    f"https://www.business.qld.gov.au/industries/mining-energy-water/mining"
+                ])
+            elif country.lower() in ['usa', 'united states']:
+                urls.extend([
+                    f"https://mrdata.usgs.gov/mrds/",
+                    f"https://www.usgs.gov/centers/nmic/mineral-resources-data-system",
+                    f"https://edx.netl.doe.gov/dataset?q={encoded_mine}"
                 ])
         
-        # Technische Report-Datenbanken
+        # 2. MINING INTELLIGENCE PLATFORMS - Spezialisierte Datenbanken
         urls.extend([
-            f"https://www.sedar.com/search/search_form_pc_en.htm?searchText={mine_name}",
-            f"https://www.sec.gov/edgar/search/?q={mine_name}+mine"
+            f"https://www.mineralinfo.fr/mines-monde",
+            f"https://www.mindat.org/search.php?search={encoded_mine}",
+            f"https://www.mining-atlas.com/",
+            f"https://www.infomine.com/search/?q={encoded_mine}",
+            f"https://www.miningglobal.com/search?q={encoded_mine}",
+            f"https://www.globaldata.com/store/search/?q={encoded_mine}+mine"
         ])
         
-        # Mining-News und Datenbanken
+        # 3. TECHNICAL REPORTS & FINANCIAL FILINGS
         urls.extend([
-            f"https://www.mining.com/?s={mine_name}",
+            f"https://www.sedarplus.ca/search?q={encoded_mine}",
+            f"https://www.sec.gov/edgar/searchedgar/companysearch.html",
+            f"https://disclosure.spsx.com.au/gns/search.jsp",  # ASX filings
+            f"https://webfiles.thecse.com/"  # CSE filings
+        ])
+        
+        # 4. ENVIRONMENTAL & CLOSURE DATA SOURCES
+        urls.extend([
+            f"https://www.epa.gov/superfund-redevelopment/mine-scarred-lands",
+            f"https://www.environmentaldefence.ca/mining/",
+            f"https://www.pollutionwaste.canada.ca/national-releases-inventory/",
+            f"https://projects.eia.gov/powerplant-cleanup-costs/",  # Closure cost references
+            f"https://www.canada.ca/en/environment-climate-change/services/environmental-indicators.html"
+        ])
+        
+        # 5. MINING INDUSTRY DATABASES & NEWS ARCHIVES
+        urls.extend([
+            f"https://www.mining.com/tag/{encoded_mine.replace('+', '-')}/",
             f"https://www.northernminer.com/?s={mine_name}",
-            f"https://www.miningweekly.com/search?q={mine_name}"
+            f"https://www.miningweekly.com/search?searchword={encoded_mine}",
+            f"https://www.resourceworld.com/?s={mine_name}",
+            f"https://www.miningmagazine.com/search/?q={mine_name}",
+            f"https://www.mining-journal.com/search/?q={mine_name}"
         ])
         
+        # 6. COMMODITY-SPECIFIC SOURCES
+        if commodity:
+            commodity_encoded = quote(commodity.replace(' ', '+'))
+            urls.extend([
+                f"https://www.kitco.com/news/search/?q={encoded_mine}+{commodity_encoded}",
+                f"https://www.metalbulletin.com/search?q={mine_name}+{commodity}",
+                f"https://www.platts.com/search?query={mine_name}+{commodity}",
+                f"https://www.fastmarkets.com/search?q={mine_name}+{commodity}"
+            ])
+        
+        logger.info(f"[BrightData-URLs] Generated {len(urls)} mining-specific URLs for {mine_name}")
         return urls
     
     @staticmethod

@@ -174,7 +174,10 @@ class MultiModelSearchOrchestrator:
         region: Optional[str] = None,
         commodity: Optional[str] = None,
         session_id: Optional[str] = None,
-        max_concurrent_models: int = 10
+        max_concurrent_models: int = 10,
+        # 2-PHASEN WORKFLOW PARAMETER (29.08.2025)
+        use_all_db_sources: bool = False,
+        db_sources: Optional[List[Dict[str, Any]]] = None
     ) -> OrchestrationResult:
         """
         Hauptfunktion: Sucht eine Mine mit allen angegebenen Modellen
@@ -187,6 +190,8 @@ class MultiModelSearchOrchestrator:
             commodity: Rohstoff (optional)
             session_id: Session ID für tracking
             max_concurrent_models: Max parallele Modell-Calls
+            use_all_db_sources: True = Nutze alle DB-Quellen (2-Phasen Workflow)
+            db_sources: Liste aller DB-Quellen für Phase 2 
             
         Returns:
             OrchestrationResult mit allen Modell-Ergebnissen
@@ -216,25 +221,46 @@ class MultiModelSearchOrchestrator:
                 logger.warning(f"[ORCHESTRATOR]    • {model}")
             if len(unavailable_models) > 10:
                 logger.warning(f"[ORCHESTRATOR]    • ... und {len(unavailable_models) - 10} weitere")
-        
-        # PHASE 1: SHARED SOURCE DISCOVERY (nur einmal für alle Modelle)
-        logger.info(f"[ORCHESTRATOR] Phase 1: Shared Source Discovery für {mine_name}")
-        discovery_start = datetime.now()
-        
-        try:
-            shared_sources = self.source_discovery.discover_sources_for_mine(
-                mine_name=mine_name,
-                country=country,
-                region=region,
-                commodity=commodity
-            )
-            discovery_duration = (datetime.now() - discovery_start).total_seconds()
-            logger.info(f"[ORCHESTRATOR] Source Discovery completed: {len(shared_sources)} sources in {discovery_duration:.2f}s")
             
-        except Exception as e:
-            logger.error(f"[ORCHESTRATOR] Source Discovery failed: {e}")
-            shared_sources = []
-            discovery_duration = 0.0
+            # FALLBACK-FIX 29.08.2025: Verwende nur verfügbare Modelle für Ausführung
+            logger.info(f"[ORCHESTRATOR] 🛠️ FALLBACK: Verwende nur {len(available_models)} verfügbare Modelle")
+            models = available_models
+        
+        # PHASE 1: SOURCE DISCOVERY - 2-Phasen Workflow berücksichtigen
+        if use_all_db_sources and db_sources:
+            # 2-PHASEN WORKFLOW: Nutze vorgesammelte DB-Quellen
+            logger.info(f"[ORCHESTRATOR] 🔥 2-PHASEN WORKFLOW: Nutze {len(db_sources)} vorgesammelte DB-Quellen")
+            shared_sources = db_sources
+            discovery_duration = 0.0  # Bereits in Phase 1 gemacht
+            
+            logger.info(f"[ORCHESTRATOR] ✅ DB-Quellen-Übersicht:")
+            domain_count = {}
+            for source in db_sources[:10]:  # Erste 10 für Übersicht
+                domain = source.get('domain', 'unknown')
+                domain_count[domain] = domain_count.get(domain, 0) + 1
+                logger.info(f"[ORCHESTRATOR]   📄 {source.get('title', 'Unknown Title')[:50]}... ({domain})")
+                
+            logger.info(f"[ORCHESTRATOR] Top Domains: {dict(sorted(domain_count.items(), key=lambda x: x[1], reverse=True)[:5])}")
+            
+        else:
+            # LEGACY WORKFLOW: Individuelle Source Discovery
+            logger.info(f"[ORCHESTRATOR] Phase 1: Legacy Source Discovery für {mine_name}")
+            discovery_start = datetime.now()
+            
+            try:
+                shared_sources = self.source_discovery.discover_sources_for_mine(
+                    mine_name=mine_name,
+                    country=country,
+                    region=region,
+                    commodity=commodity
+                )
+                discovery_duration = (datetime.now() - discovery_start).total_seconds()
+                logger.info(f"[ORCHESTRATOR] Source Discovery completed: {len(shared_sources)} sources in {discovery_duration:.2f}s")
+                
+            except Exception as e:
+                logger.error(f"[ORCHESTRATOR] Source Discovery failed: {e}")
+                shared_sources = []
+                discovery_duration = 0.0
         
         # PHASE 2: PARALLEL MODEL EXECUTION
         logger.info(f"[ORCHESTRATOR] Phase 2: Parallele Modell-Execution")
@@ -449,7 +475,7 @@ class MultiModelSearchOrchestrator:
                 country_config=country_config
             )
             
-            # Search options with shared sources
+            # Search options with shared sources - 2-PHASEN WORKFLOW UNTERSTÜTZUNG
             options = {
                 'mine_name': mine_name,
                 'country': country,
@@ -457,15 +483,43 @@ class MultiModelSearchOrchestrator:
                 'region': region,
                 'discovered_sources': shared_sources,  # CRITICAL: Pass shared sources
                 'skip_source_discovery': True,  # Skip individual discovery
+                'use_all_sources': True,  # 2-PHASEN WORKFLOW: Nutze ALLE Quellen ohne Filter
                 'name_variants': name_variants,
                 'currency': country_config.get('currency', 'USD'),
                 'multilingual_terms': country_config.get('multilingual_terms', [])
             }
             
-            # Execute provider search
+            # Execute provider search with enhanced error handling
+            # PROVIDER-ERROR-FIX 29.08.2025: Spezifische Behandlung für API-Limits und 404-Fehler
             search_result = await provider.search(query, model_name, options)
             
             search_duration = (datetime.now() - search_start).total_seconds()
+            
+            # API-ERROR-CHECK 29.08.2025: Prüfe auf spezifische Provider-Fehler
+            if hasattr(search_result, 'error') and search_result.error:
+                error_msg = str(search_result.error).lower()
+                
+                # Kategorisiere Fehler für besseres Logging
+                if 'pay-as-you-go limit' in error_msg or 'quota' in error_msg or 'budget' in error_msg:
+                    logger.warning(f"[ORCHESTRATOR-API-LIMIT] {model_id}: API-Limit erreicht - {search_result.error}")
+                elif '404' in error_msg or 'not found' in error_msg:
+                    logger.warning(f"[ORCHESTRATOR-API-404] {model_id}: API-Endpoint nicht erreichbar - {search_result.error}")
+                elif 'unauthorized' in error_msg or '401' in error_msg or 'invalid key' in error_msg:
+                    logger.warning(f"[ORCHESTRATOR-API-AUTH] {model_id}: Authentifizierung fehlgeschlagen - {search_result.error}")
+                else:
+                    logger.error(f"[ORCHESTRATOR-API-ERROR] {model_id}: Unbekannter API-Fehler - {search_result.error}")
+                
+                # Erstelle aussagekräftige Fehlermeldung für Frontend  
+                friendly_error = self._create_friendly_error_message(str(search_result.error), model_id)
+                
+                return ModelSearchResult(
+                    model_id=model_id,
+                    success=False,
+                    data={},
+                    sources=[],
+                    error=friendly_error,
+                    search_duration=search_duration
+                )
             
             # PROVIDER-RESPONSE-VALIDIERUNG
             validation_report = self._validate_provider_response(search_result, model_id)
@@ -659,6 +713,38 @@ class MultiModelSearchOrchestrator:
             logger.error(f"[DB-CONSISTENCY-ERROR] {str(e)}")
         
         return consistency_report
+    
+    def _create_friendly_error_message(self, error: str, model_id: str) -> str:
+        """
+        ERROR-HANDLING FIX 29.08.2025: Erstelle benutzerfreundliche Fehlermeldungen
+        für verschiedene Provider-Fehler-Szenarien
+        """
+        error_lower = error.lower()
+        
+        # API-Limit/Quota-Fehler
+        if any(phrase in error_lower for phrase in ["pay-as-you-go limit", "quota", "rate limit", "limit exceeded"]):
+            return f"💰 {model_id}: Budget-Limit erreicht - Erhöhen Sie Ihr Limit im Provider-Dashboard"
+        
+        # 404-Fehler (meist ungültige API-Keys oder falsche Endpoints)
+        elif "404" in error_lower:
+            # ENTFERNT 02.09.2025: Abacus spezielle Behandlung nicht mehr nötig
+            return f"❌ {model_id}: Provider nicht erreichbar - möglicherweise fehlt API-Key oder falscher Endpoint"
+        
+        # Authentifizierungs-Fehler
+        elif any(phrase in error_lower for phrase in ["401", "unauthorized", "invalid key", "authentication"]):
+            return f"🔑 {model_id}: Authentifizierung fehlgeschlagen - API-Key prüfen"
+        
+        # Timeout-Fehler
+        elif any(phrase in error_lower for phrase in ["timeout", "timed out", "connection timeout"]):
+            return f"⏱️ {model_id}: Verbindungs-Timeout - Provider antwortet nicht rechtzeitig"
+        
+        # JSON-Parsing-Fehler
+        elif any(phrase in error_lower for phrase in ["json", "invalid response", "malformed"]):
+            return f"📄 {model_id}: Ungültige Antwort - Provider sendet fehlerhaftes Format"
+        
+        # Generic Fehler
+        else:
+            return f"❌ {model_id}: {error[:100]}..." if len(error) > 100 else f"❌ {model_id}: {error}"
 
 
 # Global orchestrator instance

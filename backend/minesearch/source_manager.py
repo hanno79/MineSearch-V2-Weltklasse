@@ -215,7 +215,8 @@ class SourceManager:
             Formatierte Quellenangaben
         """
         if not self.sources:
-            return "Keine spezifischen Quellen dokumentiert"
+            # REGEL 10 FIX 29.08.2025: Keine Dummy-Werte - leerer String wenn keine Quellen
+            return ""
         
         formatted_sources = []
         for source_id in sorted(self.sources.keys()):

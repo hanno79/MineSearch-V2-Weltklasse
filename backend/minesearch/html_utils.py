@@ -88,7 +88,10 @@ def html_debug_log(data: Optional[Dict], structured_data: Optional[Dict], result
 
 def create_result_card(result: Dict) -> str:
     """Erstellt eine Ergebniskarte für eine Mine"""
-    mine_name = result.get('mine_name', 'Unbekannt')
+    # REGEL 10 COMPLIANCE: Keine Dummy-Werte
+    mine_name = result.get('mine_name')
+    if not mine_name:
+        return create_error_card({'mine_name': 'ERROR', 'error': 'Mine name missing - REGEL 10: Keine Dummy-Werte'})
     success = result.get('success', False)
     
     if not success:
@@ -119,7 +122,8 @@ def create_result_card(result: Dict) -> str:
 
 def create_error_card(result: Dict) -> str:
     """Erstellt eine Fehlerkarte"""
-    mine_name = result.get('mine_name', 'Unbekannt')
+    # REGEL 10 COMPLIANCE: Keine Dummy-Werte
+    mine_name = result.get('mine_name') or 'ERROR'
     error = result.get('error', 'Unbekannter Fehler')
     
     return f"""
@@ -146,11 +150,22 @@ def create_batch_results_table(results: List[Dict]) -> str:
         <h3>📊 Batch-Ergebnisse</h3>
         <p><strong>{len(successful_results)}/{len(results)}</strong> Minen erfolgreich analysiert</p>
         
+        <!-- TRANSPARENCY FIX 30.08.2025: Legende für Datenquellen -->
+        <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin: 15px 0;">
+            <h4 style="margin-top: 0; color: #495057;">🔍 Datenquellen-Legende:</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                <div><span style="color: #4caf50;">🔍 fresh_search</span> = Neue Suche (diese Session)</div>
+                <div><span style="color: #ff9800;">💾 cached</span> = Aus Datenbank-Cache</div>
+                <div><span style="color: #666;">❓ unknown</span> = Unbekannte Herkunft</div>
+            </div>
+        </div>
+        
         <div style="max-height: 600px; overflow-x: auto; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px;">
-            <table style="width: 100%; border-collapse: collapse; min-width: 2000px;">
+            <table style="width: 100%; border-collapse: collapse; min-width: 2200px;">
                 <thead style="background: #f5f5f5; position: sticky; top: 0;">
                     <tr>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; min-width: 120px;">Status</th>"""
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; min-width: 120px;">Status</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; min-width: 150px; background: #e8f5e8;">🔍 Datenquelle</th>"""
     
     # Dynamische Header-Generierung für alle CSV_COLUMNS
     for column in CSV_COLUMNS:
@@ -176,7 +191,10 @@ def create_batch_results_table(results: List[Dict]) -> str:
     
     # Datenzeilen für alle Ergebnisse
     for result in results:
-        mine_name = result.get('mine_name', 'Unbekannt')
+        # REGEL 10 COMPLIANCE: Keine Dummy-Werte
+        mine_name = result.get('mine_name')
+        if not mine_name:
+            continue  # Skip results without mine name instead of using dummy
         success = result.get('success', False)
         
         if success:
@@ -256,9 +274,50 @@ def create_batch_results_table(results: List[Dict]) -> str:
             status_color = "#f44336"
             structured_data = {}
         
+        # TRANSPARENCY FIX 30.08.2025: Bestimme Datenquelle für Anzeige
+        data_source = "unknown"
+        source_icon = "❓"
+        source_color = "#666666"
+        source_tooltip = "Unbekannte Datenquelle"
+        
+        if success and data:
+            individual_results = data.get('individual_results', [])
+            if individual_results:
+                # Prüfe erste erfolgreiche Einzelergebnis
+                for individual in individual_results:
+                    if individual.get('success'):
+                        individual_data = individual.get('data', {})
+                        data_source = individual_data.get('data_source', data.get('data_source', 'unknown'))
+                        break
+            else:
+                # Direkt aus result.data
+                data_source = data.get('data_source', 'unknown')
+        
+        # Setze Icon und Farbe basierend auf Datenquelle
+        if data_source == 'fresh_search':
+            source_icon = "🔍"
+            source_color = "#4caf50"
+            source_tooltip = "Neue Suche - gerade durchgeführt"
+        elif data_source == 'cached':
+            source_icon = "💾"
+            source_color = "#ff9800" 
+            source_tooltip = "Aus Datenbank-Cache geladen"
+        else:
+            source_icon = "❓"
+            source_color = "#666666"
+            source_tooltip = f"Quelle: {data_source}"
+
+        # Bestimme Zeilenhintergrund basierend auf Datenquelle
+        row_bg = ""
+        if data_source == 'fresh_search':
+            row_bg = "background-color: #f1f8e9;"  # Leichtes Grün für neue Daten
+        elif data_source == 'cached':
+            row_bg = "background-color: #fafafa;"   # Grau für gecachte Daten
+
         html += f"""
-        <tr style="border-bottom: 1px solid #eee;">
-            <td style="border: 1px solid #ddd; padding: 8px; color: {status_color};">{status_icon}</td>"""
+        <tr style="border-bottom: 1px solid #eee; {row_bg}">
+            <td style="border: 1px solid #ddd; padding: 8px; color: {status_color};">{status_icon}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; color: {source_color}; font-weight: bold;" title="{source_tooltip}">{source_icon} {data_source}</td>"""
         
         # Alle CSV_COLUMNS Werte hinzufügen
         for column in CSV_COLUMNS:

@@ -84,6 +84,10 @@ class OpenRouterProvider(AbstractProvider):
         
         try:
             # ÄNDERUNG 04.07.2025: Enhanced Source Discovery nutzen
+            # FIX 01.09.2025: Defensive Programming gegen NoneType options
+            if not options:
+                options = {}
+            
             mine_name = options.get('mine_name', '')
             country = options.get('country')
             region = options.get('region')
@@ -91,6 +95,8 @@ class OpenRouterProvider(AbstractProvider):
             # ÄNDERUNG 06.07.2025: Nutze übergebene Quellen wenn vorhanden
             discovered_sources = options.get('discovered_sources', [])
             skip_discovery = options.get('skip_source_discovery', False)
+            # 2-PHASEN WORKFLOW CHECK (29.08.2025)
+            use_all_sources = options.get('use_all_sources', False)
             
             # Initialisiere source_discovery immer
             source_discovery = EnhancedSourceDiscovery()
@@ -105,7 +111,10 @@ class OpenRouterProvider(AbstractProvider):
                 )
                 logger.info(f"[OPENROUTER] {len(discovered_sources)} Quellen selbst entdeckt")
             else:
-                logger.info(f"[OPENROUTER] Nutze {len(discovered_sources)} übergebene Quellen")
+                if use_all_sources:
+                    logger.info(f"[OPENROUTER] 🔥 2-PHASEN WORKFLOW: Nutze ALLE {len(discovered_sources)} übergebenen DB-Quellen ohne Filter")
+                else:
+                    logger.info(f"[OPENROUTER] Nutze {len(discovered_sources)} übergebene Quellen")
             
             # Generiere Sprachvarianten
             name_variants = generate_name_variants(mine_name) if mine_name else []

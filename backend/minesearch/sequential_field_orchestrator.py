@@ -96,27 +96,41 @@ class SequentialFieldOrchestrator:
         self.registry = provider_registry
         self.source_discovery = EnhancedSourceDiscovery()
         
-        # Kritische Felder: aus Konfiguration laden (Priorität = Reihenfolge); Fallback auf Standardliste
-        default_critical_fields = [
-            'Country',
-            'Region',
-            'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)',
-            'Eigentümer',
-            'Betreiber',
-            'Aktivitätsstatus',
-            'x-Koordinate',
-            'y-Koordinate',
-            'Minentyp (Untertage/ Open-Pit/ usw.)',
-            'Produktionsstart',
-            'Produktionsende',
-            'Fördermenge/Jahr',
-            'Restaurationskosten',
-            'Fläche der Mine in qkm',
-            'Jahr der Erstellung des Dokumentes',
-            'Dokumentenjahr',
-            'Kostenjahr',
-            'Minenfläche in qkm'
-        ]
+        # TIMEOUT-FIX 01.09.2025: Test-Modus mit reduzierten Feldern
+        test_mode = settings.get('test_mode', False) if settings else False
+        
+        if test_mode:
+            # Nur wichtigste 6 Felder für Tests
+            default_critical_fields = [
+                'Name',
+                'Country',
+                'Eigentümer',
+                'Betreiber', 
+                'Restaurationskosten',
+                'Aktivitätsstatus'
+            ]
+        else:
+            # Kritische Felder: aus Konfiguration laden (Priorität = Reihenfolge); Fallback auf Standardliste
+            default_critical_fields = [
+                'Country',
+                'Region',
+                'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)',
+                'Eigentümer',
+                'Betreiber',
+                'Aktivitätsstatus',
+                'x-Koordinate',
+                'y-Koordinate',
+                'Minentyp (Untertage/ Open-Pit/ usw.)',
+                'Produktionsstart',
+                'Produktionsende',
+                'Fördermenge/Jahr',
+                'Restaurationskosten',
+                'Fläche der Mine in qkm',
+                'Jahr der Erstellung des Dokumentes',
+                'Dokumentenjahr',
+                'Kostenjahr',
+                'Minenfläche in qkm'
+            ]
 
         self.critical_fields = self._load_critical_fields_from_config(default_critical_fields)
         
