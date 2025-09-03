@@ -201,23 +201,50 @@ def is_template_or_dummy_value(value: str, field: str = None) -> bool:
                     logger.warning(f"[TEMPLATE DETECTION] Verdächtig runder Betrag ohne echte Quelle: '{value_str}' → ABGELEHNT")
                     return True
         
-        # Unrealistic low values that are obvious placeholders
-        if re.match(r'^\$?\s*[0-9]{1,2}(\.[0-9])?\s*(million|mio|usd|cad)?$', value_lower):
-            logger.warning(f"[TEMPLATE DETECTION] Unrealistische Restaurationskosten: '{value_str}'")
-            return True
+        # OPTIMIERUNG 03.09.2025: Weniger aggressive Filterung für realistische Werte
+        # Erlaube "2.3 Million CAD" aber blockiere "2 Million" oder "1 Million"
+        if re.match(r'^\$?\s*[0-9]{1}(\.[0-9])?\s*(million|mio|usd|cad)?$', value_lower):
+            # Prüfe ob es eine Dezimalstelle gibt - dann ist es wahrscheinlich realistisch
+            if '.' not in value_str:
+                logger.warning(f"[TEMPLATE DETECTION] Unrealistische ganze Zahl Restaurationskosten: '{value_str}'")
+                return True
+            # Werte unter 1.5 Million sind verdächtig niedrig für große Minen
+            numeric_part = re.search(r'([0-9]+(?:\.[0-9]+)?)', value_str)
+            if numeric_part and float(numeric_part.group(1)) < 1.5:
+                logger.warning(f"[TEMPLATE DETECTION] Unrealistische niedrige Restaurationskosten: '{value_str}'")
+                return True
     
     elif field in ['x-Koordinate', 'y-Koordinate']:
-        # 6.3: Koordinaten-Validierung
-        # Blockiere verdächtig gerundete Koordinaten
-        if re.match(r'^[\-\+]?\d{1,3}\.0+$', value_str):  # z.B. "49.000000", "-70.000000"
-            logger.warning(f"[TEMPLATE DETECTION] Verdächtig gerundete Koordinate: '{value_str}' → ABGELEHNT")
+        # 6.3: KOORDINATEN-FIX 03.09.2025: Weniger strenge Koordinaten-Validierung
+        
+        # Nur offensichtliche Dummy-Koordinaten blockieren (z.B. 0.0, 999.999, etc.)
+        if re.match(r'^[\-\+]?0+\.?0*$', value_str):  # Nur echte Null-Koordinaten: "0", "0.0", "0.000"
+            logger.warning(f"[TEMPLATE DETECTION] Null-Koordinate abgelehnt: '{value_str}' → ABGELEHNT")
             return True
         
-        # Prüfe auf realistische Dezimalstellen (mindestens 3)
-        decimal_match = re.search(r'\.(\d+)', value_str)
-        if decimal_match and len(decimal_match.group(1)) < 3:
-            logger.warning(f"[TEMPLATE DETECTION] Zu wenig Dezimalstellen für echte Koordinate: '{value_str}' → ABGELEHNT")
+        # Blockiere unrealistische Koordinaten (>180 für Längengrad, >90 für Breitengrad)
+        try:
+            coord_value = float(value_str.replace('+', ''))
+            if abs(coord_value) > 180:
+                logger.warning(f"[TEMPLATE DETECTION] Unrealistische Koordinate >180°: '{value_str}' → ABGELEHNT")
+                return True
+        except ValueError:
+            # Nicht-numerische Koordinaten sind definitiv Templates
+            logger.warning(f"[TEMPLATE DETECTION] Nicht-numerische Koordinate: '{value_str}' → ABGELEHNT")
             return True
+        
+        # GELOCKERT: Akzeptiere auch Koordinaten mit wenigen Dezimalstellen (2+ reicht)
+        decimal_match = re.search(r'\.(\d+)', value_str)
+        if decimal_match and len(decimal_match.group(1)) >= 2:
+            # 2+ Dezimalstellen sind OK - echte Koordinaten können 48.25 oder 77.78 sein
+            logger.debug(f"[COORD-ACCEPT] Koordinate mit {len(decimal_match.group(1))} Dezimalstellen akzeptiert: '{value_str}'")
+        elif not decimal_match:
+            # Ganze Zahlen sind verdächtig, aber nicht automatisch abgelehnt
+            # Nur bei offensichtlichen Dummy-Werten wie 0, 1, 99, 999 blockieren
+            coord_int = abs(int(float(value_str.replace('+', ''))))
+            if coord_int in [0, 1, 99, 999] or coord_int > 180:
+                logger.warning(f"[TEMPLATE DETECTION] Verdächtige ganze Zahl Koordinate: '{value_str}' → ABGELEHNT")
+                return True
     
     elif field in ['Eigentümer', 'Betreiber']:
         # 6.4: Eigentümer/Betreiber-Validierung

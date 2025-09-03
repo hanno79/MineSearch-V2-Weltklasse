@@ -262,8 +262,47 @@ class DataExtractor:
             country_config = get_country_config(country) if country else {}
             currency = country_config.get('currency', 'USD')
             
+            # KOORDINATEN-FIX 03.09.2025: Extrahiere Country ZUERST und setze globalen Kontext
+            country_extracted = False
+            from minesearch.extraction_validators import validate_coordinate
+            
+            # Setze Länder-Kontext aus Parameter wenn verfügbar
+            if country:
+                validate_coordinate._country_context = country
+                logger.debug(f"[COORD-CONTEXT] Globaler Länder-Kontext aus Parameter gesetzt: {country}")
+                country_extracted = True
+            
             # Extrahiere Daten mit Patterns
             for field, field_patterns in self.patterns.items():
+                # Setze Länder-Kontext sobald Country extrahiert wurde
+                if field == 'Country' and not country_extracted:
+                    value = self._extract_field(field, field_patterns, content, currency)
+                    if value:
+                        clean_value, field_sources = self.source_manager.parse_field_with_sources(value)
+                        if self._is_valid_data_value(clean_value, field):
+                            data[field] = clean_value
+                            # Setze Länder-Kontext für Koordinaten-Validierung
+                            from minesearch.extraction_validators import validate_coordinate
+                            if hasattr(validate_coordinate, '_country_context'):
+                                delattr(validate_coordinate, '_country_context')
+                            validate_coordinate._country_context = clean_value
+                            country_extracted = True
+                            logger.debug(f"[COORD-CONTEXT] Länder-Kontext früh gesetzt: {clean_value}")
+                            
+                            # Standard monitoring und source assignment
+                            from minesearch.template_monitor import monitor_extraction_result
+                            source_values = [s.get('value', '') for s in field_sources] if field_sources else []
+                            try:
+                                monitor_extraction_result(field, clean_value, mine_name, source_values)
+                            except Exception as e:
+                                logger.exception(f"[TEMPLATE MONITOR] Fehler beim Monitoring für Feld '{field}' in Mine '{mine_name}' mit Quellen {source_values}: {e}")
+                            
+                            if field_sources:
+                                self.source_manager.assign_field_sources(field, field_sources)
+                            elif response_sources and clean_value not in ['X', '']:
+                                self.source_manager.assign_field_sources(field, response_sources)
+                    continue  # Country bereits verarbeitet
+                    
                 value = self._extract_field(field, field_patterns, content, currency)
                 if value:
                     # ÄNDERUNG 07.07.2025: Debug-Logging vor Platzhalter-Check
@@ -327,13 +366,10 @@ class DataExtractor:
                         # 2. Zusätzliche Bereinigung
                         data[field] = clean_field_value(data[field], field)
             
-            # QUELLENREFERENZEN-FIX 19.07.2025: Formatiere Felder mit Quellen-Referenzen NACH Bereinigung
-            for field in CSV_COLUMNS:
-                if field not in ['Name', 'Quellenangaben'] and data.get(field) and data[field] not in ['X', '']:
-                    formatted_value = self.source_manager.format_field_with_sources(data[field], field)
-                    if formatted_value != data[field]:
-                        logger.debug(f"[SOURCE] Feld '{field}' mit Quellen formatiert: '{formatted_value}'")
-                        data[field] = formatted_value
+            # ARCHITEKTUR-FIX 03.09.2025: Quellenreferenzen [1,2,3] NICHT in DB-Felder!
+            # format_field_with_sources wird nur noch für CSV-Export verwendet
+            # Hier bleiben die Felder sauber ohne [1,2,3] - Quellenreferenzen sind im _source_mapping
+            logger.debug("[CLEAN DB] Quellenreferenzen werden NICHT in DB-Felder eingefügt - nur in _source_mapping gespeichert")
             
             # CLEAN DATA AT SOURCE FIX 20.08.2025: Markiere nur logisch ausgeschlossene Felder
             # Leere Felder bleiben leer (NULL) - keine X-Marker für einfache "nicht gefunden"
@@ -418,7 +454,15 @@ class DataExtractor:
         return None
     
     def _extract_coordinates(self, content: str, data: Dict[str, str]) -> Dict[str, str]:
-        """Extrahiere Koordinaten mit erweiterten Patterns"""
+        """
+        KOORDINATEN-FIX 03.09.2025: Extrahiere Koordinaten mit Länder-Kontext für automatische Korrektur
+        """
+        # Setze Länder-Kontext für validate_coordinate
+        country = data.get('Country', data.get('Land', ''))
+        if country:
+            validate_coordinate._country_context = country
+            logger.debug(f"[COORD-CONTEXT] Länder-Kontext gesetzt: {country}")
+        
         # Versuche zuerst mit Standard-Patterns
         if not data.get('x-Koordinate'):
             for pattern in self.coordinate_patterns['latitude']:
@@ -439,16 +483,27 @@ class DataExtractor:
             for pattern in self.coordinate_patterns['longitude']:
                 match = re.search(pattern, content, re.IGNORECASE)
                 if match:
+                    logger.debug(f"[COORD-MATCH] Longitude Pattern matched: '{pattern[:50]}...' → '{match.group()}'")
                     if 'DMS' in pattern or '°' in pattern:
                         # Handle DMS format
-                        coord = validate_coordinate(match.group(0), 'y')
+                        raw_value = match.group(0)
+                        logger.debug(f"[COORD-DEBUG] DMS Raw value: '{raw_value}'")
+                        coord = validate_coordinate(raw_value, 'y')
+                        logger.debug(f"[COORD-DEBUG] DMS After validation: '{coord}'")
                     else:
-                        coord = validate_coordinate(match.group(1), 'y')
+                        raw_value = match.group(1)
+                        logger.debug(f"[COORD-DEBUG] Decimal Raw value: '{raw_value}'")
+                        coord = validate_coordinate(raw_value, 'y')
+                        logger.debug(f"[COORD-DEBUG] Decimal After validation: '{coord}'")
                     
                     if coord:
                         data['y-Koordinate'] = coord
-                        logger.info(f"[COORDINATES] Longitude gefunden: {coord}")
+                        logger.info(f"[COORDINATES] Longitude gefunden: {coord} (Land: {country})")
                         break
+        
+        # Lösche Länder-Kontext nach Nutzung
+        if hasattr(validate_coordinate, '_country_context'):
+            delattr(validate_coordinate, '_country_context')
         
         return data
     
@@ -902,7 +957,13 @@ class DataExtractor:
             validated = validate_year(data['Produktionsende'], 'production')
             data['Produktionsende'] = validated or ""
         
-        # ÄNDERUNG 05.07.2025: Strikte Koordinaten-Validierung
+        # KOORDINATEN-FIX 03.09.2025: Strikte Koordinaten-Validierung mit korrektem Länder-Kontext
+        # Setze Länder-Kontext für Koordinaten-Korrektur in _validate_fields
+        country_context = data.get('Country', data.get('Land', ''))
+        if country_context:
+            validate_coordinate._country_context = country_context
+            logger.debug(f"[VALIDATE-FIELDS] Länder-Kontext für Koordinaten-Korrektur gesetzt: {country_context}")
+        
         # Validiere x-Koordinate (Latitude)
         if data.get('x-Koordinate'):
             validated = validate_coordinate(data['x-Koordinate'], 'x')
@@ -920,6 +981,11 @@ class DataExtractor:
             else:
                 logger.warning(f"Ungültige y-Koordinate entfernt: {data['y-Koordinate']}")
                 data['y-Koordinate'] = ""
+        
+        # Bereinige Länder-Kontext nach Koordinaten-Validierung
+        if hasattr(validate_coordinate, '_country_context'):
+            delattr(validate_coordinate, '_country_context')
+            logger.debug("[VALIDATE-FIELDS] Länder-Kontext bereinigt nach Koordinaten-Validierung")
         
         # Fläche
         if data.get('Fläche der Mine in qkm'):

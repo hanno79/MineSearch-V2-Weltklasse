@@ -161,19 +161,28 @@ def validate_coordinate(value: str, coord_type: str) -> Optional[str]:
         logger.warning(f"Koordinate enthält Text statt Koordinate: {value}")
         return None
     
-    # RULE 10 COMPLIANCE 26.08.2025: Erkenne verdächtige Template-Koordinaten
-    # AI-Modelle neigen dazu, gerundete/geschätzte Koordinaten zu verwenden
+    # KOORDINATEN-FIX 03.09.2025: Weniger strenge Template-Erkennung
+    # Nur offensichtliche Dummy-Koordinaten blockieren, nicht echte gerundete Werte
     str_value = str(value).strip()
     
-    # Erkenne exakt gerundete Koordinaten (z.B. 49.000000, 70.000000)
-    if re.match(r'^-?\d+\.0+$', str_value):
-        logger.warning(f"[RULE 10] Gerundete Koordinate erkannt und blockiert: {value} (verdächtig exakt)")
+    # Blockiere nur exakte Null-Koordinaten und extreme Rundungen
+    if re.match(r'^-?0+\.?0*$', str_value):  # Nur 0, 0.0, 0.000, etc.
+        logger.warning(f"[COORD-BLOCK] Null-Koordinate blockiert: {value} (verdächtig)")
         return None
     
-    # Erkenne typische "Zentrum von Regionen" Koordinaten (z.B. 50.0, 60.0)
-    if re.match(r'^-?\d+\.?0?$', str_value) and float(str_value) % 5 == 0:
-        logger.warning(f"[RULE 10] Region-Zentrum-Koordinate erkannt und blockiert: {value} (zu grob)")
-        return None
+    # GELOCKERT: Akzeptiere auch gerundete Koordinaten - echte Minen können bei 78.0000 liegen!
+    # Blockiere nur offensichtliche Template-Werte wie 999.0, 100.0, etc.
+    if re.match(r'^-?\d+\.0+$', str_value):
+        coord_val = abs(float(str_value))
+        # Blockiere nur sehr verdächtige Werte (999, 100, aber NICHT 48, 77, etc.)
+        if coord_val in [100.0, 999.0] or coord_val >= 200.0:
+            logger.warning(f"[COORD-BLOCK] Verdächtige Template-Koordinate blockiert: {value}")
+            return None
+        else:
+            logger.debug(f"[COORD-ACCEPT] Gerundete aber plausible Koordinate akzeptiert: {value}")
+    
+    # ENTFERNT: Die "Zentrum von Regionen" Prüfung war viel zu strikt
+    # Echte Minen können durchaus bei runden Koordinaten liegen
     
     try:
         # Entferne Grad-Zeichen und Whitespace
@@ -238,6 +247,22 @@ def validate_coordinate(value: str, coord_type: str) -> Optional[str]:
                 logger.warning(f"Longitude außerhalb gültigen Bereichs: {coord_float}")
                 return None
             
+            # KOORDINATEN-FIX 03.09.2025: Intelligente Vorzeichenerhaltung
+            # Überprüfe ob das ursprüngliche Extraktionsergebnis bereits ein Vorzeichen hatte
+            original_had_sign = str(value).strip().startswith(('-', '+'))
+            
+            if original_had_sign:
+                # Koordinate hatte bereits ein Vorzeichen - vertraue den Rohdaten
+                logger.debug(f"[COORD-PRESERVE] Originalvorzeichen erhalten: {value} → {coord_float}")
+            else:
+                # Koordinate hatte kein Vorzeichen - prüfe länderspezifische Korrektur als Fallback
+                country_context = getattr(validate_coordinate, '_country_context', None)
+                corrected_coord = _auto_correct_longitude_sign(coord_float, country_context)
+                
+                if corrected_coord != coord_float:
+                    logger.info(f"[COORD-FALLBACK] Longitude ohne Vorzeichen korrigiert: {coord_float} → {corrected_coord} (Land: {country_context})")
+                    coord_float = corrected_coord
+            
             # Plausibilitätschecks für bekannte Mining-Regionen
             # Amerika: -170° bis -30°, Europa/Afrika: -20° bis 60°, Asien/Ozeanien: 60° bis 180°
             mining_region = _identify_mining_region(coord_float)
@@ -269,6 +294,82 @@ def validate_coordinate(value: str, coord_type: str) -> Optional[str]:
                 return str(decimal)
     
     return None
+
+def _auto_correct_longitude_sign(longitude: float, country: Optional[str]) -> float:
+    """
+    KOORDINATEN-FIX 03.09.2025: Automatische Korrektur fehlender Minuszeichen basierend auf Land
+    
+    Diese Funktion korrigiert systematisch verlorene Minuszeichen bei Längengraden,
+    die durch DataExtractor-Bugs entstehen. Basiert auf geografischen Länderzuordnungen.
+    
+    Args:
+        longitude: Longitude-Wert (möglicherweise ohne korrektes Vorzeichen)
+        country: Land der Mine (für Kontext)
+        
+    Returns:
+        Korrigierter Longitude-Wert
+    """
+    if not country:
+        return longitude
+    
+    country_lower = country.lower()
+    
+    # KANADA: Komplett in westlicher Hemisphäre (-52° bis -141°)
+    if country_lower in ['canada', 'kanada']:
+        if 50 <= longitude <= 141:  # Positiv aber sollte negativ sein
+            corrected = -longitude
+            logger.info(f"[COORD-FIX] Kanada: Minuszeichen ergänzt {longitude} → {corrected}")
+            return corrected
+        elif longitude > 0 and longitude < 50:  # Verdächtig kleine positive Werte
+            corrected = -longitude
+            logger.warning(f"[COORD-FIX] Kanada: Kleine positive Longitude korrigiert {longitude} → {corrected}")
+            return corrected
+    
+    # USA: Hauptland westlich (-66° bis -172°)
+    elif country_lower in ['usa', 'united states', 'america', 'vereinigte staaten']:
+        if 66 <= longitude <= 172:  # Positiv aber sollte negativ sein
+            corrected = -longitude
+            logger.info(f"[COORD-FIX] USA: Minuszeichen ergänzt {longitude} → {corrected}")
+            return corrected
+    
+    # MEXIKO & ZENTRALAMERIKA: Westlich (-68° bis -118°)
+    elif country_lower in ['mexico', 'mexiko', 'guatemala', 'honduras', 'nicaragua', 'costa rica', 'panama']:
+        if 68 <= longitude <= 118:  # Positiv aber sollte negativ sein
+            corrected = -longitude
+            logger.info(f"[COORD-FIX] {country}: Minuszeichen ergänzt {longitude} → {corrected}")
+            return corrected
+    
+    # SÜDAMERIKA: Hauptsächlich westlich (-34° bis -81°)
+    elif country_lower in ['brazil', 'brasilien', 'argentina', 'argentinien', 'chile', 'peru', 'colombia', 'kolumbien', 'venezuela', 'bolivia', 'bolivien', 'ecuador', 'uruguay', 'paraguay']:
+        if 34 <= longitude <= 81:  # Positiv aber sollte negativ sein (außer Brasilien Ostküste)
+            corrected = -longitude
+            logger.info(f"[COORD-FIX] {country}: Minuszeichen ergänzt {longitude} → {corrected}")
+            return corrected
+    
+    # EUROPA: Hauptsächlich östlich (-10° bis 40°) - KEINE Korrektur für positive Werte
+    elif country_lower in ['germany', 'deutschland', 'france', 'frankreich', 'spain', 'spanien', 'italy', 'italien', 'poland', 'polen', 'sweden', 'schweden', 'norway', 'norwegen', 'finland', 'finnland']:
+        # Für Europa keine automatische Korrektur - kann sowohl positiv als auch negativ sein
+        pass
+    
+    # ASIEN: Hauptsächlich östlich (60° bis 180°) - KEINE Korrektur
+    elif country_lower in ['china', 'india', 'indien', 'japan', 'south korea', 'südkorea', 'indonesia', 'indonesien', 'thailand', 'philippines', 'philippinen']:
+        # Für Asien keine automatische Korrektur
+        pass
+    
+    # AUSTRALIEN & OZEANIEN: Östlich (113° bis 180°) - KEINE Korrektur
+    elif country_lower in ['australia', 'australien', 'new zealand', 'neuseeland', 'papua new guinea']:
+        # Für Australien/Ozeanien keine automatische Korrektur
+        pass
+    
+    # AFRIKA: Gemischt (-17° bis 52°) - Vorsichtige Korrektur nur für klar westliche Länder
+    elif country_lower in ['morocco', 'marokko', 'mauritania', 'mauretanien', 'senegal', 'gambia', 'guinea-bissau', 'guinea', 'sierra leone', 'liberia', 'ivory coast', 'elfenbeinküste', 'ghana', 'togo', 'benin', 'nigeria', 'cameroon', 'kamerun']:
+        if 5 <= longitude <= 17:  # Westafrika - sollte negativ sein
+            corrected = -longitude
+            logger.info(f"[COORD-FIX] Westafrika {country}: Minuszeichen ergänzt {longitude} → {corrected}")
+            return corrected
+    
+    return longitude
+
 
 def _identify_mining_region(longitude: float) -> Optional[str]:
     """

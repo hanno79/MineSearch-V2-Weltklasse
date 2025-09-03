@@ -24,17 +24,16 @@ class APIKeysConfig:
     FIRECRAWL_API_KEY = os.getenv('FIRECRAWL_API_KEY', '')
     BRIGHTDATA_API_KEY = os.getenv('BRIGHTDATA_API_KEY', '')
     
-    # ÄNDERUNG 06.07.2025: Premium LLM Provider API Keys
-    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
-    ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
-    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
-    GROK_API_KEY = os.getenv('GROK_API_KEY', '')
-    # MODEL-FIX 15.07.2025: DeepSeek Direct API Key hinzugefügt
-    DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
+    # DEAKTIVIERT 03.09.2025: Premium LLM Provider API Keys über OpenRouter verfügbar
+    # OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+    # ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+    # GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+    # GROK_API_KEY = os.getenv('GROK_API_KEY', '')
+    # DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
     
     @classmethod
     def get_all_keys(cls):
-        """Alle API-Keys als Dictionary zurückgeben"""
+        """Alle API-Keys als Dictionary zurückgeben - Premium LLM Keys über OpenRouter"""
         return {
             'PERPLEXITY_API_KEY': cls.PERPLEXITY_API_KEY,
             'OPENROUTER_API_KEY': cls.OPENROUTER_API_KEY,
@@ -43,12 +42,8 @@ class APIKeysConfig:
             'EXA_API_KEY': cls.EXA_API_KEY,
             'SCRAPINGBEE_API_KEY': cls.SCRAPINGBEE_API_KEY,
             'FIRECRAWL_API_KEY': cls.FIRECRAWL_API_KEY,
-            'BRIGHTDATA_API_KEY': cls.BRIGHTDATA_API_KEY,
-            'OPENAI_API_KEY': cls.OPENAI_API_KEY,
-            'ANTHROPIC_API_KEY': cls.ANTHROPIC_API_KEY,
-            'GEMINI_API_KEY': cls.GEMINI_API_KEY,
-            'GROK_API_KEY': cls.GROK_API_KEY,
-            'DEEPSEEK_API_KEY': cls.DEEPSEEK_API_KEY
+            'BRIGHTDATA_API_KEY': cls.BRIGHTDATA_API_KEY
+            # Premium LLM Keys (OpenAI, Anthropic, Gemini, Grok, DeepSeek) über OpenRouter verfügbar
         }
     
     @classmethod
@@ -64,14 +59,9 @@ class APIKeysConfig:
         # Spezielle Validierungen per Provider
         if key_name == 'OPENROUTER_API_KEY':
             return key_value.startswith('sk-or-')
-        elif key_name == 'OPENAI_API_KEY':
-            return key_value.startswith('sk-')
-        elif key_name == 'ANTHROPIC_API_KEY':
-            return key_value.startswith('sk-ant-')
         elif key_name == 'PERPLEXITY_API_KEY':
             return key_value.startswith('pplx-')
-        elif key_name == 'GROK_API_KEY':
-            return key_value.startswith('xai-')
+        # Premium LLM Keys werden nicht mehr direkt validiert (über OpenRouter verfügbar)
         
         return True
     
@@ -89,13 +79,19 @@ class APIKeysConfig:
     
     @classmethod
     def validate_all_keys(cls):
-        """Alle API-Keys validieren und Bericht erstellen"""
+        """Alle API-Keys validieren und Bericht erstellen - nur noch aktive Keys"""
         missing_keys = cls.get_missing_keys()
         
         if missing_keys:
-            print(f"⚠️  WARNUNG: Fehlende oder ungültige API-Keys: {', '.join(missing_keys)}")
-            print("   Bitte .env Datei prüfen und fehlende Keys hinzufügen.")
-            return False
+            # Filter heraus: Premium LLM Keys die über OpenRouter verfügbar sind
+            filtered_missing = [key for key in missing_keys 
+                              if key not in ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GROK_API_KEY', 'DEEPSEEK_API_KEY']]
+            
+            if filtered_missing:
+                print(f"⚠️  WARNUNG: Fehlende oder ungültige API-Keys: {', '.join(filtered_missing)}")
+                print("   Bitte .env Datei prüfen und fehlende Keys hinzufügen.")
+                print("   (Premium LLM Keys werden über OpenRouter bereitgestellt)")
+                return False
         
-        print("✅ Alle API-Keys sind gesetzt und gültig.")
+        print("✅ Alle benötigten API-Keys sind gesetzt und gültig. Premium LLMs über OpenRouter verfügbar.")
         return True

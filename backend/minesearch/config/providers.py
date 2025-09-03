@@ -10,7 +10,7 @@ try:
     from minesearch.config.api_keys import APIKeysConfig
 except ImportError as e:
     print(f"WARNING: Could not import APIKeysConfig: {e}")
-    # Fallback APIKeysConfig
+    # Fallback APIKeysConfig - Premium LLM Keys über OpenRouter verfügbar
     import os
     class APIKeysConfig:
         PERPLEXITY_API_KEY = os.getenv('PERPLEXITY_API_KEY', '')
@@ -21,11 +21,12 @@ except ImportError as e:
         SCRAPINGBEE_API_KEY = os.getenv('SCRAPINGBEE_API_KEY', '')
         FIRECRAWL_API_KEY = os.getenv('FIRECRAWL_API_KEY', '')
         BRIGHTDATA_API_KEY = os.getenv('BRIGHTDATA_API_KEY', '')
-        OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
-        ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
-        GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
-        GROK_API_KEY = os.getenv('GROK_API_KEY', '')
-        DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
+        # Premium LLM Keys über OpenRouter verfügbar - nicht mehr direkt benötigt
+        # OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+        # ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+        # GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+        # GROK_API_KEY = os.getenv('GROK_API_KEY', '')
+        # DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
 
 from minesearch.config.models import (
     PERPLEXITY_MODELS,
@@ -120,9 +121,9 @@ PROVIDERS_CONFIG = {
         'retry_delay': 10
     },
     'openai': {
-        # ÄNDERUNG 24.08.2025: Deaktiviert - OpenAI Modelle über OpenRouter geroutet
+        # DEAKTIVIERT 03.09.2025: OpenAI Modelle über OpenRouter verfügbar
         'enabled': False,
-        'api_key': APIKeysConfig.OPENAI_API_KEY,
+        # 'api_key': APIKeysConfig.OPENAI_API_KEY,  # Über OpenRouter
         'base_url': 'https://api.openai.com/v1',
         'models': OPENAI_MODELS,
         'timeout': 140,  # Premium Provider - längere Timeouts
@@ -130,9 +131,9 @@ PROVIDERS_CONFIG = {
         'retry_delay': 12
     },
     'anthropic': {
-        # ÄNDERUNG 24.08.2025: Deaktiviert - Anthropic Modelle über OpenRouter geroutet
+        # DEAKTIVIERT 03.09.2025: Anthropic Modelle über OpenRouter verfügbar
         'enabled': False,
-        'api_key': APIKeysConfig.ANTHROPIC_API_KEY,
+        # 'api_key': APIKeysConfig.ANTHROPIC_API_KEY,  # Über OpenRouter
         'base_url': 'https://api.anthropic.com/v1',
         'models': ANTHROPIC_MODELS,
         'timeout': 150,  # Premium Provider - längere Timeouts
@@ -140,9 +141,9 @@ PROVIDERS_CONFIG = {
         'retry_delay': 15
     },
     'gemini': {
-        # ÄNDERUNG 24.08.2025: Deaktiviert - Gemini Modelle über OpenRouter geroutet
+        # DEAKTIVIERT 03.09.2025: Gemini Modelle über OpenRouter verfügbar
         'enabled': False,
-        'api_key': APIKeysConfig.GEMINI_API_KEY,
+        # 'api_key': APIKeysConfig.GEMINI_API_KEY,  # Über OpenRouter
         'base_url': 'https://generativelanguage.googleapis.com/v1',
         'models': GEMINI_MODELS,
         'timeout': 120,  # Meist schnell, aber variabel
@@ -150,9 +151,9 @@ PROVIDERS_CONFIG = {
         'retry_delay': 8
     },
     'grok': {
-        # ÄNDERUNG 24.08.2025: Deaktiviert - Grok Modelle über OpenRouter geroutet
+        # DEAKTIVIERT 03.09.2025: Grok Modelle über OpenRouter verfügbar
         'enabled': False,
-        'api_key': APIKeysConfig.GROK_API_KEY,
+        # 'api_key': APIKeysConfig.GROK_API_KEY,  # Über OpenRouter
         'base_url': 'https://api.x.ai/v1',
         'models': GROK_MODELS,
         'timeout': 180,  # Langsamer wegen Web-Access
