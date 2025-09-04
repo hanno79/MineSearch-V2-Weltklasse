@@ -13,6 +13,7 @@ import json
 import sqlite3
 from typing import Any, Dict, List, Optional, Set, Tuple
 from pathlib import Path
+from .database.db_utils import get_normalized_db_path, get_sqlite_connection
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +149,7 @@ class NullNormalizer:
         return normalized_data
     
     def normalize_database_entry(self, entry_id: int, structured_data_json: str, 
-                                db_path: str = "/app/backend/mines.db") -> bool:
+                                db_path: str = None) -> bool:
         """
         NORMALISIERT EINZELNEN DATENBANK-EINTRAG 25.08.2025
         
@@ -175,7 +176,10 @@ class NullNormalizer:
             # Speichere normalisierte Daten zurück in DB
             normalized_json = json.dumps(normalized_data, ensure_ascii=False)
             
-            conn = sqlite3.connect(db_path)
+            if db_path is None:
+                conn = get_sqlite_connection()
+            else:
+                conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             
             cursor.execute(
@@ -193,7 +197,7 @@ class NullNormalizer:
             logger.error(f"[NULL-NORMALIZER] Fehler bei Eintrag {entry_id}: {e}")
             return False
     
-    def normalize_database(self, db_path: str = "/app/backend/mines.db", 
+    def normalize_database(self, db_path: str = None, 
                           batch_size: int = 100) -> Dict[str, int]:
         """
         NORMALISIERT KOMPLETTE DATENBANK 25.08.2025
@@ -208,7 +212,10 @@ class NullNormalizer:
         try:
             logger.info("[NULL-NORMALIZER] Starte Datenbank-NULL-Normalisierung...")
             
-            conn = sqlite3.connect(db_path)
+            if db_path is None:
+                conn = get_sqlite_connection()
+            else:
+                conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             
             # Hole alle Einträge mit structured_data
@@ -265,7 +272,7 @@ class NullNormalizer:
             logger.error(f"[NULL-NORMALIZER] Kritischer Fehler bei Datenbank-Normalisierung: {e}")
             return {'error': str(e)}
     
-    def get_null_statistics(self, db_path: str = "/app/backend/mines.db") -> Dict[str, Any]:
+    def get_null_statistics(self, db_path: str = None) -> Dict[str, Any]:
         """
         ANALYSIERT NULL-WERTE IN DER DATENBANK 25.08.2025
         
@@ -276,7 +283,10 @@ class NullNormalizer:
             Statistiken über NULL-Werte und normalisierbare Werte
         """
         try:
-            conn = sqlite3.connect(db_path)
+            if db_path is None:
+                conn = get_sqlite_connection()
+            else:
+                conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             
             # Hole alle Einträge

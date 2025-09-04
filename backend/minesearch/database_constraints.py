@@ -14,6 +14,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from .field_constants import PROHIBITED_FIELD_NAMES
+from .database.db_utils import get_normalized_db_path, get_sqlite_connection
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class DatabaseConstraintManager:
             db_path: Pfad zur Datenbank (optional)
         """
         if db_path is None:
-            db_path = "/app/backend/mines.db"
+            db_path = get_normalized_db_path()
         
         self.db_path = db_path
         
@@ -289,7 +290,7 @@ class DatabaseConstraintManager:
         try:
             logger.info("[CONSTRAINTS] Installiere Datenbank-Constraints...")
             
-            conn = sqlite3.connect(self.db_path)
+            conn = get_sqlite_connection()
             cursor = conn.cursor()
             
             # 1. Log-Tabelle erstellen
@@ -358,7 +359,7 @@ class DatabaseConstraintManager:
         try:
             logger.info("[CONSTRAINT-TEST] Starte Constraint-Validierung...")
             
-            conn = sqlite3.connect(self.db_path)
+            conn = get_sqlite_connection()
             cursor = conn.cursor()
             
             test_passed = 0
@@ -455,7 +456,7 @@ class DatabaseConstraintManager:
         """
         
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = get_sqlite_connection()
             cursor = conn.cursor()
             
             cursor.execute("""

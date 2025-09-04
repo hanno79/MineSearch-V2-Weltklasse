@@ -29,6 +29,7 @@ if str(backend_path) not in sys.path:
     sys.path.insert(0, str(backend_path))
 
 from field_name_blacklist import is_field_name_value, validate_extracted_fields
+from minesearch.database.db_utils import get_normalized_db_path, get_sqlite_connection
 
 # Logging konfigurieren
 logging.basicConfig(
@@ -56,7 +57,7 @@ class DatabaseCleanupTool:
         """
         if db_path is None:
             # Standardpfad zur MineSearch-Datenbank
-            db_path = "/app/backend/mines.db"
+            db_path = get_normalized_db_path()
         
         self.db_path = db_path
         self.backup_path = f"{db_path}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"

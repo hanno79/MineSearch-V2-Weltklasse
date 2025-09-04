@@ -445,6 +445,7 @@ class DatabaseNormalizer:
         except Exception as e:
             logger.error(f"❌ Migration fehlgeschlagen: {e}")
             import traceback
+from minesearch.database.db_utils import get_normalized_db_path, get_sqlite_connection
             traceback.print_exc()
             return False
         
@@ -456,9 +457,9 @@ def main():
     """Main Entry Point"""
     # Finde Datenbank
     db_paths = [
-        "/app/backend/mines.db",
-        "/app/backend/minesearch.db",
-        "./mines.db",
+        get_normalized_db_path(),
+        get_normalized_db_path(),
+        get_normalized_db_path(),
         "./minesearch.db"
     ]
     

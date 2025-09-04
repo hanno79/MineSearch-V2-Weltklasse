@@ -17,7 +17,9 @@ let databaseViewer = {
     filterColumn: null,
     filterValue: null,
     columns: [],
-    tables: []
+    tables: [],
+    categories: {},
+    normalizedStructure: false
 };
 
 /**
@@ -56,8 +58,12 @@ async function loadDatabaseTables() {
         
         if (data.success) {
             databaseViewer.tables = data.tables;
+            databaseViewer.categories = data.categories || {};
+            databaseViewer.normalizedStructure = data.normalized_structure || false;
+            
             updateTableCounts(data.tables);
-            console.log('✅ [DATABASE-VIEWER] Tabellen geladen und Counts aktualisiert');
+            updateTableCategorization(data.tables, data.categories);
+            console.log('✅ [DATABASE-VIEWER] Normalisierte Tabellenstruktur geladen:', data.categories);
         }
     } catch (error) {
         console.error('❌ Fehler beim Laden der Tabellen:', error);
@@ -91,6 +97,119 @@ function updateTableCounts(tables) {
             console.warn(`⚠️ [DATABASE-VIEWER] Count element not found: count-${table.name}`);
         }
     });
+}
+
+/**
+ * Aktualisiert Tabellen-Kategorisierung basierend auf normalisierter Struktur
+ */
+function updateTableCategorization(tables, categories) {
+    console.log('🏗️ [DATABASE-VIEWER] Updating table categorization with normalized structure');
+    
+    if (!categories || Object.keys(categories).length === 0) {
+        console.log('⚠️ [DATABASE-VIEWER] No categories provided - using existing structure');
+        return;
+    }
+    
+    // Hole das Tabellen-Container-Element
+    const tabsContainer = document.querySelector('.database-tabs');
+    if (!tabsContainer) {
+        console.error('❌ [DATABASE-VIEWER] Tabs container not found');
+        return;
+    }
+    
+    // Lösche bestehende dynamische Kategorien (behalte nur den ersten Legacy-Bereich)
+    const existingGroups = tabsContainer.querySelectorAll('.tab-group');
+    existingGroups.forEach((group, index) => {
+        if (index > 0) { // Behalte nur die erste Gruppe (Legacy System)
+            group.remove();
+        }
+    });
+    
+    // Füge neue kategorisierte Gruppen hinzu
+    const categoryColors = {
+        'Stammdaten': '#059669',      // Grün
+        'Kerndaten': '#0ea5e9',       // Blau  
+        'Beziehungen': '#8b5cf6',     // Violett
+        'Feldwerte': '#f59e0b'        // Orange
+    };
+    
+    const categoryIcons = {
+        'Stammdaten': '📋',
+        'Kerndaten': '⛏️', 
+        'Beziehungen': '🔗',
+        'Feldwerte': '💾'
+    };
+    
+    // Erstelle Gruppen für jede Kategorie
+    Object.entries(categories).forEach(([categoryName, tableNames]) => {
+        if (tableNames && tableNames.length > 0) {
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'tab-group';
+            
+            // Kategorie-Header
+            const headerH4 = document.createElement('h4');
+            headerH4.style.cssText = `
+                margin: 15px 0 5px 0; 
+                font-size: 0.85rem; 
+                color: ${categoryColors[categoryName] || '#666'}; 
+                text-transform: uppercase; 
+                font-weight: 600;
+            `;
+            headerH4.innerHTML = `${categoryIcons[categoryName] || '📁'} ${categoryName}`;
+            groupDiv.appendChild(headerH4);
+            
+            // Buttons für jede Tabelle in dieser Kategorie
+            tableNames.forEach(tableName => {
+                // Finde Tabellen-Info aus der API-Response
+                const tableInfo = tables.find(t => t.name === tableName);
+                if (!tableInfo) {
+                    console.warn(`⚠️ [DATABASE-VIEWER] Table info not found for: ${tableName}`);
+                    return;
+                }
+                
+                const button = document.createElement('button');
+                button.className = 'database-tab-btn';
+                button.dataset.table = tableName;
+                
+                // Icon basierend auf Tabellennamen
+                let icon = '📊';
+                if (tableName.includes('mine')) icon = '⛏️';
+                else if (tableName.includes('company') || tableName.includes('companies')) icon = '🏢';
+                else if (tableName.includes('country') || tableName.includes('countries')) icon = '🌍';
+                else if (tableName.includes('commodity') || tableName.includes('commodities')) icon = '💎';
+                else if (tableName.includes('source')) icon = '📚';
+                else if (tableName.includes('search')) icon = '🔍';
+                else if (tableName.includes('field')) icon = '💾';
+                else if (tableName.includes('production')) icon = '⚖️';
+                else if (tableName.includes('restoration')) icon = '🌱';
+                
+                // Benutzerfreundlicher Display-Name
+                let displayName = tableName
+                    .replace(/_/g, ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase());
+                
+                button.innerHTML = `
+                    <span class="db-icon">${icon}</span>
+                    ${displayName}
+                    <span class="db-count" id="count-${tableName}">(${tableInfo.row_count || 0})</span>
+                `;
+                
+                // Füge Kategorie-spezifische Stylings hinzu
+                button.style.borderLeft = `3px solid ${categoryColors[categoryName] || '#666'}`;
+                
+                // Event Listener
+                button.addEventListener('click', () => {
+                    loadTableData(tableName, 1);
+                });
+                
+                groupDiv.appendChild(button);
+            });
+            
+            tabsContainer.appendChild(groupDiv);
+        }
+    });
+    
+    console.log('✅ [DATABASE-VIEWER] Table categorization updated with normalized structure');
 }
 
 /**

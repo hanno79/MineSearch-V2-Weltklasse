@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from collections import defaultdict
 from minesearch.field_name_blacklist import is_field_name_value
+from minesearch.database.db_utils import get_normalized_db_path, get_sqlite_connection
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ class DataQualityMonitor:
     def __init__(self, db_path: str = None):
         """Initialisiert das Monitoring-System"""
         if db_path is None:
-            db_path = "/app/backend/mines.db"
+            db_path = get_normalized_db_path()
         
         self.db_path = db_path
         self.alert_thresholds = {
@@ -64,7 +65,7 @@ class DataQualityMonitor:
             details: Zusätzliche Details
         """
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = get_sqlite_connection()
             cursor = conn.cursor()
             
             # Erstelle monitoring_events Tabelle falls nicht vorhanden
@@ -136,7 +137,7 @@ class DataQualityMonitor:
             Umfassender Qualitätsbericht
         """
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = get_sqlite_connection()
             cursor = conn.cursor()
             
             quality_report = {
@@ -237,7 +238,7 @@ class DataQualityMonitor:
     def _analyze_field_contamination(self) -> Dict[str, Any]:
         """Analysiert aktuelle Feldkontamination in der Datenbank"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = get_sqlite_connection()
             cursor = conn.cursor()
             
             cursor.execute("""
@@ -296,7 +297,7 @@ class DataQualityMonitor:
     def _analyze_null_patterns(self) -> Dict[str, Any]:
         """Analysiert NULL-Wert-Muster für Anomalie-Erkennung"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = get_sqlite_connection()
             cursor = conn.cursor()
             
             cursor.execute("""
@@ -471,7 +472,7 @@ class DataQualityMonitor:
     def _check_database_layer(self) -> Dict[str, Any]:
         """Prüft Status der Database Layer Protection"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = get_sqlite_connection()
             cursor = conn.cursor()
             
             # Prüfe Trigger
@@ -527,7 +528,7 @@ class DataQualityMonitor:
     def _get_uptime_info(self) -> Dict[str, Any]:
         """Sammelt System-Uptime Informationen"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = get_sqlite_connection()
             cursor = conn.cursor()
             
             # Letzte Aktivität

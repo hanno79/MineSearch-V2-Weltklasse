@@ -1,0 +1,743 @@
+{
+  "mine_name": "Sigma Mine",
+  "analysis_timestamp": "2025-09-04T15:34:05.641405",
+  "sessions_analyzed": 10,
+  "total_fields": 18,
+  "total_valid_values": 134,
+  "avg_consistency_score": 0.7678571428571429,
+  "template_value_rate": 0.0,
+  "field_consistency": {
+    "Fläche der Mine in qkm": {
+      "field_name": "Fläche der Mine in qkm",
+      "total_values": 1,
+      "unique_values": 1,
+      "unique_values_list": [
+        "2.5 km²"
+      ],
+      "value_counts": {
+        "2.5 km²": 1
+      },
+      "consistency_score": 1.0,
+      "most_common_value": "2.5 km²",
+      "most_common_count": 1,
+      "confidence": 0.2,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Name": {
+      "field_name": "Name",
+      "total_values": 10,
+      "unique_values": 1,
+      "unique_values_list": [
+        "Sigma Mine"
+      ],
+      "value_counts": {
+        "Sigma Mine": 10
+      },
+      "consistency_score": 1.0,
+      "most_common_value": "Sigma Mine",
+      "most_common_count": 10,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Quellenangaben": {
+      "field_name": "Quellenangaben",
+      "total_values": 4,
+      "unique_values": 4,
+      "unique_values_list": [
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://nrcan.gc.ca/mining-materials/publications/Sigma%20Mine",
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://sedar.com/documents/ni-43-101/sigma-mine-technical-report.pdf",
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://nrcan.gc.ca/mining-materials/mining/sigma-mine",
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://mern.gouv.qc.ca/mines/environnement/Sigma%20Mine-restoration"
+      ],
+      "value_counts": {
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://nrcan.gc.ca/mining-materials/publications/Sigma%20Mine": 1,
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://sedar.com/documents/ni-43-101/sigma-mine-technical-report.pdf": 1,
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://nrcan.gc.ca/mining-materials/mining/sigma-mine": 1,
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://mern.gouv.qc.ca/mines/environnement/Sigma%20Mine-restoration": 1
+      },
+      "consistency_score": 0.25,
+      "most_common_value": "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://nrcan.gc.ca/mining-materials/publications/Sigma%20Mine",
+      "most_common_count": 1,
+      "confidence": 0.2,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Region": {
+      "field_name": "Region",
+      "total_values": 10,
+      "unique_values": 2,
+      "unique_values_list": [
+        "Quebec",
+        "Québec"
+      ],
+      "value_counts": {
+        "Quebec": 8,
+        "Québec": 2
+      },
+      "consistency_score": 0.8,
+      "most_common_value": "Quebec",
+      "most_common_count": 8,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Aktivitätsstatus": {
+      "field_name": "Aktivitätsstatus",
+      "total_values": 10,
+      "unique_values": 2,
+      "unique_values_list": [
+        "Geschlossen",
+        "Aktiv"
+      ],
+      "value_counts": {
+        "Geschlossen": 7,
+        "Aktiv": 3
+      },
+      "consistency_score": 0.7,
+      "most_common_value": "Geschlossen",
+      "most_common_count": 7,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)": {
+      "field_name": "Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)",
+      "total_values": 10,
+      "unique_values": 1,
+      "unique_values_list": [
+        "Gold"
+      ],
+      "value_counts": {
+        "Gold": 10
+      },
+      "consistency_score": 1.0,
+      "most_common_value": "Gold",
+      "most_common_count": 10,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Eigentümer": {
+      "field_name": "Eigentümer",
+      "total_values": 10,
+      "unique_values": 3,
+      "unique_values_list": [
+        "Barrick Gold Corporation",
+        "Wesdome Gold Mines Ltd",
+        "Wesdome Gold Mines Ltd. (100%)"
+      ],
+      "value_counts": {
+        "Barrick Gold Corporation": 3,
+        "Wesdome Gold Mines Ltd": 5,
+        "Wesdome Gold Mines Ltd. (100%)": 2
+      },
+      "consistency_score": 0.5,
+      "most_common_value": "Wesdome Gold Mines Ltd",
+      "most_common_count": 5,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "x-Koordinate": {
+      "field_name": "x-Koordinate",
+      "total_values": 10,
+      "unique_values": 1,
+      "unique_values_list": [
+        "48.2345"
+      ],
+      "value_counts": {
+        "48.2345": 10
+      },
+      "consistency_score": 1.0,
+      "most_common_value": "48.2345",
+      "most_common_count": 10,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Restaurationskosten": {
+      "field_name": "Restaurationskosten",
+      "total_values": 2,
+      "unique_values": 2,
+      "unique_values_list": [
+        "45.2 Millionen CAD",
+        "12.8 Millionen CAD"
+      ],
+      "value_counts": {
+        "45.2 Millionen CAD": 1,
+        "12.8 Millionen CAD": 1
+      },
+      "consistency_score": 0.5,
+      "most_common_value": "45.2 Millionen CAD",
+      "most_common_count": 1,
+      "confidence": 0.2,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Produktionsende": {
+      "field_name": "Produktionsende",
+      "total_values": 7,
+      "unique_values": 3,
+      "unique_values_list": [
+        "1997",
+        "2004",
+        "1994"
+      ],
+      "value_counts": {
+        "1997": 4,
+        "2004": 2,
+        "1994": 1
+      },
+      "consistency_score": 0.5714285714285714,
+      "most_common_value": "1997",
+      "most_common_count": 4,
+      "confidence": 0.8,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "_source_mapping": {
+      "field_name": "_source_mapping",
+      "total_values": 10,
+      "unique_values": 5,
+      "unique_values_list": [
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://nrcan.gc.ca/mining-materials/publications/Sigma%20Mine', 'title': '', 'type': 'industry', 'reliability': 0.6}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'Betreiber': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Restaurationskosten': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2], 'Fördermenge/Jahr': [1, 2], 'Fläche der Mine in qkm': [1, 2]}}",
+        "{'sources': {}, 'field_sources': {}}",
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://sedar.com/documents/ni-43-101/sigma-mine-technical-report.pdf', 'title': '', 'type': 'exchange', 'reliability': 0.9}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2]}}",
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://nrcan.gc.ca/mining-materials/mining/sigma-mine', 'title': '', 'type': 'industry', 'reliability': 0.6}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2]}}",
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://mern.gouv.qc.ca/mines/environnement/Sigma%20Mine-restoration', 'title': '', 'type': 'government', 'reliability': 1.0}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2]}}"
+      ],
+      "value_counts": {
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://nrcan.gc.ca/mining-materials/publications/Sigma%20Mine', 'title': '', 'type': 'industry', 'reliability': 0.6}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'Betreiber': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Restaurationskosten': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2], 'Fördermenge/Jahr': [1, 2], 'Fläche der Mine in qkm': [1, 2]}}": 1,
+        "{'sources': {}, 'field_sources': {}}": 6,
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://sedar.com/documents/ni-43-101/sigma-mine-technical-report.pdf', 'title': '', 'type': 'exchange', 'reliability': 0.9}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2]}}": 1,
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://nrcan.gc.ca/mining-materials/mining/sigma-mine', 'title': '', 'type': 'industry', 'reliability': 0.6}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2]}}": 1,
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://mern.gouv.qc.ca/mines/environnement/Sigma%20Mine-restoration', 'title': '', 'type': 'government', 'reliability': 1.0}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2]}}": 1
+      },
+      "consistency_score": 0.6,
+      "most_common_value": "{'sources': {}, 'field_sources': {}}",
+      "most_common_count": 6,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Country": {
+      "field_name": "Country",
+      "total_values": 10,
+      "unique_values": 1,
+      "unique_values_list": [
+        "Kanada"
+      ],
+      "value_counts": {
+        "Kanada": 10
+      },
+      "consistency_score": 1.0,
+      "most_common_value": "Kanada",
+      "most_common_count": 10,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Minentyp (Untertage/ Open-Pit/ usw.)": {
+      "field_name": "Minentyp (Untertage/ Open-Pit/ usw.)",
+      "total_values": 10,
+      "unique_values": 2,
+      "unique_values_list": [
+        "Underground/Souterrain",
+        "Untertage"
+      ],
+      "value_counts": {
+        "Underground/Souterrain": 9,
+        "Untertage": 1
+      },
+      "consistency_score": 0.9,
+      "most_common_value": "Underground/Souterrain",
+      "most_common_count": 9,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Betreiber": {
+      "field_name": "Betreiber",
+      "total_values": 4,
+      "unique_values": 2,
+      "unique_values_list": [
+        "Barrick Gold",
+        "Wesdome Gold Mines"
+      ],
+      "value_counts": {
+        "Barrick Gold": 3,
+        "Wesdome Gold Mines": 1
+      },
+      "consistency_score": 0.75,
+      "most_common_value": "Barrick Gold",
+      "most_common_count": 3,
+      "confidence": 0.6,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Fördermenge/Jahr": {
+      "field_name": "Fördermenge/Jahr",
+      "total_values": 4,
+      "unique_values": 2,
+      "unique_values_list": [
+        "125,000 oz Gold/Jahr (1995)",
+        "125,000 oz Gold/Jahr (2023)"
+      ],
+      "value_counts": {
+        "125,000 oz Gold/Jahr (1995)": 1,
+        "125,000 oz Gold/Jahr (2023)": 3
+      },
+      "consistency_score": 0.75,
+      "most_common_value": "125,000 oz Gold/Jahr (2023)",
+      "most_common_count": 3,
+      "confidence": 0.6,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Jahr der Erstellung des Dokumentes": {
+      "field_name": "Jahr der Erstellung des Dokumentes",
+      "total_values": 2,
+      "unique_values": 1,
+      "unique_values_list": [
+        "2023"
+      ],
+      "value_counts": {
+        "2023": 2
+      },
+      "consistency_score": 1.0,
+      "most_common_value": "2023",
+      "most_common_count": 2,
+      "confidence": 0.4,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "y-Koordinate": {
+      "field_name": "y-Koordinate",
+      "total_values": 10,
+      "unique_values": 1,
+      "unique_values_list": [
+        "-79.4567"
+      ],
+      "value_counts": {
+        "-79.4567": 10
+      },
+      "consistency_score": 1.0,
+      "most_common_value": "-79.4567",
+      "most_common_count": 10,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    "Produktionsstart": {
+      "field_name": "Produktionsstart",
+      "total_values": 10,
+      "unique_values": 3,
+      "unique_values_list": [
+        "1974",
+        "1989",
+        "2010"
+      ],
+      "value_counts": {
+        "1974": 4,
+        "1989": 5,
+        "2010": 1
+      },
+      "consistency_score": 0.5,
+      "most_common_value": "1989",
+      "most_common_count": 5,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    }
+  },
+  "model_performance": {
+    "unknown": {
+      "total_searches": 10,
+      "successful_searches": 10,
+      "success_rate": 1.0,
+      "avg_duration_ms": 6.1460014,
+      "avg_total_fields": 13.4,
+      "avg_valid_fields": 13.4,
+      "quality_rate": 1.0,
+      "template_values_count": 0,
+      "avg_confidence_score": 0.8,
+      "performance_score": 93.32718733193333,
+      "fields_distribution": {
+        "17": 1,
+        "13": 3,
+        "14": 3,
+        "12": 3
+      }
+    }
+  },
+  "consistency_categories": {
+    "high_consistency": 7,
+    "medium_consistency": 7,
+    "low_consistency": 1
+  },
+  "high_consistency_fields": [
+    {
+      "field_name": "Name",
+      "total_values": 10,
+      "unique_values": 1,
+      "unique_values_list": [
+        "Sigma Mine"
+      ],
+      "value_counts": {
+        "Sigma Mine": 10
+      },
+      "consistency_score": 1.0,
+      "most_common_value": "Sigma Mine",
+      "most_common_count": 10,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    {
+      "field_name": "Region",
+      "total_values": 10,
+      "unique_values": 2,
+      "unique_values_list": [
+        "Quebec",
+        "Québec"
+      ],
+      "value_counts": {
+        "Quebec": 8,
+        "Québec": 2
+      },
+      "consistency_score": 0.8,
+      "most_common_value": "Quebec",
+      "most_common_count": 8,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    {
+      "field_name": "Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)",
+      "total_values": 10,
+      "unique_values": 1,
+      "unique_values_list": [
+        "Gold"
+      ],
+      "value_counts": {
+        "Gold": 10
+      },
+      "consistency_score": 1.0,
+      "most_common_value": "Gold",
+      "most_common_count": 10,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    {
+      "field_name": "x-Koordinate",
+      "total_values": 10,
+      "unique_values": 1,
+      "unique_values_list": [
+        "48.2345"
+      ],
+      "value_counts": {
+        "48.2345": 10
+      },
+      "consistency_score": 1.0,
+      "most_common_value": "48.2345",
+      "most_common_count": 10,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    {
+      "field_name": "Country",
+      "total_values": 10,
+      "unique_values": 1,
+      "unique_values_list": [
+        "Kanada"
+      ],
+      "value_counts": {
+        "Kanada": 10
+      },
+      "consistency_score": 1.0,
+      "most_common_value": "Kanada",
+      "most_common_count": 10,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    {
+      "field_name": "Minentyp (Untertage/ Open-Pit/ usw.)",
+      "total_values": 10,
+      "unique_values": 2,
+      "unique_values_list": [
+        "Underground/Souterrain",
+        "Untertage"
+      ],
+      "value_counts": {
+        "Underground/Souterrain": 9,
+        "Untertage": 1
+      },
+      "consistency_score": 0.9,
+      "most_common_value": "Underground/Souterrain",
+      "most_common_count": 9,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    {
+      "field_name": "y-Koordinate",
+      "total_values": 10,
+      "unique_values": 1,
+      "unique_values_list": [
+        "-79.4567"
+      ],
+      "value_counts": {
+        "-79.4567": 10
+      },
+      "consistency_score": 1.0,
+      "most_common_value": "-79.4567",
+      "most_common_count": 10,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    }
+  ],
+  "medium_consistency_fields": [
+    {
+      "field_name": "Aktivitätsstatus",
+      "total_values": 10,
+      "unique_values": 2,
+      "unique_values_list": [
+        "Geschlossen",
+        "Aktiv"
+      ],
+      "value_counts": {
+        "Geschlossen": 7,
+        "Aktiv": 3
+      },
+      "consistency_score": 0.7,
+      "most_common_value": "Geschlossen",
+      "most_common_count": 7,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    {
+      "field_name": "Eigentümer",
+      "total_values": 10,
+      "unique_values": 3,
+      "unique_values_list": [
+        "Barrick Gold Corporation",
+        "Wesdome Gold Mines Ltd",
+        "Wesdome Gold Mines Ltd. (100%)"
+      ],
+      "value_counts": {
+        "Barrick Gold Corporation": 3,
+        "Wesdome Gold Mines Ltd": 5,
+        "Wesdome Gold Mines Ltd. (100%)": 2
+      },
+      "consistency_score": 0.5,
+      "most_common_value": "Wesdome Gold Mines Ltd",
+      "most_common_count": 5,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    {
+      "field_name": "Produktionsende",
+      "total_values": 7,
+      "unique_values": 3,
+      "unique_values_list": [
+        "1997",
+        "2004",
+        "1994"
+      ],
+      "value_counts": {
+        "1997": 4,
+        "2004": 2,
+        "1994": 1
+      },
+      "consistency_score": 0.5714285714285714,
+      "most_common_value": "1997",
+      "most_common_count": 4,
+      "confidence": 0.8,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    {
+      "field_name": "_source_mapping",
+      "total_values": 10,
+      "unique_values": 5,
+      "unique_values_list": [
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://nrcan.gc.ca/mining-materials/publications/Sigma%20Mine', 'title': '', 'type': 'industry', 'reliability': 0.6}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'Betreiber': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Restaurationskosten': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2], 'Fördermenge/Jahr': [1, 2], 'Fläche der Mine in qkm': [1, 2]}}",
+        "{'sources': {}, 'field_sources': {}}",
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://sedar.com/documents/ni-43-101/sigma-mine-technical-report.pdf', 'title': '', 'type': 'exchange', 'reliability': 0.9}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2]}}",
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://nrcan.gc.ca/mining-materials/mining/sigma-mine', 'title': '', 'type': 'industry', 'reliability': 0.6}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2]}}",
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://mern.gouv.qc.ca/mines/environnement/Sigma%20Mine-restoration', 'title': '', 'type': 'government', 'reliability': 1.0}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2]}}"
+      ],
+      "value_counts": {
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://nrcan.gc.ca/mining-materials/publications/Sigma%20Mine', 'title': '', 'type': 'industry', 'reliability': 0.6}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'Betreiber': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Restaurationskosten': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2], 'Fördermenge/Jahr': [1, 2], 'Fläche der Mine in qkm': [1, 2]}}": 1,
+        "{'sources': {}, 'field_sources': {}}": 6,
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://sedar.com/documents/ni-43-101/sigma-mine-technical-report.pdf', 'title': '', 'type': 'exchange', 'reliability': 0.9}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2]}}": 1,
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://nrcan.gc.ca/mining-materials/mining/sigma-mine', 'title': '', 'type': 'industry', 'reliability': 0.6}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2]}}": 1,
+        "{'sources': {'1': {'url': 'https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine', 'title': '', 'type': 'government', 'reliability': 1.0}, '2': {'url': 'https://mern.gouv.qc.ca/mines/environnement/Sigma%20Mine-restoration', 'title': '', 'type': 'government', 'reliability': 1.0}}, 'field_sources': {'Country': [1, 2], 'Region': [1, 2], 'Eigentümer': [1, 2], 'x-Koordinate': [1, 2], 'y-Koordinate': [1, 2], 'Aktivitätsstatus': [1, 2], 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [1, 2], 'Minentyp (Untertage/ Open-Pit/ usw.)': [1, 2], 'Produktionsstart': [1, 2], 'Produktionsende': [1, 2]}}": 1
+      },
+      "consistency_score": 0.6,
+      "most_common_value": "{'sources': {}, 'field_sources': {}}",
+      "most_common_count": 6,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    {
+      "field_name": "Betreiber",
+      "total_values": 4,
+      "unique_values": 2,
+      "unique_values_list": [
+        "Barrick Gold",
+        "Wesdome Gold Mines"
+      ],
+      "value_counts": {
+        "Barrick Gold": 3,
+        "Wesdome Gold Mines": 1
+      },
+      "consistency_score": 0.75,
+      "most_common_value": "Barrick Gold",
+      "most_common_count": 3,
+      "confidence": 0.6,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    {
+      "field_name": "Fördermenge/Jahr",
+      "total_values": 4,
+      "unique_values": 2,
+      "unique_values_list": [
+        "125,000 oz Gold/Jahr (1995)",
+        "125,000 oz Gold/Jahr (2023)"
+      ],
+      "value_counts": {
+        "125,000 oz Gold/Jahr (1995)": 1,
+        "125,000 oz Gold/Jahr (2023)": 3
+      },
+      "consistency_score": 0.75,
+      "most_common_value": "125,000 oz Gold/Jahr (2023)",
+      "most_common_count": 3,
+      "confidence": 0.6,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    },
+    {
+      "field_name": "Produktionsstart",
+      "total_values": 10,
+      "unique_values": 3,
+      "unique_values_list": [
+        "1974",
+        "1989",
+        "2010"
+      ],
+      "value_counts": {
+        "1974": 4,
+        "1989": 5,
+        "2010": 1
+      },
+      "consistency_score": 0.5,
+      "most_common_value": "1989",
+      "most_common_count": 5,
+      "confidence": 1.0,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    }
+  ],
+  "low_consistency_fields": [
+    {
+      "field_name": "Quellenangaben",
+      "total_values": 4,
+      "unique_values": 4,
+      "unique_values_list": [
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://nrcan.gc.ca/mining-materials/publications/Sigma%20Mine",
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://sedar.com/documents/ni-43-101/sigma-mine-technical-report.pdf",
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://nrcan.gc.ca/mining-materials/mining/sigma-mine",
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://mern.gouv.qc.ca/mines/environnement/Sigma%20Mine-restoration"
+      ],
+      "value_counts": {
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://nrcan.gc.ca/mining-materials/publications/Sigma%20Mine": 1,
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://sedar.com/documents/ni-43-101/sigma-mine-technical-report.pdf": 1,
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://nrcan.gc.ca/mining-materials/mining/sigma-mine": 1,
+        "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://mern.gouv.qc.ca/mines/environnement/Sigma%20Mine-restoration": 1
+      },
+      "consistency_score": 0.25,
+      "most_common_value": "[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine\n[2] Quelle 2: https://nrcan.gc.ca/mining-materials/publications/Sigma%20Mine",
+      "most_common_count": 1,
+      "confidence": 0.2,
+      "avg_confidence_score": 0.8,
+      "models_contributing": [
+        "openrouter:deepseek-free"
+      ]
+    }
+  ]
+}

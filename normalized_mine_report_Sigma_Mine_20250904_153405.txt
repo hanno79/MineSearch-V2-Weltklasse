@@ -1,0 +1,62 @@
+🏭 COMPREHENSIVE MINE ANALYSIS: Sigma Mine
+======================================================================
+📊 Sessions analyzed: 10
+📋 Total fields: 18
+✅ Valid values: 134
+📈 Average consistency: 76.8%
+🎭 Template value rate: 0.0%
+
+🎯 CONSISTENCY DISTRIBUTION:
+   🟢 High (≥80%): 7 fields
+   🟡 Medium (50-79%): 7 fields
+   🔴 Low (<50%): 1 fields
+
+🟢 TOP CONSISTENT FIELDS:
+   📝 Name:
+      🎯 Consistency: 100.0% (10/10)
+      🏆 Most common: 'Sigma Mine'
+      🤖 AI Confidence: 0.80/1.0
+      🤝 Models: openrouter:deepseek-free
+   📝 Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.):
+      🎯 Consistency: 100.0% (10/10)
+      🏆 Most common: 'Gold'
+      🤖 AI Confidence: 0.80/1.0
+      🤝 Models: openrouter:deepseek-free
+   📝 x-Koordinate:
+      🎯 Consistency: 100.0% (10/10)
+      🏆 Most common: '48.2345'
+      🤖 AI Confidence: 0.80/1.0
+      🤝 Models: openrouter:deepseek-free
+   📝 Country:
+      🎯 Consistency: 100.0% (10/10)
+      🏆 Most common: 'Kanada'
+      🤖 AI Confidence: 0.80/1.0
+      🤝 Models: openrouter:deepseek-free
+   📝 y-Koordinate:
+      🎯 Consistency: 100.0% (10/10)
+      🏆 Most common: '-79.4567'
+      🤖 AI Confidence: 0.80/1.0
+      🤝 Models: openrouter:deepseek-free
+
+🔴 LOW CONSISTENCY FIELDS (need attention):
+   📝 Quellenangaben: 25.0% (4 different values)
+      📊 Top values: '[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine
+[2] Quelle 2: https://nrcan.gc.ca/mining-materials/publications/Sigma%20Mine' (1x), '[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine
+[2] Quelle 2: https://sedar.com/documents/ni-43-101/sigma-mine-technical-report.pdf' (1x), '[1] Quelle 1: https://mern.gouv.qc.ca/mines/publications-mines-hydrocarbures/Sigma%20Mine
+[2] Quelle 2: https://nrcan.gc.ca/mining-materials/mining/sigma-mine' (1x)
+
+🤖 MODEL PERFORMANCE RANKING:
+   1. unknown:
+      🏆 Overall Score: 93.3/100
+      ✅ Success Rate: 100.0%
+      📊 Avg Valid Fields: 13.4 (Quality: 100.0%)
+      ⏱️ Avg Duration: 6ms
+      🎯 Avg AI Confidence: 0.80
+      🎭 Template Values: 0 total
+
+🎯 ADDITIONAL MODEL INSIGHTS:
+   💰 Cost-Efficiency Ranking:
+      💡 unknown: 93.3 (Est. $0.010/search)
+
+🎯 FIELD SPECIALIZATION:
+   🏅 openrouter:deepseek-free: Best for Name, Quellenangaben, Region...

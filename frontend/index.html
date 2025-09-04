@@ -329,6 +329,9 @@ Canadian Malartic,Canada,Gold,Quebec</pre>
                 </div>
                 
                 <form id="csv-form" enctype="multipart/form-data" onsubmit="startBatchSearch(); return false;">
+                    <!-- Hidden field for selected models -->
+                    <input type="hidden" name="selected_models" id="selected_models" value="">
+                    
                     <div class="form-group">
                         <label for="csv_file">CSV-Datei auswählen:</label>
                         <input type="file" id="csv_file" name="file" accept=".csv" required>

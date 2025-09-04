@@ -1,0 +1,138 @@
+{
+  "test_info": {
+    "mine": {
+      "name": "Sigma Mine",
+      "country": "Kanada",
+      "region": "Quebec"
+    },
+    "models_tested": [
+      "meta/llama-3.1-8b-instruct:free",
+      "google/gemma-2-9b-it:free"
+    ],
+    "total_searches": 10,
+    "timestamp": "2025-09-04T15:18:35.338856"
+  },
+  "results": [
+    {
+      "iteration": 1,
+      "model": "meta/llama-3.1-8b-instruct:free",
+      "duration": 4.309652090072632,
+      "success": true,
+      "fields_found": 0,
+      "structured_data": {},
+      "sources_count": 0,
+      "timestamp": "2025-09-04T15:17:16.655989"
+    },
+    {
+      "iteration": 2,
+      "model": "meta/llama-3.1-8b-instruct:free",
+      "duration": 2.594963550567627,
+      "success": true,
+      "fields_found": 0,
+      "structured_data": {},
+      "sources_count": 0,
+      "timestamp": "2025-09-04T15:17:21.253372"
+    },
+    {
+      "iteration": 3,
+      "model": "meta/llama-3.1-8b-instruct:free",
+      "duration": 2.7368812561035156,
+      "success": true,
+      "fields_found": 0,
+      "structured_data": {},
+      "sources_count": 0,
+      "timestamp": "2025-09-04T15:17:25.992347"
+    },
+    {
+      "iteration": 4,
+      "model": "meta/llama-3.1-8b-instruct:free",
+      "duration": 11.440280199050903,
+      "success": true,
+      "fields_found": 0,
+      "structured_data": {},
+      "sources_count": 0,
+      "timestamp": "2025-09-04T15:17:40.486095"
+    },
+    {
+      "iteration": 5,
+      "model": "meta/llama-3.1-8b-instruct:free",
+      "duration": 3.400867223739624,
+      "success": true,
+      "fields_found": 0,
+      "structured_data": {},
+      "sources_count": 0,
+      "timestamp": "2025-09-04T15:17:45.889387"
+    },
+    {
+      "iteration": 1,
+      "model": "google/gemma-2-9b-it:free",
+      "duration": 5.290844917297363,
+      "success": true,
+      "fields_found": 0,
+      "structured_data": {},
+      "sources_count": 0,
+      "timestamp": "2025-09-04T15:17:53.182092"
+    },
+    {
+      "iteration": 2,
+      "model": "google/gemma-2-9b-it:free",
+      "duration": 12.87166452407837,
+      "success": true,
+      "fields_found": 0,
+      "structured_data": {},
+      "sources_count": 0,
+      "timestamp": "2025-09-04T15:18:08.056929"
+    },
+    {
+      "iteration": 3,
+      "model": "google/gemma-2-9b-it:free",
+      "duration": 6.186810255050659,
+      "success": true,
+      "fields_found": 0,
+      "structured_data": {},
+      "sources_count": 0,
+      "timestamp": "2025-09-04T15:18:16.244346"
+    },
+    {
+      "iteration": 4,
+      "model": "google/gemma-2-9b-it:free",
+      "duration": 4.960844278335571,
+      "success": true,
+      "fields_found": 0,
+      "structured_data": {},
+      "sources_count": 0,
+      "timestamp": "2025-09-04T15:18:23.207585"
+    },
+    {
+      "iteration": 5,
+      "model": "google/gemma-2-9b-it:free",
+      "duration": 8.126647472381592,
+      "success": true,
+      "fields_found": 0,
+      "structured_data": {},
+      "sources_count": 0,
+      "timestamp": "2025-09-04T15:18:33.336404"
+    }
+  ],
+  "statistics": {
+    "total_searches": 10,
+    "successful_searches": 10,
+    "overall_success_rate": 100.0,
+    "model_statistics": {
+      "meta/llama-3.1-8b-instruct:free": {
+        "total_searches": 5,
+        "successful_searches": 5,
+        "success_rate": 100.0,
+        "avg_duration": 4.896528863906861,
+        "avg_fields_found": 0.0
+      },
+      "google/gemma-2-9b-it:free": {
+        "total_searches": 5,
+        "successful_searches": 5,
+        "success_rate": 100.0,
+        "avg_duration": 7.487362289428711,
+        "avg_fields_found": 0.0
+      }
+    }
+  }
+}

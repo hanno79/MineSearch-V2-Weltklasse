@@ -83,6 +83,95 @@ class NormalizedDatabaseManager(DatabaseManager):
         
         return normalized
     
+    def _normalize_mine_type(self, type_name: str) -> str:
+        """Normalisiere Minentyp mit Synonym-Erkennung"""
+        if not type_name:
+            return None
+        
+        # Synonyme für Minentypen
+        mine_type_synonyms = {
+            # Open Pit Varianten
+            'open-pit': 'Open-Pit',
+            'open_pit': 'Open-Pit', 
+            'openpit': 'Open-Pit',
+            'open pit': 'Open-Pit',
+            'surface': 'Open-Pit',
+            'tagebau': 'Tagebau',
+            
+            # Underground Varianten
+            'underground': 'Untertage',
+            'untertage': 'Untertage',
+            'untertagebau': 'Untertage',
+            'subsurface': 'Untertage',
+            
+            # Andere Typen
+            'placer': 'Placer',
+            'quarry': 'Quarry',
+            'dredging': 'Dredging',
+            'in-situ-leaching': 'In-Situ-Leaching',
+            'solution mining': 'In-Situ-Leaching'
+        }
+        
+        # Normalisiere Input
+        normalized = type_name.lower().strip()
+        
+        # Prüfe Synonyme
+        if normalized in mine_type_synonyms:
+            return mine_type_synonyms[normalized]
+        
+        # Fallback: Originalnamen mit korrigierter Gross-/Kleinschreibung
+        return type_name.title()
+    
+    def _normalize_activity_status(self, status_name: str) -> str:
+        """Normalisiere Aktivitätsstatus mit Synonym-Erkennung"""
+        if not status_name:
+            return None
+        
+        # Synonyme für Aktivitätsstatus
+        activity_synonyms = {
+            # Aktiv Varianten
+            'active': 'aktiv',
+            'aktiv': 'aktiv',
+            'exploitation': 'aktiv',
+            'operating': 'aktiv',
+            'in betrieb': 'aktiv',
+            
+            # Geschlossen Varianten
+            'closed': 'geschlossen',
+            'geschlossen': 'geschlossen',
+            'inactive': 'geschlossen',
+            'stillgelegt': 'stillgelegt',
+            
+            # Entwicklung Varianten
+            'development': 'in Entwicklung',
+            'entwicklung': 'in Entwicklung',
+            'in entwicklung': 'in Entwicklung',
+            'under development': 'in Entwicklung',
+            
+            # Exploration Varianten
+            'exploration': 'Exploration',
+            'erkundung': 'Exploration',
+            
+            # Geplant Varianten
+            'planned': 'geplant',
+            'geplant': 'geplant',
+            
+            # Andere Status
+            'feasibility': 'Feasibility',
+            'pausiert': 'pausiert',
+            'in wartung': 'in Wartung'
+        }
+        
+        # Normalisiere Input
+        normalized = status_name.lower().strip()
+        
+        # Prüfe Synonyme
+        if normalized in activity_synonyms:
+            return activity_synonyms[normalized]
+        
+        # Fallback: Originalnamen mit korrigierter Gross-/Kleinschreibung
+        return status_name.title()
+    
     def get_or_create_company(self, company_name: str, company_type: str = 'owner', db_session: Optional[Session] = None) -> Optional[int]:
         """Hole oder erstelle Unternehmen und gib ID zurück"""
         if not company_name or company_name in ['Nicht gefunden', 'Not found', 'Unknown']:
@@ -137,6 +226,158 @@ class NormalizedDatabaseManager(DatabaseManager):
             session.commit()
             return insert_result.lastrowid
     
+    def get_or_create_country(self, country_name: str, db_session: Optional[Session] = None) -> Optional[int]:
+        """Hole oder erstelle Land und gib ID zurück"""
+        if not country_name or country_name in ['Nicht gefunden', 'Not found', 'Unknown']:
+            return None
+            
+        # Externe Transaktion verwenden, falls bereitgestellt
+        if db_session is not None:
+            session = db_session
+            result = session.execute(text("""
+                SELECT id FROM countries WHERE name = :country_name LIMIT 1
+            """), {'country_name': country_name})
+            existing = result.fetchone()
+            if existing:
+                return existing[0]
+            insert_result = session.execute(text("""
+                INSERT INTO countries (name) VALUES (:country_name)
+            """), {'country_name': country_name})
+            session.flush()
+            return insert_result.lastrowid
+        
+        # Eigene Session verwalten
+        with self.get_session() as session:
+            result = session.execute(text("""
+                SELECT id FROM countries WHERE name = :country_name LIMIT 1
+            """), {'country_name': country_name})
+            existing = result.fetchone()
+            if existing:
+                return existing[0]
+            insert_result = session.execute(text("""
+                INSERT INTO countries (name) VALUES (:country_name)
+            """), {'country_name': country_name})
+            session.commit()
+            return insert_result.lastrowid
+
+    def get_or_create_region(self, region_name: str, country_id: Optional[int] = None, db_session: Optional[Session] = None) -> Optional[int]:
+        """Hole oder erstelle Region und gib ID zurück"""
+        if not region_name or region_name in ['Nicht gefunden', 'Not found', 'Unknown']:
+            return None
+            
+        # Externe Transaktion verwenden, falls bereitgestellt
+        if db_session is not None:
+            session = db_session
+            result = session.execute(text("""
+                SELECT id FROM regions WHERE name = :region_name LIMIT 1
+            """), {'region_name': region_name})
+            existing = result.fetchone()
+            if existing:
+                return existing[0]
+            insert_result = session.execute(text("""
+                INSERT INTO regions (name, country_id) VALUES (:region_name, :country_id)
+            """), {'region_name': region_name, 'country_id': country_id})
+            session.flush()
+            return insert_result.lastrowid
+        
+        # Eigene Session verwalten
+        with self.get_session() as session:
+            result = session.execute(text("""
+                SELECT id FROM regions WHERE name = :region_name LIMIT 1
+            """), {'region_name': region_name})
+            existing = result.fetchone()
+            if existing:
+                return existing[0]
+            insert_result = session.execute(text("""
+                INSERT INTO regions (name, country_id) VALUES (:region_name, :country_id)
+            """), {'region_name': region_name, 'country_id': country_id})
+            session.commit()
+            return insert_result.lastrowid
+
+    def get_or_create_mine_type(self, type_name: str, db_session: Optional[Session] = None) -> Optional[int]:
+        """Hole oder erstelle Minentyp und gib ID zurück - mit intelligenter Synonym-Erkennung"""
+        if not type_name:
+            return None
+        
+        # INTELLIGENTE NORMALISIERUNG: Synonyme erkennen
+        normalized_type = self._normalize_mine_type(type_name)
+        if not normalized_type:
+            return None
+            
+        # Externe Transaktion verwenden, falls bereitgestellt
+        if db_session is not None:
+            session = db_session
+            # Suche nach dem normalisierten Namen
+            result = session.execute(text("""
+                SELECT id FROM mine_types WHERE name = :type_name LIMIT 1
+            """), {'type_name': normalized_type})
+            existing = result.fetchone()
+            if existing:
+                return existing[0]
+            # Falls nicht gefunden, erstelle mit normalisiertem Namen
+            insert_result = session.execute(text("""
+                INSERT INTO mine_types (name) VALUES (:type_name)
+            """), {'type_name': normalized_type})
+            session.flush()
+            return insert_result.lastrowid
+        
+        # Eigene Session verwalten
+        with self.get_session() as session:
+            # Suche nach dem normalisierten Namen
+            result = session.execute(text("""
+                SELECT id FROM mine_types WHERE name = :type_name LIMIT 1
+            """), {'type_name': normalized_type})
+            existing = result.fetchone()
+            if existing:
+                return existing[0]
+            # Falls nicht gefunden, erstelle mit normalisiertem Namen
+            insert_result = session.execute(text("""
+                INSERT INTO mine_types (name) VALUES (:type_name)
+            """), {'type_name': normalized_type})
+            session.commit()
+            return insert_result.lastrowid
+
+    def get_or_create_activity_status(self, status_name: str, db_session: Optional[Session] = None) -> Optional[int]:
+        """Hole oder erstelle Aktivitätsstatus und gib ID zurück - mit intelligenter Synonym-Erkennung"""
+        if not status_name:
+            return None
+        
+        # INTELLIGENTE NORMALISIERUNG: Synonyme erkennen
+        normalized_status = self._normalize_activity_status(status_name)
+        if not normalized_status:
+            return None
+            
+        # Externe Transaktion verwenden, falls bereitgestellt
+        if db_session is not None:
+            session = db_session
+            # Suche nach dem normalisierten Namen
+            result = session.execute(text("""
+                SELECT id FROM activity_statuses WHERE status = :status_name LIMIT 1
+            """), {'status_name': normalized_status})
+            existing = result.fetchone()
+            if existing:
+                return existing[0]
+            # Falls nicht gefunden, erstelle mit normalisiertem Namen
+            insert_result = session.execute(text("""
+                INSERT INTO activity_statuses (status) VALUES (:status_name)
+            """), {'status_name': normalized_status})
+            session.flush()
+            return insert_result.lastrowid
+        
+        # Eigene Session verwalten
+        with self.get_session() as session:
+            result = session.execute(text("""
+                SELECT id FROM activity_statuses WHERE status = :status_name LIMIT 1
+            """), {'status_name': normalized_status})
+            existing = result.fetchone()
+            if existing:
+                return existing[0]
+            insert_result = session.execute(text("""
+                INSERT INTO activity_statuses (status) VALUES (:status_name)
+            """), {'status_name': normalized_status})
+            session.commit()
+            return insert_result.lastrowid
+
     def get_or_create_mine(self, mine_name: str, country: str, structured_data: Dict[str, Any], db_session: Optional[Session] = None) -> int:
         """Hole oder erstelle Mine und gib ID zurück"""
         normalized_name = self.normalize_mine_name(mine_name)
@@ -162,12 +403,14 @@ class NormalizedDatabaseManager(DatabaseManager):
             # Extrahiere zusätzliche Daten aus structured_data
             region = structured_data.get('Region') or structured_data.get('region')
             
-            # Koordinaten extrahieren
+            # Koordinaten extrahieren - FIX 04.09.2025: Korrekte Zuordnung
             latitude = None
             longitude = None
             
-            lat_raw = structured_data.get('x-Koordinate') or structured_data.get('latitude') or structured_data.get('lat')
-            lon_raw = structured_data.get('y-Koordinate') or structured_data.get('longitude') or structured_data.get('lon')
+            # x-Koordinate ist typischerweise Longitude (Ost-West)
+            # y-Koordinate ist typischerweise Latitude (Nord-Süd)
+            lon_raw = structured_data.get('x-Koordinate') or structured_data.get('longitude') or structured_data.get('lon')
+            lat_raw = structured_data.get('y-Koordinate') or structured_data.get('latitude') or structured_data.get('lat')
             
             if lat_raw:
                 try:
@@ -225,29 +468,43 @@ class NormalizedDatabaseManager(DatabaseManager):
                 elif 'lithium' in commodity_lower:
                     primary_commodity = 'lithium'
             
+            # FIX 04.09.2025: Verwende die Lookup-Funktionen für alle Fremdschlüssel
+            country_id = self.get_or_create_country(country, db_session=session)
+            region_id = None
+            if region:
+                region_id = self.get_or_create_region(region, country_id, db_session=session)
+            
+            mine_type_id = None
+            if mine_type and mine_type != 'open_pit':  # Nur wenn explizit gesetzt
+                mine_type_id = self.get_or_create_mine_type(mine_type, db_session=session)
+            
+            activity_status_id = None 
+            if status and status != 'active':  # Nur wenn explizit gesetzt
+                activity_status_id = self.get_or_create_activity_status(status, db_session=session)
+            
             # Eigentümer und Betreiber
             owner_id = None
             operator_id = None
             
             owner_name = structured_data.get('Eigentümer') or structured_data.get('Owner')
-            if owner_name:
-                owner_id = self.get_or_create_company(owner_name, 'owner')
+            if owner_name and owner_name not in ['Nicht gefunden', 'nichts gefunden', 'Not found']:
+                owner_id = self.get_or_create_company(owner_name, 'owner', db_session=session)
             
             operator_name = structured_data.get('Betreiber') or structured_data.get('Operator')
-            if operator_name:
-                operator_id = self.get_or_create_company(operator_name, 'operator')
+            if operator_name and operator_name not in ['Nicht gefunden', 'nichts gefunden', 'Not found']:
+                operator_id = self.get_or_create_company(operator_name, 'operator', db_session=session)
             
-            # Erstelle Mine
+            # Erstelle Mine mit allen Fremdschlüsseln
             insert_result = session.execute(text("""
                 INSERT INTO mines 
                 (name, country_id, region_id, mine_type_id, activity_status_id, latitude, longitude)
                 VALUES (:name, :country_id, :region_id, :mine_type_id, :activity_status_id, :latitude, :longitude)
             """), {
                 'name': mine_name,
-                'country_id': None,  # TODO: lookup country_id
-                'region_id': None,   # TODO: lookup region_id
-                'mine_type_id': None, # TODO: lookup mine_type_id
-                'activity_status_id': None, # TODO: lookup activity_status_id
+                'country_id': country_id,
+                'region_id': region_id,
+                'mine_type_id': mine_type_id,
+                'activity_status_id': activity_status_id,
                 'latitude': latitude,
                 'longitude': longitude
             })
@@ -319,24 +576,41 @@ class NormalizedDatabaseManager(DatabaseManager):
                     primary_commodity = 'coal'
                 elif 'lithium' in commodity_lower:
                     primary_commodity = 'lithium'
+            # FIX 04.09.2025: ELSE-Pfad - Verwende die Lookup-Funktionen für alle Fremdschlüssel
+            country_id = self.get_or_create_country(country)
+            region_id = None
+            if region:
+                region_id = self.get_or_create_region(region, country_id)
+            
+            mine_type_id = None
+            if mine_type and mine_type != 'open_pit':  # Nur wenn explizit gesetzt
+                mine_type_id = self.get_or_create_mine_type(mine_type)
+            
+            activity_status_id = None 
+            if status and status != 'active':  # Nur wenn explizit gesetzt
+                activity_status_id = self.get_or_create_activity_status(status)
+                
+            # Eigentümer und Betreiber
             owner_id = None
             operator_id = None
             owner_name = structured_data.get('Eigentümer') or structured_data.get('Owner')
-            if owner_name:
+            if owner_name and owner_name not in ['Nicht gefunden', 'nichts gefunden', 'Not found']:
                 owner_id = self.get_or_create_company(owner_name, 'owner')
             operator_name = structured_data.get('Betreiber') or structured_data.get('Operator')
-            if operator_name:
+            if operator_name and operator_name not in ['Nicht gefunden', 'nichts gefunden', 'Not found']:
                 operator_id = self.get_or_create_company(operator_name, 'operator')
+                
+            # Erstelle Mine mit allen Fremdschlüsseln
             insert_result = session_local.execute(text("""
                 INSERT INTO mines 
                 (name, country_id, region_id, mine_type_id, activity_status_id, latitude, longitude)
                 VALUES (:name, :country_id, :region_id, :mine_type_id, :activity_status_id, :latitude, :longitude)
             """), {
                 'name': mine_name,
-                'country_id': None,  # TODO: lookup country_id
-                'region_id': None,   # TODO: lookup region_id
-                'mine_type_id': None, # TODO: lookup mine_type_id
-                'activity_status_id': None, # TODO: lookup activity_status_id
+                'country_id': country_id,
+                'region_id': region_id,
+                'mine_type_id': mine_type_id,
+                'activity_status_id': activity_status_id,
                 'latitude': latitude,
                 'longitude': longitude
             })
@@ -501,17 +775,28 @@ class NormalizedDatabaseManager(DatabaseManager):
                 if is_template:
                     confidence_score = 0.1
                     
-                # NORMALISIERUNG FIX: Verwende field_values Tabelle mit korrekten Spalten
-                local_session.execute(text("""
-                    INSERT INTO field_values 
-                    (search_session_id, field_name, atomic_value, confidence_score)
-                    VALUES (:search_session_id, :field_name, :atomic_value, :confidence_score)
-                """), {
-                    'search_session_id': search_result_id,
-                    'field_name': field_name,
-                    'atomic_value': str(field_value),
-                    'confidence_score': confidence_score
-                })
+                # KONSISTENZ-FIX 04.09.2025: Verwende gleiche _insert_or_update_mine_data_field wie IF-Zweig
+                self._insert_or_update_mine_data_field(
+                    local_session,
+                    {
+                        'search_result_id': search_result_id,
+                        'mine_id': mine_id,
+                        'field_name': field_name
+                    },
+                    {
+                        'raw_value': raw_value,
+                        'normalized_value': normalized_value,
+                        'numeric_value': numeric_value,
+                        'unit': unit,
+                        'confidence_score': confidence_score,
+                        'is_template_value': is_template,
+                        'validation_status': validation_status,
+                        'source_name': source_name,
+                        'model_used': model_used
+                    },
+                    actor=model_used,
+                    reason="save_mine_field_data"
+                )
             local_session.commit()
             logger.info(f"✅ {len(structured_data)} Feldwerte gespeichert für Mine ID {mine_id}")
     
@@ -660,12 +945,20 @@ class NormalizedDatabaseManager(DatabaseManager):
         Returns: search_result_id aus search_sessions
         """
         try:
-            # SESSION-ID FIX 04.09.2025: Generiere UUID falls keine session_id übergeben
-            if session_id is None:
-                import uuid
-                session_id = str(uuid.uuid4())
-                logger.info(f"[NORMALIZED-DB] Generierte neue session_id: {session_id} für Mine {mine_name}")
+            # SESSION-ID FIX 04.09.2025: Generiere EINZIGARTIGE UUID für jede Mine in Batch
+            import uuid
+            unique_session_id = str(uuid.uuid4())
             
+            # Batch-Tracking: Falls session_id bereitgestellt, nutze als batch_reference_id
+            if session_id:
+                logger.info(f"[NORMALIZED-DB] Batch-Reference: {session_id} -> Unique ID: {unique_session_id} für Mine {mine_name}")
+                batch_reference_id = session_id
+            else:
+                batch_reference_id = unique_session_id
+                logger.info(f"[NORMALIZED-DB] Generierte neue session_id: {unique_session_id} für Mine {mine_name}")
+            
+            # Verwende unique_session_id für DB-Speicherung
+            session_id = unique_session_id
             logger.debug(f"[NORMALIZED-DB] Speichere Ergebnis für Mine '{mine_name}' mit session_id: {session_id}")
             # 1. Hole oder erstelle Mine
             # REGEL 10 COMPLIANCE: Keine Dummy-Werte - Skip bei fehlendem Country
@@ -723,6 +1016,10 @@ class NormalizedDatabaseManager(DatabaseManager):
                 session.flush()
                 # 4. Speichere atomare Feldwerte in derselben Transaktion
                 self.save_mine_field_data(mine_id, search_result_id, structured_data, model_used, sources, db_session=session)
+                # 5. KOORDINATEN-FIX 04.09.2025: Aktualisiere Mine mit besten verfügbaren Koordinaten
+                self._update_mine_coordinates_from_fields(mine_id, db_session=session)
+                # KRITISCHER FIX 04.09.2025: Commit der gesamten Transaktion
+                session.commit()
             else:
                 with self.get_session() as session_local:
                     insert_result = session_local.execute(text("""
@@ -744,6 +1041,8 @@ class NormalizedDatabaseManager(DatabaseManager):
                     session_local.commit()
                     # 4. Speichere atomare Feldwerte mit eigener Session
                     self.save_mine_field_data(mine_id, search_result_id, structured_data, model_used, sources)
+                    # 5. KOORDINATEN-FIX 04.09.2025: Aktualisiere Mine mit besten verfügbaren Koordinaten
+                    self._update_mine_coordinates_from_fields(mine_id)
             
             logger.info(f"✅ NORMALIZED SAVE: Mine='{mine_name}' Model='{model_used}' Fields={fields_found} Quality={data_quality_score:.2f}")
             
@@ -795,4 +1094,118 @@ class NormalizedDatabaseManager(DatabaseManager):
                 
         except Exception as e:
             logger.error(f"❌ Fehler bei field_definitions Initialisierung: {e}")
+            # Nicht re-raise, damit der Hauptprozess weiterläuft
+
+    def _update_mine_coordinates_from_fields(self, mine_id: int, db_session: Optional[Session] = None):
+        """
+        KOORDINATEN-FIX 04.09.2025: Aktualisiert die mines-Tabelle mit den besten verfügbaren 
+        Koordinaten aus mine_data_fields
+        """
+        try:
+            if db_session:
+                session = db_session
+                # Hole beste x-Koordinate (= Longitude in unseren Suchergebnissen)
+                x_result = session.execute(text("""
+                    SELECT normalized_value, confidence_score 
+                    FROM mine_data_fields 
+                    WHERE mine_id = :mine_id 
+                      AND field_name = 'x-Koordinate' 
+                      AND normalized_value IS NOT NULL 
+                      AND normalized_value != 'Nicht gefunden'
+                      AND normalized_value != 'nichts gefunden'
+                    ORDER BY confidence_score DESC, id DESC
+                    LIMIT 1
+                """), {'mine_id': mine_id}).fetchone()
+
+                # Hole beste y-Koordinate (= Latitude in unseren Suchergebnissen)
+                y_result = session.execute(text("""
+                    SELECT normalized_value, confidence_score 
+                    FROM mine_data_fields 
+                    WHERE mine_id = :mine_id 
+                      AND field_name = 'y-Koordinate' 
+                      AND normalized_value IS NOT NULL 
+                      AND normalized_value != 'Nicht gefunden'
+                      AND normalized_value != 'nichts gefunden'
+                    ORDER BY confidence_score DESC, id DESC
+                    LIMIT 1
+                """), {'mine_id': mine_id}).fetchone()
+
+                # Verarbeite Koordinaten basierend auf Suchergebnis-Analyse
+                latitude = None
+                longitude = None
+
+                # In unseren Suchergebnissen: x-Koordinate = tatsächlich Latitude, y-Koordinate = tatsächlich Longitude
+                if x_result:
+                    try:
+                        latitude = float(str(x_result[0]).replace(',', '.'))
+                        if not (45 <= latitude <= 62):  # Quebec Latitude-Bereich
+                            latitude = None
+                    except (ValueError, TypeError):
+                        pass
+
+                if y_result:
+                    try:
+                        longitude = float(str(y_result[0]).replace(',', '.'))
+                        if not (-79 <= longitude <= -57):  # Quebec Longitude-Bereich
+                            longitude = None
+                    except (ValueError, TypeError):
+                        pass
+
+                # Hole beste Flächenangabe (sortiere nach extrahiertem numerischen Wert, höchster zuerst)
+                area_results = session.execute(text("""
+                    SELECT normalized_value, confidence_score 
+                    FROM mine_data_fields 
+                    WHERE mine_id = :mine_id 
+                      AND field_name = 'Fläche der Mine in qkm' 
+                      AND normalized_value IS NOT NULL 
+                      AND normalized_value != 'Nicht gefunden'
+                      AND normalized_value != 'nichts gefunden'
+                    ORDER BY confidence_score DESC, id DESC
+                """), {'mine_id': mine_id}).fetchall()
+
+                area_sqkm = None
+                if area_results:
+                    import re
+                    # Durchlaufe alle Flächen-Ergebnisse und finde den höchsten plausiblen Wert
+                    best_area = 0
+                    for area_result in area_results:
+                        try:
+                            # Extrahiere Zahlenwerte aus Flächen-String (z.B. "15.7 km²" → 15.7)
+                            area_str = str(area_result[0])
+                            # Suche nach Dezimalzahlen im String
+                            match = re.search(r'(\d+\.?\d*)', area_str)
+                            if match:
+                                current_area = float(match.group(1))
+                                # Plausibilitätsprüfung und wähle höchsten Wert
+                                if 0.01 <= current_area <= 10000 and current_area > best_area:
+                                    best_area = current_area
+                        except (ValueError, TypeError):
+                            continue
+                    
+                    # Verwende den besten gefundenen Wert
+                    if best_area > 0:
+                        area_sqkm = best_area
+
+                # Aktualisiere die Mine wenn wir Daten haben
+                if latitude is not None or longitude is not None or area_sqkm is not None:
+                    session.execute(text("""
+                        UPDATE mines 
+                        SET latitude = :latitude, longitude = :longitude, area_sqkm = :area_sqkm, 
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = :mine_id
+                    """), {
+                        'mine_id': mine_id,
+                        'latitude': latitude,
+                        'longitude': longitude,
+                        'area_sqkm': area_sqkm
+                    })
+                    logger.info(f"✅ [DATEN-UPDATE] Mine {mine_id} aktualisiert: Lat={latitude}, Lon={longitude}, Area={area_sqkm}km²")
+            else:
+                # Eigenständige Session
+                with self.get_session() as session_local:
+                    self._update_mine_coordinates_from_fields(mine_id, db_session=session_local)
+                    session_local.commit()
+                    
+        except Exception as e:
+            logger.error(f"❌ [KOORDINATEN-UPDATE] Fehler bei Mine {mine_id}: {e}")
             # Nicht re-raise, damit der Hauptprozess weiterläuft

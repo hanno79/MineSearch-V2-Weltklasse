@@ -238,8 +238,18 @@ async function startBatchSearch() {
         // SCHRITT 1: CSV UPLOAD - Erstelle Session ID
         console.log('📤 [BATCH-STEP-1] Uploading CSV file...');
         
+        // DEFENSIVE FIX 04.09.2025: Extra Validierung vor FormData-Erstellung
+        if (!csvFile || csvFile.size === 0) {
+            throw new Error('CSV-Datei ist ungültig oder leer');
+        }
+        
         const uploadFormData = new FormData();
-        uploadFormData.append('csv_file', csvFile);
+        uploadFormData.append('file', csvFile);
+        
+        // VALIDATION FIX: Überprüfe ob File korrekt angehängt wurde
+        if (!uploadFormData.has('file')) {
+            throw new Error('Fehler beim Anhängen der CSV-Datei an FormData');
+        }
         
         const uploadResponse = await fetch(`${window.API_BASE_URL}/api/upload-csv`, {
             method: 'POST',
@@ -248,6 +258,13 @@ async function startBatchSearch() {
         });
         
         if (!uploadResponse.ok) {
+            // DEBUG FIX 04.09.2025: Detaillierte Fehlermeldung bei 422
+            const errorText = await uploadResponse.text();
+            console.error(`[CSV-UPLOAD-ERROR] Status: ${uploadResponse.status}, Response: ${errorText}`);
+            
+            if (uploadResponse.status === 422) {
+                throw new Error(`CSV Upload Validierung fehlgeschlagen (422): ${errorText}`);
+            }
             throw new Error(`CSV Upload fehlgeschlagen: ${uploadResponse.status}`);
         }
         
@@ -1542,6 +1559,9 @@ function showProgressContainer(sessionIdOrState, totalMines, totalModels) {
     const progressContainer = document.getElementById('batch-progress-container');
     if (!progressContainer) return;
     
+    // TIMING-FIX 04.09.2025: Progress-Startzeit tracken
+    window.progressStartTime = Date.now();
+    
     // Container anzeigen
     progressContainer.style.display = 'block';
     
@@ -1692,12 +1712,15 @@ async function updateProgressDisplay() {
         
         const progress = data.data;
         
-        // Bei 'completed' Status: Stoppe Updates und verstecke Container
-        if (progress.status === 'completed' || progress.status === 'finished') {
+        // TIMING-FIX 04.09.2025: Ignoriere 'completed' in den ersten 5 Sekunden
+        const timeSinceStart = Date.now() - (window.progressStartTime || 0);
+        if ((progress.status === 'completed' || progress.status === 'finished') && timeSinceStart > 5000) {
             console.log('📊 [PROGRESS] Batch completed, stopping updates');
             clearInterval(progressUpdateInterval);
             setTimeout(() => hideProgressContainer(), 2000);
             return;
+        } else if (progress.status === 'completed' && timeSinceStart <= 5000) {
+            console.log(`📊 [PROGRESS] Ignoring premature 'completed' status (${Math.round(timeSinceStart/1000)}s since start)`);
         }
         
         // Berechne Progress-Prozentsatz für einfache Progress-Daten
