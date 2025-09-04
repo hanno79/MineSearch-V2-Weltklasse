@@ -41,7 +41,8 @@ NORMALIZED_TABLES = {
         "restoration_costs"    # Restaurationskosten-Historie
     ],
     "Feldwerte": [
-        "field_values",        # Atomare Feldwerte
+        "mine_data_fields",    # Mine-Feldwerte aus Suchen (PRIMARY)  
+        "field_values",        # Atomare Feldwerte (LEGACY)
         "field_value_sources"  # Feldwert ↔ Quellen (N:M)
     ]
 }

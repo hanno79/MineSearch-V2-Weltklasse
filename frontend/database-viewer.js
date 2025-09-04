@@ -7,7 +7,7 @@
 
 // Database Viewer State
 let databaseViewer = {
-    currentTable: 'search_results',
+    currentTable: 'mines',
     currentPage: 1,
     pageLimit: 50,
     totalPages: 1,
@@ -34,8 +34,8 @@ async function initializeDatabaseViewer() {
         await loadDatabaseTables();
         
         // Lade Standard-Tabelle
-        console.log('🔄 [DATABASE-VIEWER-DEBUG] Loading default table: search_results...');
-        await loadTableData('search_results');
+        console.log('🔄 [DATABASE-VIEWER-DEBUG] Loading default table: mines...');
+        await loadTableData('mines');
         
         // Event Listener für Tab-Wechsel
         console.log('🔄 [DATABASE-VIEWER-DEBUG] Setting up event listeners...');

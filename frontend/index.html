@@ -765,64 +765,10 @@ Canadian Malartic,Canada,Gold,Quebec</pre>
                 <!-- Database Navigation -->
                 <div class="database-navigation">
                     <div class="database-tabs">
-                        <!-- Legacy System Tables -->
+                        <!-- Tabellen werden dynamisch durch JavaScript aus der API geladen -->
                         <div class="tab-group">
-                            <h4 style="margin: 10px 0 5px 0; font-size: 0.85rem; color: #666; text-transform: uppercase;">Legacy System</h4>
-                            <button class="database-tab-btn active" data-table="search_results">
-                                <span class="db-icon">🔍</span>
-                                Suchergebnisse
-                                <span class="db-count" id="count-search_results">(0)</span>
-                            </button>
-                            <button class="database-tab-btn" data-table="sources">
-                                <span class="db-icon">📚</span>
-                                Quellen  
-                                <span class="db-count" id="count-sources">(0)</span>
-                            </button>
-                            <button class="database-tab-btn" data-table="model_statistics_comprehensive">
-                                <span class="db-icon">📊</span>
-                                Modell-Stats
-                                <span class="db-count" id="count-model_statistics_comprehensive">(0)</span>
-                            </button>
-                        </div>
-                        
-                        <!-- Normalized System Tables -->
-                        <div class="tab-group">
-                            <h4 style="margin: 15px 0 5px 0; font-size: 0.85rem; color: #059669; text-transform: uppercase; font-weight: 600;">🆕 Normalized Schema</h4>
-                            <button class="database-tab-btn" data-table="mines_normalized">
-                                <span class="db-icon">⛏️</span>
-                                Minen (Normalized)
-                                <span class="db-count" id="count-mines_normalized">(0)</span>
-                            </button>
-                            <button class="database-tab-btn" data-table="companies">
-                                <span class="db-icon">🏢</span>
-                                Unternehmen
-                                <span class="db-count" id="count-companies">(0)</span>
-                            </button>
-                            <button class="database-tab-btn" data-table="search_results_normalized">
-                                <span class="db-icon">🔍</span>
-                                Suchen (Normalized)
-                                <span class="db-count" id="count-search_results_normalized">(0)</span>
-                            </button>
-                            <button class="database-tab-btn" data-table="mine_data_fields">
-                                <span class="db-icon">📊</span>
-                                Feldwerte (Atomic)
-                                <span class="db-count" id="count-mine_data_fields">(0)</span>
-                            </button>
-                        </div>
-                        
-                        <!-- Other Tables -->
-                        <div class="tab-group">
-                            <h4 style="margin: 15px 0 5px 0; font-size: 0.85rem; color: #666; text-transform: uppercase;">System Tables</h4>
-                            <button class="database-tab-btn" data-table="constraint_log">
-                                <span class="db-icon">⚠️</span>
-                                Validierung
-                                <span class="db-count" id="count-constraint_log">(0)</span>
-                            </button>
-                            <button class="database-tab-btn" data-table="monitoring_events">
-                                <span class="db-icon">📡</span>
-                                Monitoring
-                                <span class="db-count" id="count-monitoring_events">(0)</span>
-                            </button>
+                            <h4 style="margin: 10px 0 5px 0; font-size: 0.85rem; color: #666; text-transform: uppercase;">Loading...</h4>
+                            <p style="color: #666; font-size: 0.9em; margin: 10px 0;">Lade Datenbank-Tabellen...</p>
                         </div>
                     </div>
                 </div>

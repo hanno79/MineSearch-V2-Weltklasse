@@ -378,17 +378,29 @@ class NormalizedDatabaseManager(DatabaseManager):
             session.commit()
             return insert_result.lastrowid
 
-    def get_or_create_mine(self, mine_name: str, country: str, structured_data: Dict[str, Any], db_session: Optional[Session] = None) -> int:
-        """Hole oder erstelle Mine und gib ID zurück"""
-        normalized_name = self.normalize_mine_name(mine_name)
+    def get_or_create_mine(self, mine_name: str, structured_data: Dict[str, Any] = None, db_session: Optional[Session] = None) -> int:
+        """
+        Erstellt oder findet eine Mine basierend auf dem Namen.
         
-        # Externe Transaktion verwenden, falls bereitgestellt
-        if db_session is not None:
-            session = db_session
-        else:
-            session = None
+        NEUES SCHEMA (04.09.2025): 
+        - Mines Tabelle enthält nur noch: ID, Name, Country, Region
+        - Alle anderen Daten (Koordinaten, Fläche, etc.) werden in mine_data_fields gespeichert
+        
+        Args:
+            mine_name: Name der Mine
+            structured_data: Optional - zusätzliche Daten für Region/Land
+            db_session: Optional - vorhandene DB-Session verwenden
             
-        if session is not None:
+        Returns:
+            Mine-ID
+        """
+        normalized_name = self.normalize_mine_name(mine_name)
+        structured_data = structured_data or {}
+        
+        # Wenn eine Session übergeben wurde, verwende sie
+        if db_session:
+            session = db_session
+            
             # Suche existierende Mine
             result = session.execute(text("""
                 SELECT id FROM mines 
@@ -400,116 +412,31 @@ class NormalizedDatabaseManager(DatabaseManager):
             if existing:
                 return existing[0]
             
-            # Extrahiere zusätzliche Daten aus structured_data
+            # Extrahiere nur Region für das neue vereinfachte Schema
             region = structured_data.get('Region') or structured_data.get('region')
             
-            # Koordinaten extrahieren - FIX 04.09.2025: Korrekte Zuordnung
-            latitude = None
-            longitude = None
-            
-            # x-Koordinate ist typischerweise Longitude (Ost-West)
-            # y-Koordinate ist typischerweise Latitude (Nord-Süd)
-            lon_raw = structured_data.get('x-Koordinate') or structured_data.get('longitude') or structured_data.get('lon')
-            lat_raw = structured_data.get('y-Koordinate') or structured_data.get('latitude') or structured_data.get('lat')
-            
-            if lat_raw:
-                try:
-                    latitude = float(str(lat_raw).replace(',', '.'))
-                    # Validate latitude range
-                    if not (-90 <= latitude <= 90):
-                        latitude = None
-                except (ValueError, TypeError):
-                    pass
-            
-            if lon_raw:
-                try:
-                    longitude = float(str(lon_raw).replace(',', '.'))
-                    # Validate longitude range
-                    if not (-180 <= longitude <= 180):
-                        longitude = None
-                except (ValueError, TypeError):
-                    pass
-            
-            # Status bestimmen
-            status = 'active'
-            status_raw = structured_data.get('Aktivitätsstatus') or structured_data.get('status')
-            if status_raw:
-                status_lower = str(status_raw).lower()
-                if 'inaktiv' in status_lower or 'inactive' in status_lower:
-                    status = 'inactive'
-                elif 'entwicklung' in status_lower or 'development' in status_lower:
-                    status = 'development'
-                elif 'geschlossen' in status_lower or 'closed' in status_lower:
-                    status = 'closed'
-            
-            # Mine-Typ bestimmen
-            mine_type = 'open_pit'
-            type_raw = structured_data.get('Minentyp (Untertage/ Open-Pit/ usw.)')
-            if type_raw:
-                type_lower = str(type_raw).lower()
-                if 'untertage' in type_lower or 'underground' in type_lower:
-                    mine_type = 'underground'
-                elif 'placer' in type_lower:
-                    mine_type = 'placer'
-            
-            # Rohstoff bestimmen
-            primary_commodity = 'gold'
-            commodity_raw = structured_data.get('Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)')
-            if commodity_raw:
-                commodity_lower = str(commodity_raw).lower()
-                if 'kupfer' in commodity_lower or 'copper' in commodity_lower:
-                    primary_commodity = 'copper'
-                elif 'silber' in commodity_lower or 'silver' in commodity_lower:
-                    primary_commodity = 'silver'
-                elif 'eisen' in commodity_lower or 'iron' in commodity_lower:
-                    primary_commodity = 'iron'
-                elif 'kohle' in commodity_lower or 'coal' in commodity_lower:
-                    primary_commodity = 'coal'
-                elif 'lithium' in commodity_lower:
-                    primary_commodity = 'lithium'
-            
-            # FIX 04.09.2025: Verwende die Lookup-Funktionen für alle Fremdschlüssel
-            country_id = self.get_or_create_country(country, db_session=session)
+            # Hole IDs für Country und Region
+            country = structured_data.get('Country') or structured_data.get('country')
+            country_id = None
             region_id = None
-            if region:
-                region_id = self.get_or_create_region(region, country_id, db_session=session)
             
-            mine_type_id = None
-            if mine_type and mine_type != 'open_pit':  # Nur wenn explizit gesetzt
-                mine_type_id = self.get_or_create_mine_type(mine_type, db_session=session)
+            if country:
+                country_id = self.get_or_create_country(country, db_session=session)
+                if region and country_id:
+                    region_id = self.get_or_create_region(region, country_id, db_session=session)
             
-            activity_status_id = None 
-            if status and status != 'active':  # Nur wenn explizit gesetzt
-                activity_status_id = self.get_or_create_activity_status(status, db_session=session)
-            
-            # Eigentümer und Betreiber
-            owner_id = None
-            operator_id = None
-            
-            owner_name = structured_data.get('Eigentümer') or structured_data.get('Owner')
-            if owner_name and owner_name not in ['Nicht gefunden', 'nichts gefunden', 'Not found']:
-                owner_id = self.get_or_create_company(owner_name, 'owner', db_session=session)
-            
-            operator_name = structured_data.get('Betreiber') or structured_data.get('Operator')
-            if operator_name and operator_name not in ['Nicht gefunden', 'nichts gefunden', 'Not found']:
-                operator_id = self.get_or_create_company(operator_name, 'operator', db_session=session)
-            
-            # Erstelle Mine mit allen Fremdschlüsseln
+            # Erstelle Mine nur mit Name, Country, Region
             insert_result = session.execute(text("""
                 INSERT INTO mines 
-                (name, country_id, region_id, mine_type_id, activity_status_id, latitude, longitude)
-                VALUES (:name, :country_id, :region_id, :mine_type_id, :activity_status_id, :latitude, :longitude)
+                (name, country_id, region_id)
+                VALUES (:name, :country_id, :region_id)
             """), {
                 'name': mine_name,
                 'country_id': country_id,
-                'region_id': region_id,
-                'mine_type_id': mine_type_id,
-                'activity_status_id': activity_status_id,
-                'latitude': latitude,
-                'longitude': longitude
+                'region_id': region_id
             })
             session.flush()
-            logger.info(f"✅ Neue Mine erstellt: {mine_name} → {normalized_name} (ID: {insert_result.lastrowid})")
+            logger.info(f"✅ Neue Mine erstellt: {mine_name} (ID: {insert_result.lastrowid})")
             return insert_result.lastrowid
         
         # Ohne externe Session: eigene Session öffnen und committen
@@ -520,108 +447,44 @@ class NormalizedDatabaseManager(DatabaseManager):
                 WHERE name = :mine_name
                 LIMIT 1
             """), {'mine_name': mine_name})
+            
             existing = result.fetchone()
             if existing:
                 return existing[0]
-            # Extrahiere zusätzliche Daten aus structured_data
+            
+            # Extrahiere nur Region für das neue vereinfachte Schema
             region = structured_data.get('Region') or structured_data.get('region')
-            # Koordinaten extrahieren
-            latitude = None
-            longitude = None
-            lat_raw = structured_data.get('x-Koordinate') or structured_data.get('latitude') or structured_data.get('lat')
-            lon_raw = structured_data.get('y-Koordinate') or structured_data.get('longitude') or structured_data.get('lon')
-            if lat_raw:
-                try:
-                    latitude = float(str(lat_raw).replace(',', '.'))
-                    if not (-90 <= latitude <= 90):
-                        latitude = None
-                except (ValueError, TypeError):
-                    pass
-            if lon_raw:
-                try:
-                    longitude = float(str(lon_raw).replace(',', '.'))
-                    if not (-180 <= longitude <= 180):
-                        longitude = None
-                except (ValueError, TypeError):
-                    pass
-            status = 'active'
-            status_raw = structured_data.get('Aktivitätsstatus') or structured_data.get('status')
-            if status_raw:
-                status_lower = str(status_raw).lower()
-                if 'inaktiv' in status_lower or 'inactive' in status_lower:
-                    status = 'inactive'
-                elif 'entwicklung' in status_lower or 'development' in status_lower:
-                    status = 'development'
-                elif 'geschlossen' in status_lower or 'closed' in status_lower:
-                    status = 'closed'
-            mine_type = 'open_pit'
-            type_raw = structured_data.get('Minentyp (Untertage/ Open-Pit/ usw.)')
-            if type_raw:
-                type_lower = str(type_raw).lower()
-                if 'untertage' in type_lower or 'underground' in type_lower:
-                    mine_type = 'underground'
-                elif 'placer' in type_lower:
-                    mine_type = 'placer'
-            primary_commodity = 'gold'
-            commodity_raw = structured_data.get('Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)')
-            if commodity_raw:
-                commodity_lower = str(commodity_raw).lower()
-                if 'kupfer' in commodity_lower or 'copper' in commodity_lower:
-                    primary_commodity = 'copper'
-                elif 'silber' in commodity_lower or 'silver' in commodity_lower:
-                    primary_commodity = 'silver'
-                elif 'eisen' in commodity_lower or 'iron' in commodity_lower:
-                    primary_commodity = 'iron'
-                elif 'kohle' in commodity_lower or 'coal' in commodity_lower:
-                    primary_commodity = 'coal'
-                elif 'lithium' in commodity_lower:
-                    primary_commodity = 'lithium'
-            # FIX 04.09.2025: ELSE-Pfad - Verwende die Lookup-Funktionen für alle Fremdschlüssel
-            country_id = self.get_or_create_country(country)
+            
+            # Hole IDs für Country und Region
+            country = structured_data.get('Country') or structured_data.get('country')
+            country_id = None
             region_id = None
-            if region:
-                region_id = self.get_or_create_region(region, country_id)
             
-            mine_type_id = None
-            if mine_type and mine_type != 'open_pit':  # Nur wenn explizit gesetzt
-                mine_type_id = self.get_or_create_mine_type(mine_type)
+            if country:
+                country_id = self.get_or_create_country(country, db_session=session_local)
+                if region and country_id:
+                    region_id = self.get_or_create_region(region, country_id, db_session=session_local)
             
-            activity_status_id = None 
-            if status and status != 'active':  # Nur wenn explizit gesetzt
-                activity_status_id = self.get_or_create_activity_status(status)
-                
-            # Eigentümer und Betreiber
-            owner_id = None
-            operator_id = None
-            owner_name = structured_data.get('Eigentümer') or structured_data.get('Owner')
-            if owner_name and owner_name not in ['Nicht gefunden', 'nichts gefunden', 'Not found']:
-                owner_id = self.get_or_create_company(owner_name, 'owner')
-            operator_name = structured_data.get('Betreiber') or structured_data.get('Operator')
-            if operator_name and operator_name not in ['Nicht gefunden', 'nichts gefunden', 'Not found']:
-                operator_id = self.get_or_create_company(operator_name, 'operator')
-                
-            # Erstelle Mine mit allen Fremdschlüsseln
+            # Erstelle Mine nur mit Name, Country, Region
             insert_result = session_local.execute(text("""
                 INSERT INTO mines 
-                (name, country_id, region_id, mine_type_id, activity_status_id, latitude, longitude)
-                VALUES (:name, :country_id, :region_id, :mine_type_id, :activity_status_id, :latitude, :longitude)
+                (name, country_id, region_id)
+                VALUES (:name, :country_id, :region_id)
             """), {
                 'name': mine_name,
                 'country_id': country_id,
-                'region_id': region_id,
-                'mine_type_id': mine_type_id,
-                'activity_status_id': activity_status_id,
-                'latitude': latitude,
-                'longitude': longitude
+                'region_id': region_id
             })
-            session_local.commit()
-            logger.info(f"✅ Neue Mine erstellt: {mine_name} → {normalized_name} (ID: {insert_result.lastrowid})")
+            
+            logger.info(f"✅ Neue Mine erstellt: {mine_name} (ID: {insert_result.lastrowid})")
             return insert_result.lastrowid
     
     def save_mine_field_data(self, mine_id: int, search_result_id: int, structured_data: Dict[str, Any], 
-                           model_used: str, sources: List[Dict[str, Any]], db_session: Optional[Session] = None):
+                           model_used: str, sources: List[Dict[str, Any]], session_id: str = None, db_session: Optional[Session] = None):
         """Speichere atomare Feldwerte in mine_data_fields"""
+        logger.info(f"[FIELD_SAVE_DEBUG] Called with {len(structured_data) if structured_data else 0} fields, session_id: {session_id}")
         if not structured_data:
+            logger.warning("[FIELD_SAVE_DEBUG] No structured_data - returning early")
             return
         
         # KRITISCHER FIX 29.08.2025: Stelle sicher dass field_definitions initialisiert ist
@@ -710,6 +573,7 @@ class NormalizedDatabaseManager(DatabaseManager):
                         'field_name': field_name
                     },
                     {
+                        'session_id': session_id,  # CRITICAL FIX 04.09.2025: Add session_id 
                         'raw_value': raw_value,
                         'normalized_value': normalized_value,
                         'numeric_value': numeric_value,
@@ -792,7 +656,8 @@ class NormalizedDatabaseManager(DatabaseManager):
                         'is_template_value': is_template,
                         'validation_status': validation_status,
                         'source_name': source_name,
-                        'model_used': model_used
+                        'model_used': model_used,
+                        'session_id': session_id
                     },
                     actor=model_used,
                     reason="save_mine_field_data"
@@ -800,136 +665,104 @@ class NormalizedDatabaseManager(DatabaseManager):
             local_session.commit()
             logger.info(f"✅ {len(structured_data)} Feldwerte gespeichert für Mine ID {mine_id}")
     
+    def _get_or_create_ai_model_id(self, session: Session, model_used: str) -> Optional[int]:
+        """Hole oder erstelle ai_model_id für gegebenes model_used."""
+        try:
+            # Versuche direkte Zuordnung über full_model_id
+            result = session.execute(text("""
+                SELECT id FROM ai_models 
+                WHERE full_model_id = :model_used
+                LIMIT 1
+            """), {'model_used': model_used}).fetchone()
+            
+            if result:
+                return result[0]
+            
+            # Versuche Zuordnung über model_name falls model_used nur der Name ist
+            result = session.execute(text("""
+                SELECT id FROM ai_models 
+                WHERE model_name = :model_used
+                LIMIT 1
+            """), {'model_used': model_used}).fetchone()
+            
+            if result:
+                return result[0]
+            
+            # Für OpenRouter-Modelle: Versuche mit openrouter: Präfix
+            if not model_used.startswith('openrouter:'):
+                openrouter_id = f"openrouter:{model_used}"
+                result = session.execute(text("""
+                    SELECT id FROM ai_models 
+                    WHERE full_model_id = :model_used
+                    LIMIT 1
+                """), {'model_used': openrouter_id}).fetchone()
+                
+                if result:
+                    return result[0]
+                
+                # Erstelle neuen ai_models Eintrag für OpenRouter
+                insert_result = session.execute(text("""
+                    INSERT INTO ai_models (provider, model_name, full_model_id)
+                    VALUES ('openrouter', :model_name, :full_model_id)
+                    RETURNING id
+                """), {
+                    'model_name': model_used,
+                    'full_model_id': openrouter_id
+                })
+                return insert_result.fetchone()[0]
+            else:
+                # Modell hat bereits openrouter: Präfix - erstelle neuen Eintrag
+                model_name = model_used.replace('openrouter:', '')
+                insert_result = session.execute(text("""
+                    INSERT INTO ai_models (provider, model_name, full_model_id)
+                    VALUES ('openrouter', :model_name, :full_model_id)
+                    RETURNING id
+                """), {
+                    'model_name': model_name,
+                    'full_model_id': model_used
+                })
+                return insert_result.fetchone()[0]
+            
+            logger.warning(f"[AI_MODEL_MAPPING] Unbekanntes Modell: {model_used}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"[AI_MODEL_MAPPING ERROR] Fehler für model '{model_used}': {e}")
+            return None
+
     def _insert_or_update_mine_data_field(self, session: Session, key: Dict[str, Any], 
                                           new_values: Dict[str, Any], actor: Optional[str] = None, 
                                           reason: Optional[str] = None) -> None:
-        """Führt ein selektives UPDATE oder INSERT für `mine_data_fields` durch und loggt Ersetzungen.
+        """INSERT-only für mine_data_fields - jede Suche speichert separate Feldwerte.
 
         Args:
             session: Aktive DB-Session (Transaktion). Wird nicht committed.
             key: Primärschlüsselwerte: {search_result_id, mine_id, field_name}
-            new_values: Zu schreibende Spaltenwerte (ohne Schlüsselspalten)
+            new_values: Zu schreibende Spaltenwerte (inkl. session_id)
             actor: Wer schreibt (z. B. model_used)
             reason: Warum (z. B. save_mine_field_data)
         """
-        # Lese existierenden Datensatz innerhalb derselben Transaktion
-        existing_row = session.execute(text("""
-            SELECT raw_value, normalized_value, numeric_value, unit, confidence_score,
-                   is_template_value, validation_status, source_name, model_used
-            FROM mine_data_fields
-            WHERE search_result_id = :search_result_id
-              AND mine_id = :mine_id
-              AND field_name = :field_name
-            LIMIT 1
-        """), key).fetchone()
-
-        def _values_equal(left: Any, right: Any) -> bool:
-            # Behandle numerische Vergleiche tolerant
-            try:
-                if left is None and right is None:
-                    return True
-                # Float-Vergleich mit Toleranz
-                if isinstance(left, (int, float)) or isinstance(right, (int, float)):
-                    if left is None or right is None:
-                        return False
-                    return abs(float(left) - float(right)) < 1e-9
-            except Exception:
-                pass
-            return left == right
-
-        if existing_row:
-            existing = dict(existing_row._mapping)
-            changed_fields: Dict[str, Dict[str, Any]] = {}
-            for col, new_val in new_values.items():
-                old_val = existing.get(col)
-                if not _values_equal(old_val, new_val):
-                    changed_fields[col] = {"old": old_val, "new": new_val}
-
-            if not changed_fields:
-                logger.debug(
-                    f"[mine_data_fields SKIP] Unverändert für key={key} actor={actor or 'unknown'}"
-                )
-                return
-
-            set_clause = ", ".join([f"{col} = :{col}" for col in changed_fields.keys()])
-            update_sql = f"""
-                UPDATE mine_data_fields
-                SET {set_clause}
-                WHERE search_result_id = :search_result_id
-                  AND mine_id = :mine_id
-                  AND field_name = :field_name
-            """
-            params = {**key, **{c: new_values[c] for c in changed_fields.keys()}}
-            session.execute(text(update_sql), params)
-
-            # Detailliertes Logging der Ersetzung
-            logger.info(
-                "[mine_data_fields UPDATE] key=%s actor=%s reason=%s changes=%s",
-                key,
-                actor or "unknown",
-                reason or "values_changed",
-                changed_fields,
+        # INSERT-only Logik - da jede Suche eigene search_result_id hat
+        insert_sql = """
+            INSERT INTO mine_data_fields (
+                search_result_id, mine_id, field_name, raw_value, normalized_value,
+                numeric_value, unit, confidence_score, is_template_value,
+                validation_status, source_name, model_used, session_id
+            ) VALUES (
+                :search_result_id, :mine_id, :field_name, :raw_value, :normalized_value,
+                :numeric_value, :unit, :confidence_score, :is_template_value,
+                :validation_status, :source_name, :model_used, :session_id
             )
-        else:
-            insert_sql = """
-                INSERT INTO mine_data_fields (
-                    search_result_id, mine_id, field_name, raw_value, normalized_value,
-                    numeric_value, unit, confidence_score, is_template_value,
-                    validation_status, source_name, model_used
-                ) VALUES (
-                    :search_result_id, :mine_id, :field_name, :raw_value, :normalized_value,
-                    :numeric_value, :unit, :confidence_score, :is_template_value,
-                    :validation_status, :source_name, :model_used
-                )
-            """
-            params = {**key, **new_values}
-            try:
-                session.execute(text(insert_sql), params)
-                logger.debug(
-                    f"[mine_data_fields INSERT] Neu erstellt für key={key} actor={actor or 'unknown'}"
-                )
-            except IntegrityError:
-                # Rennbedingung: Datensatz wurde parallel eingefügt. Führe Update aus.
-                session.rollback()  # Rolle nur die fehlerhafte Aussage zurück, behalte Transaktion
-                # Re-Select für Logging und differenziertes Update
-                existing_row_after = session.execute(text("""
-                    SELECT raw_value, normalized_value, numeric_value, unit, confidence_score,
-                           is_template_value, validation_status, source_name, model_used
-                    FROM mine_data_fields
-                    WHERE search_result_id = :search_result_id
-                      AND mine_id = :mine_id
-                      AND field_name = :field_name
-                    LIMIT 1
-                """), key).fetchone()
-                existing_after = dict(existing_row_after._mapping) if existing_row_after else {}
-                changed_fields_after: Dict[str, Dict[str, Any]] = {}
-                for col, new_val in new_values.items():
-                    old_val = existing_after.get(col)
-                    if old_val != new_val:
-                        changed_fields_after[col] = {"old": old_val, "new": new_val}
-
-                if changed_fields_after:
-                    set_clause_after = ", ".join([f"{col} = :{col}" for col in changed_fields_after.keys()])
-                    update_sql_after = f"""
-                        UPDATE mine_data_fields
-                        SET {set_clause_after}
-                        WHERE search_result_id = :search_result_id
-                          AND mine_id = :mine_id
-                          AND field_name = :field_name
-                    """
-                    update_params_after = {**key, **{c: new_values[c] for c in changed_fields_after.keys()}}
-                    session.execute(text(update_sql_after), update_params_after)
-                    logger.info(
-                        "[mine_data_fields UPDATE-AFTER-CONFLICT] key=%s actor=%s reason=%s changes=%s",
-                        key,
-                        actor or "unknown",
-                        reason or "conflict_update",
-                        changed_fields_after,
-                    )
-                else:
-                    logger.debug(
-                        f"[mine_data_fields SKIP-AFTER-CONFLICT] Unverändert für key={key} actor={actor or 'unknown'}"
-                    )
+        """
+        params = {**key, **new_values}
+        try:
+            session.execute(text(insert_sql), params)
+            logger.debug(
+                f"[mine_data_fields INSERT] Feldwert gespeichert für key={key} actor={actor or 'unknown'}"
+            )
+        except Exception as e:
+            logger.error(f"[mine_data_fields INSERT ERROR] Fehler für key={key}: {e}")
+            raise
 
     def save_search_result_normalized(self, mine_name: str, model_used: str, 
                                     structured_data: Dict[str, Any],
@@ -969,7 +802,12 @@ class NormalizedDatabaseManager(DatabaseManager):
                     raise ValueError(f"Fehlende Country-Daten für {mine_name}")
                 country = extracted_country
             
-            mine_id = self.get_or_create_mine(mine_name, country, structured_data, db_session=db_session)
+            # Füge country zu structured_data hinzu für das neue Schema
+            if country and structured_data:
+                structured_data['Country'] = country
+            elif country and not structured_data:
+                structured_data = {'Country': country}
+            mine_id = self.get_or_create_mine(mine_name, structured_data, db_session=db_session)
             
             # 2. Berechne Qualitätsmetriken
             fields_found = len([v for v in structured_data.values() if v and v != 'Nicht gefunden'])
@@ -997,52 +835,60 @@ class NormalizedDatabaseManager(DatabaseManager):
             # 3. Speichere in search_sessions
             if db_session is not None:
                 session = db_session
+                # CRITICAL FIX 04.09.2025: Use RETURNING clause to get proper search_result_id
                 insert_result = session.execute(text("""
                     INSERT INTO search_sessions 
-                    (session_id, mine_id, search_timestamp, ai_model_id, search_type, 
+                    (session_id, mine_id, ai_model_id, search_timestamp, search_type, 
                      search_duration_ms, success)
-                    VALUES (:session_id, :mine_id, :search_timestamp, :ai_model_id, :search_type,
+                    VALUES (:session_id, :mine_id, :ai_model_id, :search_timestamp, :search_type,
                            :search_duration_ms, :success)
+                    RETURNING id
                 """), {
                     'session_id': session_id,
                     'mine_id': mine_id,
+                    'ai_model_id': self._get_or_create_ai_model_id(session, model_used),
                     'search_timestamp': datetime.now(),
-                    'ai_model_id': None,  # TODO: Map model_used to ai_model_id
                     'search_type': 'single',
                     'search_duration_ms': search_duration,
                     'success': True
                 })
-                search_result_id = insert_result.lastrowid
+                search_result_id = insert_result.fetchone()[0]
+                logger.debug(f"[NORMALIZED-DB] Created search_session with ID: {search_result_id}")
                 session.flush()
                 # 4. Speichere atomare Feldwerte in derselben Transaktion
-                self.save_mine_field_data(mine_id, search_result_id, structured_data, model_used, sources, db_session=session)
-                # 5. KOORDINATEN-FIX 04.09.2025: Aktualisiere Mine mit besten verfügbaren Koordinaten
-                self._update_mine_coordinates_from_fields(mine_id, db_session=session)
+                logger.info(f"[FIELD_SAVE_DEBUG] About to call save_mine_field_data with {len(structured_data)} fields")
+                self.save_mine_field_data(mine_id, search_result_id, structured_data, model_used, sources, session_id=session_id, db_session=session)
+                logger.info(f"[FIELD_SAVE_DEBUG] Finished save_mine_field_data call")
+                # ENTFERNT 04.09.2025: Koordinaten werden nicht mehr in mines Tabelle gespeichert
                 # KRITISCHER FIX 04.09.2025: Commit der gesamten Transaktion
                 session.commit()
             else:
                 with self.get_session() as session_local:
+                    # CRITICAL FIX 04.09.2025: Use RETURNING clause to get proper search_result_id
                     insert_result = session_local.execute(text("""
                         INSERT INTO search_sessions 
-                        (session_id, mine_id, search_timestamp, ai_model_id, search_type, 
+                        (session_id, mine_id, ai_model_id, search_timestamp, search_type, 
                          search_duration_ms, success)
-                        VALUES (:session_id, :mine_id, :search_timestamp, :ai_model_id, :search_type,
+                        VALUES (:session_id, :mine_id, :ai_model_id, :search_timestamp, :search_type,
                                :search_duration_ms, :success)
+                        RETURNING id
                     """), {
                         'session_id': session_id,
                         'mine_id': mine_id,
+                        'ai_model_id': self._get_or_create_ai_model_id(session_local, model_used),
                         'search_timestamp': datetime.now(),
-                        'ai_model_id': None,  # TODO: Map model_used to ai_model_id
                         'search_type': 'single',
                         'search_duration_ms': search_duration,
                         'success': True
                     })
-                    search_result_id = insert_result.lastrowid
+                    search_result_id = insert_result.fetchone()[0]
+                    logger.debug(f"[NORMALIZED-DB] Created search_session with ID: {search_result_id}")
                     session_local.commit()
                     # 4. Speichere atomare Feldwerte mit eigener Session
-                    self.save_mine_field_data(mine_id, search_result_id, structured_data, model_used, sources)
-                    # 5. KOORDINATEN-FIX 04.09.2025: Aktualisiere Mine mit besten verfügbaren Koordinaten
-                    self._update_mine_coordinates_from_fields(mine_id)
+                    logger.info(f"[FIELD_SAVE_DEBUG] About to call save_mine_field_data (else branch) with {len(structured_data)} fields")
+                    self.save_mine_field_data(mine_id, search_result_id, structured_data, model_used, sources, session_id=session_id)
+                    logger.info(f"[FIELD_SAVE_DEBUG] Finished save_mine_field_data call (else branch)")
+                    # ENTFERNT 04.09.2025: Koordinaten werden nicht mehr in mines Tabelle gespeichert
             
             logger.info(f"✅ NORMALIZED SAVE: Mine='{mine_name}' Model='{model_used}' Fields={fields_found} Quality={data_quality_score:.2f}")
             
@@ -1096,116 +942,5 @@ class NormalizedDatabaseManager(DatabaseManager):
             logger.error(f"❌ Fehler bei field_definitions Initialisierung: {e}")
             # Nicht re-raise, damit der Hauptprozess weiterläuft
 
-    def _update_mine_coordinates_from_fields(self, mine_id: int, db_session: Optional[Session] = None):
-        """
-        KOORDINATEN-FIX 04.09.2025: Aktualisiert die mines-Tabelle mit den besten verfügbaren 
-        Koordinaten aus mine_data_fields
-        """
-        try:
-            if db_session:
-                session = db_session
-                # Hole beste x-Koordinate (= Longitude in unseren Suchergebnissen)
-                x_result = session.execute(text("""
-                    SELECT normalized_value, confidence_score 
-                    FROM mine_data_fields 
-                    WHERE mine_id = :mine_id 
-                      AND field_name = 'x-Koordinate' 
-                      AND normalized_value IS NOT NULL 
-                      AND normalized_value != 'Nicht gefunden'
-                      AND normalized_value != 'nichts gefunden'
-                    ORDER BY confidence_score DESC, id DESC
-                    LIMIT 1
-                """), {'mine_id': mine_id}).fetchone()
-
-                # Hole beste y-Koordinate (= Latitude in unseren Suchergebnissen)
-                y_result = session.execute(text("""
-                    SELECT normalized_value, confidence_score 
-                    FROM mine_data_fields 
-                    WHERE mine_id = :mine_id 
-                      AND field_name = 'y-Koordinate' 
-                      AND normalized_value IS NOT NULL 
-                      AND normalized_value != 'Nicht gefunden'
-                      AND normalized_value != 'nichts gefunden'
-                    ORDER BY confidence_score DESC, id DESC
-                    LIMIT 1
-                """), {'mine_id': mine_id}).fetchone()
-
-                # Verarbeite Koordinaten basierend auf Suchergebnis-Analyse
-                latitude = None
-                longitude = None
-
-                # In unseren Suchergebnissen: x-Koordinate = tatsächlich Latitude, y-Koordinate = tatsächlich Longitude
-                if x_result:
-                    try:
-                        latitude = float(str(x_result[0]).replace(',', '.'))
-                        if not (45 <= latitude <= 62):  # Quebec Latitude-Bereich
-                            latitude = None
-                    except (ValueError, TypeError):
-                        pass
-
-                if y_result:
-                    try:
-                        longitude = float(str(y_result[0]).replace(',', '.'))
-                        if not (-79 <= longitude <= -57):  # Quebec Longitude-Bereich
-                            longitude = None
-                    except (ValueError, TypeError):
-                        pass
-
-                # Hole beste Flächenangabe (sortiere nach extrahiertem numerischen Wert, höchster zuerst)
-                area_results = session.execute(text("""
-                    SELECT normalized_value, confidence_score 
-                    FROM mine_data_fields 
-                    WHERE mine_id = :mine_id 
-                      AND field_name = 'Fläche der Mine in qkm' 
-                      AND normalized_value IS NOT NULL 
-                      AND normalized_value != 'Nicht gefunden'
-                      AND normalized_value != 'nichts gefunden'
-                    ORDER BY confidence_score DESC, id DESC
-                """), {'mine_id': mine_id}).fetchall()
-
-                area_sqkm = None
-                if area_results:
-                    import re
-                    # Durchlaufe alle Flächen-Ergebnisse und finde den höchsten plausiblen Wert
-                    best_area = 0
-                    for area_result in area_results:
-                        try:
-                            # Extrahiere Zahlenwerte aus Flächen-String (z.B. "15.7 km²" → 15.7)
-                            area_str = str(area_result[0])
-                            # Suche nach Dezimalzahlen im String
-                            match = re.search(r'(\d+\.?\d*)', area_str)
-                            if match:
-                                current_area = float(match.group(1))
-                                # Plausibilitätsprüfung und wähle höchsten Wert
-                                if 0.01 <= current_area <= 10000 and current_area > best_area:
-                                    best_area = current_area
-                        except (ValueError, TypeError):
-                            continue
-                    
-                    # Verwende den besten gefundenen Wert
-                    if best_area > 0:
-                        area_sqkm = best_area
-
-                # Aktualisiere die Mine wenn wir Daten haben
-                if latitude is not None or longitude is not None or area_sqkm is not None:
-                    session.execute(text("""
-                        UPDATE mines 
-                        SET latitude = :latitude, longitude = :longitude, area_sqkm = :area_sqkm, 
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE id = :mine_id
-                    """), {
-                        'mine_id': mine_id,
-                        'latitude': latitude,
-                        'longitude': longitude,
-                        'area_sqkm': area_sqkm
-                    })
-                    logger.info(f"✅ [DATEN-UPDATE] Mine {mine_id} aktualisiert: Lat={latitude}, Lon={longitude}, Area={area_sqkm}km²")
-            else:
-                # Eigenständige Session
-                with self.get_session() as session_local:
-                    self._update_mine_coordinates_from_fields(mine_id, db_session=session_local)
-                    session_local.commit()
-                    
-        except Exception as e:
-            logger.error(f"❌ [KOORDINATEN-UPDATE] Fehler bei Mine {mine_id}: {e}")
-            # Nicht re-raise, damit der Hauptprozess weiterläuft
+    # ENTFERNT 04.09.2025: Koordinaten-Update Funktion nicht mehr benötigt
+    # Alle Daten bleiben in mine_data_fields für Konsistenz-Analysen
