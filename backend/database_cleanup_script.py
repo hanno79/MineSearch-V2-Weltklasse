@@ -56,7 +56,7 @@ class DatabaseCleanupTool:
         """
         if db_path is None:
             # Standardpfad zur MineSearch-Datenbank
-            db_path = "/app/backend/minesearch/database/mines.db"
+            db_path = "/app/backend/mines.db"
         
         self.db_path = db_path
         self.backup_path = f"{db_path}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"

@@ -26,6 +26,7 @@ from minesearch.extraction_processors import (
 )
 from minesearch.source_manager import SourceManager
 from minesearch.field_name_blacklist import is_field_name_value
+from minesearch.database.normalized_manager import NormalizedDatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class DataExtractor:
         self.patterns = get_extraction_patterns()
         self.coordinate_patterns = get_enhanced_coordinate_patterns()
         self.source_manager = SourceManager()
+        self.normalized_db = NormalizedDatabaseManager()
     
     def _get_field_status_marker(self, field: str, activity_status: str) -> str:
         """
@@ -1131,6 +1133,46 @@ class DataExtractor:
             'source_index': source_index,
             'source_mapping': source_mapping  # QUELLENREFERENZEN-FIX: Für DB-Speicherung
         }
+    
+    def save_to_normalized_database(self, mine_name: str, model_used: str, 
+                                  structured_data: Dict[str, Any], sources: List[Dict[str, Any]],
+                                  session_id: Optional[str] = None, country: Optional[str] = None,
+                                  search_duration: Optional[float] = None) -> int:
+        """
+        NEUE FUNKTION 03.09.2025: Speichere extrahierte Daten direkt in normalisierte Datenbank
+        
+        Args:
+            mine_name: Name der Mine
+            model_used: Verwendetes AI-Modell
+            structured_data: Extrahierte strukturierte Daten
+            sources: Liste der Quellen
+            session_id: Session-ID (optional)
+            country: Land (optional)
+            search_duration: Suchdauer in Sekunden (optional)
+            
+        Returns:
+            search_result_id aus der normalisierten Datenbank
+        """
+        try:
+            logger.info(f"[NORMALIZED-SAVE] Speichere Daten für Mine '{mine_name}' mit Modell '{model_used}'")
+            
+            # Verwende den NormalizedDatabaseManager
+            search_result_id = self.normalized_db.save_search_result_normalized(
+                mine_name=mine_name,
+                model_used=model_used,
+                structured_data=structured_data,
+                sources=sources,
+                session_id=session_id,
+                country=country,
+                search_duration=search_duration
+            )
+            
+            logger.info(f"✅ [NORMALIZED-SAVE] Erfolgreich gespeichert - Search Result ID: {search_result_id}")
+            return search_result_id
+            
+        except Exception as e:
+            logger.error(f"❌ [NORMALIZED-SAVE] Fehler beim Speichern: {e}")
+            raise
 
 
 # Hilfsfunktionen für Quellenzuordnung

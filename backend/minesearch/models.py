@@ -203,8 +203,9 @@ class SourceRegistry:
                     last_attempted_access=db_source.last_attempted_access,
                     total_searches=db_source.total_searches,
                     successful_searches=db_source.successful_searches,
-                    typical_content_types=db_source.typical_content_types or [],
-                    metadata=db_source.extra_metadata or {}
+                    # NORMALISIERUNG FIX 04.09.2025: JSON-Spalten entfernt
+                    typical_content_types=[],
+                    metadata={}
                 )
         return None
     
@@ -262,8 +263,9 @@ class SourceRegistry:
                 last_attempted_access=db_source.last_attempted_access,
                 total_searches=db_source.total_searches,
                 successful_searches=db_source.successful_searches,
-                typical_content_types=db_source.typical_content_types or [],
-                metadata=db_source.extra_metadata or {}
+                # NORMALISIERUNG FIX 04.09.2025: JSON-Spalten entfernt
+                typical_content_types=[],
+                metadata={}
             ))
         return records
     

@@ -328,51 +328,11 @@ class MineSearchService:
         # Berechne Datenqualität
         quality_metrics = self._calculate_data_quality(clean_structured_data)
         
-        # DATABASE INTEGRATION: Speichere Legacy-Suchergebnis in Database
-        # BUGFIX 20.07.2025: Verwende tatsächlich verwendetes Modell
-        try:
-            logger.info(f"[DB LEGACY] Speichere mit model_used: {legacy_full_model_id} (original request: {model})")
-            # Legacy-System (für Rückwärts-Kompatibilität)
-            search_result = self.db_manager.save_search_result(
-                mine_name=mine_name,
-                model_used=legacy_full_model_id,
-                structured_data=clean_structured_data,  # ENHANCED: Verwende bereinigte Daten
-                sources=[{
-                    'url': s.get('url', ''),
-                    'title': s.get('title', ''),
-                    'type': s.get('type', 'unknown'),
-                    'reliability': s.get('reliability')  # REGEL 10: Keine 0.5 Fallbacks
-                } for s in sources],
-                data_quality=quality_metrics.get('completion_percentage', 0),
-                success=True,
-                country=country,
-                search_type="legacy"
-            )
-            logger.info(f"[DB] Legacy-Suchergebnis für {mine_name} gespeichert (ID: {search_result.id})")
-            
-            # 🆕 NORMALISIERTES SYSTEM: Entfernt - wird jetzt in _process_search_result erledigt
-            
-            # 🚀 PERFORMANCE FIX 02.09.2025: Async Model Statistics Update für bessere Performance
-            try:
-                from minesearch.async_db_tasks import async_db_tasks
-                # Schedule async - blockiert nicht die Suche
-                asyncio.create_task(async_db_tasks.schedule_stats_update(legacy_full_model_id))
-                logger.info(f"[ASYNC-STATS-LEGACY] Model statistics update scheduled for {legacy_full_model_id}")
-            except Exception as stats_error:
-                logger.error(f"[ASYNC-STATS-LEGACY] Failed to schedule model statistics for {legacy_full_model_id}: {stats_error}")
-                # Don't fail the search if statistics update fails
-            
-            # 🚀 PERFORMANCE FIX 02.09.2025: Async Source Updates für bessere Performance
-            try:
-                from minesearch.async_db_tasks import async_db_tasks
-                # Schedule async source updates - blockiert nicht die Suche
-                asyncio.create_task(async_db_tasks.schedule_source_updates(sources, country))
-                logger.info(f"[ASYNC-SOURCES-LEGACY] Source updates scheduled for {len(sources)} sources")
-            except Exception as source_error:
-                logger.error(f"[ASYNC-SOURCES-LEGACY] Failed to schedule source updates: {source_error}")
-                    
-        except Exception as e:
-            logger.error(f"[DB] Fehler beim Speichern des Legacy-Suchergebnisses: {e}")
+        # LEGACY DATABASE REMOVED 03.09.2025: Alle Legacy-DB-Operationen entfernt
+        # Nur noch normalisierte DB wird in _process_search_result verwendet
+        
+        # Legacy async tasks removed with database removal
+        logger.info(f"[LEGACY-CLEANUP] Legacy database operations removed - using only normalized DB")
         
         return {
             "success": True,
@@ -457,31 +417,10 @@ class MineSearchService:
             actual_model_used = result.metadata.get('model_used') or model
             logger.info(f"[DB] Speichere mit model_used: {actual_model_used} (original request: {model})")
             
-            # Legacy-System (für Rückwärts-Kompatibilität)
-            search_result = self.db_manager.save_search_result(
-                mine_name=mine_name,
-                model_used=actual_model_used,
-                structured_data=clean_structured_data,  # CLEAN DATA AT SOURCE: Nur bereinigte Daten in DB
-                sources=[{
-                    'url': s.get('url', ''),
-                    'title': s.get('title', ''),
-                    'type': s.get('type', 'unknown'),
-                    'reliability': s.get('reliability')  # REGEL 10: Keine 0.5 Fallbacks
-                } for s in sources],
-                # Speichere nur, wenn messbar (> 0). None bleibt NULL in DB
-                search_duration=search_duration if (search_duration is not None and search_duration > 0) else None,
-                data_quality=quality_metrics.get('completion_percentage', 0),
-                success=True,
-                country=country,
-                search_type="provider",
-                # QUELLENREFERENZEN-FIX 24.08.2025: Füge Quellen-Mapping hinzu
-                structured_data_with_sources=result.metadata.get('structured_data_with_sources'),
-                source_index=result.metadata.get('source_index'),
-                source_mapping=result.metadata.get('source_mapping')
-            )
-            logger.info(f"[DB] Suchergebnis für {mine_name} gespeichert (ID: {search_result.id})")
+            # LEGACY DATABASE REMOVED 03.09.2025: Alle Legacy-DB-Operationen entfernt
+            # Nur noch normalisierte DB wird verwendet
             
-            # 🆕 NORMALISIERTES SYSTEM: Parallele Speicherung
+            # 🆕 NORMALISIERTES SYSTEM: Einzige Speicherung
             # Debug-Datei Logging
             with open('/app/normalized_debug.log', 'a') as f:
                 f.write(f"DEBUG: Normalized save attempt for {mine_name} with model {actual_model_used}\n")
@@ -504,7 +443,7 @@ class MineSearchService:
                 with open('/app/normalized_debug.log', 'a') as f:
                     f.write(f"DEBUG: Normalized save SUCCESS! ID = {normalized_result_id}\n")
                 print(f"🔥🔥🔥 DEBUG: Normalized save SUCCESS! ID = {normalized_result_id}")
-                logger.info(f"✅ DUAL SAVE SUCCESS: Legacy ID={search_result.id}, Normalized ID={normalized_result_id}")
+                logger.info(f"✅ NORMALIZED SAVE SUCCESS: ID={normalized_result_id}")
             except Exception as norm_error:
                 with open('/app/normalized_debug.log', 'a') as f:
                     f.write(f"DEBUG: Normalized save FAILED! Error = {norm_error}\n")

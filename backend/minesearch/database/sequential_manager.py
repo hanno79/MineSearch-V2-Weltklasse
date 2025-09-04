@@ -209,7 +209,7 @@ class SequentialDatabaseManager:
                     source_type=resolved_source_type,
                     reliability_score=initial_quality,
                     first_discovered_by=model_id,
-                    discovery_models=[model_id],
+                    # NORMALISIERUNG FIX 04.09.2025: discovery_models entfernt
                     discovery_count=1,
                     last_discovery_session=session_id,
                     cumulative_quality_score=initial_quality
@@ -682,9 +682,10 @@ class SequentialDatabaseManager:
                 'field_extraction_success_rate': source.field_extraction_success_rate,
                 'times_used_in_field_search': source.times_used_in_field_search,
                 'recent_usage_count': recent_usage,
-                'discovery_models': source.discovery_models or [],
-                'field_specialization': source.field_specialization or {},
-                'mine_specialization': source.mine_specialization or {}
+                # NORMALISIERUNG FIX 04.09.2025: JSON-Spalten entfernt
+                'discovery_models': [],
+                'field_specialization': {},
+                'mine_specialization': {}
             })
         
         return stats

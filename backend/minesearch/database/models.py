@@ -29,17 +29,14 @@ class Source(Base):
     source_type = Column(String(50), nullable=False, default='unknown')  # government, exchange, industry, database, document
     reliability_score = Column(Float, nullable=False, default=50.0)
     
-    # ÄNDERUNG 27.08.2025: Erweiterte Felder für Sequential Orchestrator
+    # NORMALISIERUNG FIX 04.09.2025: JSON-Spalten entfernt
     # Akkumulations-Tracking
     discovery_count = Column(Integer, nullable=False, default=1)  # Wie oft wurde diese Quelle entdeckt
     first_discovered_by = Column(String(100), nullable=True)  # Modell das diese Quelle zuerst fand
-    discovery_models = Column(JSON, nullable=True)  # Liste aller Modelle die diese Quelle fanden
     last_discovery_session = Column(String(100), nullable=True, index=True)  # Letzte Session die diese Quelle fand
     
     # Qualitätsbewertung für Akkumulation
     cumulative_quality_score = Column(Float, nullable=False, default=0.0)  # Akkumulierte Qualitätsbewertung
-    field_specialization = Column(JSON, nullable=True)  # Welche Felder diese Quelle gut abdeckt
-    mine_specialization = Column(JSON, nullable=True)  # Für welche Minen diese Quelle besonders gut ist
     
     # Verwendungs-Statistiken für Sequential Search
     times_used_in_field_search = Column(Integer, nullable=False, default=0)
@@ -52,9 +49,8 @@ class Source(Base):
     total_searches = Column(Integer, nullable=False, default=0)
     successful_searches = Column(Integer, nullable=False, default=0)
     
-    # Metadaten
-    typical_content_types = Column(JSON, nullable=True)  # ['pdf', 'html', 'api', etc.]
-    extra_metadata = Column(JSON, nullable=True)  # Zusätzliche Informationen
+    # NORMALISIERUNG FIX 04.09.2025: JSON-Spalten entfernt
+    # typical_content_types und extra_metadata wurden in normalisierte Tabellen migriert
     
     # Timestamps
     created_at = Column(DateTime, nullable=False, server_default=func.now())
@@ -84,18 +80,16 @@ class Source(Base):
             'total_searches': self.total_searches,
             'successful_searches': self.successful_searches,
             'success_rate': (self.successful_searches / self.total_searches * 100) if self.total_searches > 0 else 0,
-            'typical_content_types': self.typical_content_types or [],
-            'metadata': self.extra_metadata or {},
+            # NORMALISIERUNG FIX 04.09.2025: JSON-Felder entfernt
+            'typical_content_types': [],
+            'metadata': {},
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             # ÄNDERUNG 27.08.2025: Neue Felder für Sequential Orchestrator
             'discovery_count': self.discovery_count,
             'first_discovered_by': self.first_discovered_by,
-            'discovery_models': self.discovery_models or [],
             'last_discovery_session': self.last_discovery_session,
             'cumulative_quality_score': self.cumulative_quality_score,
-            'field_specialization': self.field_specialization or {},
-            'mine_specialization': self.mine_specialization or {},
             'times_used_in_field_search': self.times_used_in_field_search,
             'successful_field_extractions': self.successful_field_extractions,
             'field_extraction_success_rate': self.field_extraction_success_rate
@@ -201,16 +195,9 @@ class Source(Base):
         # Erste Entdeckung
         if is_new_discovery or not self.first_discovered_by:
             self.first_discovered_by = model_id
-            self.discovery_models = [model_id]
             self.discovery_count = 1
         else:
-            # Weitere Entdeckungen
-            if self.discovery_models is None:
-                self.discovery_models = []
-            
-            if model_id not in self.discovery_models:
-                self.discovery_models.append(model_id)
-            
+            # Weitere Entdeckungen - vereinfacht ohne JSON-Spalte
             self.discovery_count += 1
         
         # Update session tracking
@@ -231,16 +218,10 @@ class Source(Base):
             self.successful_field_extractions += 1
             
             # Update field specialization
-            if self.field_specialization is None:
-                self.field_specialization = {}
             
-            current_score = self.field_specialization.get(field_name, 0.0)
             # Gewichteter Durchschnitt der Qualitätsbewertungen
-            field_count = self.field_specialization.get(f"{field_name}_count", 0) + 1
             new_score = ((current_score * (field_count - 1)) + quality_score) / field_count
             
-            self.field_specialization[field_name] = new_score
-            self.field_specialization[f"{field_name}_count"] = field_count
         
         # Update success rate
         self.field_extraction_success_rate = (
@@ -253,25 +234,6 @@ class Source(Base):
             current_cumulative = self.cumulative_quality_score * (self.times_used_in_field_search - 1)
             self.cumulative_quality_score = (current_cumulative + quality_score) / self.times_used_in_field_search
     
-    def update_mine_specialization(self, mine_name: str, effectiveness_score: float):
-        """
-        ÄNDERUNG 27.08.2025: Update Mine Specialization Tracking
-        
-        Args:
-            mine_name: Name der Mine
-            effectiveness_score: Effektivitätsbewertung für diese Mine (0.0-100.0)
-        """
-        if self.mine_specialization is None:
-            self.mine_specialization = {}
-        
-        # Gewichteter Durchschnitt der Effektivitätsbewertungen
-        current_score = self.mine_specialization.get(mine_name, 0.0)
-        current_count = self.mine_specialization.get(f"{mine_name}_count", 0) + 1
-        new_score = ((current_score * (current_count - 1)) + effectiveness_score) / current_count
-        
-        self.mine_specialization[mine_name] = new_score
-        self.mine_specialization[f"{mine_name}_count"] = current_count
-    
     def get_quality_for_field(self, field_name: str) -> float:
         """
         ÄNDERUNG 27.08.2025: Ermittle Qualitätsbewertung für spezifisches Feld
@@ -279,18 +241,8 @@ class Source(Base):
         Returns:
             Qualitätsscore für das angegebene Feld (0.0-100.0)
         """
-        if not self.field_specialization:
-            return self.reliability_score  # Fallback auf allgemeine Zuverlässigkeit
-        
-        field_score = self.field_specialization.get(field_name, 0.0)
-        if field_score > 0:
-            return field_score
-        
-        # Fallback: Durchschnitt aller Feld-Scores oder allgemeine Zuverlässigkeit
-        field_scores = [v for k, v in self.field_specialization.items() if not k.endswith('_count') and v > 0]
-        if field_scores:
-            return sum(field_scores) / len(field_scores)
-        
+        # NORMALISIERUNG FIX 04.09.2025: Fallback auf allgemeine Zuverlässigkeit
+        # da field_specialization JSON-Spalte entfernt wurde
         return self.reliability_score
     
     def get_effectiveness_for_mine(self, mine_name: str) -> float:
@@ -300,18 +252,8 @@ class Source(Base):
         Returns:
             Effektivitätsscore für die angegebene Mine (0.0-100.0)
         """
-        if not self.mine_specialization:
-            return self.reliability_score  # Fallback auf allgemeine Zuverlässigkeit
-        
-        mine_score = self.mine_specialization.get(mine_name, 0.0)
-        if mine_score > 0:
-            return mine_score
-        
-        # Fallback: Durchschnitt aller Mine-Scores oder allgemeine Zuverlässigkeit
-        mine_scores = [v for k, v in self.mine_specialization.items() if not k.endswith('_count') and v > 0]
-        if mine_scores:
-            return sum(mine_scores) / len(mine_scores)
-        
+        # NORMALISIERUNG FIX 04.09.2025: Fallback auf allgemeine Zuverlässigkeit
+        # da mine_specialization JSON-Spalte entfernt wurde
         return self.reliability_score
     
     @classmethod

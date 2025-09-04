@@ -28,7 +28,7 @@ class DataQualityMonitor:
     def __init__(self, db_path: str = None):
         """Initialisiert das Monitoring-System"""
         if db_path is None:
-            db_path = "/app/backend/minesearch/database/mines.db"
+            db_path = "/app/backend/mines.db"
         
         self.db_path = db_path
         self.alert_thresholds = {

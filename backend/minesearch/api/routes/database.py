@@ -17,29 +17,37 @@ from minesearch.database import db_manager
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Liste der wichtigen Tabellen für den Viewer
-IMPORTANT_TABLES = [
-    # Legacy System (JSON-basiert)
-    "search_results",
-    "sources", 
-    "model_statistics_comprehensive",
-    "constraint_log",
-    "monitoring_events",
-    "field_search_results",
-    "source_discovery_sessions",
-    "sequential_search_results",
-    "model_source_contributions",
-    
-    # Normalized System (27.08.2025)
-    "mines_normalized",
-    "companies", 
-    "search_results_normalized",
-    "mine_data_fields",
-    
-    # Atomic Values System (28.08.2025)
-    "field_values",           # Atomische Feldwerte ohne Quellenreferenzen
-    "field_value_sources"     # N:M Verknüpfung zwischen Feldwerten und Quellen
-]
+# Normalisierte Tabellenstruktur (03.09.2025) - Einheitliches System ohne Legacy
+NORMALIZED_TABLES = {
+    "Stammdaten": [
+        "countries",           # Länder-Lookup mit ISO-Codes
+        "regions",             # Regionen mit Länder-FK
+        "mine_types",          # Minentypen (Untertage, Open-Pit, etc.)
+        "activity_statuses",   # Aktivitätsstatus (Aktiv, Geschlossen, etc.)
+        "commodities",         # Rohstoffe (Gold, Kupfer, etc.)
+        "companies",           # Unternehmen (Eigentümer/Betreiber)
+        "ai_models"            # AI-Modelle für Suchen
+    ],
+    "Kerndaten": [
+        "mines",               # Minen mit FKs zu Lookup-Tabellen
+        "search_sessions",     # Such-Sessions mit AI-Modell-FK
+        "sources"              # Quellen für Daten
+    ],
+    "Beziehungen": [
+        "mine_commodities",    # Mine ↔ Rohstoffe (N:M)
+        "mine_owners",         # Mine ↔ Eigentümer (N:M)
+        "mine_operators",      # Mine ↔ Betreiber (N:M)
+        "production_periods",  # Produktionshistorie
+        "restoration_costs"    # Restaurationskosten-Historie
+    ],
+    "Feldwerte": [
+        "field_values",        # Atomare Feldwerte
+        "field_value_sources"  # Feldwert ↔ Quellen (N:M)
+    ]
+}
+
+# Flache Liste für Rückwärtskompatibilität
+IMPORTANT_TABLES = [table for category in NORMALIZED_TABLES.values() for table in category]
 
 @router.get("/tables")
 async def get_all_tables():
@@ -63,19 +71,20 @@ async def get_all_tables():
                     count_result = session.execute(text(f"SELECT COUNT(*) FROM {quoted_table}"))
                     count = count_result.fetchone()[0]
                     
-                    # Kategorisiere Tabellen
+                    # Kategorisiere Tabellen basierend auf normalisierter Struktur
                     category = "Other"
-                    if table_name in IMPORTANT_TABLES:
-                        if table_name in ["mines_normalized", "companies", "search_results_normalized", "mine_data_fields"]:
-                            category = "Normalized (NEW)"
-                        else:
-                            category = "Legacy System"
+                    if table_name in NORMALIZED_TABLES["Stammdaten"]:
+                        category = "Stammdaten"
+                    elif table_name in NORMALIZED_TABLES["Kerndaten"]:
+                        category = "Kerndaten"
+                    elif table_name in NORMALIZED_TABLES["Beziehungen"]:
+                        category = "Beziehungen"
+                    elif table_name in NORMALIZED_TABLES["Feldwerte"]:
+                        category = "Feldwerte"
                     elif "statistics" in table_name:
-                        category = "Statistics"
+                        category = "Statistics (Legacy)"
                     elif "log" in table_name:
-                        category = "Logs"
-                    elif "normalized" in table_name:
-                        category = "Normalized (NEW)"
+                        category = "Logs (Legacy)"
                         
                     table_info.append({
                         "name": table_name,
@@ -97,8 +106,10 @@ async def get_all_tables():
             return {
                 "success": True,
                 "tables": table_info,
+                "categories": NORMALIZED_TABLES,
                 "important_tables": IMPORTANT_TABLES,
-                "total_tables": len(table_info)
+                "total_tables": len(table_info),
+                "normalized_structure": True
             }
             
     except Exception as e:

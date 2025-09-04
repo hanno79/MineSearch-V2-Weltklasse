@@ -456,7 +456,7 @@ def main():
     """Main Entry Point"""
     # Finde Datenbank
     db_paths = [
-        "/app/backend/minesearch/database/mines.db",
+        "/app/backend/mines.db",
         "/app/backend/minesearch.db",
         "./mines.db",
         "./minesearch.db"

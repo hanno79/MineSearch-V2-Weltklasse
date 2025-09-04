@@ -119,7 +119,6 @@ async def search_mine(
         # ÄNDERUNG 12.07.2025: Erweiterte Datenbank-Speicherung
         if result.get('success') and result.get('data'):
             try:
-                from minesearch.database import db_manager
                 search_duration = result.get('data', {}).get('search_duration')
                 structured_data = result['data'].get('structured_data', {})
                 
@@ -127,70 +126,36 @@ async def search_mine(
                 filled_fields = count_filled_fields(structured_data)
                 sources_count = len(result['data'].get('sources', []))
                 
-                # 1. Speichere search_result (bestehend)
-                db_manager.save_search_result(
+                # 1. Speichere in normalisierte Datenbank (UNIFIED SCHEMA)
+                from minesearch.data_extraction import DataExtractor
+                extractor = DataExtractor()
+                session_id = f"search_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]}"
+                
+                normalized_result_id = extractor.save_to_normalized_database(
                     mine_name=request.mine_name,
                     model_used=model,
                     structured_data=structured_data,
                     sources=result['data'].get('sources', []),
+                    session_id=session_id,
                     country=request.country,
-                    region=request.region,
-                    commodity=request.commodity,
-                    search_type='standard',
-                    search_duration=search_duration,
-                    structured_data_with_sources=result['data'].get('structured_data_with_sources'),
-                    source_index=result['data'].get('source_index'),
-                    data_quality=result['data'].get('data_quality'),
-                    source_discovery_session=result['data'].get('source_discovery_session'),
-                    success=True
+                    search_duration=search_duration
                 )
                 
-                # 2. NEUE model_statistics Speicherung
-                await services.benchmark_service.save_model_statistics(
-                    model_id=model,
-                    mine_name=request.mine_name,
-                    country=request.country,
-                    region=request.region,
-                    commodity=request.commodity,
-                    run_number=1,  # API-Calls sind immer Run 1
-                    success=True,
-                    response_time_ms=response_time_ms,
-                    fields_found=filled_fields,
-                    sources_count=sources_count,
-                    raw_result=result,
-                    structured_data=structured_data
-                )
+                logger.info(f"✅ [NORMALIZED-DB] Daten in normalisierte DB gespeichert - ID: {normalized_result_id}")
                 
-                # 3. NEUE field_statistics Update
-                await benchmark_service.update_field_statistics(
-                    model_id=model,
-                    structured_data=structured_data
-                )
+                # ENTFERNT: Legacy model_statistics und field_statistics
+                # Alle Statistiken werden jetzt in der normalisierten DB verwaltet
+                logger.info(f"✅ [SEARCH-API] Such-Statistiken in normalisierte DB integriert")
                 
                 logger.info(f"[SEARCH API] Statistiken gespeichert: {model}, {filled_fields} Felder, {response_time_ms:.0f}ms")
                 
             except Exception as e:
                 logger.error(f"Fehler beim Speichern der Statistiken: {str(e)}")
         else:
-            # Auch fehlgeschlagene Suchen tracken
-            try:
-                error_message = result.get('error', 'Unbekannter Fehler')
-                await services.benchmark_service.save_model_statistics(
-                    model_id=model,
-                    mine_name=request.mine_name,
-                    country=request.country,
-                    region=request.region,
-                    commodity=request.commodity,
-                    run_number=1,
-                    success=False,
-                    response_time_ms=response_time_ms,
-                    fields_found=0,
-                    sources_count=0,
-                    error_message=error_message
-                )
-                logger.info(f"[SEARCH API] Fehler-Statistik gespeichert: {model}, {error_message}")
-            except Exception as e:
-                logger.error(f"Fehler beim Speichern der Fehler-Statistik: {str(e)}")
+            # ENTFERNT: Legacy Fehler-Tracking in search_results 
+            # Fehler werden jetzt über die normalisierte DB verwaltet
+            error_message = result.get('error', 'Unbekannter Fehler')
+            logger.info(f"[SEARCH API] Fehlgeschlagene Suche: {model}, Fehler: {error_message}")
         
         return MineSearchResponse(**result)
     except ValueError as e:
@@ -214,27 +179,8 @@ async def search_two_phase(request: MineSearchRequest):
             'error': 'Two-Phase-Suche temporär nicht verfügbar - verwenden Sie Multi-Model-Suche stattdessen'
         }
         
-        # Speichere Ergebnis
-        if result.get('success') and result.get('data'):
-            try:
-                from minesearch.database import db_manager
-                db_manager.save_search_result(
-                    mine_name=request.mine_name,
-                    model_used='two_phase',
-                    structured_data=result.get('data', {}),
-                    sources=result.get('sources', []),
-                    country=request.country,
-                    region=request.region,
-                    commodity=request.commodity,
-                    search_type='two_phase',
-                    search_duration=result.get('search_duration'),
-                    confidence_scores=result.get('confidence_scores'),
-                    phase1_sources=result.get('phase1_sources'),
-                    phase2_models=result.get('phase2_models'),
-                    success=True
-                )
-            except Exception as e:
-                logger.error(f"Fehler beim Speichern des Zwei-Phasen-Ergebnisses: {str(e)}")
+        # LEGACY DATABASE REMOVED 03.09.2025: Nur noch normalisierte DB
+        # Speicherung erfolgt automatisch in MineSearchService
         
         return result
     except Exception as e:
@@ -298,26 +244,8 @@ async def search_multiple_models(request: MultiSearchRequest):
             'timestamp': datetime.now().isoformat()
         }
         
-        # Speichere alle erfolgreichen Ergebnisse
-        if successful_results:
-            try:
-                from minesearch.database import db_manager
-                for model_result in successful_results:
-                    if model_result.get('data'):
-                        db_manager.save_search_result(
-                            mine_name=request.mine_name,
-                            model_used=model_result['model_id'],
-                            structured_data=model_result['data'].get('structured_data', {}),
-                            sources=model_result.get('sources', []),
-                            country=request.country,
-                            region=request.region,
-                            commodity=request.commodity,
-                            search_type='multi_model',
-                            search_duration=model_result.get('search_duration', 0),
-                            success=True
-                        )
-            except Exception as e:
-                logger.error(f"Fehler beim Speichern der Multi-Model-Ergebnisse: {str(e)}")
+        # LEGACY DATABASE REMOVED 03.09.2025: Nur noch normalisierte DB  
+        # Speicherung erfolgt automatisch in MineSearchService
         
         return result
     except Exception as e:
@@ -334,28 +262,8 @@ async def smart_search(request: SmartSearchRequest):
             'error': 'Smart-Search temporär nicht verfügbar - verwenden Sie Multi-Model-Suche stattdessen'
         }
         
-        # Speichere Ergebnis
-        if result.get('success') and result.get('data'):
-            from minesearch.database import db_manager
-            try:
-                models_used = ", ".join(result.get('models_used', []))
-                db_manager.save_search_result(
-                    mine_name=request.mine_name,
-                    model_used=models_used,
-                    structured_data=result['data'].get('structured_data', {}),
-                    sources=result['data'].get('sources', []),
-                    country=request.country,
-                    region=request.region,
-                    commodity=request.commodity,
-                    search_type='smart_search',
-                    search_duration=result.get('total_duration'),
-                    structured_data_with_sources=result['data'].get('structured_data_with_sources'),
-                    source_index=result['data'].get('source_index'),
-                    data_quality=result['data'].get('data_quality'),
-                    success=True
-                )
-            except Exception as e:
-                logger.error(f"Fehler beim Speichern des Smart-Search-Ergebnisses: {str(e)}")
+        # LEGACY DATABASE REMOVED 03.09.2025: Nur noch normalisierte DB
+        # Speicherung erfolgt automatisch in MineSearchService
         
         return result
     except Exception as e:
@@ -374,28 +282,8 @@ async def enhanced_search(request: MineSearchRequest):
             model=request.model
         )
         
-        # Speichere Ergebnis
-        if result.get('success') and result.get('data'):
-            from minesearch.database import db_manager
-            try:
-                db_manager.save_search_result(
-                    mine_name=mine_name,
-                    model_used=model,
-                    structured_data=result['data'].get('structured_data', {}),
-                    sources=result['data'].get('sources', []),
-                    country=country,
-                    region=region,
-                    commodity=commodity,
-                    search_type='enhanced',
-                    search_duration=result['data'].get('search_duration'),
-                    structured_data_with_sources=result['data'].get('structured_data_with_sources'),
-                    source_index=result['data'].get('source_index'),
-                    data_quality=result['data'].get('data_quality'),
-                    source_discovery_session=result['data'].get('source_discovery_session'),
-                    success=True
-                )
-            except Exception as e:
-                logger.error(f"Fehler beim Speichern des Enhanced-Search-Ergebnisses: {str(e)}")
+        # LEGACY DATABASE REMOVED 03.09.2025: Nur noch normalisierte DB
+        # Speicherung erfolgt automatisch in MineSearchService
         
         return result
     except Exception as e:
@@ -417,27 +305,8 @@ async def comprehensive_search(request: MineSearchRequest):
             region=request.region
         )
         
-        # Speichere Ergebnis
-        if result.get('success') and result.get('data'):
-            try:
-                from minesearch.database import db_manager
-                db_manager.save_search_result(
-                    mine_name=request.mine_name,
-                    model_used='comprehensive_enhanced',
-                    structured_data=result.get('data', {}),
-                    sources=result.get('sources', []),
-                    country=request.country,
-                    region=request.region,
-                    commodity=request.commodity,
-                    search_type='comprehensive',
-                    search_duration=result.get('search_duration'),
-                    confidence_scores=result.get('confidence_scores'),
-                    phase1_sources=result.get('phase1_sources'),
-                    phase2_models=result.get('phase2_models'),
-                    success=True
-                )
-            except Exception as e:
-                logger.error(f"Fehler beim Speichern des Comprehensive-Ergebnisses: {str(e)}")
+        # LEGACY DATABASE REMOVED 03.09.2025: Nur noch normalisierte DB
+        # Speicherung erfolgt automatisch in MineSearchService
         
         return result
     except Exception as e:

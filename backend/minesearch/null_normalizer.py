@@ -148,7 +148,7 @@ class NullNormalizer:
         return normalized_data
     
     def normalize_database_entry(self, entry_id: int, structured_data_json: str, 
-                                db_path: str = "/app/backend/minesearch/database/mines.db") -> bool:
+                                db_path: str = "/app/backend/mines.db") -> bool:
         """
         NORMALISIERT EINZELNEN DATENBANK-EINTRAG 25.08.2025
         
@@ -193,7 +193,7 @@ class NullNormalizer:
             logger.error(f"[NULL-NORMALIZER] Fehler bei Eintrag {entry_id}: {e}")
             return False
     
-    def normalize_database(self, db_path: str = "/app/backend/minesearch/database/mines.db", 
+    def normalize_database(self, db_path: str = "/app/backend/mines.db", 
                           batch_size: int = 100) -> Dict[str, int]:
         """
         NORMALISIERT KOMPLETTE DATENBANK 25.08.2025
@@ -265,7 +265,7 @@ class NullNormalizer:
             logger.error(f"[NULL-NORMALIZER] Kritischer Fehler bei Datenbank-Normalisierung: {e}")
             return {'error': str(e)}
     
-    def get_null_statistics(self, db_path: str = "/app/backend/minesearch/database/mines.db") -> Dict[str, Any]:
+    def get_null_statistics(self, db_path: str = "/app/backend/mines.db") -> Dict[str, Any]:
         """
         ANALYSIERT NULL-WERTE IN DER DATENBANK 25.08.2025
         

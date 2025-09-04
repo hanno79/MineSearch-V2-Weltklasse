@@ -118,7 +118,9 @@ class DatabaseManager:
                     logger.info(f"[DB] Aktualisiere Quellentyp für {domain}: {source.source_type} → {source_type}")
                     source.source_type = source_type
                 if metadata:
-                    source.extra_metadata = {**(source.extra_metadata or {}), **metadata}
+                    # NORMALISIERUNG FIX 04.09.2025: extra_metadata entfernt
+                    # Metadaten werden jetzt in source_metadata Tabelle gespeichert
+                    pass
                 # Neuberechnung des Scores bei Aktualisierung
                 source.reliability_score = source.calculate_reliability_score()
             else:
@@ -128,8 +130,8 @@ class DatabaseManager:
                     domain=domain,
                     country=country,
                     region=region,
-                    source_type=source_type,
-                    extra_metadata=metadata
+                    source_type=source_type
+                    # NORMALISIERUNG FIX 04.09.2025: extra_metadata entfernt
                 )
                 session.add(source)
                 logger.info(f"[DB] Neue Quelle hinzugefügt: {domain} (Typ: {source_type})")

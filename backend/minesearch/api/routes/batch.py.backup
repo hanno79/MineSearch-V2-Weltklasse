@@ -358,23 +358,14 @@ batch_results_cache = {}
 batch_service = BatchService(uploaded_mines_cache, batch_results_cache)
 
 @router.post("/upload-csv")
-async def upload_csv(file: UploadFile = File(...)):
+async def upload_csv(csv_file: UploadFile = File(...)):
     """CSV Datei hochladen und analysieren"""
-    # REPARATUR 04.09.2025: Parameter-Name zurück zu 'file' für Standard-Kompatibilität
+    # ÄNDERUNG 04.07.2025: Parameter-Name von 'file' zu 'csv_file' geändert für Frontend-Kompatibilität
     try:
-        # DEBUG FIX 04.09.2025: Erweiterte Validierung
-        if not file:
-            logger.error("[CSV-UPLOAD] File parameter is None")
-            raise HTTPException(status_code=422, detail="File parameter is required")
-        
-        if not file.filename:
-            logger.error("[CSV-UPLOAD] File has no filename")
-            raise HTTPException(status_code=422, detail="File must have a filename")
-        
-        logger.info(f"CSV Upload empfangen: {file.filename}, Size: {file.size if hasattr(file, 'size') else 'unknown'}")
+        logger.info(f"CSV Upload empfangen: {csv_file.filename}, Size: {csv_file.size if hasattr(csv_file, 'size') else 'unknown'}")
         
         # Verarbeite CSV direkt hier statt batch_service zu nutzen
-        contents = await file.read()
+        contents = await csv_file.read()
         csv_content = contents.decode('utf-8-sig')  # FIX: UTF-8-SIG entfernt BOM automatisch
         
         # FIX: Auto-detect CSV-Delimiter (Semikolon vs Komma)
@@ -881,8 +872,40 @@ async def batch_search(
                             }
                             results.append(result_data)
                             
-                            # LEGACY DATABASE REMOVED 03.09.2025: Nur noch normalisierte DB
-                            # Speicherung erfolgt automatisch in den entsprechenden Services
+                            # Speichere in Datenbank
+                            try:
+                                db_manager.save_search_result(
+                                    mine_name=mine_name,
+                                    model_used='comprehensive_systematic',
+                                    structured_data=comprehensive_result['data'],
+                                    sources=[],
+                                    session_id=session_id,
+                                    country=country,
+                                    region=region,
+                                    commodity=commodity,
+                                    search_type='batch_comprehensive',
+                                    search_duration=comprehensive_result.get('duration_seconds'),
+                                    data_quality=comprehensive_result['completion_report'],
+                                    success=True
+                                )
+                                logger.info(f"[COMPREHENSIVE-DB] Legacy save successful for {mine_name}")
+                                
+                                # NORMALIZED SCHEMA FIX 28.08.2025: Speichere auch in normalized schema
+                                try:
+                                    normalized_result_id = normalized_db_manager.save_search_result_normalized(
+                                        mine_name=mine_name,
+                                        model_used='comprehensive_systematic',
+                                        structured_data=comprehensive_result['data'],
+                                        sources=[],
+                                        session_id=session_id,
+                                        country=country,
+                                        search_duration=comprehensive_result.get('duration_seconds')
+                                    )
+                                    logger.info(f"[COMPREHENSIVE-NORMALIZED] ✅ Normalized save successful for {mine_name} (ID: {normalized_result_id})")
+                                except Exception as normalized_error:
+                                    logger.error(f"[COMPREHENSIVE-NORMALIZED] ❌ Normalized save failed for {mine_name}: {normalized_error}")
+                            except Exception as db_error:
+                                logger.error(f"[COMPREHENSIVE-DB] Fehler beim Speichern: {str(db_error)}")
                         else:
                             # Fallback auf Standard-Suche
                             logger.warning(f"[COMPREHENSIVE] Comprehensive search für {mine_name} fehlgeschlagen, verwende Standard-Suche")
@@ -949,8 +972,45 @@ async def batch_search(
                                 
                                 logger.info(f"[SEQUENTIAL] Sequential search für {mine_name} erfolgreich abgeschlossen: Quality Score {sequential_result.quality_score}")
                                 
-                                # LEGACY DATABASE REMOVED 03.09.2025: Nur noch normalisierte DB
-                                # Sequential Orchestrator speichert bereits in der normalisierten Datenbank
+                                # Sequential Orchestrator speichert bereits in Datenbank
+                                # Zusätzliche Legacy-Speicherung für Kompatibilität
+                                try:
+                                    db_manager.save_search_result(
+                                        mine_name=mine_name,
+                                        model_used='sequential_field_orchestrator',
+                                        structured_data=sequential_result.consolidated_data,
+                                        sources=[],
+                                        session_id=session_id,
+                                        country=country,
+                                        region=region,
+                                        commodity=commodity,
+                                        search_type='batch_sequential',
+                                        search_duration=sequential_result.performance_metrics.get('total_duration_seconds'),
+                                        data_quality={
+                                            'quality_score': sequential_result.quality_score,
+                                            'completeness_percentage': sequential_result.performance_metrics.get('completeness_percentage', 0),
+                                            'sources_discovered': sequential_result.total_sources_discovered
+                                        },
+                                        success=True
+                                    )
+                                    logger.info(f"[SEQUENTIAL-DB] Legacy save successful for {mine_name}")
+                                    
+                                    # NORMALIZED SCHEMA FIX 28.08.2025: Speichere auch in normalized schema
+                                    try:
+                                        normalized_result_id = normalized_db_manager.save_search_result_normalized(
+                                            mine_name=mine_name,
+                                            model_used='sequential_field_orchestrator',
+                                            structured_data=sequential_result.consolidated_data,
+                                            sources=[],
+                                            session_id=session_id,
+                                            country=country,
+                                            search_duration=sequential_result.performance_metrics.get('total_duration_seconds')
+                                        )
+                                        logger.info(f"[SEQUENTIAL-NORMALIZED] ✅ Normalized save successful for {mine_name} (ID: {normalized_result_id})")
+                                    except Exception as normalized_error:
+                                        logger.error(f"[SEQUENTIAL-NORMALIZED] ❌ Normalized save failed for {mine_name}: {normalized_error}")
+                                except Exception as db_error:
+                                    logger.error(f"[SEQUENTIAL-DB] Fehler beim Legacy-Speichern: {str(db_error)}")
                             else:
                                 # Sequential search fehlgeschlagen, fallback auf Standard-Suche
                                 logger.warning(f"[SEQUENTIAL] Sequential search für {mine_name} fehlgeschlagen: {sequential_result.error_message}")
@@ -1074,8 +1134,6 @@ async def batch_search(
                                 country=country,
                                 region=region,
                                 commodity=commodity,
-                                # SESSION-ID FIX 04.09.2025: Übergebe batch_session_id für DB-Konsistenz
-                                session_id=batch_session_id,
                                 # KRITISCH: Verwende alle gesammelten DB-Quellen
                                 use_all_db_sources=True,
                                 db_sources=all_db_sources
@@ -1238,9 +1296,48 @@ async def batch_search(
                     results.append(result_data)
                     logger.info(f"[BATCH-INDIVIDUAL] Completed {mine_name}: {len(successful_models)}/{len(models_to_use)} models successful")
                     
-                    # LEGACY DATABASE REMOVED 03.09.2025: Nur noch normalisierte DB
-                    # Speicherung erfolgt automatisch in den entsprechenden Services
-                    if not (batch_success and best_structured_data):
+                    # KRITISCHER FIX 29.08.2025: DB-Speicherung für Standard-Suchen hinzugefügt
+                    if batch_success and best_structured_data:
+                        try:
+                            # Bestimme bestes Modell für DB-Speicherung
+                            best_model_id = "multi_model_batch"
+                            if successful_models:
+                                # Verwende das beste Modell (das mit den meisten gefüllten Feldern)
+                                best_model = max(successful_models, key=lambda x: len([v for v in x.get('data', {}).get('structured_data', {}).values() if v and str(v).strip() and str(v).strip() not in ['-', '', 'None', 'null', 'nichts gefunden']]), default=None)
+                                if best_model:
+                                    best_model_id = best_model['model_id']
+                            
+                            # Legacy DB-Speicherung mit neuer session_id
+                            db_manager.save_search_result(
+                                mine_name=mine_name,
+                                model_used=best_model_id,
+                                structured_data=best_structured_data,
+                                sources=successful_models[0].get('sources', []) if successful_models else [],
+                                country=country,
+                                region=region,
+                                commodity=commodity,
+                                session_id=batch_session_id  # Use isolated batch session
+                            )
+                            logger.info(f"[BATCH-STANDARD-DB] ✅ Legacy save successful for {mine_name} using {best_model_id}")
+                            
+                            # Normalized DB-Speicherung
+                            try:
+                                normalized_result_id = normalized_db_manager.save_search_result_normalized(
+                                    mine_name=mine_name,
+                                    model_used=best_model_id,
+                                    structured_data=best_structured_data,
+                                    sources=successful_models[0].get('sources', []) if successful_models else [],
+                                    country=country,
+                                    region=region,
+                                    commodity=commodity,
+                                    session_id=batch_session_id  # Use isolated batch session
+                                )
+                                logger.info(f"[BATCH-STANDARD-NORMALIZED] ✅ Normalized save successful for {mine_name} using {best_model_id} (ID: {normalized_result_id})")
+                            except Exception as normalized_error:
+                                logger.error(f"[BATCH-STANDARD-NORMALIZED] ❌ Normalized save failed for {mine_name}: {normalized_error}")
+                        except Exception as db_error:
+                            logger.error(f"[BATCH-STANDARD-DB] ❌ Legacy save failed for {mine_name}: {db_error}")
+                    else:
                         logger.warning(f"[BATCH-STANDARD-DB] ⚠️ No successful results to save for {mine_name} (batch_success: {batch_success}, has_data: {bool(best_structured_data)})")
                 
                 # PROGRESS-FIX 29.08.2025: Mine vollständig abgeschlossen

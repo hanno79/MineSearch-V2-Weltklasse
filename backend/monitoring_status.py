@@ -28,7 +28,7 @@ def _resolve_database_path() -> str:
     1) ENV DATABASE_PATH
     2) ENV MINES_DB_PATH (Kompatibilität für Tests/CI)
     3) minesearch.config.base.config.DATABASE_URL (falls sqlite)
-    4) Fallback: backend/minesearch/database/mines.db relativ zum Repo‑Root
+    4) Fallback: backend/mines.db relativ zum Repo‑Root
     """
     repo_root = _resolve_repo_root()
 

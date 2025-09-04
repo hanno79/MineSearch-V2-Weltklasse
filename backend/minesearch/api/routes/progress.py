@@ -230,16 +230,16 @@ async def get_progress_status(session_id: str):
         
         # IMMER fallback verwenden, wenn keine Session gefunden
         if not progress:
-            logger.info(f"Session {session_id} not found in any tracker, returning completed fallback")
-            # Fallback-Progress für unbekannte Sessions - als "completed" markiert
+            logger.info(f"Session {session_id} not found in any tracker, returning running fallback")
+            # PROGRESS-FIX 04.09.2025: Status auf "running" setzen, damit Frontend weiter pollt
             progress = {
                 'total': 1,
-                'completed': 1,  # Als "abgeschlossen" markieren, damit Frontend stoppt
+                'completed': 0,  # Noch nicht abgeschlossen
                 'failed': 0,
-                'status': 'completed',  # Status auf completed setzen
+                'status': 'running',  # Status auf running setzen - Frontend pollt weiter
                 'mines': {},
                 'session_id': session_id,
-                'message': 'Session not found - batch likely completed'
+                'message': 'Session initializing or in progress...'
             }
         
         return JSONResponse(content={

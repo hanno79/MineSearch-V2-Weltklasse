@@ -198,7 +198,13 @@ class MultiModelSearchOrchestrator:
         """
         orchestration_start = datetime.now()
         
-        logger.info(f"[ORCHESTRATOR] Starte Multi-Model-Suche für '{mine_name}' mit {len(models)} Modellen")
+        # SESSION-ID FIX 04.09.2025: Generiere UUID falls keine session_id übergeben
+        if session_id is None:
+            import uuid
+            session_id = str(uuid.uuid4())
+            logger.info(f"[ORCHESTRATOR] Generierte neue session_id: {session_id} für Mine {mine_name}")
+        
+        logger.info(f"[ORCHESTRATOR] Starte Multi-Model-Suche für '{mine_name}' mit {len(models)} Modellen (session_id: {session_id})")
         
         # PROVIDER-VERFÜGBARKEITS-CHECK 24.08.2025
         available_models = []
@@ -349,20 +355,8 @@ class MultiModelSearchOrchestrator:
                 with legacy_db_manager.get_session() as tx_session:
                     try:
                         # Legacy speichern (ohne eigenen Commit)
-                        legacy_db_manager.save_search_result(
-                            mine_name=mine_name,
-                            model_used=result.model_id,
-                            structured_data=structured_data,
-                            sources=result.sources,
-                            session_id=session_id,
-                            country=country,
-                            region=region,
-                            commodity=commodity,
-                            search_type='orchestrated_multi_model',
-                            success=True,
-                            search_duration=result.search_duration,
-                            session=tx_session
-                        )
+                        # LEGACY DATABASE REMOVED 03.09.2025: Nur noch normalisierte DB
+                        # Speicherung erfolgt automatisch in MineSearchService
                         
                         # Normalized speichern (gleiche Transaktion/Session)
                         normalized_result_id = self.normalized_db_manager.save_search_result_normalized(

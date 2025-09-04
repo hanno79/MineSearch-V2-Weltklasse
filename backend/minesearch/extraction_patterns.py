@@ -87,24 +87,26 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'(?:North|Nord|N)\s*[:=]\s*([-+]?\d+\.?\d+)'
         ],
         'y-Koordinate': [
-            # BUGFIX 17.08.2025: Pattern für aktuelles API Response Format
-            r'-\s*y-Koordinate:\s*([-+]?\d+\.?\d+)',
+            # KOORDINATEN-FIX 03.09.2025: Globale Vorzeichenerhaltung ohne länderspezifische Korrekturen
+            # Priorität 1: Patterns die Vorzeichen exakt so erfassen wie in den Rohdaten
             r'y-Koordinate:\s*([-+]?\d+\.?\d+)',
-            # Dezimalgrad-Formate
             r'Longitude:\s*([-+]?\d+\.?\d+)', 
             r'Long?\.?:\s*([-+]?\d+\.?\d+)', 
             r'Längengrad:\s*([-+]?\d+\.?\d+)',
+            
+            # Priorität 2: Koordinaten-Paare (x,y) mit Vorzeichenerhaltung
             r'(?:GPS-)?Koordinaten:\s*[-+]?\d+\.?\d+\s*[,/]\s*([-+]?\d+\.?\d+)',
-            # FIX 02.09.2025: Neue Patterns für Perplexity slash-getrennte Formate
-            r'(?:mine|Mine).*?/.*?/.*?/\s*[-+]?\d+\.?\d+\s*/\s*(-?[6-9]\d\.?\d+)',  # Longitude -60 bis -99° für Nordamerika
-            r'/\s*[-+]?\d{2}\.?\d+\s*/\s*([+-]?\d{2,3}\.?\d+)',  # Slash-getrennt, Longitude 2.-3. Position
-            # Inline Koordinaten ohne Labels (typische kanadische/nordamerikanische Ranges)
-            r'(?:bei|at|near|coordinates?)\s+\d+\.?\d+[,\s°]+(-?[6-9]\d\.?\d+)',  # Long -60 bis -99° Kanada/USA
+            
+            # Priorität 3: Strukturierte Formate mit Vorzeichenerhaltung
+            r'/\s*[-+]?\d{2}\.?\d+\s*/\s*([-+]?\d{2,3}\.?\d+)',  # Slash-getrennt
+            r'(?:bei|at|near|coordinates?)\s+\d+\.?\d+[,\s°]+([-+]?\d+\.?\d+)',  # Inline-Koordinaten
+            
+            # Priorität 4: Spezielle Formate
             # Grad-Minuten-Sekunden Format
             r'(\d+)°\s*\d+[\'′]\s*\d+(?:\.\d+)?[\"″]\s*[EW]',
             # In Tabellen oder Listen
             r'(?:Location|Standort|Position)[\s\S]{0,50}?Long?\.?\s*:?\s*([-+]?\d+\.?\d+)',
-            # Koordinaten im Text
+            # Koordinaten im Text mit Himmelsrichtung
             r'(?:liegt bei|located at|position)\s+(?:etwa\s+)?[-+]?\d+\.?\d+\s*°?\s*[NS]\s*[,/]\s*([-+]?\d+\.?\d+)\s*°?\s*[EW]',
             # Weitere Varianten
             r'Y\s*[:=]\s*([-+]?\d+\.?\d+)',
@@ -163,6 +165,27 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'(?:in\s+Betrieb\s+seit|eröffnet)\s+(\d{4})'
         ],
         'Produktionsende': [
+            # REOPENED-FIX 03.09.2025: Erweiterte Patterns für komplexe Zeitangaben mit Wiedereröffnung
+            # WICHTIG: Nur EINE Capture Group pro Pattern - der DataExtractor nutzt nur match.group(1)
+            
+            # Priorität 1: Vollständige reopened/resumed Information in Klammern erfassen
+            r'Produktionsende:\s*(\d{4}\s*\([^)]*(?:reopened|resumed|wieder|neustart)[^)]*\))',  # "2013 (reopened in 2021)"
+            r'Ende:\s*(\d{4}\s*\([^)]*(?:reopened|resumed|wieder|neustart)[^)]*\))',
+            r'geschlossen\s*(\d{4}\s*\([^)]*(?:reopened|resumed|wieder|neustart)[^)]*\))',
+            
+            # Priorität 2: Direkte reopened Patterns ohne Label - KOMPLETT in einer Group
+            r'(\d{4}\s*\([^)]*(?:reopened|resumed)\s+(?:in\s+)?\d{4}[^)]*\))',  # "2013 (reopened in 2021)"
+            r'(\d{4}\s*\([^)]*(?:wieder|neustart)\s+(?:in\s+)?\d{4}[^)]*\))',    # Deutsche Varianten
+            
+            # Priorität 3: Geschlossen/Wiedereröffnet als zusammenhängender Text
+            r'((?:closed|geschlossen)\s+\d{4}[,;\s]*(?:reopened|resumed|wieder)\s+\d{4})',  # "closed 2013, reopened 2021"
+            r'(\d{4}\s*-\s*\d{4}\s*(?:reopened|resumed))',  # "2013-2021 reopened"
+            
+            # Priorität 4: Erweiterte Text-Patterns mit vollständiger Erfassung
+            r'((?:mine\s+)?(?:closed|shutdown|geschlossen)\s+(?:in\s+)?\d{4}\s*[,.]?\s*(?:reopened|resumed)\s+(?:in\s+)?\d{4})',
+            r'((?:operations\s+)?(?:ceased|ended|beendet)\s+\d{4}[,;\s]*(?:restarted|resumed|wieder)\s+\d{4})',
+            
+            # Priorität 5: Standard einfache Patterns (Fallback)
             r'Produktionsende:\s*(\d{4})', 
             r'Ende:\s*(\d{4})', 
             r'geschlossen\s+(?:seit\s+)?(\d{4})'

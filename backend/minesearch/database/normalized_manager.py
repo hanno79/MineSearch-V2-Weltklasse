@@ -150,10 +150,10 @@ class NormalizedDatabaseManager(DatabaseManager):
         if session is not None:
             # Suche existierende Mine
             result = session.execute(text("""
-                SELECT id FROM mines_normalized 
-                WHERE normalized_name = :normalized_name
+                SELECT id FROM mines 
+                WHERE name = :mine_name
                 LIMIT 1
-            """), {'normalized_name': normalized_name})
+            """), {'mine_name': mine_name})
             
             existing = result.fetchone()
             if existing:
@@ -239,23 +239,17 @@ class NormalizedDatabaseManager(DatabaseManager):
             
             # Erstelle Mine
             insert_result = session.execute(text("""
-                INSERT INTO mines_normalized 
-                (name, normalized_name, country, region, latitude, longitude, 
-                 status, owner_company_id, operator_company_id, mine_type, primary_commodity)
-                VALUES (:name, :normalized_name, :country, :region, :latitude, :longitude,
-                        :status, :owner_id, :operator_id, :mine_type, :primary_commodity)
+                INSERT INTO mines 
+                (name, country_id, region_id, mine_type_id, activity_status_id, latitude, longitude)
+                VALUES (:name, :country_id, :region_id, :mine_type_id, :activity_status_id, :latitude, :longitude)
             """), {
                 'name': mine_name,
-                'normalized_name': normalized_name,
-                'country': country,
-                'region': region,
+                'country_id': None,  # TODO: lookup country_id
+                'region_id': None,   # TODO: lookup region_id
+                'mine_type_id': None, # TODO: lookup mine_type_id
+                'activity_status_id': None, # TODO: lookup activity_status_id
                 'latitude': latitude,
-                'longitude': longitude,
-                'status': status,
-                'owner_id': owner_id,
-                'operator_id': operator_id,
-                'mine_type': mine_type,
-                'primary_commodity': primary_commodity
+                'longitude': longitude
             })
             session.flush()
             logger.info(f"✅ Neue Mine erstellt: {mine_name} → {normalized_name} (ID: {insert_result.lastrowid})")
@@ -265,10 +259,10 @@ class NormalizedDatabaseManager(DatabaseManager):
         with self.get_session() as session_local:
             # Suche existierende Mine
             result = session_local.execute(text("""
-                SELECT id FROM mines_normalized 
-                WHERE normalized_name = :normalized_name
+                SELECT id FROM mines 
+                WHERE name = :mine_name
                 LIMIT 1
-            """), {'normalized_name': normalized_name})
+            """), {'mine_name': mine_name})
             existing = result.fetchone()
             if existing:
                 return existing[0]
@@ -334,23 +328,17 @@ class NormalizedDatabaseManager(DatabaseManager):
             if operator_name:
                 operator_id = self.get_or_create_company(operator_name, 'operator')
             insert_result = session_local.execute(text("""
-                INSERT INTO mines_normalized 
-                (name, normalized_name, country, region, latitude, longitude, 
-                 status, owner_company_id, operator_company_id, mine_type, primary_commodity)
-                VALUES (:name, :normalized_name, :country, :region, :latitude, :longitude,
-                        :status, :owner_id, :operator_id, :mine_type, :primary_commodity)
+                INSERT INTO mines 
+                (name, country_id, region_id, mine_type_id, activity_status_id, latitude, longitude)
+                VALUES (:name, :country_id, :region_id, :mine_type_id, :activity_status_id, :latitude, :longitude)
             """), {
                 'name': mine_name,
-                'normalized_name': normalized_name,
-                'country': country,
-                'region': region,
+                'country_id': None,  # TODO: lookup country_id
+                'region_id': None,   # TODO: lookup region_id
+                'mine_type_id': None, # TODO: lookup mine_type_id
+                'activity_status_id': None, # TODO: lookup activity_status_id
                 'latitude': latitude,
-                'longitude': longitude,
-                'status': status,
-                'owner_id': owner_id,
-                'operator_id': operator_id,
-                'mine_type': mine_type,
-                'primary_commodity': primary_commodity
+                'longitude': longitude
             })
             session_local.commit()
             logger.info(f"✅ Neue Mine erstellt: {mine_name} → {normalized_name} (ID: {insert_result.lastrowid})")
@@ -367,7 +355,12 @@ class NormalizedDatabaseManager(DatabaseManager):
         
         source_name = None
         if sources and len(sources) > 0:
-            source_name = sources[0].get('name') or sources[0].get('url')
+            # NORMALISIERUNG FIX: Handle sowohl String- als auch Dict-Sources
+            first_source = sources[0]
+            if isinstance(first_source, dict):
+                source_name = first_source.get('name') or first_source.get('url')
+            else:
+                source_name = str(first_source)
         
         # KRITISCHER FIX 29.08.2025: Logik-Reparatur für Session-Handling
         if db_session is not None:
@@ -507,27 +500,18 @@ class NormalizedDatabaseManager(DatabaseManager):
                 confidence_score = 0.8
                 if is_template:
                     confidence_score = 0.1
-                self._insert_or_update_mine_data_field(
-                    local_session,
-                    {
-                        'search_result_id': search_result_id,
-                        'mine_id': mine_id,
-                        'field_name': field_name
-                    },
-                    {
-                        'raw_value': raw_value,
-                        'normalized_value': normalized_value,
-                        'numeric_value': numeric_value,
-                        'unit': unit,
-                        'confidence_score': confidence_score,
-                        'is_template_value': is_template,
-                        'validation_status': validation_status,
-                        'source_name': source_name,
-                        'model_used': model_used
-                    },
-                    actor=model_used,
-                    reason="save_mine_field_data"
-                )
+                    
+                # NORMALISIERUNG FIX: Verwende field_values Tabelle mit korrekten Spalten
+                local_session.execute(text("""
+                    INSERT INTO field_values 
+                    (search_session_id, field_name, atomic_value, confidence_score)
+                    VALUES (:search_session_id, :field_name, :atomic_value, :confidence_score)
+                """), {
+                    'search_session_id': search_result_id,
+                    'field_name': field_name,
+                    'atomic_value': str(field_value),
+                    'confidence_score': confidence_score
+                })
             local_session.commit()
             logger.info(f"✅ {len(structured_data)} Feldwerte gespeichert für Mine ID {mine_id}")
     
@@ -673,9 +657,16 @@ class NormalizedDatabaseManager(DatabaseManager):
         """
         NEUE FUNKTION: Speichere Suchergebnis in normalisiertem Schema
         
-        Returns: search_result_id aus search_results_normalized
+        Returns: search_result_id aus search_sessions
         """
         try:
+            # SESSION-ID FIX 04.09.2025: Generiere UUID falls keine session_id übergeben
+            if session_id is None:
+                import uuid
+                session_id = str(uuid.uuid4())
+                logger.info(f"[NORMALIZED-DB] Generierte neue session_id: {session_id} für Mine {mine_name}")
+            
+            logger.debug(f"[NORMALIZED-DB] Speichere Ergebnis für Mine '{mine_name}' mit session_id: {session_id}")
             # 1. Hole oder erstelle Mine
             # REGEL 10 COMPLIANCE: Keine Dummy-Werte - Skip bei fehlendem Country
             if not country:
@@ -710,28 +701,23 @@ class NormalizedDatabaseManager(DatabaseManager):
                 penalty = template_fields_rejected * 0.1
                 data_quality_score = max(0.0, data_quality_score - penalty)
             
-            # 3. Speichere in search_results_normalized
+            # 3. Speichere in search_sessions
             if db_session is not None:
                 session = db_session
                 insert_result = session.execute(text("""
-                    INSERT INTO search_results_normalized 
-                    (session_id, mine_id, search_timestamp, model_used, search_type, 
-                     search_duration, success, fields_found, template_fields_rejected, 
-                     data_quality_score)
-                    VALUES (:session_id, :mine_id, :search_timestamp, :model_used, :search_type,
-                           :search_duration, :success, :fields_found, :template_fields_rejected,
-                           :data_quality_score)
+                    INSERT INTO search_sessions 
+                    (session_id, mine_id, search_timestamp, ai_model_id, search_type, 
+                     search_duration_ms, success)
+                    VALUES (:session_id, :mine_id, :search_timestamp, :ai_model_id, :search_type,
+                           :search_duration_ms, :success)
                 """), {
                     'session_id': session_id,
                     'mine_id': mine_id,
                     'search_timestamp': datetime.now(),
-                    'model_used': model_used,
+                    'ai_model_id': None,  # TODO: Map model_used to ai_model_id
                     'search_type': 'single',
-                    'search_duration': search_duration,
-                    'success': True,
-                    'fields_found': fields_found,
-                    'template_fields_rejected': template_fields_rejected,
-                    'data_quality_score': round(data_quality_score, 2)
+                    'search_duration_ms': search_duration,
+                    'success': True
                 })
                 search_result_id = insert_result.lastrowid
                 session.flush()
@@ -740,24 +726,19 @@ class NormalizedDatabaseManager(DatabaseManager):
             else:
                 with self.get_session() as session_local:
                     insert_result = session_local.execute(text("""
-                        INSERT INTO search_results_normalized 
-                        (session_id, mine_id, search_timestamp, model_used, search_type, 
-                         search_duration, success, fields_found, template_fields_rejected, 
-                         data_quality_score)
-                        VALUES (:session_id, :mine_id, :search_timestamp, :model_used, :search_type,
-                               :search_duration, :success, :fields_found, :template_fields_rejected,
-                               :data_quality_score)
+                        INSERT INTO search_sessions 
+                        (session_id, mine_id, search_timestamp, ai_model_id, search_type, 
+                         search_duration_ms, success)
+                        VALUES (:session_id, :mine_id, :search_timestamp, :ai_model_id, :search_type,
+                               :search_duration_ms, :success)
                     """), {
                         'session_id': session_id,
                         'mine_id': mine_id,
                         'search_timestamp': datetime.now(),
-                        'model_used': model_used,
+                        'ai_model_id': None,  # TODO: Map model_used to ai_model_id
                         'search_type': 'single',
-                        'search_duration': search_duration,
-                        'success': True,
-                        'fields_found': fields_found,
-                        'template_fields_rejected': template_fields_rejected,
-                        'data_quality_score': round(data_quality_score, 2)
+                        'search_duration_ms': search_duration,
+                        'success': True
                     })
                     search_result_id = insert_result.lastrowid
                     session_local.commit()

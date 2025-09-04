@@ -12,7 +12,7 @@ Konfiguration:
   1) Environment Variable "DATABASE_PATH"
   2) Environment Variable "MINES_DB_PATH" (Kompatibilität für Tests/CI)
   3) `minesearch.config.config.DATABASE_URL` (falls SQLite)
-  4) Fallback: backend/minesearch/database/mines.db relativ zum Repo-Root
+  4) Fallback: backend/mines.db relativ zum Repo-Root
 
 Der aufgelöste Pfad wird vor Nutzung validiert (existiert und ist eine Datei).
 So kann der Pfad ohne Codeänderung via Environment/Config überschrieben werden.
@@ -52,7 +52,7 @@ def _resolve_database_path() -> str:
     1) ENV DATABASE_PATH
     2) ENV MINES_DB_PATH (für Tests/CI)
     3) minesearch.config.config.DATABASE_URL (nur sqlite)
-    4) Fallback: backend/minesearch/database/mines.db relativ zum Repo-Root
+    4) Fallback: backend/mines.db relativ zum Repo-Root
     """
     repo_root = _resolve_repo_root()
 
