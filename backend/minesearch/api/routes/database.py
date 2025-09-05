@@ -17,33 +17,32 @@ from minesearch.database import db_manager
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Normalisierte Tabellenstruktur (03.09.2025) - Einheitliches System ohne Legacy
+# Normalisierte Tabellenstruktur (05.09.2025) - Nach Company Role Refactoring
 NORMALIZED_TABLES = {
     "Stammdaten": [
-        "countries",           # Länder-Lookup mit ISO-Codes
-        "regions",             # Regionen mit Länder-FK
-        "mine_types",          # Minentypen (Untertage, Open-Pit, etc.)
-        "activity_statuses",   # Aktivitätsstatus (Aktiv, Geschlossen, etc.)
+        "companies",           # Unternehmen (ohne company_type)
+        "company_roles",       # Rollen (owner, operator, contractor, joint_venture)
+        "countries",           # Länder-Lookup mit ISO-Codes  
         "commodities",         # Rohstoffe (Gold, Kupfer, etc.)
-        "companies",           # Unternehmen (Eigentümer/Betreiber)
+        "sources",             # Quellen für Daten
         "ai_models"            # AI-Modelle für Suchen
     ],
     "Kerndaten": [
         "mines",               # Minen mit FKs zu Lookup-Tabellen
-        "search_sessions",     # Such-Sessions mit AI-Modell-FK
-        "sources"              # Quellen für Daten
+        "mine_production",     # Produktionsdaten (falls vorhanden)
+        "mine_restoration_plans" # Restaurationspläne (falls vorhanden)
     ],
     "Beziehungen": [
-        "mine_commodities",    # Mine ↔ Rohstoffe (N:M)
-        "mine_owners",         # Mine ↔ Eigentümer (N:M)
-        "mine_operators",      # Mine ↔ Betreiber (N:M)
-        "production_periods",  # Produktionshistorie
-        "restoration_costs"    # Restaurationskosten-Historie
+        "company_role_assignments"  # Company ↔ Role Assignments (N:M)
     ],
     "Feldwerte": [
         "mine_data_fields",    # Mine-Feldwerte aus Suchen (PRIMARY)  
-        "field_values",        # Atomare Feldwerte (LEGACY)
-        "field_value_sources"  # Feldwert ↔ Quellen (N:M)
+        "search_results"       # Such-Ergebnisse
+    ],
+    "Legacy/Analytics": [
+        "field_definitions",   # Legacy Feld-Definitionen
+        "template_patterns",   # Template-Erkennungsmuster
+        "source_metadata"      # Source-Metadaten
     ]
 }
 
@@ -82,10 +81,16 @@ async def get_all_tables():
                         category = "Beziehungen"
                     elif table_name in NORMALIZED_TABLES["Feldwerte"]:
                         category = "Feldwerte"
-                    elif "statistics" in table_name:
-                        category = "Statistics (Legacy)"
-                    elif "log" in table_name:
+                    elif table_name in NORMALIZED_TABLES["Legacy/Analytics"]:
+                        category = "Legacy/Analytics"
+                    elif "backup" in table_name.lower():
+                        category = "System/Backup"
+                    elif "statistics" in table_name or "model_" in table_name:
+                        category = "Statistics (Legacy)" 
+                    elif "log" in table_name or "session" in table_name:
                         category = "Logs (Legacy)"
+                    elif count == 0:
+                        category = "Leer (Nicht verwendet)"
                         
                     table_info.append({
                         "name": table_name,

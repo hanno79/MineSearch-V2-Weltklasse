@@ -456,11 +456,9 @@ from minesearch.database.db_utils import get_normalized_db_path, get_sqlite_conn
 def main():
     """Main Entry Point"""
     # Finde Datenbank
+    # ÄNDERUNG 05.09.2025: Nur noch zentrale DB verwenden - minesearch.db Fallback entfernt
     db_paths = [
-        get_normalized_db_path(),
-        get_normalized_db_path(),
-        get_normalized_db_path(),
-        "./minesearch.db"
+        get_normalized_db_path()
     ]
     
     db_path = None

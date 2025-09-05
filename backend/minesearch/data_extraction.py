@@ -355,8 +355,9 @@ class DataExtractor:
             # QUELLENREFERENZEN-FIX 19.07.2025: Erstelle Quellenangaben mit neuer Logik
             data['Quellenangaben'] = self.source_manager.get_sources_summary()
             
-            # Füge Quellen-Mapping für JSON-Speicherung hinzu
-            data['_source_mapping'] = self.source_manager.get_sources_dict()
+            # SYSTEM-FELD FILTER 05.09.2025: _source_mapping wird NICHT mehr als Feld gespeichert
+            # da es JSON-Strukturen enthält und die Datenbank kontaminiert.
+            # Source-Mappings werden über separate Tabellen/Relationen verwaltet.
             
             # KERNWERTE-EXTRAKTION 27.08.2025: Extrahiere atomare Werte aus Sätzen
             # Bereinige alle Feldwerte NACH Quellen-Zuordnung

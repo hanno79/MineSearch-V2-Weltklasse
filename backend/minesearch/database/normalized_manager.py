@@ -171,6 +171,125 @@ class NormalizedDatabaseManager(DatabaseManager):
         
         # Fallback: Originalnamen mit korrigierter Gross-/Kleinschreibung
         return status_name.title()
+
+    def _calculate_confidence_score(self, field_name: str, raw_value: str, atomic_value: str) -> float:
+        """
+        Berechne dynamischen Confidence Score basierend auf verschiedenen Faktoren
+        
+        Args:
+            field_name: Name des Feldes
+            raw_value: Ursprünglicher Wert vor Bereinigung
+            atomic_value: Bereinigter atomarer Wert
+            
+        Returns:
+            Confidence Score zwischen 0.0 und 1.0
+        """
+        confidence = 0.5  # Basis-Confidence
+        
+        # 1. Faktor: Länge und Vollständigkeit des Wertes
+        if len(atomic_value.strip()) > 0:
+            confidence += 0.2
+            
+        if len(atomic_value.strip()) > 10:
+            confidence += 0.1
+            
+        # 2. Faktor: Strukturierte vs. unstrukturierte Daten
+        if field_name.lower() in ['country', 'land', 'region', 'state', 'province']:
+            # Geografische Daten sind meist zuverlässig
+            confidence += 0.2
+            
+        # 3. Faktor: Numerische Werte (Koordinaten, etc.)
+        try:
+            float(atomic_value)
+            # Numerische Werte sind präzise
+            confidence += 0.15
+        except:
+            pass
+            
+        # 4. Faktor: Bereinigungsaufwand (mehr Bereinigung = weniger Confidence)
+        cleaning_impact = len(raw_value) - len(atomic_value)
+        if cleaning_impact > 0:
+            # Pro entferntes Zeichen reduziere Confidence leicht
+            reduction = min(cleaning_impact * 0.01, 0.15)
+            confidence -= reduction
+            
+        # 5. Faktor: Spezielle Felder mit hoher Zuverlässigkeit
+        high_confidence_fields = [
+            'name', 'mine_name', 'commodity', 'owner', 'operator', 
+            'latitude', 'longitude', 'coordinates'
+        ]
+        if any(hcf in field_name.lower() for hcf in high_confidence_fields):
+            confidence += 0.1
+            
+        # 6. Faktor: Template-ähnliche Werte (niedrigere Confidence)
+        template_indicators = [
+            '[placeholder', '[template', 'xxx', 'n/a', 'unknown', 'tbd'
+        ]
+        if any(indicator in atomic_value.lower() for indicator in template_indicators):
+            confidence -= 0.3
+            
+        # Begrenze auf 0.1 bis 1.0
+        return max(0.1, min(1.0, confidence))
+
+    def _detect_template_value(self, field_name: str, atomic_value: str) -> bool:
+        """
+        Erkenne ob ein Wert ein Template/Platzhalter ist
+        
+        Args:
+            field_name: Name des Feldes
+            atomic_value: Zu prüfender Wert
+            
+        Returns:
+            True wenn Template-Wert erkannt wird
+        """
+        if not atomic_value or not atomic_value.strip():
+            return False
+            
+        value_lower = atomic_value.lower().strip()
+        
+        # 1. Offensichtliche Template-Indikatoren
+        template_indicators = [
+            'template', 'placeholder', 'example', 'sample',
+            '[template', '[placeholder', '[example',
+            'xxx', 'yyy', 'zzz',
+            'n/a', 'n.a.', 'not available', 'not applicable',
+            'tbd', 'to be determined', 'to be defined',
+            'unknown', 'unbekannt', 'nicht bekannt',
+            'pending', 'ausstehend', 
+            'insert', 'enter', 'add',
+            'your ', 'dein ', 'ihre ',
+            '[insert', '[enter', '[add'
+        ]
+        
+        for indicator in template_indicators:
+            if indicator in value_lower:
+                return True
+                
+        # 2. Wiederholende Zeichen (xxx, 999, ---)
+        if len(set(atomic_value.strip())) == 1 and len(atomic_value.strip()) >= 3:
+            return True
+            
+        # 3. Brackets um gesamten Wert
+        if atomic_value.startswith('[') and atomic_value.endswith(']'):
+            return True
+            
+        # 4. Spezielle Muster für bestimmte Felder
+        if field_name.lower() in ['email', 'e-mail', 'contact']:
+            # Template-E-Mails
+            if 'example.com' in value_lower or 'test@' in value_lower:
+                return True
+                
+        if field_name.lower() in ['phone', 'telefon', 'telephone']:
+            # Template-Telefonnummern
+            if value_lower in ['123-456-7890', '+1-xxx-xxx-xxxx', '000-000-0000']:
+                return True
+                
+        # 5. Koordinaten-Templates
+        if field_name.lower() in ['latitude', 'longitude', 'lat', 'lon', 'coordinates']:
+            if value_lower in ['0.0', '0', '00.0000', 'xx.xxxx']:
+                return True
+                
+        return False
     
     def get_or_create_company(self, company_name: str, company_type: str = 'owner', db_session: Optional[Session] = None) -> Optional[int]:
         """Hole oder erstelle Unternehmen und gib ID zurück"""
@@ -476,6 +595,9 @@ class NormalizedDatabaseManager(DatabaseManager):
                 'region_id': region_id
             })
             
+            # CRITICAL FIX 05.09.2025: Commit die Transaktion!
+            session_local.commit()
+            
             logger.info(f"✅ Neue Mine erstellt: {mine_name} (ID: {insert_result.lastrowid})")
             return insert_result.lastrowid
     
@@ -504,31 +626,60 @@ class NormalizedDatabaseManager(DatabaseManager):
             # Mit externer Session (wird von aufrufender Funktion committed)
             session = db_session
             for field_name, field_value in structured_data.items():
+                # FILTER 05.09.2025: Ignoriere System-Felder und Quellenangaben
+                if field_name.startswith('_') or field_name in ['source_mapping', 'metadata', 'Quellenangaben', 'sources', 'references']:
+                    logger.info(f"System-Feld/Quellenfeld übersprungen: {field_name}")
+                    continue
+                
                 if not field_value or field_value in ['Nicht gefunden', 'Not found', 'X']:
+                    continue
+                
+                # ATOMARE WERTE FILTER 05.09.2025: Nur primitive Datentypen erlauben
+                if isinstance(field_value, (dict, list, set, tuple)):
+                    logger.warning(f"Nicht-atomares Feld übersprungen: {field_name} = {type(field_value)}")
                     continue
                 
                 # Value-Normalisierung für atomare Speicherung
                 raw_value = str(field_value)
                 
-                # CRITICAL: Entferne Quellenreferenzen für atomare Speicherung
-                # "Aktiv [1,2,3,4,5]" → "Aktiv"
+                # VERBESSERTE QUELLENREFERENZ-BEREINIGUNG 05.09.2025
                 import re
-                atomic_value = re.sub(r'\s*\[\d+(,\d+)*\]$', '', raw_value).strip()
+                atomic_value = raw_value
+                
+                # Entferne alle Quellenreferenzen: [1], [2,3], [1] Text [2], etc.
+                atomic_value = re.sub(r'\[\d+(,\s*\d+)*\]', '', atomic_value)
+                
+                # Entferne mehrzeilige Quellenangaben mit Nummerierung
+                atomic_value = re.sub(r'\[\d+\]\s*[^\n]*\n?', '', atomic_value, flags=re.MULTILINE)
+                
+                # Bereinige überschüssige Whitespace und Zeilenwechsel
+                atomic_value = re.sub(r'\n+', ' ', atomic_value)
+                atomic_value = re.sub(r'\s+', ' ', atomic_value).strip()
+                
+                # Überspringe Felder die nur aus Referenzen bestanden
+                if not atomic_value or atomic_value in ['', ' ', '\n']:
+                    logger.info(f"Feld nach Bereinigung leer übersprungen: {field_name}")
+                    continue
                 
                 normalized_value = atomic_value
                 numeric_value = None
                 unit = None
-                is_template = False
-                validation_status = 'valid'
                 
-                # Prüfe auf Template-Werte (REGEL 10 Compliance!)
-                if value_normalizer:
+                # Erkenne Template-Werte mit neuer Methode
+                is_template = self._detect_template_value(field_name, atomic_value)
+                validation_status = 'template' if is_template else 'valid'
+                
+                if is_template:
+                    logger.warning(f"Template-Wert erkannt: {field_name} = {atomic_value}")
+                
+                # Fallback: Prüfe auch mit value_normalizer falls vorhanden
+                if value_normalizer and not is_template:
                     try:
                         validation_result = value_normalizer.validate_field_value(field_name, field_value)
                         if not validation_result.get('is_valid', True):
                             is_template = True
                             validation_status = 'template'
-                            logger.warning(f"Template-Wert erkannt: {field_name} = {field_value}")
+                            logger.warning(f"Value-Normalizer Template erkannt: {field_name} = {field_value}")
                     except:
                         pass
                 
@@ -559,10 +710,8 @@ class NormalizedDatabaseManager(DatabaseManager):
                             unit = match.group(1).upper()
                             break
                 
-                # Confidence Score (provisorisch)
-                confidence_score = 0.8
-                if is_template:
-                    confidence_score = 0.1
+                # DYNAMISCHE CONFIDENCE-BERECHNUNG 05.09.2025
+                confidence_score = self._calculate_confidence_score(field_name, raw_value, atomic_value)
                 
                 # Selektiere existierenden Datensatz und führe gezieltes UPDATE oder INSERT durch
                 self._insert_or_update_mine_data_field(
@@ -574,6 +723,7 @@ class NormalizedDatabaseManager(DatabaseManager):
                     },
                     {
                         'session_id': session_id,  # CRITICAL FIX 04.09.2025: Add session_id 
+                        'field_value': normalized_value,  # FIELD_VALUE FIX 05.09.2025: Hauptwert
                         'raw_value': raw_value,
                         'normalized_value': normalized_value,
                         'numeric_value': numeric_value,
@@ -582,7 +732,10 @@ class NormalizedDatabaseManager(DatabaseManager):
                         'is_template_value': is_template,
                         'validation_status': validation_status,
                         'source_name': source_name,
-                        'model_used': model_used
+                        'model_used': model_used,
+                        'extraction_timestamp': datetime.now(),  # FIX 05.09.2025: Setze Timestamp
+                        'model_id': self._get_or_create_ai_model_id(session, model_used),  # FIX 05.09.2025: AI Model ID
+                        'source_id': self._get_source_id_by_name(session, source_name)  # FIX 05.09.2025: Source ID
                     },
                     actor=model_used,
                     reason="save_mine_field_data"
@@ -594,17 +747,53 @@ class NormalizedDatabaseManager(DatabaseManager):
         # Ohne externe Session: eigene Session verwenden
         with self.get_session() as local_session:
             for field_name, field_value in structured_data.items():
+                # FILTER 05.09.2025: Ignoriere System-Felder und Quellenangaben (identisch zu erstem Pfad)
+                if field_name.startswith('_') or field_name in ['source_mapping', 'metadata', 'Quellenangaben', 'sources', 'references']:
+                    logger.info(f"System-Feld/Quellenfeld übersprungen: {field_name}")
+                    continue
+                
                 if not field_value or field_value in ['Nicht gefunden', 'Not found', 'X']:
                     continue
+                
+                # ATOMARE WERTE FILTER 05.09.2025: Nur primitive Datentypen erlauben
+                if isinstance(field_value, (dict, list, set, tuple)):
+                    logger.warning(f"Nicht-atomares Feld übersprungen: {field_name} = {type(field_value)}")
+                    continue
+                
+                # Value-Normalisierung für atomare Speicherung (identisch zu erstem Pfad)
                 raw_value = str(field_value)
+                
+                # VERBESSERTE QUELLENREFERENZ-BEREINIGUNG 05.09.2025 (identisch)
                 import re
-                atomic_value = re.sub(r'\s*\[\d+(,\d+)*\]$', '', raw_value).strip()
+                atomic_value = raw_value
+                
+                # Entferne alle Quellenreferenzen: [1], [2,3], [1] Text [2], etc.
+                atomic_value = re.sub(r'\[\d+(,\s*\d+)*\]', '', atomic_value)
+                
+                # Entferne mehrzeilige Quellenangaben mit Nummerierung
+                atomic_value = re.sub(r'\[\d+\]\s*[^\n]*\n?', '', atomic_value, flags=re.MULTILINE)
+                
+                # Bereinige überschüssige Whitespace und Zeilenwechsel
+                atomic_value = re.sub(r'\n+', ' ', atomic_value)
+                atomic_value = re.sub(r'\s+', ' ', atomic_value).strip()
+                
+                # Überspringe Felder die nur aus Referenzen bestanden
+                if not atomic_value or atomic_value in ['', ' ', '\n']:
+                    logger.info(f"Feld nach Bereinigung leer übersprungen: {field_name}")
+                    continue
                 normalized_value = atomic_value
                 numeric_value = None
                 unit = None
-                is_template = False
-                validation_status = 'valid'
-                if value_normalizer:
+                
+                # Erkenne Template-Werte mit neuer Methode
+                is_template = self._detect_template_value(field_name, atomic_value)
+                validation_status = 'template' if is_template else 'valid'
+                
+                if is_template:
+                    logger.warning(f"Template-Wert erkannt: {field_name} = {atomic_value}")
+                
+                # Fallback: Prüfe auch mit value_normalizer falls vorhanden
+                if value_normalizer and not is_template:
                     try:
                         validation_result = value_normalizer.validate_field_value(field_name, field_value)
                         if not validation_result.get('is_valid', True):
@@ -635,9 +824,8 @@ class NormalizedDatabaseManager(DatabaseManager):
                         if match:
                             unit = match.group(1).upper()
                             break
-                confidence_score = 0.8
-                if is_template:
-                    confidence_score = 0.1
+                # DYNAMISCHE CONFIDENCE-BERECHNUNG 05.09.2025 (identisch zu erstem Pfad)
+                confidence_score = self._calculate_confidence_score(field_name, raw_value, atomic_value)
                     
                 # KONSISTENZ-FIX 04.09.2025: Verwende gleiche _insert_or_update_mine_data_field wie IF-Zweig
                 self._insert_or_update_mine_data_field(
@@ -648,6 +836,7 @@ class NormalizedDatabaseManager(DatabaseManager):
                         'field_name': field_name
                     },
                     {
+                        'field_value': normalized_value,  # FIELD_VALUE FIX 05.09.2025: Hauptwert
                         'raw_value': raw_value,
                         'normalized_value': normalized_value,
                         'numeric_value': numeric_value,
@@ -657,7 +846,10 @@ class NormalizedDatabaseManager(DatabaseManager):
                         'validation_status': validation_status,
                         'source_name': source_name,
                         'model_used': model_used,
-                        'session_id': session_id
+                        'session_id': session_id,
+                        'extraction_timestamp': datetime.now(),  # FIX 05.09.2025: Setze Timestamp (identisch)
+                        'model_id': self._get_or_create_ai_model_id(local_session, model_used),  # FIX 05.09.2025: AI Model ID
+                        'source_id': self._get_source_id_by_name(local_session, source_name)  # FIX 05.09.2025: Source ID
                     },
                     actor=model_used,
                     reason="save_mine_field_data"
@@ -730,6 +922,59 @@ class NormalizedDatabaseManager(DatabaseManager):
             logger.error(f"[AI_MODEL_MAPPING ERROR] Fehler für model '{model_used}': {e}")
             return None
 
+    def _get_source_id_by_name(self, session: Session, source_name: str) -> Optional[int]:
+        """
+        Hole source_id basierend auf source_name.
+        Sucht in der sources Tabelle nach URL die source_name enthält.
+        """
+        if not source_name:
+            return None
+            
+        try:
+            # Suche nach exakter URL-Übereinstimmung
+            result = session.execute(text("""
+                SELECT id FROM sources 
+                WHERE url = :source_name
+                LIMIT 1
+            """), {'source_name': source_name}).fetchone()
+            
+            if result:
+                return result[0]
+            
+            # Fallback: Suche nach Domain-Übereinstimmung
+            result = session.execute(text("""
+                SELECT id FROM sources 
+                WHERE url LIKE :source_pattern
+                LIMIT 1
+            """), {'source_pattern': f'%{source_name}%'}).fetchone()
+            
+            if result:
+                return result[0]
+                
+            # Weitere Fallback: Suche nach Domain aus URL
+            if 'http' in source_name:
+                try:
+                    from urllib.parse import urlparse
+                    domain = urlparse(source_name).netloc
+                    if domain:
+                        result = session.execute(text("""
+                            SELECT id FROM sources 
+                            WHERE domain = :domain
+                            LIMIT 1
+                        """), {'domain': domain}).fetchone()
+                        
+                        if result:
+                            return result[0]
+                except:
+                    pass
+                    
+            logger.debug(f"[SOURCE_ID] Keine source_id gefunden für: {source_name}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"[SOURCE_ID ERROR] Fehler für source_name '{source_name}': {e}")
+            return None
+
     def _insert_or_update_mine_data_field(self, session: Session, key: Dict[str, Any], 
                                           new_values: Dict[str, Any], actor: Optional[str] = None, 
                                           reason: Optional[str] = None) -> None:
@@ -742,16 +987,39 @@ class NormalizedDatabaseManager(DatabaseManager):
             actor: Wer schreibt (z. B. model_used)
             reason: Warum (z. B. save_mine_field_data)
         """
+        # DEDUPLIZIERUNG 05.09.2025: Prüfe auf bestehende identische Einträge
+        check_sql = """
+            SELECT id FROM mine_data_fields 
+            WHERE mine_id = :mine_id 
+              AND field_name = :field_name 
+              AND normalized_value = :normalized_value
+              AND session_id = :session_id
+            LIMIT 1
+        """
+        
+        check_params = {
+            'mine_id': key['mine_id'],
+            'field_name': key['field_name'], 
+            'normalized_value': new_values.get('normalized_value'),
+            'session_id': new_values.get('session_id')
+        }
+        
+        existing = session.execute(text(check_sql), check_params).fetchone()
+        if existing:
+            logger.debug(f"[DEDUPLIZIERUNG] Identischer Eintrag bereits vorhanden: {key}")
+            return
+        
         # INSERT-only Logik - da jede Suche eigene search_result_id hat
+        # FIELD_VALUE FIX 05.09.2025: field_value als primärer Wert, normalized_value als bereinigte Version
         insert_sql = """
             INSERT INTO mine_data_fields (
-                search_result_id, mine_id, field_name, raw_value, normalized_value,
+                search_result_id, mine_id, field_name, field_value, raw_value, normalized_value,
                 numeric_value, unit, confidence_score, is_template_value,
-                validation_status, source_name, model_used, session_id
+                validation_status, source_name, model_used, session_id, extraction_timestamp, model_id, source_id
             ) VALUES (
-                :search_result_id, :mine_id, :field_name, :raw_value, :normalized_value,
+                :search_result_id, :mine_id, :field_name, :field_value, :raw_value, :normalized_value,
                 :numeric_value, :unit, :confidence_score, :is_template_value,
-                :validation_status, :source_name, :model_used, :session_id
+                :validation_status, :source_name, :model_used, :session_id, :extraction_timestamp, :model_id, :source_id
             )
         """
         params = {**key, **new_values}
@@ -861,7 +1129,13 @@ class NormalizedDatabaseManager(DatabaseManager):
                 logger.info(f"[FIELD_SAVE_DEBUG] Finished save_mine_field_data call")
                 # ENTFERNT 04.09.2025: Koordinaten werden nicht mehr in mines Tabelle gespeichert
                 # KRITISCHER FIX 04.09.2025: Commit der gesamten Transaktion
-                session.commit()
+                try:
+                    session.commit()
+                    logger.info(f"[TRANSACTION-DEBUG] Session commit erfolgreich für mine_id={mine_id}")
+                except Exception as commit_error:
+                    logger.error(f"🔥 SESSION COMMIT FAILED für mine_id={mine_id}: {commit_error}")
+                    session.rollback()
+                    raise commit_error
             else:
                 with self.get_session() as session_local:
                     # CRITICAL FIX 04.09.2025: Use RETURNING clause to get proper search_result_id

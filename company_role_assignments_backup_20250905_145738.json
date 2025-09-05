@@ -1,0 +1,286 @@
+{
+  "exported_at": "2025-09-05T14:57:38.351725",
+  "table": "company_role_assignments",
+  "count": 30,
+  "columns": [
+    "id",
+    "company_id",
+    "role_id",
+    "mine_id",
+    "assigned_at",
+    "is_active",
+    "notes"
+  ],
+  "data": [
+    {
+      "id": 31,
+      "company_id": 1,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 32,
+      "company_id": 2,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 33,
+      "company_id": 3,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 34,
+      "company_id": 4,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 35,
+      "company_id": 5,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 36,
+      "company_id": 6,
+      "role_id": 2,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=operator"
+    },
+    {
+      "id": 37,
+      "company_id": 7,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 38,
+      "company_id": 8,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 39,
+      "company_id": 9,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 40,
+      "company_id": 10,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 41,
+      "company_id": 11,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 42,
+      "company_id": 12,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 43,
+      "company_id": 13,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 44,
+      "company_id": 14,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 45,
+      "company_id": 15,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 46,
+      "company_id": 16,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 47,
+      "company_id": 17,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=both"
+    },
+    {
+      "id": 48,
+      "company_id": 17,
+      "role_id": 2,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=both"
+    },
+    {
+      "id": 49,
+      "company_id": 19,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 50,
+      "company_id": 20,
+      "role_id": 2,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=operator"
+    },
+    {
+      "id": 51,
+      "company_id": 21,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 52,
+      "company_id": 22,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 53,
+      "company_id": 23,
+      "role_id": 2,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=operator"
+    },
+    {
+      "id": 54,
+      "company_id": 24,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 55,
+      "company_id": 25,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 56,
+      "company_id": 26,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 57,
+      "company_id": 27,
+      "role_id": 2,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=operator"
+    },
+    {
+      "id": 58,
+      "company_id": 28,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 59,
+      "company_id": 29,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    },
+    {
+      "id": 60,
+      "company_id": 33,
+      "role_id": 1,
+      "mine_id": null,
+      "assigned_at": "2025-09-05 12:54:41",
+      "is_active": 1,
+      "notes": "Migrated from company_type=owner"
+    }
+  ]
+}

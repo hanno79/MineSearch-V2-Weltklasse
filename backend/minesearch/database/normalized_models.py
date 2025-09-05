@@ -198,48 +198,31 @@ class Company(NormalizedBase):
 
 
 class Mine(NormalizedBase):
-    """Haupttabelle für Minen (Normalisierung: 3NF - keine transitiven Abhängigkeiten)"""
+    """Haupttabelle für Minen (Vereinfachtes Schema nach 04.09.2025 Bereinigung)"""
     __tablename__ = 'mines'
     
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False, index=True)
     
-    # Foreign Keys (Normalisierung: Referenzen statt Redundanz)
+    # Foreign Keys (nur Country und Region nach Schema-Bereinigung)
     country_id = Column(Integer, ForeignKey('countries.id'), nullable=True, index=True)
     region_id = Column(Integer, ForeignKey('regions.id'), nullable=True, index=True)
-    mine_type_id = Column(Integer, ForeignKey('mine_types.id'), nullable=True)
-    activity_status_id = Column(Integer, ForeignKey('activity_statuses.id'), nullable=True)
-    
-    # Koordinaten (atomare Werte)
-    latitude = Column(Numeric(precision=10, scale=7), nullable=True)  # Höhere Präzision
-    longitude = Column(Numeric(precision=10, scale=7), nullable=True)
-    
-    # Fläche
-    area_sqkm = Column(Numeric(precision=10, scale=3), nullable=True)
     
     # Timestamps
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     
-    # Relationships
+    # Relationships (nur noch Country und Region nach Schema-Bereinigung)
     country = relationship("Country", back_populates="mines")
     region = relationship("Region", back_populates="mines")
-    mine_type = relationship("MineType", back_populates="mines")
-    activity_status = relationship("ActivityStatus", back_populates="mines")
     
-    # N:M Relationships über Assoziationstabellen
-    mine_commodities = relationship("MineCommodity", back_populates="mine", cascade="all, delete-orphan")
-    mine_owners = relationship("MineOwner", back_populates="mine", cascade="all, delete-orphan")
-    mine_operators = relationship("MineOperator", back_populates="mine", cascade="all, delete-orphan")
-    production_periods = relationship("ProductionPeriod", back_populates="mine", cascade="all, delete-orphan")
-    restoration_costs = relationship("RestorationCost", back_populates="mine", cascade="all, delete-orphan")
+    # Search Sessions (normalisierte Datenbank verwendet mine_data_fields für alle anderen Daten)
     search_sessions = relationship("SearchSession", back_populates="mine", cascade="all, delete-orphan")
     
     # Indizes für Performance
     __table_args__ = (
         Index('idx_mine_country_region', 'country_id', 'region_id'),
-        Index('idx_mine_coordinates', 'latitude', 'longitude'),
-        Index('idx_mine_status_type', 'activity_status_id', 'mine_type_id'),
+        Index('idx_mine_name', 'name'),  # Für schnelle Name-Suchen
     )
     
     def to_dict(self) -> Dict[str, Any]:
@@ -250,13 +233,6 @@ class Mine(NormalizedBase):
             'country_name': self.country.name if self.country else None,
             'region_id': self.region_id,
             'region_name': self.region.name if self.region else None,
-            'mine_type_id': self.mine_type_id,
-            'mine_type_name': self.mine_type.name if self.mine_type else None,
-            'activity_status_id': self.activity_status_id,
-            'activity_status': self.activity_status.status if self.activity_status else None,
-            'latitude': float(self.latitude) if self.latitude is not None else None,
-            'longitude': float(self.longitude) if self.longitude is not None else None,
-            'area_sqkm': float(self.area_sqkm) if self.area_sqkm is not None else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
