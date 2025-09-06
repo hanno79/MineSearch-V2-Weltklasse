@@ -24,6 +24,7 @@ from .api.middleware import setup_middleware
 from .api.handlers import setup_exception_handlers
 
 SAFE_MODE = os.getenv('SAFE_MODE', '0') == '1'
+FORCE_REFRESH = os.getenv('FORCE_REFRESH', '0') == '1'
 
 if not SAFE_MODE:
     from minesearch.providers.registry import provider_registry
@@ -61,7 +62,9 @@ async def lifespan(app: FastAPI):
             logger.warning("System startet trotzdem im eingeschränkten Modus...")
         
         try:
-            provider_registry.initialize(config.PROVIDERS)
+            if FORCE_REFRESH:
+                logger.info("🔄 FORCE_REFRESH aktiv - Registry wird komplett neu aufgebaut")
+            provider_registry.initialize(config.PROVIDERS, force_refresh=FORCE_REFRESH)
             available_models = list(provider_registry.get_all_models().keys())
             logger.info(f"Provider-Registry initialisiert. Verfügbare Modelle: {available_models}")
             if not available_models:

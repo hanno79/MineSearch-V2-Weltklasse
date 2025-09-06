@@ -14,7 +14,8 @@ from datetime import datetime
 from .base_provider import AbstractProvider, ModelConfig, SearchResult
 
 from minesearch.data_extraction import DataExtractor
-from minesearch.source_discovery import EnhancedSourceDiscovery, extract_sources_from_content
+from minesearch.enhanced_source_discovery import EnhancedSourceDiscovery
+from minesearch.source_discovery import extract_sources_from_content
 from minesearch.utils import (
     generate_name_variants,
     get_country_config,

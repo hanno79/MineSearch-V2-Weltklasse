@@ -23,7 +23,8 @@ from .utils.brightdata_search_utils import BrightdataSearchUtils
 from .utils.brightdata_scraper import BrightdataScraper
 
 # OPENROUTER WORKFLOW IMPORTS
-from minesearch.source_discovery import EnhancedSourceDiscovery, extract_sources_from_content
+from minesearch.enhanced_source_discovery import EnhancedSourceDiscovery
+from minesearch.source_discovery import extract_sources_from_content
 from minesearch.utils import (
     generate_name_variants,
     get_country_config,

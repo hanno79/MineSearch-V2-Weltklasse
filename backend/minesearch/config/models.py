@@ -232,7 +232,7 @@ OPENROUTER_MODELS = {
         'provider_category': 'anthropic'
     },
     
-    # ÄNDERUNG 24.08.2025: Premium-Modelle über OpenRouter - Google Gemini
+    # AKTUALISIERT 06.09.2025: Neueste Google Gemini Modelle über OpenRouter
     'gemini-2.5-pro': {
         'id': 'google/gemini-2.5-pro',
         'name': 'Gemini 2.5 Pro',
@@ -296,7 +296,7 @@ OPENROUTER_MODELS = {
         'provider_category': 'openai'
     },
     
-    # ÄNDERUNG 24.08.2025: Premium-Modelle über OpenRouter - xAI Grok
+    # AKTUALISIERT 06.09.2025: Neueste xAI Grok Modelle über OpenRouter
     'grok-3': {
         'id': 'x-ai/grok-3',
         'name': 'Grok 3',
@@ -338,6 +338,130 @@ OPENROUTER_MODELS = {
         'supports_web_search': True,
         'is_free': False,
         'provider_category': 'perplexity'
+    },
+    
+    # NEUE MODELLE 06.09.2025: Zusätzliche OpenRouter Modelle
+    'mistral-codestral-2508': {
+        'id': 'mistralai/codestral-2508',
+        'name': 'Mistral Codestral 2508',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'Mistral Codestral 2508 - Spezialisiert für Code und technische Dokumentation',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'mistral'
+    },
+    'hermes-4-405b': {
+        'id': 'nousresearch/hermes-4-405b',
+        'name': 'Hermes 4 405B',
+        'timeout': 180,
+        'max_tokens': 10000,
+        'description': 'Nous Research Hermes 4 405B - Hochleistungsmodell für komplexe Analysen',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'nousresearch'
+    },
+    'qwen-3-max': {
+        'id': 'qwen/qwen3-max',
+        'name': 'Qwen 3 Max',
+        'timeout': 150,
+        'max_tokens': 8000,
+        'description': 'Alibaba Qwen 3 Max - Fortschrittliches multilinguale Modell',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'qwen'
+    },
+    'kimi-k2-0905': {
+        'id': 'moonshotai/kimi-k2-0905',
+        'name': 'Kimi K2 0905',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'Moonshot AI Kimi K2 0905 - Neueste Version mit verbesserten Fähigkeiten',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'moonshot'
+    },
+    'cogito-v2-preview': {
+        'id': 'deepcogito/cogito-v2-preview-llama-109b-moe',
+        'name': 'Cogito v2 Preview (109B MoE)',
+        'timeout': 180,
+        'max_tokens': 10000,
+        'description': 'DeepCogito v2 Preview - 109B MoE Architektur für komplexe Reasoning',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'deepcogito'
+    },
+    'deepseek-chat-v3-1-free': {
+        'id': 'deepseek/deepseek-chat-v3.1:free',
+        'name': 'DeepSeek Chat v3.1 (Kostenlos)',
+        'timeout': 120,
+        'max_tokens': 4000,
+        'description': 'DeepSeek Chat v3.1 - Neueste kostenlose Version mit verbesserter Performance',
+        'supports_web_search': False,
+        'is_free': True,
+        'provider_category': 'deepseek'
+    },
+    'gpt-5-chat': {
+        'id': 'openai/gpt-5-chat',
+        'name': 'GPT-5 Chat',
+        'timeout': 200,
+        'max_tokens': 12000,
+        'description': 'OpenAI GPT-5 Chat - Nächste Generation der GPT-Serie',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'openai'
+    },
+    'gpt-5': {
+        'id': 'openai/gpt-5',
+        'name': 'GPT-5',
+        'timeout': 200,
+        'max_tokens': 12000,
+        'description': 'OpenAI GPT-5 - Neuestes Flaggschiff-Modell',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'openai'
+    },
+    'gpt-oss-120b-free': {
+        'id': 'openai/gpt-oss-120b:free',
+        'name': 'GPT OSS 120B (Kostenlos)',
+        'timeout': 150,
+        'max_tokens': 12000,
+        'description': 'OpenAI GPT OSS 120B - Kostenlose Open Source Version',
+        'supports_web_search': False,
+        'is_free': True,
+        'provider_category': 'openai'
+    },
+    'claude-opus-4-1': {
+        'id': 'anthropic/claude-opus-4.1',
+        'name': 'Claude Opus 4.1',
+        'timeout': 240,
+        'max_tokens': 12000,
+        'description': 'Anthropic Claude Opus 4.1 - Erweiterte Version mit verbesserter Analyse',
+        'supports_web_search': False,
+        'supports_deep_research': True,
+        'is_free': False,
+        'provider_category': 'anthropic'
+    },
+    'claude-sonnet-4': {
+        'id': 'anthropic/claude-sonnet-4',
+        'name': 'Claude Sonnet 4',
+        'timeout': 180,
+        'max_tokens': 8000,
+        'description': 'Anthropic Claude Sonnet 4 - Neueste Sonnet-Generation',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'anthropic'
+    },
+    'claude-3-7-sonnet-thinking': {
+        'id': 'anthropic/claude-3.7-sonnet:thinking',
+        'name': 'Claude 3.7 Sonnet (Thinking)',
+        'timeout': 180,
+        'max_tokens': 8000,
+        'description': 'Anthropic Claude 3.7 Sonnet - Mit Thinking-Modus für komplexe Reasoning',
+        'supports_web_search': False,
+        'supports_deep_research': True,
+        'is_free': False,
+        'provider_category': 'anthropic'
     }
 }
 
