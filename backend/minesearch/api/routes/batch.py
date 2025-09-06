@@ -11,6 +11,7 @@ import csv
 import io
 import logging
 import asyncio
+import random
 from ...fallback_detector import validate_data, clean_fallback_values
 try:
     import fcntl
@@ -440,15 +441,32 @@ async def upload_csv(file: UploadFile = File(...)):
                     <input type="hidden" name="sequential_workflow" value="false">
                     
                     <div class="form-group">
-                        <label><strong>Anzahl zu durchsuchender Minen:</strong></label>
+                        <label><strong>Mine-Auswahl-Modus:</strong></label>
                         <div style="margin: 10px 0;">
-                            <label><input type="radio" name="search_all" value="false" checked> Nur erste 5 Minen (schnell)</label>
+                            <label><input type="radio" name="selection_mode" value="first_n" checked onchange="toggleSelectionOptions()"> Erste X Minen</label>
+                            <div id="first_n_options" style="margin-left: 25px; margin-top: 5px;">
+                                Anzahl: <input type="number" name="count" value="5" min="1" max="1000" style="width: 60px;">
+                            </div>
                         </div>
                         <div style="margin: 10px 0;">
-                            <label><input type="radio" name="search_all" value="false"> Erste <input type="number" name="count" value="20" min="1" max="1000" style="width: 60px;"> Minen</label>
+                            <label><input type="radio" name="selection_mode" value="range" onchange="toggleSelectionOptions()"> Range-Auswahl (Von-Bis)</label>
+                            <div id="range_options" style="margin-left: 25px; margin-top: 5px; display: none;">
+                                Start-Mine: <input type="number" name="start_position" value="1" min="1" style="width: 60px;">
+                                Anzahl: <input type="number" name="range_count" value="20" min="1" max="1000" style="width: 60px;">
+                                <div style="font-size: 12px; color: #666; margin-top: 2px;" id="range_info">Sucht Minen 1-20 aus der CSV</div>
+                            </div>
                         </div>
                         <div style="margin: 10px 0;">
-                            <label><input type="radio" name="search_all" value="true"> <strong>Alle {mine_count} Minen durchsuchen</strong></label>
+                            <label><input type="radio" name="selection_mode" value="random" onchange="toggleSelectionOptions()"> Zufällige Auswahl</label>
+                            <div id="random_options" style="margin-left: 25px; margin-top: 5px; display: none;">
+                                Anzahl: <input type="number" name="random_count" value="10" min="1" max="1000" style="width: 60px;"> zufällige Minen
+                            </div>
+                        </div>
+                        <div style="margin: 10px 0;">
+                            <label><input type="radio" name="selection_mode" value="all" onchange="toggleSelectionOptions()"> <strong>Alle {mine_count} Minen durchsuchen</strong></label>
+                        </div>
+                        <div style="margin-top: 10px; padding: 8px; background: #f0f8ff; border-radius: 3px; font-size: 12px;" id="selection_summary">
+                            CSV enthält <strong>{mine_count} Minen</strong>. Maximale Batch-Größe pro Anfrage: <strong>1000 Minen</strong>.
                         </div>
                     </div>
                     
@@ -498,7 +516,94 @@ async def upload_csv(file: UploadFile = File(...)):
                     }}
                 }});
             }}
+            
+            // Mine Selection Options Toggle & Validation
+            const mineCount = {mine_count};
+            const maxBatchSize = 1000;
+            
+            // Input Elements
+            const startPositionInput = document.querySelector('input[name="start_position"]');
+            const rangeCountInput = document.querySelector('input[name="range_count"]');
+            const randomCountInput = document.querySelector('input[name="random_count"]');
+            const countInput = document.querySelector('input[name="count"]');
+            
+            // Add event listeners for live validation
+            if (startPositionInput && rangeCountInput) {{
+                startPositionInput.addEventListener('input', updateRangeInfo);
+                rangeCountInput.addEventListener('input', updateRangeInfo);
+            }}
+            
+            if (randomCountInput) {{
+                randomCountInput.addEventListener('input', function() {{
+                    validateAndCorrect(this, 1, Math.min(mineCount, maxBatchSize));
+                }});
+            }}
+            
+            if (countInput) {{
+                countInput.addEventListener('input', function() {{
+                    validateAndCorrect(this, 1, Math.min(mineCount, maxBatchSize));
+                }});
+            }}
+            
+            function updateRangeInfo() {{
+                const startPos = parseInt(startPositionInput.value) || 1;
+                const count = parseInt(rangeCountInput.value) || 20;
+                
+                // Validate and correct start position
+                const correctedStart = Math.max(1, Math.min(startPos, mineCount));
+                if (correctedStart !== startPos) {{
+                    startPositionInput.value = correctedStart;
+                }}
+                
+                // Validate and correct count based on available mines
+                const maxPossibleCount = Math.min(mineCount - correctedStart + 1, maxBatchSize);
+                const correctedCount = Math.max(1, Math.min(count, maxPossibleCount));
+                if (correctedCount !== count) {{
+                    rangeCountInput.value = correctedCount;
+                }}
+                
+                const endPos = correctedStart + correctedCount - 1;
+                const rangeInfo = document.getElementById('range_info');
+                if (rangeInfo) {{
+                    rangeInfo.textContent = `Sucht Minen ${{correctedStart}}-${{endPos}} aus der CSV (von ${{mineCount}} verfügbar)`;
+                    if (correctedCount >= maxBatchSize) {{
+                        rangeInfo.style.color = '#ff6600';
+                        rangeInfo.textContent += ' - MAX ERREICHT';
+                    }} else {{
+                        rangeInfo.style.color = '#666';
+                    }}
+                }}
+            }}
+            
+            function validateAndCorrect(input, min, max) {{
+                const value = parseInt(input.value) || min;
+                const corrected = Math.max(min, Math.min(value, max));
+                if (corrected !== value) {{
+                    input.value = corrected;
+                    // Show brief feedback
+                    const originalColor = input.style.borderColor;
+                    input.style.borderColor = '#ff6600';
+                    setTimeout(() => input.style.borderColor = originalColor, 1000);
+                }}
+            }}
+            
+            // Initialize range info on page load
+            if (startPositionInput && rangeCountInput) {{
+                updateRangeInfo();
+            }}
         }});
+        
+        function toggleSelectionOptions() {{
+            const modes = ['first_n', 'range', 'random'];
+            const selectedMode = document.querySelector('input[name="selection_mode"]:checked')?.value;
+            
+            modes.forEach(mode => {{
+                const element = document.getElementById(mode + '_options');
+                if (element) {{
+                    element.style.display = (mode === selectedMode) ? 'block' : 'none';
+                }}
+            }});
+        }}
         </script>
         """
         
@@ -527,7 +632,12 @@ async def batch_search(
     sequential_workflow: Optional[str] = Form("false"),
     # BATCH-TRANSPARENCY FIX 30.08.2025: Session-Isolation und Cache-Control
     use_cache: Optional[str] = Form("false", description="Use cached results from database"),
-    force_new_session: Optional[str] = Form("false", description="Force new unique session for isolation")
+    force_new_session: Optional[str] = Form("false", description="Force new unique session for isolation"),
+    # ENHANCED BATCH SELECTION 06.09.2025: Neue Auswahl-Modi
+    selection_mode: Optional[str] = Form("first_n", description="first_n, range, random, all"),
+    start_position: Optional[int] = Form(1, description="Start-Position für Range-Modus"),
+    range_count: Optional[int] = Form(20, description="Anzahl Minen für Range-Modus"),
+    random_count: Optional[int] = Form(10, description="Anzahl zufällige Minen")
 ):
     """
     Batch-Suche für mehrere Minen aus CSV
@@ -554,33 +664,63 @@ async def batch_search(
         columns = session_data['columns']
         logger.info(f"Batch-Suche für Session {session_id} (batch_session: {batch_session_id}) mit {len(mines)} Minen")
         
-        # Bestimme wie viele Minen gesucht werden - ERWEITERTE DEBUG-INFO 24.08.2025
-        logger.info(f"[BATCH-MINE-SELECTION] Parameters - search_all: '{search_all}', count: {count}")
-        logger.info(f"[BATCH-MINE-SELECTION] CSV enthält {len(mines)} Minen total")
+        # ENHANCED BATCH SELECTION 06.09.2025: Neue Auswahl-Modi
+        logger.info(f"[ENHANCED-BATCH-SELECTION] Mode: '{selection_mode}', CSV: {len(mines)} Minen")
+        logger.info(f"[ENHANCED-BATCH-SELECTION] Parameters - start_position: {start_position}, range_count: {range_count}, random_count: {random_count}, count: {count}")
         
-        # Serverseitige Validierung & Pagination
+        # Mine-Auswahl basierend auf selection_mode
         try:
-            effective_start = int(start_index or 0)
-            if effective_start < 0:
-                effective_start = 0
-        except Exception:
-            effective_start = 0
-
-        if search_all == "true":
-            # Wenn 'alle', verarbeite ab start_index in Seiten von maximal BATCH_REQUEST_MAX_COUNT
-            end_index = min(len(mines), effective_start + BATCH_REQUEST_MAX_COUNT)
-            mines_to_search = mines[effective_start:end_index]
-            logger.info(f"[BATCH-MINE-SELECTION] ✅ ALLE MINEN MODUS (paginiert) - verarbeite {len(mines_to_search)} Minen (Start {effective_start})")
-        else:
-            limit = count if count else 5
-            if limit > BATCH_REQUEST_MAX_COUNT:
-                logger.warning(f"[BATCH-VALIDATION] count {limit} > MAX {BATCH_REQUEST_MAX_COUNT} - kappen")
-                limit = BATCH_REQUEST_MAX_COUNT
-            end_index = min(len(mines), effective_start + limit)
-            mines_to_search = mines[effective_start:end_index]
-            logger.info(f"[BATCH-MINE-SELECTION] 🧪 BEGRENZT MODUS - verarbeite {len(mines_to_search)} (Start {effective_start}, Limit {limit}) von {len(mines)} Minen")
+            if selection_mode == "all":
+                # Alle Minen (mit Pagination für große CSVs)
+                effective_start = int(start_index or 0)
+                if effective_start < 0:
+                    effective_start = 0
+                end_index = min(len(mines), effective_start + BATCH_REQUEST_MAX_COUNT)
+                mines_to_search = mines[effective_start:end_index]
+                logger.info(f"[ENHANCED-BATCH] ✅ ALL MODE - {len(mines_to_search)} Minen (Start {effective_start}, max {BATCH_REQUEST_MAX_COUNT})")
+                
+            elif selection_mode == "range":
+                # Range-basierte Auswahl
+                safe_start = max(1, min(start_position or 1, len(mines)))
+                safe_count = max(1, min(range_count or 20, BATCH_REQUEST_MAX_COUNT))
+                
+                # Automatische Korrektur wenn Range über CSV-Grenzen hinausgeht
+                max_possible_count = len(mines) - safe_start + 1
+                if safe_count > max_possible_count:
+                    safe_count = max(1, max_possible_count)
+                    logger.warning(f"[ENHANCED-BATCH] Range count korrigiert: {range_count} -> {safe_count} (CSV-Grenzen)")
+                
+                start_idx = safe_start - 1  # Convert to 0-based index
+                end_idx = start_idx + safe_count
+                mines_to_search = mines[start_idx:end_idx]
+                logger.info(f"[ENHANCED-BATCH] ✅ RANGE MODE - Minen {safe_start}-{safe_start + len(mines_to_search) - 1} ({len(mines_to_search)} Minen)")
+                
+            elif selection_mode == "random":
+                # Zufällige Auswahl
+                safe_random_count = max(1, min(random_count or 10, len(mines), BATCH_REQUEST_MAX_COUNT))
+                if safe_random_count != random_count:
+                    logger.warning(f"[ENHANCED-BATCH] Random count korrigiert: {random_count} -> {safe_random_count}")
+                
+                mines_to_search = random.sample(mines, safe_random_count)
+                logger.info(f"[ENHANCED-BATCH] ✅ RANDOM MODE - {len(mines_to_search)} zufällige Minen aus {len(mines)}")
+                
+            else:  # "first_n" oder fallback
+                # Erste X Minen (klassischer Modus)
+                safe_count = max(1, min(count or 5, BATCH_REQUEST_MAX_COUNT))
+                if safe_count > len(mines):
+                    safe_count = len(mines)
+                    logger.warning(f"[ENHANCED-BATCH] First-N count korrigiert: {count} -> {safe_count} (CSV-Größe)")
+                
+                mines_to_search = mines[:safe_count]
+                logger.info(f"[ENHANCED-BATCH] ✅ FIRST_N MODE - erste {len(mines_to_search)} Minen")
+                
+        except Exception as e:
+            logger.error(f"[ENHANCED-BATCH] Fehler bei Mine-Auswahl: {e}")
+            # Fallback: Erste 5 Minen
+            mines_to_search = mines[:min(5, len(mines))]
+            logger.warning(f"[ENHANCED-BATCH] FALLBACK - erste {len(mines_to_search)} Minen verwendet")
             
-        logger.info(f"[BATCH-MINE-SELECTION] 🎯 FINALE ENTSCHEIDUNG: {len(mines_to_search)} Minen werden durchsucht")
+        logger.info(f"[ENHANCED-BATCH] 🎯 FINALE AUSWAHL: {len(mines_to_search)} Minen werden durchsucht")
         
         # IMPROVED 19.07.2025: Vereinfachte und robuste Model-Auswahl
         models_to_use = []
@@ -608,17 +748,18 @@ async def batch_search(
                 detail="Mindestens ein gültiges Modell muss ausgewählt werden. Frontend-Parameter: selected_models, model"
             )
 
-        # Zusätzliche serverseitige Validierung: count darf nicht > BATCH_REQUEST_MAX_COUNT sein
-        if search_all != "true":
-            try:
-                requested_count = int(count or 0)
-            except Exception:
-                requested_count = 0
-            if requested_count > BATCH_REQUEST_MAX_COUNT:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Maximale Batch-Größe pro Anfrage ist {BATCH_REQUEST_MAX_COUNT}. Nutzen Sie Pagination über 'start_index'."
-                )
+        # ENHANCED BATCH VALIDATION 06.09.2025: Erweiterte Validierung für alle Modi
+        # Legacy-Kompatibilität: search_all="true" wird automatisch zu selection_mode="all"
+        if search_all == "true" and selection_mode == "first_n":
+            selection_mode = "all"
+            logger.info(f"[ENHANCED-BATCH] Legacy-Kompatibilität: search_all=true -> selection_mode=all")
+        
+        # Validiere finale Mine-Anzahl gegen Limits
+        if len(mines_to_search) > BATCH_REQUEST_MAX_COUNT:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Zu viele Minen ausgewählt ({len(mines_to_search)}). Maximale Batch-Größe: {BATCH_REQUEST_MAX_COUNT}."
+            )
         
         # PROGRESS-FIX 29.08.2025: Erstelle Progress Session für detaillierte Fortschrittsanzeige
         total_operations = len(mines_to_search) * len(models_to_use)
