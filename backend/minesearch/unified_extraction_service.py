@@ -35,7 +35,7 @@ class UnifiedAIExtractionService:
         self.base_url = "https://openrouter.ai/api/v1/chat/completions"
         
         # Standard-Modell für Extraktion: Schnell und kostengünstig
-        self.default_extraction_model = "anthropic/claude-3-haiku-20240307"
+        self.default_extraction_model = "anthropic/claude-3.5-haiku"
     
     async def extract_from_raw_content(
         self,

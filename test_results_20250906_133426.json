@@ -1,0 +1,88 @@
+{
+  "timestamp": "2025-09-06T13:34:26.665656",
+  "mine": "Mont Wright",
+  "country": "Kanada",
+  "overall_success_rate": 0.0,
+  "results": {
+    "Tavily": {
+      "tavily:search": {
+        "success": false,
+        "error": "Timeout"
+      },
+      "tavily:deep-research": {
+        "success": false,
+        "error": "Timeout"
+      }
+    },
+    "ScrapingBee": {
+      "scrapingbee:basic-scrape": {
+        "success": false,
+        "error": "Timeout"
+      },
+      "scrapingbee:js-render": {
+        "success": false,
+        "error": "('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))"
+      },
+      "scrapingbee:ai-extract": {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/search (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7800d9d46ea0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      }
+    },
+    "Firecrawl": {
+      "firecrawl:scrape": {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/search (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7800d9d46c30>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      },
+      "firecrawl:crawl": {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/search (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7800d9d463f0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      },
+      "firecrawl:extract": {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/search (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7800d9d46060>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      }
+    },
+    "BrightData": {
+      "brightdata:web-scraper": {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/search (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7800d9d457c0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      },
+      "brightdata:browser-api": {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/search (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7800d9d47950>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      },
+      "brightdata:serp": {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/search (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7800d9d78230>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      }
+    },
+    "Exa": {
+      "exa:neural-search": {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/search (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7800d9d47a70>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      },
+      "exa:research": {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/search (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7800d9d45fa0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      },
+      "exa:research-pro": {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/search (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7800d9d46300>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      }
+    },
+    "OpenRouter (Sample)": {
+      "openrouter:deepseek-free": {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/search (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7800d9d46db0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      },
+      "openrouter:kimi-k2": {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/search (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7800d9d46b70>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      },
+      "openrouter:claude-3.5-haiku": {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/search (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7800d9d78770>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+      }
+    }
+  }
+}

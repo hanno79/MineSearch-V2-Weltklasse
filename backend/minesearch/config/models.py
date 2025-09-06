@@ -77,8 +77,8 @@ _apply_defaults_to_models(
 # OpenRouter Modelle (DeepSeek wird jetzt separat geführt)
 OPENROUTER_MODELS = {
     'deepseek-free': {
-        'id': 'deepseek/deepseek-chat',
-        'name': 'DeepSeek Chat (Kostenlos)',
+        'id': 'deepseek/deepseek-chat-v3.1:free',
+        'name': 'DeepSeek Chat v3.1 (Kostenlos)',
         'timeout': 120,
         'max_tokens': 3000,
         'description': 'Kostenloses Chat-Modell mit gutem Reasoning',
@@ -86,8 +86,8 @@ OPENROUTER_MODELS = {
         'is_free': True
     },
     'deepseek-chat': {
-        'id': 'deepseek/deepseek-chat',
-        'name': 'DeepSeek Chat',
+        'id': 'deepseek/deepseek-chat-v3.1',
+        'name': 'DeepSeek Chat v3.1',
         'timeout': 120,
         'max_tokens': 8000,
         'description': 'Fortgeschrittenes Chat-Modell',
@@ -95,9 +95,9 @@ OPENROUTER_MODELS = {
         'is_free': False
     },
     'deepseek-reasoner': {
-        # ÄNDERUNG 09.07.2025: Korrigierte Model-ID für DeepSeek R1
-        'id': 'deepseek/deepseek-r1-0528',
-        'name': 'DeepSeek R1 (Reasoner) [BETA]',
+        # ÄNDERUNG 06.09.2025: Aktualisierte Model-ID für DeepSeek R1
+        'id': 'deepseek/deepseek-r1-0528:free',
+        'name': 'DeepSeek R1 (Reasoner) [Kostenlos]',
         'timeout': 180,
         'max_tokens': 12000,
         'description': 'DeepSeek R1 - Experimentell: Niedriger Feldabdeckung, optimiert für Reasoning statt Datenextraktion',

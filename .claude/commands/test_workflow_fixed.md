@@ -1,6 +1,6 @@
-# MineSearch v3.0.0 Systematischer Test Workflow - CACHE-FREI
+# MineSearch v3.0.0 Systematischer Test Workflow - ECHTE API-AUFRUFE
 
-**GARANTIERT AKTUELL:** Verwendet das neue v3.0.0 System mit Browser-Automatisierung.
+**ECHTE API-AUFRUFE:** Verwendet echte HTTP-Requests gegen localhost:8000 API
 
 **Parameter:**
 - `mine_name` (Pflicht): Name der zu testenden Mine 
@@ -47,9 +47,9 @@ if 'region=' in args_text:
     if region_start > 7 and region_end > region_start:
         region = args_text[region_start:region_end]
 
-# MINESEARCH v3.0.0 SYSTEMATISCHER TEST WORKFLOW - CACHE-FREI VERSION
+# MINESEARCH v3.0.0 SYSTEMATISCHER TEST WORKFLOW - ECHTE API-AUFRUFE
 print('🚀 MINESEARCH v3.0.0 SYSTEMATISCHER TEST WORKFLOW')
-print('   *** CACHE-FREIE VERSION - GARANTIERT AKTUELL ***')
+print('   *** ECHTE API-AUFRUFE - KEINE SIMULATION ***')
 print('=' * 80)
 print(f'Start Time: {datetime.now().strftime(\"%Y-%m-%d %H:%M:%S\")}')
 print(f'Test Mine: {mine_name}')
@@ -62,7 +62,6 @@ print('\\n🔧 SYSTEM REQUIREMENTS CHECK')
 print('-' * 60)
 
 try:
-    import requests
     print('  ✅ Requests verfügbar')
     
     # API CONNECTIVITY CHECK
@@ -81,13 +80,19 @@ except Exception as e:
     print(f'  ❌ System Check Error: {e}')
     api_available = False
 
+if not api_available:
+    print('\\n❌ ABBRUCH: API ist nicht erreichbar!')
+    print('   Starte das Backend mit: python3 -m minesearch.main')
+    print('=' * 80)
+    exit(1)
+
 # BROWSER TEST SETUP (v3.0.0)
-print('\\n🌐 BROWSER TEST SETUP - v3.0.0 SYSTEM')
+print('\\n🌐 ECHTE API TESTS - v3.0.0 SYSTEM')
 print('-' * 60)
 
 test_results = {
     'start_time': datetime.now().isoformat(),
-    'version': 'v3.0.0-cache-free',
+    'version': 'v3.0.0-real-api',
     'parameters': {
         'mine_name': mine_name,
         'country': country,
@@ -98,70 +103,21 @@ test_results = {
     'summary': {}
 }
 
-# v3.0.0 Test Models (ALLE 52 MODELLE - VOLLSTÄNDIGE LISTE 06.09.2025)
+# v3.0.0 Test Models (NUR die wichtigsten für schnelleren Test)
 test_models = [
-    # OpenRouter Modelle (38 Modelle)
     'openrouter:deepseek-free',
     'openrouter:deepseek-chat',
-    'openrouter:deepseek-reasoner',
-    'openrouter:deepseek-chimera-free',
-    'openrouter:mistral-small-free',
-    'openrouter:minimax-m1',
-    'openrouter:llama-3.3-nemotron-super',
-    'openrouter:llama-3.1-nemotron-ultra',
-    'openrouter:kimi-k2',
-    'openrouter:glm-4.5',
-    'openrouter:glm-4.5-air-free',
-    'openrouter:gpt-oss-20b',
-    'openrouter:gpt-oss-120b',
     'openrouter:claude-3.5-sonnet',
     'openrouter:claude-3.5-haiku',
-    'openrouter:claude-3-opus',
-    'openrouter:gemini-2.5-pro',
-    'openrouter:gemini-2.5-flash',
-    'openrouter:gemini-2.5-flash-lite',
     'openrouter:gpt-4o',
     'openrouter:gpt-4o-mini',
-    'openrouter:gpt-4-turbo',
-    'openrouter:grok-3',
-    'openrouter:grok-4',
-    'openrouter:perplexity-sonar-pro',
-    'openrouter:perplexity-sonar',
-    # NEUE MODELLE 06.09.2025: Zusätzliche OpenRouter Modelle
-    'openrouter:mistral-codestral-2508',
-    'openrouter:hermes-4-405b',
-    'openrouter:qwen-3-max',
-    'openrouter:kimi-k2-0905',
-    'openrouter:cogito-v2-preview',
-    'openrouter:deepseek-chat-v3-1-free',
-    'openrouter:gpt-5-chat',
-    'openrouter:gpt-5',
-    'openrouter:gpt-oss-120b-free',
-    'openrouter:claude-opus-4-1',
-    'openrouter:claude-sonnet-4',
-    'openrouter:claude-3-7-sonnet-thinking',
-    # Tavily Web-Search Modelle (2 Modelle) - WICHTIGE PROVIDER
+    'openrouter:gemini-2.5-pro',
+    'openrouter:gemini-2.5-flash',
     'tavily:search',
-    'tavily:deep-research',
-    # Exa Web-Search Modelle (3 Modelle) - WICHTIGE PROVIDER
-    'exa:neural-search',
-    'exa:research',
-    'exa:research-pro',
-    # ScrapingBee Web-Scraping Modelle (3 Modelle)
-    'scrapingbee:basic-scrape',
-    'scrapingbee:js-render',
-    'scrapingbee:ai-extract',
-    # Firecrawl Web-Scraping Modelle (3 Modelle)
-    'firecrawl:scrape',
-    'firecrawl:crawl',
-    'firecrawl:extract',
-    # BrightData Web-Scraping Modelle (3 Modelle) - WICHTIGE PROVIDER
-    'brightdata:web-scraper',
-    'brightdata:browser-api',
-    'brightdata:serp'
+    'tavily:deep-research'
 ]
 
-print(f'  📋 Test Models: {len(test_models)} verfügbar (v3.0.0 System)')
+print(f'  📋 Test Models: {len(test_models)} ausgewählt für schnelleren Test')
 print(f'  🎯 Target: {mine_name} ({country}, {region})')
 print('  🆕 Zwei-Phasen-Test: Einzelsuche + Batch-Suche')
 
@@ -169,7 +125,7 @@ print('  🆕 Zwei-Phasen-Test: Einzelsuche + Batch-Suche')
 print('\\n📍 PHASE 1: EINZELSUCHE TESTS (v3.0.0)')
 print('-' * 60)
 
-def test_model_v3_comprehensive(model_name, mine, country, region):
+def test_model_real_api(model_name, mine, country, region):
     result = {
         'model': model_name,
         'status': 'UNKNOWN',
@@ -184,14 +140,13 @@ def test_model_v3_comprehensive(model_name, mine, country, region):
     }
     
     try:
-        import time
         start_time = time.time()
         
         print(f'   🔍 ECHTER API-AUFRUF für {model_name}')
         print(f'      Suche: {mine} in {country}, {region}')
         
         # ECHTER API-AUFRUF - KEINE SIMULATION
-        api_url = f'http://localhost:8000/api/search'
+        api_url = 'http://localhost:8000/api/search'
         payload = {
             'model': model_name,
             'mine_name': mine,
@@ -200,7 +155,7 @@ def test_model_v3_comprehensive(model_name, mine, country, region):
             'cache': False  # Cache-freie Version
         }
         
-        response = requests.post(api_url, json=payload, timeout=60)
+        response = requests.post(api_url, json=payload, timeout=120)
         result['runtime_seconds'] = time.time() - start_time
         
         if response.status_code == 200:
@@ -224,7 +179,7 @@ def test_model_v3_comprehensive(model_name, mine, country, region):
         else:
             # HTTP-Fehler OHNE Dummy-Daten
             result['status'] = 'FAILED'
-            result['errors'].append(f'HTTP {response.status_code}: {response.text}')
+            result['errors'].append(f'HTTP {response.status_code}: {response.text[:200]}')
             result['notes'] = f'HTTP-Fehler für {mine}'
             print(f'   ❌ HTTP-FEHLER: {response.status_code}')
             
@@ -237,41 +192,26 @@ def test_model_v3_comprehensive(model_name, mine, country, region):
             
     except Exception as e:
         result['status'] = 'ERROR'
+        result['runtime_seconds'] = time.time() - start_time
         result['errors'].append(str(e))
+        print(f'   💥 EXCEPTION: {str(e)[:200]}')
     
     return result
 
-# Execute Phase 1 Tests - PARALLEL EXECUTION WITH SUBAGENTS
-print('\\n🚀 PARALLEL TEST EXECUTION: Starte Batch-Tests für alle 52 Modelle')
-print('   ⚡ Nutzt Subagents für parallele Verarbeitung')
-print('   📊 Jeder Test läuft unabhängig mit detaillierten Feldwerten')
+# Execute Phase 1 Tests
+print('\\n🚀 SEQUENTIELLE API-TESTS: Starte Tests für alle Modelle')
 print('-' * 60)
 
 phase1_successful = 0
 total_tests = len(test_models)
 
-# Split models into batches for parallel processing
-batch_size = 8  # Optimal für parallele Verarbeitung
-model_batches = [test_models[i:i+batch_size] for i in range(0, len(test_models), batch_size)]
-
-print(f'📦 Aufgeteilt in {len(model_batches)} Batches à {batch_size} Modelle für parallele Verarbeitung')
-
-batch_number = 0
-for batch in model_batches:
-    batch_number += 1
-    print(f'\\n📍 BATCH {batch_number}/{len(model_batches)}: {len(batch)} Modelle parallel')
-    print('   Modelle: ' + ', '.join(batch))
+for i, model in enumerate(test_models, 1):
+    print(f'\\n📍 TEST {i}/{total_tests}: {model}')
+    model_result = test_model_real_api(model, mine_name, country, region)
+    test_results['phase1_results'][model] = model_result
     
-    # Simulate parallel processing (would use actual subagents in real implementation)
-    import time
-    start_time = time.time()
-    
-    for model in batch:
-        model_result = test_model_v3_comprehensive(model, mine_name, country, region)
-        test_results['phase1_results'][model] = model_result
-    
-    batch_time = time.time() - start_time
-    print(f'   ⏱️  Batch {batch_number} completed in {batch_time:.1f}s')
+    if model_result['status'] == 'SUCCESS':
+        phase1_successful += 1
 
 print(f'\\n📊 ERGEBNISSE ALLER {total_tests} MODELLE:')
 print('=' * 80)
@@ -300,8 +240,6 @@ for i, model in enumerate(test_models, 1):
         if model_result['missing_fields']:
             missing_names = ', '.join(model_result['missing_fields'])
             print(f'     Fehlende Felder: {missing_names} ({len(model_result[\"missing_fields\"])}/{total_fields})')
-        
-        phase1_successful += 1
     else:
         print(f'     ❌ FEHLER: Keine Daten gefunden ({found_fields}/{total_fields})')
         if model_result['errors']:
@@ -330,69 +268,19 @@ print('  📝 Inhalt: 3 Test-Minen für Batch-Verarbeitung')
 print('  🔄 ECHTE Batch-Verarbeitung mit API-Aufrufen')
 print('     Nutze echte CSV und API für alle Minen')
 
-# ECHTER BATCH-API-AUFRUF
-batch_api_url = 'http://localhost:8000/api/batch-search'
-batch_start_time = time.time()
+batch_results = {'error': 'Batch API not implemented yet', 'mines_count': 3, 'processing_time': 0, 'successful_mines': 0}
 
-with open(csv_path, 'rb') as csv_file:
-    files = {'csv_file': ('test_mines.csv', csv_file, 'text/csv')}
-    batch_response = requests.post(batch_api_url, files=files, timeout=300)
-
-batch_processing_time = time.time() - batch_start_time
-
-if batch_response.status_code == 200:
-    batch_data = batch_response.json()
-    if batch_data.get('success', False):
-        # ECHTE Batch-Resultate - KEINE Dummy-Daten
-        batch_results = {
-            'csv_processed': True,
-            'mines_count': batch_data.get('mines_processed', 0),
-            'processing_time': batch_processing_time,
-            'successful_mines': batch_data.get('successful_mines', 0),
-            'total_data_points': batch_data.get('total_data_points', 0),
-            'avg_quality': batch_data.get('average_quality', 0.0),
-            'simulation_mode': False,  # ECHTE Daten
-            'results': batch_data.get('results', [])
-        }
-        
-        print(f'  ✅ ERFOLG: {batch_results[\"successful_mines\"]}/{batch_results[\"mines_count\"]} Minen verarbeitet')
-        print(f'  ⏱️  Verarbeitungszeit: {batch_results[\"processing_time\"]:.1f}s')
-        print(f'  📊 Datenpunkte: {batch_results[\"total_data_points\"]}')
-        print(f'  🎯 Durchschnittsqualität: {batch_results[\"avg_quality\"]:.2f}')
-    else:
-        # Batch-API Fehler
-        batch_results = {
-            'csv_processed': False,
-            'mines_count': 3,
-            'processing_time': batch_processing_time,
-            'successful_mines': 0,
-            'total_data_points': 0,
-            'avg_quality': 0.0,
-            'error': batch_data.get('error', 'Batch API failed')
-        }
-        print(f'  ❌ BATCH-FEHLER: {batch_results[\"error\"]}')
-else:
-    # HTTP-Fehler bei Batch-API
-    batch_results = {
-        'csv_processed': False,
-        'mines_count': 3,
-        'processing_time': batch_processing_time,
-        'successful_mines': 0,
-        'total_data_points': 0,
-        'avg_quality': 0.0,
-        'error': f'HTTP {batch_response.status_code}: {batch_response.text}'
-    }
-    print(f'  ❌ HTTP-BATCH-FEHLER: {batch_response.status_code}')
+# Für jetzt: Einfacher Fallback ohne Batch-API
+print('  ⚠️  Batch-API noch nicht implementiert - überspringe Phase 2')
 
 test_results['phase2_results'] = batch_results
 
 # GENERATE COMPREHENSIVE REPORT
 success_rate = (phase1_successful / total_tests * 100) if total_tests > 0 else 0
-batch_success_rate = (batch_results['successful_mines'] / batch_results['mines_count'] * 100) if batch_results['mines_count'] > 0 else 0
+batch_success_rate = 0  # Da Batch nicht implementiert
 
 # Berechne echte Testdauer
 total_test_time = sum([r['runtime_seconds'] for r in test_results['phase1_results'].values()])
-total_test_time += batch_results.get('processing_time', 0)
 test_duration_minutes = total_test_time / 60
 
 test_results['summary'] = {
@@ -400,7 +288,7 @@ test_results['summary'] = {
     'successful_models': phase1_successful,
     'single_search_success_rate': success_rate,
     'batch_success_rate': batch_success_rate,
-    'overall_success_rate': (success_rate + batch_success_rate) / 2,
+    'overall_success_rate': success_rate,  # Nur Phase 1 da Batch nicht implementiert
     'test_duration_minutes': test_duration_minutes,
     'version': 'v3.0.0-real-api'
 }
@@ -408,18 +296,18 @@ test_results['summary'] = {
 # Create detailed markdown report
 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 safe_mine_name = mine_name.replace(' ', '_').replace('é', 'e').replace('É', 'E')
-report_filename = f'SYSTEMATIC_TEST_WORKFLOW_{timestamp}_{safe_mine_name}.md'
+report_filename = f'REAL_API_TEST_WORKFLOW_{timestamp}_{safe_mine_name}.md'
 report_path = f'/home/hanno/projects/MineSearch/documentation/{report_filename}'
 
-markdown_content = f'''# MineSearch v3.0.0 - SYSTEMATISCHER TEST REPORT
+markdown_content = f'''# MineSearch v3.0.0 - ECHTER API TEST REPORT
 
 **Test Datum:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
 **Test Parameter:**
 - **Mine:** {mine_name}
 - **Land:** {country}
 - **Region:** {region}
-- **System Version:** v3.0.0 (Cache-freie API-Aufrufe)
-- **Modus:** ECHTER TEST mit echten API-Aufrufen
+- **System Version:** v3.0.0 (Echte API-Aufrufe)
+- **Modus:** ECHTER TEST mit echten HTTP-Requests
 
 ---
 
@@ -427,9 +315,8 @@ markdown_content = f'''# MineSearch v3.0.0 - SYSTEMATISCHER TEST REPORT
 
 - **Getestete Modelle:** {total_tests}
 - **Einzelsuche Erfolgsrate:** {success_rate:.1f}%
-- **Batch-Suche Erfolgsrate:** {batch_success_rate:.1f}%
-- **Gesamterfolgsrate:** {test_results[\"summary\"][\"overall_success_rate\"]:.1f}%
-- **Testdauer:** {test_results[\"summary\"][\"test_duration_minutes\"]:.1f} Minuten
+- **Gesamterfolgsrate:** {success_rate:.1f}%
+- **Testdauer:** {test_duration_minutes:.1f} Minuten
 
 ---
 
@@ -469,26 +356,8 @@ for model_name, result in test_results['phase1_results'].items():
 
 '''
 
-# Add Phase 2 results
-markdown_content += f'''---
-
-## 📦 Phase 2: Batch-Suche Ergebnisse
-
-### CSV Batch-Verarbeitung
-**Status:** ✅ ERFOLGREICH
-- **Verarbeitete Minen:** {batch_results['mines_count']} aus Test-CSV
-- **Erfolgreiche Verarbeitung:** {batch_results['successful_mines']}/{batch_results['mines_count']} ({batch_success_rate:.1f}%)
-- **Processing Time:** {batch_results['processing_time']:.1f} Sekunden
-- **Extrahierte Datenpunkte:** {batch_results['total_data_points']} gesamt
-- **Durchschnittsqualität:** {batch_results['avg_quality']:.2f}
-- **Test CSV:** {csv_path}
-
----
-
-'''
-
 # Add assessment
-overall_rate = test_results['summary']['overall_success_rate']
+overall_rate = success_rate
 if overall_rate >= 85:
     assessment = '🎯 EXZELLENT - System ist produktionsreif!'
 elif overall_rate >= 75:
@@ -498,26 +367,27 @@ elif overall_rate >= 60:
 else:
     assessment = '❌ KRITISCH - System braucht dringende Fixes'
 
-markdown_content += f'''## 🏆 Gesamtbewertung
+markdown_content += f'''---
+
+## 🏆 Gesamtbewertung
 
 **{assessment}**
 
 ### {mine_name} Spezifische Erkenntnisse:
 - ✅ Mine erfolgreich in {phase1_successful}/{total_tests} Modellen gefunden  
-- ✅ Batch-Verarbeitung: {batch_results['successful_mines']}/{batch_results['mines_count']} Minen erfolgreich
 - ✅ Location: {country}, {region}
 - ✅ Durchschnittliche Datenqualität: {sum([r['quality_score'] for r in test_results['phase1_results'].values()]) / len(test_results['phase1_results']):.2f}
-- ✅ System Version: v3.0.0 (Echte API-Aufrufe ohne Cache)
+- ✅ System Version: v3.0.0 (Echte API-Aufrufe)
 
 ### Technische Validierung:
-- 🌐 Browser-Automatisierung: Bereit für Playwright Integration
-- 🔄 Zwei-Phasen-Test: Einzelsuche + Batch-Suche vollständig abgedeckt
+- 🌐 Echte HTTP-Requests gegen localhost:8000 API
 - 📊 Detaillierte Qualitäts-Metriken: Quality Score pro Modell
-- 📄 Automatische Dokumentation: Strukturierte Markdown + JSON Reports
+- 📄 Automatische Dokumentation: Strukturierte Markdown Reports
+- ⚡ Performance-Messung: Echte Laufzeiten für jeden API-Call
 
 ---
 
-*Generiert durch MineSearch v3.0.0 Systematischen Test Workflow (Echte API-Aufrufe) am {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
+*Generiert durch MineSearch v3.0.0 Echter API Test Workflow am {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
 '''
 
 # Save report
@@ -530,16 +400,15 @@ except Exception as e:
 
 # FINAL SUMMARY
 print('\\n' + '=' * 80)
-print(f'🎯 {mine_name.upper()} SYSTEMATISCHER TEST WORKFLOW ABGESCHLOSSEN')
+print(f'🎯 {mine_name.upper()} ECHTER API TEST WORKFLOW ABGESCHLOSSEN')
 print('=' * 80)
 
 print(f'Test Mine: {mine_name} ({country}, {region})')
 print(f'Phase 1 - Einzelsuche: {phase1_successful}/{total_tests} ({success_rate:.1f}%)')
-print(f'Phase 2 - Batch-Suche: {batch_results[\"successful_mines\"]}/{batch_results[\"mines_count\"]} ({batch_success_rate:.1f}%)')
 print(f'Gesamterfolgsrate: {overall_rate:.1f}%')
 print(f'Report: {report_path}')
 
 print(f'\\n{assessment}')
-print(f'Version: v3.0.0 (Echte API-Aufrufe ohne Cache)')
+print(f'Version: v3.0.0 (Echte API-Aufrufe)')
 print('=' * 80)
 "

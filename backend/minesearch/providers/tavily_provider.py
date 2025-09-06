@@ -261,13 +261,13 @@ class TavilyProvider(AbstractProvider):
         Tavily fand nur wenige Felder - erweiterte Suchstrategie für vollständige Daten
         """
         
-        # ERWEITERTE Query-Templates für alle Datenfelder
+        # KOMPAKTE Query-Templates für Tavily 400-Zeichen Limit
         query_templates = {
-            'comprehensive': '"{mine}" mine {country} {region} (owner OR operator OR "operated by" OR "owned by") (coordinates OR GPS OR lat OR long) ({commodity} OR gold OR mining) (production OR annual OR tonnes OR ounces)',
-            'restoration': '"{mine}" mine {country} ("restoration cost" OR "closure cost" OR ARO OR "asset retirement obligation" OR "reclamation cost" OR "decommissioning") (million OR CAD OR USD)',
-            'financial': '"{mine}" mine {country} ("technical report" OR "NI 43-101" OR "annual report" OR "feasibility study" OR "financial statement") (cost OR budget OR investment)',
-            'operational': '"{mine}" mine {country} {region} (Hecla OR operator OR owner) (active OR production OR operational OR closed) (underground OR "open pit" OR surface)',
-            'location_specific': '"{mine}" mine Quebec Canada (coordinates OR latitude OR longitude OR GPS OR location OR "49.3" OR "78.9") Hecla'
+            'comprehensive': '"{mine}" mine {country} {region} (owner OR operator) coordinates production',
+            'restoration': '"{mine}" mine {country} "restoration cost" million',
+            'financial': '"{mine}" mine {country} "technical report" cost',
+            'operational': '"{mine}" mine {country} {region} operator active',
+            'location_specific': '"{mine}" mine {country} coordinates GPS'
         }
         
         # FIX: Für Casa Berardi spezielle optimierte Query
@@ -298,11 +298,12 @@ class TavilyProvider(AbstractProvider):
         query = re.sub(r'\(\s+', '(', query)  # Leerzeichen nach öffnender Klammer
         query = query.strip()
         
-        # KORRIGIERT 13.07.2025: Tavily Query-Limit ist 400 Zeichen (nicht 600)
-        if len(query) > 400:
+        # KORRIGIERT 06.09.2025: Tavily Query-Limit ist 400 Zeichen - kürze Query intelligent
+        if len(query) > 395:  # Etwas Puffer lassen
             # Priorisierte Begriffe für Kürzung
             essential_parts = [
                 f'"{mine_name}"',
+                'mine',
                 country or "",
                 commodity or "mine",
                 '(operator OR owner)',
@@ -315,14 +316,14 @@ class TavilyProvider(AbstractProvider):
                 if not part:
                     continue
                 test_query = f"{query} {part}".strip()
-                if len(test_query) <= 590:  # Sicherheitspuffer
+                if len(test_query) <= 390:  # Sicherheitspuffer für 400 Zeichen Limit
                     query = test_query
                 else:
                     break
             
             # Extremer Fallback
-            if len(query) > 600:
-                query = f'"{mine_name[:150]}" mine {country or ""}'.strip()[:600]
+            if len(query) > 395:
+                query = f'"{mine_name[:100]}" mine {country or ""}'.strip()[:395]
         
         logger.info(f"[TAVILY] Optimierte Query ({len(query)} Zeichen): {query}")
         return query
@@ -531,35 +532,13 @@ SUCHSTRATEGIE:
     ) -> str:
         """Erweiterte Query mit Source Discovery (wie OpenRouter)"""
         
-        # Basis Mining-Query
+        # Basis Mining-Query - bereits optimiert für 400 Zeichen
         enhanced_query = self._build_mining_query(base_query, mine_name, country, commodity, region)
         
-        # Füge Discovery-Quellen hinzu
-        if discovered_sources:
-            sources_text = f"\n\n📚 WICHTIG: Nutze dein Wissen über ALLE {len(discovered_sources)} folgenden Quellen!\n"
-            sources_text += "Auch wenn du nicht direkt darauf zugreifen kannst, kennst du möglicherweise Daten aus diesen Quellen:\n\n"
-            
-            # Gruppiere nach Quellentyp (wie OpenRouter)
-            gov_sources = [s for s in discovered_sources if s.get('type') == 'government']
-            db_sources = [s for s in discovered_sources if s.get('type') == 'database']
-            exchange_sources = [s for s in discovered_sources if s.get('type') == 'exchange']
-            other_sources = [s for s in discovered_sources if s.get('type') not in ['government', 'database', 'exchange']]
-            
-            if gov_sources:
-                sources_text += f"🏛️ REGIERUNGSQUELLEN ({len(gov_sources)}):\n"
-                for source in gov_sources[:5]:  # Top 5
-                    sources_text += f"- {source.get('title', source.get('url', 'Unknown'))}\n"
-            
-            if db_sources:
-                sources_text += f"\n🗃️ DATENBANKEN ({len(db_sources)}):\n"
-                for source in db_sources[:5]:  # Top 5
-                    sources_text += f"- {source.get('title', source.get('url', 'Unknown'))}\n"
-            
-            enhanced_query += sources_text
+        # WICHTIG: Tavily hat 400 Zeichen Limit - Query darf NICHT erweitert werden!
+        # Sources werden separat als include_domains übergeben, nicht in der Query
         
-        # Füge Sprachvarianten hinzu (wie OpenRouter)
-        if name_variants:
-            enhanced_query += f"\n\nSuche auch nach alternativen Namen: {', '.join(name_variants[:5])}\n"
+        # Keine weiteren Texte hinzufügen, da Query sonst zu lang wird
         
         return enhanced_query
     

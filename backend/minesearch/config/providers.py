@@ -96,6 +96,7 @@ PROVIDERS_CONFIG = {
     'scrapingbee': {
         'enabled': True,
         'api_key': APIKeysConfig.SCRAPINGBEE_API_KEY,
+        'openrouter_api_key': APIKeysConfig.OPENROUTER_API_KEY,  # Für AI-Extraktion
         'base_url': 'https://app.scrapingbee.com/api/v1',
         'models': SCRAPINGBEE_MODELS,
         'timeout': 180,  # Langsam für Scraping
@@ -105,6 +106,7 @@ PROVIDERS_CONFIG = {
     'firecrawl': {
         'enabled': True,
         'api_key': APIKeysConfig.FIRECRAWL_API_KEY,
+        'openrouter_api_key': APIKeysConfig.OPENROUTER_API_KEY,  # Für AI-Extraktion
         'base_url': 'https://api.firecrawl.dev/v1',
         'models': FIRECRAWL_MODELS,
         'timeout': 200,  # Langsam für Crawling
@@ -114,6 +116,7 @@ PROVIDERS_CONFIG = {
     'brightdata': {
         'enabled': True,
         'api_key': APIKeysConfig.BRIGHTDATA_API_KEY,
+        'openrouter_api_key': APIKeysConfig.OPENROUTER_API_KEY,  # Für AI-Extraktion
         'base_url': 'https://api.brightdata.com',
         'models': BRIGHTDATA_MODELS,
         'timeout': 150,  # Mittel für BrightData

@@ -422,13 +422,13 @@ class MineSearchService:
             
             # 🆕 NORMALISIERTES SYSTEM: Einzige Speicherung
             # Debug-Datei Logging
-            with open('/app/normalized_debug.log', 'a') as f:
-                f.write(f"DEBUG: Normalized save attempt for {mine_name} with model {actual_model_used}\n")
+            # with open('./normalized_debug.log', 'a') as f:
+                    #                 f.write(f"DEBUG: Normalized save attempt for {mine_name} with model {actual_model_used}\n")
             
             print(f"🔥🔥🔥 DEBUG: Normalized save attempt for {mine_name} with model {actual_model_used}")
             try:
-                with open('/app/normalized_debug.log', 'a') as f:
-                    f.write(f"DEBUG: Inside try block, calling save_search_result_normalized\n")
+                # with open('./normalized_debug.log', 'a') as f:
+                    #                     f.write(f"DEBUG: Inside try block, calling save_search_result_normalized\n")
                 logger.info(f"[DB NORMALIZED] Speichere normalisiert: {mine_name} → {actual_model_used}")
                 print(f"🔥🔥🔥 DEBUG: Inside try block, calling save_search_result_normalized")
                 normalized_result_id = self.normalized_db_manager.save_search_result_normalized(
@@ -440,18 +440,17 @@ class MineSearchService:
                     country=country,
                     search_duration=search_duration
                 )
-                with open('/app/normalized_debug.log', 'a') as f:
-                    f.write(f"DEBUG: Normalized save SUCCESS! ID = {normalized_result_id}\n")
+                # with open('./normalized_debug.log', 'a') as f:
+                    #                     f.write(f"DEBUG: Normalized save SUCCESS! ID = {normalized_result_id}\n")
                 print(f"🔥🔥🔥 DEBUG: Normalized save SUCCESS! ID = {normalized_result_id}")
                 logger.info(f"✅ NORMALIZED SAVE SUCCESS: ID={normalized_result_id}")
             except Exception as norm_error:
-                with open('/app/normalized_debug.log', 'a') as f:
-                    f.write(f"DEBUG: Normalized save FAILED! Error = {norm_error}\n")
-                    import traceback
-                    f.write(f"DEBUG: Traceback = {traceback.format_exc()}\n")
+                # with open('./normalized_debug.log', 'a') as f:
+                #     f.write(f"DEBUG: Normalized save FAILED! Error = {norm_error}\n")
+                import traceback
+                #     f.write(f"DEBUG: Traceback = {traceback.format_exc()}\n")
                 print(f"🔥🔥🔥 DEBUG: Normalized save FAILED! Error = {norm_error}")
                 logger.error(f"❌ Normalized save failed: {norm_error}")
-                import traceback
                 logger.error(f"❌ Normalized save traceback:\n{traceback.format_exc()}")
                 # Continue with legacy system if normalized fails
             

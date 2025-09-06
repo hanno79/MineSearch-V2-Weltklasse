@@ -10,7 +10,13 @@ import logging
 from typing import Dict, List, Any, Tuple, Optional
 from dataclasses import dataclass
 
+# Import EnhancedSourceDiscovery für Export
+from .enhanced_source_discovery import EnhancedSourceDiscovery
+
 logger = logging.getLogger(__name__)
+
+# Export EnhancedSourceDiscovery für andere Module
+__all__ = ['SourceManager', 'SourceReference', 'EnhancedSourceDiscovery']
 
 
 @dataclass

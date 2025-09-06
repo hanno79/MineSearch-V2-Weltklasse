@@ -17,37 +17,44 @@ from minesearch.database import db_manager
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Normalisierte Tabellenstruktur (05.09.2025) - Nach Company Role Refactoring
-NORMALIZED_TABLES = {
-    "Stammdaten": [
-        "companies",           # Unternehmen (ohne company_type)
-        "company_roles",       # Rollen (owner, operator, contractor, joint_venture)
-        "countries",           # Länder-Lookup mit ISO-Codes  
-        "commodities",         # Rohstoffe (Gold, Kupfer, etc.)
-        "sources",             # Quellen für Daten
-        "ai_models"            # AI-Modelle für Suchen
+# NORMALISIERTE DATENBANK-STRUKTUR (06.09.2025)
+# Nach Bereinigung: Nur 12 relevante Tabellen
+NORMALIZED_STRUCTURE = {
+    "🗂️ Stammdaten (Lookups)": [
+        'countries',     # Länder mit ISO-Codes
+        'regions',       # Regionen/Provinzen
+        'commodities',   # Rohstoffe (Gold, Kupfer, etc.)
+        'companies',     # Unternehmen (Owner/Operator)
+        'ai_models',     # AI-Modelle für Suchen
+        'sources'        # Datenquellen
     ],
-    "Kerndaten": [
-        "mines",               # Minen mit FKs zu Lookup-Tabellen
-        "mine_production",     # Produktionsdaten (falls vorhanden)
-        "mine_restoration_plans" # Restaurationspläne (falls vorhanden)
+    "⛏️ Kerndaten": [
+        'mines'          # Minen mit Foreign Keys zu Lookups
     ],
-    "Beziehungen": [
-        "company_role_assignments"  # Company ↔ Role Assignments (N:M)
+    "🔗 Beziehungen (N:M)": [
+        'mine_commodities',  # Mine ↔ Rohstoffe
+        'mine_owners',       # Mine ↔ Eigentümer
+        'mine_operators'     # Mine ↔ Betreiber
     ],
-    "Feldwerte": [
-        "mine_data_fields",    # Mine-Feldwerte aus Suchen (PRIMARY)  
-        "search_results"       # Such-Ergebnisse
-    ],
-    "Legacy/Analytics": [
-        "field_definitions",   # Legacy Feld-Definitionen
-        "template_patterns",   # Template-Erkennungsmuster
-        "source_metadata"      # Source-Metadaten
+    "🔍 Such-Ergebnisse": [
+        'search_results',    # Gespeicherte Suchergebnisse
+        'search_sessions'    # Such-Sessions für Gruppierung
     ]
 }
 
-# Flache Liste für Rückwärtskompatibilität
-IMPORTANT_TABLES = [table for category in NORMALIZED_TABLES.values() for table in category]
+def categorize_table(table_name: str, row_count: int) -> str:
+    """Kategorisiert Tabellen basierend auf normalisierter Struktur"""
+    
+    # Durchsuche die normalisierte Struktur
+    for category, tables in NORMALIZED_STRUCTURE.items():
+        if table_name in tables:
+            return category
+    
+    # Fallback für unbekannte Tabellen (sollte nicht vorkommen)
+    return "❓ Unbekannt"
+
+# Wichtige Tabellen für Quick-Access
+IMPORTANT_TABLES = ['mines', 'search_results', 'sources', 'countries', 'commodities', 'companies']
 
 @router.get("/tables")
 async def get_all_tables():
@@ -63,35 +70,24 @@ async def get_all_tables():
             """))
             all_tables = result.fetchall()
             
-            # Zähle Einträge für jede Tabelle
+            # Zähle Einträge für jede Tabelle und kategorisiere dynamisch
             table_info = []
+            categories_found = {}
+            
             for table_name, table_type in all_tables:
                 try:
                     quoted_table = preparer.quote(table_name)
                     count_result = session.execute(text(f"SELECT COUNT(*) FROM {quoted_table}"))
                     count = count_result.fetchone()[0]
                     
-                    # Kategorisiere Tabellen basierend auf normalisierter Struktur
-                    category = "Other"
-                    if table_name in NORMALIZED_TABLES["Stammdaten"]:
-                        category = "Stammdaten"
-                    elif table_name in NORMALIZED_TABLES["Kerndaten"]:
-                        category = "Kerndaten"
-                    elif table_name in NORMALIZED_TABLES["Beziehungen"]:
-                        category = "Beziehungen"
-                    elif table_name in NORMALIZED_TABLES["Feldwerte"]:
-                        category = "Feldwerte"
-                    elif table_name in NORMALIZED_TABLES["Legacy/Analytics"]:
-                        category = "Legacy/Analytics"
-                    elif "backup" in table_name.lower():
-                        category = "System/Backup"
-                    elif "statistics" in table_name or "model_" in table_name:
-                        category = "Statistics (Legacy)" 
-                    elif "log" in table_name or "session" in table_name:
-                        category = "Logs (Legacy)"
-                    elif count == 0:
-                        category = "Leer (Nicht verwendet)"
-                        
+                    # Dynamische Kategorisierung
+                    category = categorize_table(table_name, count)
+                    
+                    # Sammle gefundene Kategorien für Statistik
+                    if category not in categories_found:
+                        categories_found[category] = []
+                    categories_found[category].append(table_name)
+                    
                     table_info.append({
                         "name": table_name,
                         "type": table_type,
@@ -112,10 +108,12 @@ async def get_all_tables():
             return {
                 "success": True,
                 "tables": table_info,
-                "categories": NORMALIZED_TABLES,
+                "categories": categories_found,  # Dynamisch gefundene Kategorien
+                "normalized_structure": NORMALIZED_STRUCTURE,  # Struktur-Definition
                 "important_tables": IMPORTANT_TABLES,
                 "total_tables": len(table_info),
-                "normalized_structure": True
+                "normalized": True,  # Flag für normalisierte DB
+                "category_count": len(categories_found)
             }
             
     except Exception as e:

@@ -59,11 +59,13 @@ async function loadDatabaseTables() {
         if (data.success) {
             databaseViewer.tables = data.tables;
             databaseViewer.categories = data.categories || {};
-            databaseViewer.normalizedStructure = data.normalized_structure || false;
+            databaseViewer.dynamicCategorization = data.dynamic_categorization || false;
             
-            updateTableCounts(data.tables);
+            console.log(`✅ [DATABASE-VIEWER] ${data.total_tables} Tabellen in ${data.category_count} Kategorien geladen`);
+            console.log('📊 [DATABASE-VIEWER] Kategorien:', data.categories);
+            
             updateTableCategorization(data.tables, data.categories);
-            console.log('✅ [DATABASE-VIEWER] Normalisierte Tabellenstruktur geladen:', data.categories);
+            console.log('✅ [DATABASE-VIEWER] Dynamische Tabellenstruktur aktiviert');
         }
     } catch (error) {
         console.error('❌ Fehler beim Laden der Tabellen:', error);
@@ -100,15 +102,11 @@ function updateTableCounts(tables) {
 }
 
 /**
- * Aktualisiert Tabellen-Kategorisierung basierend auf normalisierter Struktur
+ * Aktualisiert Tabellen-Kategorisierung basierend auf dynamischer Struktur
  */
 function updateTableCategorization(tables, categories) {
-    console.log('🏗️ [DATABASE-VIEWER] Updating table categorization with normalized structure');
-    
-    if (!categories || Object.keys(categories).length === 0) {
-        console.log('⚠️ [DATABASE-VIEWER] No categories provided - using existing structure');
-        return;
-    }
+    console.log('🏗️ [DATABASE-VIEWER] Updating table categorization with dynamic structure');
+    console.log('🏗️ [DATABASE-VIEWER] Categories found:', categories);
     
     // Hole das Tabellen-Container-Element
     const tabsContainer = document.querySelector('.database-tabs');
@@ -117,27 +115,16 @@ function updateTableCategorization(tables, categories) {
         return;
     }
     
-    // Lösche bestehende dynamische Kategorien (behalte nur den ersten Legacy-Bereich)
-    const existingGroups = tabsContainer.querySelectorAll('.tab-group');
-    existingGroups.forEach((group, index) => {
-        if (index > 0) { // Behalte nur die erste Gruppe (Legacy System)
-            group.remove();
-        }
-    });
+    // Lösche bestehende Inhalte
+    tabsContainer.innerHTML = '';
     
-    // Füge neue kategorisierte Gruppen hinzu
-    const categoryColors = {
-        'Stammdaten': '#059669',      // Grün
-        'Kerndaten': '#0ea5e9',       // Blau  
-        'Beziehungen': '#8b5cf6',     // Violett
-        'Feldwerte': '#f59e0b'        // Orange
-    };
-    
-    const categoryIcons = {
-        'Stammdaten': '📋',
-        'Kerndaten': '⛏️', 
-        'Beziehungen': '🔗',
-        'Feldwerte': '💾'
+    // Definiere Kategorie-Styling für normalisierte Struktur
+    const categoryStyles = {
+        '🗂️ Stammdaten (Lookups)': { color: '#059669', icon: '🗂️' },
+        '⛏️ Kerndaten': { color: '#0ea5e9', icon: '⛏️' },
+        '🔗 Beziehungen (N:M)': { color: '#8b5cf6', icon: '🔗' },
+        '🔍 Such-Ergebnisse': { color: '#f59e0b', icon: '🔍' },
+        '❓ Unbekannt': { color: '#64748b', icon: '❓' }
     };
     
     // Erstelle Gruppen für jede Kategorie
@@ -146,19 +133,14 @@ function updateTableCategorization(tables, categories) {
             const groupDiv = document.createElement('div');
             groupDiv.className = 'tab-group';
             
-            // Kategorie-Header
-            const headerH4 = document.createElement('h4');
-            headerH4.style.cssText = `
-                margin: 15px 0 5px 0; 
-                font-size: 0.85rem; 
-                color: ${categoryColors[categoryName] || '#666'}; 
-                text-transform: uppercase; 
-                font-weight: 600;
-            `;
-            headerH4.innerHTML = `${categoryIcons[categoryName] || '📁'} ${categoryName}`;
-            groupDiv.appendChild(headerH4);
+            // Kategorie-Header mit Styling
+            const style = categoryStyles[categoryName] || { color: '#64748b', icon: '📄' };
+            const headerDiv = document.createElement('h4');
+            headerDiv.style.cssText = `margin: 10px 0 5px 0; font-size: 0.85rem; color: ${style.color}; text-transform: uppercase; font-weight: 600;`;
+            headerDiv.textContent = `${style.icon} ${categoryName} (${tableNames.length})`;
+            groupDiv.appendChild(headerDiv);
             
-            // Buttons für jede Tabelle in dieser Kategorie
+            // Buttons für jede Tabelle in dieser Kategorie erstellen
             tableNames.forEach(tableName => {
                 // Finde Tabellen-Info aus der API-Response
                 const tableInfo = tables.find(t => t.name === tableName);
@@ -182,6 +164,8 @@ function updateTableCategorization(tables, categories) {
                 else if (tableName.includes('field')) icon = '💾';
                 else if (tableName.includes('production')) icon = '⚖️';
                 else if (tableName.includes('restoration')) icon = '🌱';
+                else if (tableName.includes('statistics')) icon = '📈';
+                else if (tableName.includes('session')) icon = '🎯';
                 
                 // Benutzerfreundlicher Display-Name
                 let displayName = tableName
@@ -195,7 +179,10 @@ function updateTableCategorization(tables, categories) {
                 `;
                 
                 // Füge Kategorie-spezifische Stylings hinzu
-                button.style.borderLeft = `3px solid ${categoryColors[categoryName] || '#666'}`;
+                button.style.borderLeft = `3px solid ${style.color}`;
+                if (tableInfo.row_count === 0) {
+                    button.style.opacity = '0.5';
+                }
                 
                 // Event Listener
                 button.addEventListener('click', () => {

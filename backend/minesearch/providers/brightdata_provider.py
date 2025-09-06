@@ -359,13 +359,13 @@ class BrightdataProvider(AbstractProvider):
         commodity = options.get('commodity', '')
         
         # OPENROUTER WORKFLOW STEP 1: Source Discovery (wie OpenRouter)
-        from minesearch.source_manager import EnhancedSourceDiscovery
+        from minesearch.enhanced_source_discovery import EnhancedSourceDiscovery
         source_discovery = EnhancedSourceDiscovery()
         discovered_sources = options.get('discovered_sources', [])
         
         if not discovered_sources and not options.get('skip_discovery', False):
             logger.info(f"[BRIGHTDATA-BROWSER] Starte Source Discovery für {mine_name}")
-            discovered_sources = source_discovery.discover_sources_for_mine(mine_name, country, commodity, limit=15)
+            discovered_sources = source_discovery.discover_sources_for_mine(mine_name, country, region=None, commodity=commodity)
         
         # Baue Mining-spezifische URLs
         target_urls = await self._build_mining_urls(mine_name, country)
@@ -533,13 +533,13 @@ class BrightdataProvider(AbstractProvider):
                     logger.error(f"[Brightdata SERP] Fehler bei Suche '{search_query}': {e}")
         
         # OPENROUTER WORKFLOW STEP 1: Source Discovery (wie OpenRouter)
-        from minesearch.source_manager import EnhancedSourceDiscovery
+        from minesearch.enhanced_source_discovery import EnhancedSourceDiscovery
         source_discovery = EnhancedSourceDiscovery()
         discovered_sources = options.get('discovered_sources', [])
         
         if not discovered_sources and not options.get('skip_discovery', False):
             logger.info(f"[BRIGHTDATA-SERP] Starte Source Discovery für {mine_name}")
-            discovered_sources = source_discovery.discover_sources_for_mine(mine_name, country, commodity, limit=15)
+            discovered_sources = source_discovery.discover_sources_for_mine(mine_name, country, region=None, commodity=commodity)
         
         # OPENROUTER WORKFLOW STEP 2: Content durch AI-Modell schicken
         raw_content = self._format_search_results(scraped_data, sources)
@@ -843,7 +843,7 @@ class BrightdataProvider(AbstractProvider):
             import httpx
             
             # Standard AI-Modell für alternative Provider
-            model_name = "anthropic/claude-3-haiku-20240307"
+            model_name = "anthropic/claude-3.5-haiku"
             
             # Erstelle strukturierten Prompt (wie OpenRouter)
             system_prompt = SpecializedPrompts.get_universal_anti_template_instructions()
