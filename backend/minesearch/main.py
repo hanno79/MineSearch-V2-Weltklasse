@@ -99,11 +99,13 @@ setup_middleware(app)
 # Exception Handler aktivieren
 setup_exception_handlers(app)
 
-# Statische Dateien für Frontend
-app.mount("/static", StaticFiles(directory="/app/frontend"), name="static")
+# Statische Dateien für Frontend (Native Installation)
+frontend_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend")
+app.mount("/static", StaticFiles(directory=frontend_path), name="static")
 
-# Statische Dateien für CSV-Zugriff
-app.mount("/csv", StaticFiles(directory="/app"), name="csv")
+# Statische Dateien für CSV-Zugriff  
+project_root = os.path.join(os.path.dirname(__file__), "..", "..")
+app.mount("/csv", StaticFiles(directory=project_root), name="csv")
 
 # API-Router einbinden
 if SAFE_MODE:
