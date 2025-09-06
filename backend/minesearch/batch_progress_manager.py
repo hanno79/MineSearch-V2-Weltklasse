@@ -71,6 +71,12 @@ class SessionProgress:
     successful_results: int = 0
     failed_results: int = 0
     
+    # ERWEITERTE FEHLER-KLASSIFIKATION 06.09.2025
+    quality_filtered: int = 0      # Durch Qualitäts-Filter abgelehnt
+    api_timeouts: int = 0          # API-Timeouts oder Provider-Fehler
+    database_errors: int = 0       # Database-Speicher-Fehler
+    system_errors: int = 0         # Echte System-Fehler
+    
     # Performance-Metriken für Zeitschätzung
     avg_time_per_mine: float = 0.0
     estimated_completion: Optional[datetime] = None
@@ -216,6 +222,11 @@ class BatchProgressManager:
                 "sources_found": session.sources_found,
                 "successful_results": session.successful_results,
                 "failed_results": session.failed_results,
+                # ERWEITERTE FEHLER-KLASSIFIKATION 06.09.2025
+                "quality_filtered": session.quality_filtered,
+                "api_timeouts": session.api_timeouts,
+                "database_errors": session.database_errors,
+                "system_errors": session.system_errors,
                 "eta": eta_text,
                 "started_at": session.started_at.isoformat(),
                 "last_update": session.last_update.isoformat(),
@@ -262,8 +273,8 @@ class BatchProgressManager:
                 current_model=model_name
             )
     
-    def mark_model_complete(self, session_id: str, model_name: str, success: bool) -> None:
-        """Markiere Modell als abgeschlossen"""
+    def mark_model_complete(self, session_id: str, model_name: str, success: bool, error_message: str = None) -> None:
+        """Markiere Modell als abgeschlossen mit erweiterten Fehler-Klassifikation"""
         session = self.sessions.get(session_id)
         if session:
             session.completed_models += 1
@@ -271,6 +282,8 @@ class BatchProgressManager:
                 session.successful_results += 1
             else:
                 session.failed_results += 1
+                # ERWEITERTE FEHLER-KLASSIFIKATION 06.09.2025
+                self._classify_error(session, error_message)
                 
             self.update_progress(
                 session_id=session_id,
@@ -280,6 +293,42 @@ class BatchProgressManager:
                 successful_results=session.successful_results,
                 failed_results=session.failed_results
             )
+    
+    def _classify_error(self, session: SessionProgress, error_message: str) -> None:
+        """Klassifiziert Fehler nach Typ"""
+        if not error_message:
+            session.system_errors += 1
+            return
+        
+        error_lower = error_message.lower()
+        
+        if any(keyword in error_lower for keyword in [
+            'unzureichende suchergebnisse',
+            'niedrige qualität',
+            'confidence',
+            'relevanz',
+            'validation failed'
+        ]):
+            session.quality_filtered += 1
+        elif any(keyword in error_lower for keyword in [
+            'timeout',
+            'rate limit',
+            'api error',
+            'connection',
+            'provider',
+            'network'
+        ]):
+            session.api_timeouts += 1
+        elif any(keyword in error_lower for keyword in [
+            'no such column',
+            'database',
+            'sqlite',
+            'operational error',
+            'constraint'
+        ]):
+            session.database_errors += 1
+        else:
+            session.system_errors += 1
     
     def mark_mine_complete(self, session_id: str, mine_name: str) -> None:
         """Markiere Mine als abgeschlossen"""

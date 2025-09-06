@@ -1263,12 +1263,13 @@ async def batch_search(
                                 sources_found=len(orchestration_result.shared_sources)
                             )
                             
-                            # PROGRESS-FIX 29.08.2025: Markiere Modell-Completions
+                            # PROGRESS-FIX 29.08.2025 + FEHLER-KLASSIFIKATION 06.09.2025: Markiere Modell-Completions
                             for idx, model_result in enumerate(orchestration_result.successful_models + orchestration_result.failed_models):
                                 batch_progress_manager.mark_model_complete(
                                     session_id=session_id,
                                     model_name=model_result.model_id,
-                                    success=model_result.success
+                                    success=model_result.success,
+                                    error_message=model_result.error if not model_result.success else None
                                 )
                         
                         except Exception as orchestrator_error:
