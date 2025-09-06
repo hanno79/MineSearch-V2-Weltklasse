@@ -17,28 +17,52 @@ from minesearch.database import db_manager
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# NORMALISIERTE DATENBANK-STRUKTUR (06.09.2025)
-# Nach Bereinigung: Nur 12 relevante Tabellen
+# NORMALISIERTE DATENBANK-STRUKTUR (06.09.2025 - AKTUALISIERT)
+# Nach tatsächlicher Analyse: 30 Tabellen mit korrekten Counts
 NORMALIZED_STRUCTURE = {
     "🗂️ Stammdaten (Lookups)": [
-        'countries',     # Länder mit ISO-Codes
-        'regions',       # Regionen/Provinzen
-        'commodities',   # Rohstoffe (Gold, Kupfer, etc.)
-        'companies',     # Unternehmen (Owner/Operator)
-        'ai_models',     # AI-Modelle für Suchen
-        'sources'        # Datenquellen
+        'countries',           # Länder mit ISO-Codes
+        'regions',             # Regionen/Provinzen
+        'commodities',         # Rohstoffe (Gold, Kupfer, etc.)
+        'companies',           # Unternehmen (Owner/Operator)
+        'activity_statuses',   # Status der Minenaktivität
+        'mine_types',          # Typ der Mine (Tagebau, Untertage, etc.)
+        'ai_models',           # AI-Modelle für Suchen
+        'sources'              # Datenquellen
     ],
     "⛏️ Kerndaten": [
-        'mines'          # Minen mit Foreign Keys zu Lookups
+        'mines',               # Minen mit Foreign Keys zu Lookups
+        'mine_data_fields'     # Normalisierte Mine-Daten (3NF)
     ],
     "🔗 Beziehungen (N:M)": [
-        'mine_commodities',  # Mine ↔ Rohstoffe
-        'mine_owners',       # Mine ↔ Eigentümer
-        'mine_operators'     # Mine ↔ Betreiber
+        'mine_commodities',    # Mine ↔ Rohstoffe
+        'mine_owners',         # Mine ↔ Eigentümer
+        'mine_operators'       # Mine ↔ Betreiber
     ],
     "🔍 Such-Ergebnisse": [
-        'search_results',    # Gespeicherte Suchergebnisse
-        'search_sessions'    # Such-Sessions für Gruppierung
+        'search_results',      # Gespeicherte Suchergebnisse
+        'search_sessions',     # Such-Sessions für Gruppierung
+        'sequential_search_results'  # Sequentielle Suchergebnisse
+    ],
+    "🧠 Feld-Management": [
+        'field_type_mapping',     # Kategorisierung: normalized vs primitive
+        'field_definitions',      # Standard-Felddefinitionen
+        'field_values',           # Feld-Werte-Cache
+        'field_statistics',       # Feld-Statistiken
+        'field_consistency',      # Konsistenz-Prüfungen
+        'field_search_results',   # Such-spezifische Feld-Ergebnisse
+        'field_search_source_usages', # Source-Nutzung per Feld
+        'field_value_sources'     # Quellen für Feld-Werte
+    ],
+    "📊 Statistik & Analyse": [
+        'model_statistics',       # Modell-Performance-Statistiken
+        'model_statistics_comprehensive',  # Detaillierte Modell-Statistiken
+        'model_summary',          # Modell-Zusammenfassungen
+        'model_field_consistency', # Modell-Feld-Konsistenz
+        'model_source_contributions'  # Modell-Source-Beiträge
+    ],
+    "🔎 Discovery & Sessions": [
+        'source_discovery_sessions'  # Source-Discovery-Sessions
     ]
 }
 
@@ -53,8 +77,12 @@ def categorize_table(table_name: str, row_count: int) -> str:
     # Fallback für unbekannte Tabellen (sollte nicht vorkommen)
     return "❓ Unbekannt"
 
-# Wichtige Tabellen für Quick-Access
-IMPORTANT_TABLES = ['mines', 'search_results', 'sources', 'countries', 'commodities', 'companies']
+# Wichtige Tabellen für Quick-Access (aktualisiert nach Schema-Analyse)
+IMPORTANT_TABLES = [
+    'mines', 'mine_data_fields', 'search_sessions', 
+    'countries', 'commodities', 'companies', 'activity_statuses', 'mine_types',
+    'sources', 'field_type_mapping'
+]
 
 @router.get("/tables")
 async def get_all_tables():

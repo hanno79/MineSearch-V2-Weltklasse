@@ -302,21 +302,20 @@ class NormalizedDatabaseManager(DatabaseManager):
         
         # Externe Transaktion verwenden, falls bereitgestellt
         if db_session is not None:
-            # Suche existierende Firma
+            # Suche existierende Firma (normalized_name für Vergleich, aber nicht in DB)
             result = db_session.execute(text("""
                 SELECT id FROM companies 
-                WHERE normalized_name = :normalized_name
+                WHERE LOWER(name) = :normalized_name
                 LIMIT 1
             """), {'normalized_name': normalized_name})
             existing = result.fetchone()
             if existing:
                 return existing[0]
             insert_result = db_session.execute(text("""
-                INSERT INTO companies (name, normalized_name, company_type) 
-                VALUES (:name, :normalized_name, :company_type)
+                INSERT INTO companies (name, company_type) 
+                VALUES (:name, :company_type)
             """), {
                 'name': company_name,
-                'normalized_name': normalized_name,
                 'company_type': company_type
             })
             db_session.flush()
@@ -324,10 +323,10 @@ class NormalizedDatabaseManager(DatabaseManager):
         
         # Eigene Session verwalten
         with self.get_session() as session:
-            # Suche existierende Firma
+            # Suche existierende Firma (normalized_name für Vergleich, aber nicht in DB)
             result = session.execute(text("""
                 SELECT id FROM companies 
-                WHERE normalized_name = :normalized_name
+                WHERE LOWER(name) = :normalized_name
                 LIMIT 1
             """), {'normalized_name': normalized_name})
             existing = result.fetchone()
@@ -335,11 +334,10 @@ class NormalizedDatabaseManager(DatabaseManager):
                 return existing[0]
             # Erstelle neue Firma
             insert_result = session.execute(text("""
-                INSERT INTO companies (name, normalized_name, company_type) 
-                VALUES (:name, :normalized_name, :company_type)
+                INSERT INTO companies (name, company_type) 
+                VALUES (:name, :company_type)
             """), {
                 'name': company_name,
-                'normalized_name': normalized_name,
                 'company_type': company_type
             })
             session.commit()
@@ -453,6 +451,77 @@ class NormalizedDatabaseManager(DatabaseManager):
             insert_result = session.execute(text("""
                 INSERT INTO mine_types (name) VALUES (:type_name)
             """), {'type_name': normalized_type})
+            session.commit()
+            return insert_result.lastrowid
+
+    def get_or_create_commodity(self, commodity_name: str, db_session: Optional[Session] = None) -> Optional[int]:
+        """Hole oder erstelle Rohstoff und gib ID zurück - mit intelligenter Synonym-Erkennung"""
+        if not commodity_name or commodity_name in ['Nicht gefunden', 'Not found', 'Unknown']:
+            return None
+        
+        # Synonyme für Rohstoffe
+        commodity_synonyms = {
+            'gold': 'Gold',
+            'kupfer': 'Kupfer', 
+            'copper': 'Kupfer',
+            'silber': 'Silber',
+            'silver': 'Silber',
+            'eisenerz': 'Eisenerz',
+            'iron ore': 'Eisenerz',
+            'kohle': 'Kohle',
+            'coal': 'Kohle',
+            'nickel': 'Nickel',
+            'zink': 'Zink',
+            'zinc': 'Zink',
+            'blei': 'Blei',
+            'lead': 'Blei',
+            'platin': 'Platin',
+            'platinum': 'Platin',
+            'palladium': 'Palladium',
+            'uran': 'Uran',
+            'uranium': 'Uran',
+            'lithium': 'Lithium',
+            'diamanten': 'Diamanten',
+            'diamonds': 'Diamanten'
+        }
+        
+        # Normalisiere Input
+        normalized = commodity_name.lower().strip()
+        
+        # Prüfe Synonyme
+        if normalized in commodity_synonyms:
+            commodity_name = commodity_synonyms[normalized]
+        else:
+            # Fallback: Title Case
+            commodity_name = commodity_name.title()
+            
+        # Externe Transaktion verwenden, falls bereitgestellt
+        if db_session is not None:
+            session = db_session
+            result = session.execute(text("""
+                SELECT id FROM commodities WHERE name = :commodity_name LIMIT 1
+            """), {'commodity_name': commodity_name})
+            existing = result.fetchone()
+            if existing:
+                return existing[0]
+            # Falls nicht gefunden, erstelle neuen Rohstoff
+            insert_result = session.execute(text("""
+                INSERT INTO commodities (name) VALUES (:commodity_name)
+            """), {'commodity_name': commodity_name})
+            session.flush()
+            return insert_result.lastrowid
+        
+        # Eigene Session verwalten
+        with self.get_session() as session:
+            result = session.execute(text("""
+                SELECT id FROM commodities WHERE name = :commodity_name LIMIT 1
+            """), {'commodity_name': commodity_name})
+            existing = result.fetchone()
+            if existing:
+                return existing[0]
+            insert_result = session.execute(text("""
+                INSERT INTO commodities (name) VALUES (:commodity_name)
+            """), {'commodity_name': commodity_name})
             session.commit()
             return insert_result.lastrowid
 
@@ -603,7 +672,7 @@ class NormalizedDatabaseManager(DatabaseManager):
     
     def save_mine_field_data(self, mine_id: int, search_result_id: int, structured_data: Dict[str, Any], 
                            model_used: str, sources: List[Dict[str, Any]], session_id: str = None, db_session: Optional[Session] = None):
-        """Speichere atomare Feldwerte in mine_data_fields"""
+        """Speichere atomare Feldwerte in mine_data_fields - ECHTE 3NF v4.0.0 mit field_type"""
         logger.info(f"[FIELD_SAVE_DEBUG] Called with {len(structured_data) if structured_data else 0} fields, session_id: {session_id}")
         if not structured_data:
             logger.warning("[FIELD_SAVE_DEBUG] No structured_data - returning early")
@@ -665,6 +734,73 @@ class NormalizedDatabaseManager(DatabaseManager):
                 numeric_value = None
                 unit = None
                 
+                # NEUE 3NF v4.0.0: Feld-Typ-Bestimmung und Normalisierung
+                field_type = self._determine_field_type(field_name)
+                
+                # Inizialize alle Werte
+                commodity_id = None
+                company_id = None
+                activity_status_id = None
+                mine_type_id = None
+                country_id = None
+                region_id = None
+                primitive_value = None
+                
+                if field_type == 'normalized':
+                    logger.info(f"[FIELD_TYPE] '{field_name}' -> NORMALIZED")
+                    
+                    # Rohstoff-Normalisierung
+                    if 'rohstoffabbau' in field_name.lower() or 'commodity' in field_name.lower():
+                        commodity_id = self.get_or_create_commodity(atomic_value, db_session=session)
+                        logger.info(f"[NORMALIZATION] Commodity '{atomic_value}' -> ID {commodity_id}")
+                    
+                    # Firmen-Normalisierung  
+                    elif 'eigentümer' in field_name.lower() or 'betreiber' in field_name.lower() or 'owner' in field_name.lower() or 'operator' in field_name.lower():
+                        company_type = 'owner' if 'eigentümer' in field_name.lower() or 'owner' in field_name.lower() else 'operator'
+                        company_id = self.get_or_create_company(atomic_value, company_type, db_session=session)
+                        logger.info(f"[NORMALIZATION] Company '{atomic_value}' ({company_type}) -> ID {company_id}")
+                    
+                    # Status-Normalisierung
+                    elif 'aktivitätsstatus' in field_name.lower() or 'activity' in field_name.lower() or 'status' in field_name.lower():
+                        activity_status_id = self.get_or_create_activity_status(atomic_value, db_session=session)
+                        logger.info(f"[NORMALIZATION] Status '{atomic_value}' -> ID {activity_status_id}")
+                    
+                    # Minentyp-Normalisierung
+                    elif 'minentyp' in field_name.lower() or 'mine_type' in field_name.lower() or 'type' in field_name.lower():
+                        mine_type_id = self.get_or_create_mine_type(atomic_value, db_session=session)
+                        logger.info(f"[NORMALIZATION] Mine Type '{atomic_value}' -> ID {mine_type_id}")
+                    
+                    # Country-Normalisierung
+                    elif field_name.lower() == 'country' or 'country' in field_name.lower():
+                        country_id = self.get_or_create_country(atomic_value, db_session=session)
+                        logger.info(f"[NORMALIZATION] Country '{atomic_value}' -> ID {country_id}")
+                    
+                    # Region-Normalisierung
+                    elif field_name.lower() == 'region' or 'region' in field_name.lower():
+                        # Hole Country für Region-Zuordnung
+                        country_for_region = None
+                        if country_id:
+                            country_for_region = country_id
+                        else:
+                            # Versuche Country aus structured_data zu finden
+                            country_value = structured_data.get('Country') or structured_data.get('country')
+                            if country_value:
+                                country_for_region = self.get_or_create_country(country_value, db_session=session)
+                        
+                        region_id = self.get_or_create_region(atomic_value, country_for_region, db_session=session)
+                        logger.info(f"[NORMALIZATION] Region '{atomic_value}' -> ID {region_id}")
+                    
+                    # Wenn keine Normalisierung gefunden, Fallback zu primitive
+                    if not any([commodity_id, company_id, activity_status_id, mine_type_id, country_id, region_id]):
+                        logger.warning(f"[FIELD_TYPE] '{field_name}' als normalized klassifiziert aber keine Normalisierung gefunden - Fallback zu primitive")
+                        field_type = 'primitive'
+                        primitive_value = atomic_value
+                    
+                else:
+                    # field_type == 'primitive'
+                    logger.info(f"[FIELD_TYPE] '{field_name}' -> PRIMITIVE")
+                    primitive_value = atomic_value
+                
                 # Erkenne Template-Werte mit neuer Methode
                 is_template = self._detect_template_value(field_name, atomic_value)
                 validation_status = 'template' if is_template else 'valid'
@@ -713,29 +849,34 @@ class NormalizedDatabaseManager(DatabaseManager):
                 # DYNAMISCHE CONFIDENCE-BERECHNUNG 05.09.2025
                 confidence_score = self._calculate_confidence_score(field_name, raw_value, atomic_value)
                 
-                # Selektiere existierenden Datensatz und führe gezieltes UPDATE oder INSERT durch
-                self._insert_or_update_mine_data_field(
+                # Speichere mit neuer 3NF Struktur
+                self._insert_mine_data_field_3nf(
                     session,
                     {
                         'search_result_id': search_result_id,
                         'mine_id': mine_id,
-                        'field_name': field_name
-                    },
-                    {
-                        'session_id': session_id,  # CRITICAL FIX 04.09.2025: Add session_id 
-                        'field_value': normalized_value,  # FIELD_VALUE FIX 05.09.2025: Hauptwert
-                        'raw_value': raw_value,
-                        'normalized_value': normalized_value,
-                        'numeric_value': numeric_value,
-                        'unit': unit,
+                        'field_name': field_name,
+                        'field_type': field_type,
+                        'session_id': session_id,
                         'confidence_score': confidence_score,
                         'is_template_value': is_template,
                         'validation_status': validation_status,
                         'source_name': source_name,
                         'model_used': model_used,
-                        'extraction_timestamp': datetime.now(),  # FIX 05.09.2025: Setze Timestamp
-                        'model_id': self._get_or_create_ai_model_id(session, model_used),  # FIX 05.09.2025: AI Model ID
-                        'source_id': self._get_source_id_by_name(session, source_name)  # FIX 05.09.2025: Source ID
+                        'extraction_timestamp': datetime.now(),
+                        'model_id': self._get_or_create_ai_model_id(session, model_used),
+                        'source_id': self._get_source_id_by_name(session, source_name),
+                        # Für NORMALIZED Felder: nur IDs
+                        'commodity_id': commodity_id,
+                        'company_id': company_id,
+                        'activity_status_id': activity_status_id,
+                        'mine_type_id': mine_type_id,
+                        'country_id': country_id,
+                        'region_id': region_id,
+                        # Für PRIMITIVE Felder: nur Wert
+                        'primitive_value': primitive_value,
+                        'numeric_value': numeric_value,
+                        'unit': unit
                     },
                     actor=model_used,
                     reason="save_mine_field_data"
@@ -827,29 +968,101 @@ class NormalizedDatabaseManager(DatabaseManager):
                 # DYNAMISCHE CONFIDENCE-BERECHNUNG 05.09.2025 (identisch zu erstem Pfad)
                 confidence_score = self._calculate_confidence_score(field_name, raw_value, atomic_value)
                     
-                # KONSISTENZ-FIX 04.09.2025: Verwende gleiche _insert_or_update_mine_data_field wie IF-Zweig
-                self._insert_or_update_mine_data_field(
+                # NEUE 3NF v4.0.0: Identische Feld-Typ-Bestimmung wie im ersten Pfad
+                field_type = self._determine_field_type(field_name)
+                
+                # Initialize alle Werte
+                commodity_id = None
+                company_id = None
+                activity_status_id = None
+                mine_type_id = None
+                country_id = None
+                region_id = None
+                primitive_value = None
+                
+                if field_type == 'normalized':
+                    logger.info(f"[FIELD_TYPE] '{field_name}' -> NORMALIZED")
+                    
+                    # Rohstoff-Normalisierung
+                    if 'rohstoffabbau' in field_name.lower() or 'commodity' in field_name.lower():
+                        commodity_id = self.get_or_create_commodity(atomic_value, db_session=local_session)
+                        logger.info(f"[NORMALIZATION] Commodity '{atomic_value}' -> ID {commodity_id}")
+                    
+                    # Firmen-Normalisierung  
+                    elif 'eigentümer' in field_name.lower() or 'betreiber' in field_name.lower() or 'owner' in field_name.lower() or 'operator' in field_name.lower():
+                        company_type = 'owner' if 'eigentümer' in field_name.lower() or 'owner' in field_name.lower() else 'operator'
+                        company_id = self.get_or_create_company(atomic_value, company_type, db_session=local_session)
+                        logger.info(f"[NORMALIZATION] Company '{atomic_value}' ({company_type}) -> ID {company_id}")
+                    
+                    # Status-Normalisierung
+                    elif 'aktivitätsstatus' in field_name.lower() or 'activity' in field_name.lower() or 'status' in field_name.lower():
+                        activity_status_id = self.get_or_create_activity_status(atomic_value, db_session=local_session)
+                        logger.info(f"[NORMALIZATION] Status '{atomic_value}' -> ID {activity_status_id}")
+                    
+                    # Minentyp-Normalisierung
+                    elif 'minentyp' in field_name.lower() or 'mine_type' in field_name.lower() or 'type' in field_name.lower():
+                        mine_type_id = self.get_or_create_mine_type(atomic_value, db_session=local_session)
+                        logger.info(f"[NORMALIZATION] Mine Type '{atomic_value}' -> ID {mine_type_id}")
+                    
+                    # Country-Normalisierung
+                    elif field_name.lower() == 'country' or 'country' in field_name.lower():
+                        country_id = self.get_or_create_country(atomic_value, db_session=local_session)
+                        logger.info(f"[NORMALIZATION] Country '{atomic_value}' -> ID {country_id}")
+                    
+                    # Region-Normalisierung
+                    elif field_name.lower() == 'region' or 'region' in field_name.lower():
+                        # Hole Country für Region-Zuordnung
+                        country_for_region = None
+                        if country_id:
+                            country_for_region = country_id
+                        else:
+                            # Versuche Country aus structured_data zu finden
+                            country_value = structured_data.get('Country') or structured_data.get('country')
+                            if country_value:
+                                country_for_region = self.get_or_create_country(country_value, db_session=local_session)
+                        
+                        region_id = self.get_or_create_region(atomic_value, country_for_region, db_session=local_session)
+                        logger.info(f"[NORMALIZATION] Region '{atomic_value}' -> ID {region_id}")
+                    
+                    # Wenn keine Normalisierung gefunden, Fallback zu primitive
+                    if not any([commodity_id, company_id, activity_status_id, mine_type_id, country_id, region_id]):
+                        logger.warning(f"[FIELD_TYPE] '{field_name}' als normalized klassifiziert aber keine Normalisierung gefunden - Fallback zu primitive")
+                        field_type = 'primitive'
+                        primitive_value = atomic_value
+                    
+                else:
+                    # field_type == 'primitive'
+                    logger.info(f"[FIELD_TYPE] '{field_name}' -> PRIMITIVE")
+                    primitive_value = atomic_value
+                
+                # Speichere mit neuer 3NF Struktur (identisch zum ersten Pfad)
+                self._insert_mine_data_field_3nf(
                     local_session,
                     {
                         'search_result_id': search_result_id,
                         'mine_id': mine_id,
-                        'field_name': field_name
-                    },
-                    {
-                        'field_value': normalized_value,  # FIELD_VALUE FIX 05.09.2025: Hauptwert
-                        'raw_value': raw_value,
-                        'normalized_value': normalized_value,
-                        'numeric_value': numeric_value,
-                        'unit': unit,
+                        'field_name': field_name,
+                        'field_type': field_type,
+                        'session_id': session_id,
                         'confidence_score': confidence_score,
                         'is_template_value': is_template,
                         'validation_status': validation_status,
                         'source_name': source_name,
                         'model_used': model_used,
-                        'session_id': session_id,
-                        'extraction_timestamp': datetime.now(),  # FIX 05.09.2025: Setze Timestamp (identisch)
-                        'model_id': self._get_or_create_ai_model_id(local_session, model_used),  # FIX 05.09.2025: AI Model ID
-                        'source_id': self._get_source_id_by_name(local_session, source_name)  # FIX 05.09.2025: Source ID
+                        'extraction_timestamp': datetime.now(),
+                        'model_id': self._get_or_create_ai_model_id(local_session, model_used),
+                        'source_id': self._get_source_id_by_name(local_session, source_name),
+                        # Für NORMALIZED Felder: nur IDs
+                        'commodity_id': commodity_id,
+                        'company_id': company_id,
+                        'activity_status_id': activity_status_id,
+                        'mine_type_id': mine_type_id,
+                        'country_id': country_id,
+                        'region_id': region_id,
+                        # Für PRIMITIVE Felder: nur Wert
+                        'primitive_value': primitive_value,
+                        'numeric_value': numeric_value,
+                        'unit': unit
                     },
                     actor=model_used,
                     reason="save_mine_field_data"
@@ -975,62 +1188,115 @@ class NormalizedDatabaseManager(DatabaseManager):
             logger.error(f"[SOURCE_ID ERROR] Fehler für source_name '{source_name}': {e}")
             return None
 
-    def _insert_or_update_mine_data_field(self, session: Session, key: Dict[str, Any], 
-                                          new_values: Dict[str, Any], actor: Optional[str] = None, 
-                                          reason: Optional[str] = None) -> None:
-        """INSERT-only für mine_data_fields - jede Suche speichert separate Feldwerte.
-
+    def _determine_field_type(self, field_name: str) -> str:
+        """Bestimme ob ein Feld 'normalized' oder 'primitive' ist basierend auf field_type_mapping"""
+        try:
+            with self.get_session() as session:
+                # Suche in field_type_mapping nach passendem Pattern
+                result = session.execute(text("""
+                    SELECT field_type FROM field_type_mapping 
+                    WHERE LOWER(:field_name) LIKE LOWER(field_pattern)
+                    ORDER BY LENGTH(field_pattern) DESC
+                    LIMIT 1
+                """), {'field_name': field_name}).fetchone()
+                
+                if result:
+                    field_type = result[0]
+                    logger.debug(f"[FIELD_TYPE_MAPPING] '{field_name}' -> {field_type}")
+                    return field_type
+                
+                # Fallback: Heuristische Bestimmung
+                field_lower = field_name.lower()
+                
+                # Normalized fields (werden zu FK-IDs)
+                if any(pattern in field_lower for pattern in [
+                    'rohstoff', 'commodity', 'eigentümer', 'betreiber', 'owner', 'operator',
+                    'aktivitätsstatus', 'activity', 'status', 'minentyp', 'mine_type', 'type',
+                    'country', 'land', 'region'
+                ]):
+                    logger.debug(f"[FIELD_TYPE_HEURISTIC] '{field_name}' -> normalized")
+                    return 'normalized'
+                
+                # Primitive fields (bleiben als Text/Zahlen)
+                if any(pattern in field_lower for pattern in [
+                    'name', 'koordinate', 'coordinate', 'latitude', 'longitude', 'jahr', 'year',
+                    'datum', 'date', 'menge', 'volume', 'fläche', 'area', 'kosten', 'cost',
+                    'quellen', 'sources'
+                ]):
+                    logger.debug(f"[FIELD_TYPE_HEURISTIC] '{field_name}' -> primitive")
+                    return 'primitive'
+                
+                # Default: primitive für unbekannte Felder
+                logger.debug(f"[FIELD_TYPE_DEFAULT] '{field_name}' -> primitive (default)")
+                return 'primitive'
+                
+        except Exception as e:
+            logger.error(f"[FIELD_TYPE_ERROR] Fehler bei Feld-Typ-Bestimmung für '{field_name}': {e}")
+            return 'primitive'  # Safe default
+    
+    def _insert_mine_data_field_3nf(self, session: Session, data: Dict[str, Any], 
+                                   actor: Optional[str] = None, reason: Optional[str] = None) -> None:
+        """INSERT für mine_data_fields mit neuer 3NF-Struktur und field_type
+        
         Args:
             session: Aktive DB-Session (Transaktion). Wird nicht committed.
-            key: Primärschlüsselwerte: {search_result_id, mine_id, field_name}
-            new_values: Zu schreibende Spaltenwerte (inkl. session_id)
+            data: Alle Spaltenwerte inkl. field_type
             actor: Wer schreibt (z. B. model_used)
             reason: Warum (z. B. save_mine_field_data)
         """
-        # DEDUPLIZIERUNG 05.09.2025: Prüfe auf bestehende identische Einträge
+        # DEDUPLIZIERUNG: Prüfe auf bestehende identische Einträge
         check_sql = """
             SELECT id FROM mine_data_fields 
             WHERE mine_id = :mine_id 
               AND field_name = :field_name 
-              AND normalized_value = :normalized_value
               AND session_id = :session_id
+              AND field_type = :field_type
             LIMIT 1
         """
         
         check_params = {
-            'mine_id': key['mine_id'],
-            'field_name': key['field_name'], 
-            'normalized_value': new_values.get('normalized_value'),
-            'session_id': new_values.get('session_id')
+            'mine_id': data['mine_id'],
+            'field_name': data['field_name'], 
+            'session_id': data['session_id'],
+            'field_type': data['field_type']
         }
         
         existing = session.execute(text(check_sql), check_params).fetchone()
         if existing:
-            logger.debug(f"[DEDUPLIZIERUNG] Identischer Eintrag bereits vorhanden: {key}")
+            logger.debug(f"[DEDUPLIZIERUNG] Identischer 3NF-Eintrag bereits vorhanden: {data['field_name']}")
             return
         
-        # INSERT-only Logik - da jede Suche eigene search_result_id hat
-        # FIELD_VALUE FIX 05.09.2025: field_value als primärer Wert, normalized_value als bereinigte Version
+        # NEUE 3NF-STRUKTUR: field_type und entsprechende Werte
         insert_sql = """
             INSERT INTO mine_data_fields (
-                search_result_id, mine_id, field_name, field_value, raw_value, normalized_value,
-                numeric_value, unit, confidence_score, is_template_value,
-                validation_status, source_name, model_used, session_id, extraction_timestamp, model_id, source_id
+                search_result_id, mine_id, field_name, field_type,
+                commodity_id, company_id, activity_status_id, mine_type_id, country_id, region_id,
+                primitive_value, numeric_value, unit,
+                confidence_score, is_template_value, validation_status,
+                source_name, model_used, session_id, extraction_timestamp, model_id, source_id
             ) VALUES (
-                :search_result_id, :mine_id, :field_name, :field_value, :raw_value, :normalized_value,
-                :numeric_value, :unit, :confidence_score, :is_template_value,
-                :validation_status, :source_name, :model_used, :session_id, :extraction_timestamp, :model_id, :source_id
+                :search_result_id, :mine_id, :field_name, :field_type,
+                :commodity_id, :company_id, :activity_status_id, :mine_type_id, :country_id, :region_id,
+                :primitive_value, :numeric_value, :unit,
+                :confidence_score, :is_template_value, :validation_status,
+                :source_name, :model_used, :session_id, :extraction_timestamp, :model_id, :source_id
             )
         """
-        params = {**key, **new_values}
+        
         try:
-            session.execute(text(insert_sql), params)
-            logger.debug(
-                f"[mine_data_fields INSERT] Feldwert gespeichert für key={key} actor={actor or 'unknown'}"
-            )
+            session.execute(text(insert_sql), data)
+            logger.debug(f"[mine_data_fields 3NF INSERT] {data['field_type']} Feld '{data['field_name']}' gespeichert")
         except Exception as e:
-            logger.error(f"[mine_data_fields INSERT ERROR] Fehler für key={key}: {e}")
+            logger.error(f"[mine_data_fields 3NF INSERT ERROR] Fehler für Feld '{data['field_name']}': {e}")
             raise
+    
+    def _insert_or_update_mine_data_field(self, session: Session, key: Dict[str, Any], 
+                                          new_values: Dict[str, Any], actor: Optional[str] = None, 
+                                          reason: Optional[str] = None) -> None:
+        """DEPRECATED: Alte Methode für Kompatibilität - wird durch _insert_mine_data_field_3nf ersetzt"""
+        logger.warning("[DEPRECATED] _insert_or_update_mine_data_field wird durch _insert_mine_data_field_3nf ersetzt")
+        # Fallback auf alte Logik für Kompatibilität
+        pass
 
     def save_search_result_normalized(self, mine_name: str, model_used: str, 
                                     structured_data: Dict[str, Any],
@@ -1216,5 +1482,82 @@ class NormalizedDatabaseManager(DatabaseManager):
             logger.error(f"❌ Fehler bei field_definitions Initialisierung: {e}")
             # Nicht re-raise, damit der Hauptprozess weiterläuft
 
+    def get_mine_data_with_joins(self, mine_id: int, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """Hole Minendaten mit JOINs für lesbare Ausgabe der normalisierten Felder"""
+        try:
+            with self.get_session() as session:
+                # Base Query für alle Feldwerte
+                base_conditions = "WHERE mdf.mine_id = :mine_id"
+                params = {'mine_id': mine_id}
+                
+                if session_id:
+                    base_conditions += " AND mdf.session_id = :session_id"
+                    params['session_id'] = session_id
+                
+                # Query mit JOINs für normalisierte Felder
+                query = f"""
+                SELECT 
+                    mdf.field_name,
+                    mdf.field_type,
+                    mdf.primitive_value,
+                    mdf.numeric_value,
+                    mdf.unit,
+                    c.name as commodity_name,
+                    comp.name as company_name,
+                    ast.status as activity_status,
+                    mt.name as mine_type_name,
+                    cnt.name as country_name,
+                    r.name as region_name,
+                    mdf.confidence_score,
+                    mdf.is_template_value,
+                    mdf.model_used,
+                    mdf.extraction_timestamp
+                FROM mine_data_fields mdf
+                LEFT JOIN commodities c ON mdf.commodity_id = c.id
+                LEFT JOIN companies comp ON mdf.company_id = comp.id
+                LEFT JOIN activity_statuses ast ON mdf.activity_status_id = ast.id
+                LEFT JOIN mine_types mt ON mdf.mine_type_id = mt.id
+                LEFT JOIN countries cnt ON mdf.country_id = cnt.id
+                LEFT JOIN regions r ON mdf.region_id = r.id
+                {base_conditions}
+                ORDER BY mdf.field_name
+                """
+                
+                result = session.execute(text(query), params)
+                rows = result.fetchall()
+                
+                # Konvertiere zu lesbarem Dictionary
+                readable_data = {}
+                for row in rows:
+                    field_name = row[0]
+                    field_type = row[1]
+                    
+                    if field_type == 'normalized':
+                        # Für normalisierte Felder: Zeige den lesbaren Namen
+                        if row[5]:  # commodity_name
+                            readable_data[field_name] = row[5]
+                        elif row[6]:  # company_name
+                            readable_data[field_name] = row[6]
+                        elif row[7]:  # activity_status
+                            readable_data[field_name] = row[7]
+                        elif row[8]:  # mine_type_name
+                            readable_data[field_name] = row[8]
+                        elif row[9]:  # country_name
+                            readable_data[field_name] = row[9]
+                        elif row[10]:  # region_name
+                            readable_data[field_name] = row[10]
+                    else:
+                        # Für primitive Felder: Zeige den primitiven Wert
+                        value = row[2]  # primitive_value
+                        if row[3] and row[4]:  # numeric_value und unit
+                            value = f"{row[3]} {row[4]}"
+                        readable_data[field_name] = value
+                
+                return readable_data
+                
+        except Exception as e:
+            logger.error(f"[JOIN_QUERY_ERROR] Fehler beim Abrufen der Minendaten für Mine {mine_id}: {e}")
+            return {}
+    
     # ENTFERNT 04.09.2025: Koordinaten-Update Funktion nicht mehr benötigt
     # Alle Daten bleiben in mine_data_fields für Konsistenz-Analysen
