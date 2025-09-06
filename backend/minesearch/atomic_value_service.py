@@ -66,19 +66,21 @@ def calculate_best_atomic_value(
     session: Session, 
     mine_name: str, 
     field_name: str,
-    fallback_to_json: bool = True
+    fallback_to_json: bool = False  # REGEL 10: Kein Fallback mehr - nur echte Daten oder NULL
 ) -> Dict[str, Any]:
     """
     Berechnet den besten atomischen Wert für ein Feld basierend auf Häufigkeit und Confidence
+    
+    REGEL 10 KONFORM: Gibt NULL zurück wenn keine Daten vorhanden, kein Fallback!
     
     Args:
         session: SQLAlchemy Session
         mine_name: Name der Mine  
         field_name: Name des Feldes
-        fallback_to_json: Falls True, greife auf JSON-Daten zurück wenn keine atomischen Werte
+        fallback_to_json: DEPRECATED - wird ignoriert, immer False (REGEL 10)
     
     Returns:
-        Dict mit best_value, confidence, frequency, sources etc.
+        Dict mit best_value, confidence, frequency, sources etc. oder NULL-Dict
     """
     from minesearch.field_value_parser import build_display_value
     
@@ -112,19 +114,16 @@ def calculate_best_atomic_value(
             ]
         }
     
-    elif fallback_to_json:
-        # Fallback auf JSON-basierte Methode
-        logger.info(f"Fallback zu JSON-Parsing für {mine_name}.{field_name}")
-        return calculate_best_value_from_json(session, mine_name, field_name)
-    
     else:
+        # REGEL 10: Kein Fallback - NULL zurückgeben wenn keine Daten
+        logger.info(f"[REGEL 10] Keine atomischen Werte für {mine_name}.{field_name} - gebe NULL zurück")
         return {
-            'atomic_value': '',
-            'display_value': 'Nichts gefunden',
-            'confidence_score': 0.0,
+            'atomic_value': None,  # NULL statt leerer String
+            'display_value': None,  # NULL statt "Nichts gefunden"
+            'confidence_score': None,  # NULL statt 0.0
             'frequency': 0,
             'source_references': [],
-            'method': 'not_found'
+            'method': 'no_data'  # Klare Kennzeichnung: keine Daten vorhanden
         }
 
 

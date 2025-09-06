@@ -187,26 +187,30 @@ def test_model_v3_comprehensive(model_name, mine, country, region):
         search_time = random.uniform(5.2, 13.8)
         result['runtime_seconds'] = search_time
         
-        # 18 standard fields (v3.0.0 Schema) with realistic values
+        # WARNUNG: SIMULATION MODUS - ALLE WERTE SIND TEST-DATEN
+        # DUMMY-DATEN: Nur für Test-Workflow - NICHT produktiv verwenden!
+        print(f'   🚨 WARNUNG: Generiere TEST-SIMULATION für {model_name}')
+        print('      ALLE FELDWERTE SIND DUMMY-DATEN - NICHT REAL!')
+        
         field_templates = {
-            'Name': mine,
-            'Land': country,
-            'Region': region,
-            'Eigentümer': ['Newmont Corporation', 'Barrick Gold', 'Agnico Eagle', 'AngloGold Ashanti', 'Kinross Gold'],
-            'Betreiber': ['Newmont Operations', 'Barrick Mining', 'Local Mining Corp', 'Joint Venture Partners'],
-            'Koordinaten': f'Lat: {random.uniform(45.2, 62.8):.3f}, Lon: {random.uniform(-85.4, -57.2):.3f}',
-            'Aktivitätsstatus': ['Aktiv', 'In Produktion', 'Entwicklung', 'Exploration'],
-            'Rohstoff': ['Gold', 'Gold/Silber', 'Gold/Kupfer', 'Polymetallisch'],
-            'Minentyp': ['Underground', 'Open Pit', 'Underground/Open Pit'],
-            'Produktionsstart': str(random.randint(1995, 2020)),
-            'Produktionsende': str(random.randint(2025, 2045)),
-            'Fördermenge': f'{random.randint(150, 800)} oz Gold/Jahr',
-            'Restaurationskosten': f'{random.randint(45, 250)} Mio CAD',
-            'Fläche': f'{random.randint(2500, 15000)} Hektar',
-            'Quellenangaben': f'{random.randint(8, 35)} Quellen gefunden',
-            'Tiefe': f'{random.randint(200, 1200)}m unter Tage',
-            'Reserven': f'{random.randint(2, 15)} Mio oz Gold',
-            'Ressourcen': f'{random.randint(5, 25)} Mio oz Gold (geschätzt)'
+            'Name': f'TEST_SIMULATION_{mine}',  # DUMMY für Tests
+            'Land': f'TEST_{country}',  # DUMMY für Tests  
+            'Region': f'TEST_{region}',  # DUMMY für Tests
+            'Eigentümer': f'DUMMY_OWNER_SIMULATION',  # DUMMY für Tests
+            'Betreiber': f'DUMMY_OPERATOR_SIMULATION',  # DUMMY für Tests
+            'Koordinaten': f'DUMMY_COORDS_SIMULATION',  # DUMMY für Tests
+            'Aktivitätsstatus': f'DUMMY_STATUS_SIMULATION',  # DUMMY für Tests
+            'Rohstoff': f'DUMMY_COMMODITY_SIMULATION',  # DUMMY für Tests
+            'Minentyp': f'DUMMY_TYPE_SIMULATION',  # DUMMY für Tests
+            'Produktionsstart': 'DUMMY_START_SIMULATION',  # DUMMY für Tests
+            'Produktionsende': 'DUMMY_END_SIMULATION',  # DUMMY für Tests
+            'Fördermenge': f'DUMMY_PRODUCTION_SIMULATION',  # DUMMY für Tests
+            'Restaurationskosten': f'DUMMY_COSTS_SIMULATION',  # DUMMY für Tests
+            'Fläche': f'DUMMY_AREA_SIMULATION',  # DUMMY für Tests
+            'Quellenangaben': f'DUMMY_SOURCES_SIMULATION',  # DUMMY für Tests
+            'Tiefe': f'DUMMY_DEPTH_SIMULATION',  # DUMMY für Tests
+            'Reserven': f'DUMMY_RESERVES_SIMULATION',  # DUMMY für Tests
+            'Ressourcen': f'DUMMY_RESOURCES_SIMULATION'  # DUMMY für Tests
         }
         
         # Model-specific performance (v3.0.0 optimiert für alle 52 Modelle)
@@ -347,28 +351,35 @@ def test_model_v3_comprehensive(model_name, mine, country, region):
             found_count = random.randint(12, 16)
             result['quality_score'] = random.uniform(0.58, 0.82)
         
-        # Generate realistic field values
-        all_field_names = list(field_templates.keys())
-        selected_fields = random.sample(all_field_names, found_count)
+        # PROPER ERROR HANDLING - KEIN FALLBACK mit versteckten Dummy-Daten
+        success_probability = random.random()
         
-        for field in selected_fields:
-            template = field_templates[field]
-            if isinstance(template, list):
-                result['found_fields'][field] = random.choice(template)
-            else:
-                result['found_fields'][field] = template
-        
-        result['missing_fields'] = [f for f in all_field_names if f not in result['found_fields']]
-        result['source_count'] = random.randint(68, 210)
-        
-        # Success rate simulation (v3.0.0 improved)
-        if random.random() > 0.08:  # 92% success rate
+        if success_probability > 0.08:  # 92% success rate
+            # SUCCESS: Generate test simulation data with clear DUMMY marking
+            all_field_names = list(field_templates.keys())
+            selected_fields = random.sample(all_field_names, found_count)
+            
+            for field in selected_fields:
+                result['found_fields'][field] = field_templates[field]
+            
+            result['missing_fields'] = [f for f in all_field_names if f not in result['found_fields']]
+            result['source_count'] = random.randint(68, 210)
             result['status'] = 'SUCCESS'
-            result['notes'] = f'{mine} erfolgreich analysiert: {found_count}/{len(all_field_names)} Felder (v3.0.0)'
+            result['notes'] = f'TEST-SIMULATION für {mine}: {found_count}/{len(all_field_names)} Felder (DUMMY-DATEN)'
+            
+            print(f'   ✅ SIMULATION ERFOLGREICH: {found_count}/{len(all_field_names)} DUMMY-Felder')
+            
         else:
+            # FAILED: Expliziter Fehler OHNE versteckte Dummy-Daten
             result['status'] = 'FAILED'
-            result['errors'].append('Network timeout or provider error')
-            result['notes'] = f'{mine} Test fehlgeschlagen'
+            result['found_fields'] = {}  # KEINE Daten bei Fehlern!
+            result['missing_fields'] = list(field_templates.keys())
+            result['source_count'] = 0  # KEINE Quellen bei Fehlern!
+            result['quality_score'] = 0.0  # KEINE Quality bei Fehlern!
+            result['errors'].append('SIMULATION FAILURE: Provider Test Error (Echter Fehlerfall)')
+            result['notes'] = f'TEST-SIMULATION für {mine} FEHLGESCHLAGEN - KEINE Daten verfügbar'
+            
+            print(f'   ❌ SIMULATION FEHLGESCHLAGEN: {model_name} - Echter Fehlerfall ohne Daten')
             
     except Exception as e:
         result['status'] = 'ERROR'
@@ -428,17 +439,19 @@ for i, model in enumerate(test_models, 1):
     print(f'     Sources: {model_result[\"source_count\"]}')
     
     if model_result['status'] == 'SUCCESS' and model_result['found_fields']:
-        print(f'     Gefundene Felder: {found_fields}/{total_fields} ({completeness:.1f}% Vollständigkeit)')
+        print(f'     🚨 TEST-SIMULATION: {found_fields}/{total_fields} DUMMY-Felder ({completeness:.1f}%)')
+        print('     ⚠️  WARNUNG: ALLE WERTE SIND DUMMY-DATEN - NICHT REAL!')
         for field_name, field_value in model_result['found_fields'].items():
             print(f'       - {field_name}: {field_value}')
         
         if model_result['missing_fields']:
             missing_names = ', '.join(model_result['missing_fields'])
-            print(f'     Nicht gefundene Felder: {missing_names} ({len(model_result[\"missing_fields\"])}/{total_fields})')
+            print(f'     Nicht simulierte Felder: {missing_names} ({len(model_result[\"missing_fields\"])}/{total_fields})')
         
         phase1_successful += 1
     else:
-        print(f'     Fields: {found_fields}/{total_fields} ({completeness:.1f}%)')
+        print(f'     ❌ ECHTER FEHLERFALL: KEINE Daten verfügbar ({found_fields}/{total_fields})')
+        print('     ✅ KORREKTE Fehlerbehandlung: Keine versteckten Dummy-Werte!')
         if model_result['errors']:
             print(f'     Errors: {\", \".join(model_result[\"errors\"])}')
 
@@ -461,22 +474,28 @@ with open(csv_path, 'w') as f:
 print(f'  📄 Test CSV erstellt: {csv_path}')
 print('  📝 Inhalt: 3 Test-Minen für Batch-Verarbeitung')
 
-# Simulate batch processing
+# BATCH PROCESSING SIMULATION mit expliziter DUMMY-Kennzeichnung
+print('  🚨 WARNUNG: Batch-Verarbeitung ist SIMULATION mit DUMMY-Daten!')
+print('     ALLE Batch-Resultate sind TEST-DATEN - NICHT REAL!')
+
 batch_results = {
-    'csv_processed': True,
+    'csv_processed': True,  # SIMULATION: Echter Test würde echte CSV verwenden
     'mines_count': 3,
-    'processing_time': random.uniform(35.5, 67.2),
-    'successful_mines': random.randint(2, 3),
-    'total_data_points': random.randint(142, 186),
-    'avg_quality': random.uniform(0.65, 0.85)
+    'processing_time': random.uniform(35.5, 67.2),  # DUMMY-Zeit für Simulation
+    'successful_mines': random.randint(2, 3),  # DUMMY-Erfolg für Simulation
+    'total_data_points': random.randint(142, 186),  # DUMMY-Datenpunkte für Simulation
+    'avg_quality': random.uniform(0.65, 0.85),  # DUMMY-Qualität für Simulation
+    'simulation_mode': True,  # KENNZEICHNUNG: Dies ist eine Simulation
+    'warning': 'ALLE BATCH-WERTE SIND DUMMY-DATEN FÜR TEST-ZWECKE!'
 }
 
 test_results['phase2_results'] = batch_results
 
-print(f'  ✅ Batch-Verarbeitung: {batch_results[\"successful_mines\"]}/{batch_results[\"mines_count\"]} Minen erfolgreich')
-print(f'  ⏱️  Processing Time: {batch_results[\"processing_time\"]:.1f}s')
-print(f'  📊 Datenpunkte: {batch_results[\"total_data_points\"]} gesamt')
-print(f'  🎯 Durchschnittsqualität: {batch_results[\"avg_quality\"]:.2f}')
+print(f'  ✅ SIMULATION: {batch_results[\"successful_mines\"]}/{batch_results[\"mines_count\"]} Minen (DUMMY-ERFOLG)')
+print(f'  ⏱️  DUMMY-Zeit: {batch_results[\"processing_time\"]:.1f}s (NICHT REAL)')
+print(f'  📊 DUMMY-Datenpunkte: {batch_results[\"total_data_points\"]} (SIMULATION)')
+print(f'  🎯 DUMMY-Qualität: {batch_results[\"avg_quality\"]:.2f} (TEST-WERT)')
+print(f'  ⚠️  {batch_results[\"warning\"]}')
 
 # GENERATE COMPREHENSIVE REPORT
 success_rate = (phase1_successful / total_tests * 100) if total_tests > 0 else 0
@@ -498,28 +517,36 @@ safe_mine_name = mine_name.replace(' ', '_').replace('é', 'e').replace('É', 'E
 report_filename = f'SYSTEMATIC_TEST_WORKFLOW_{timestamp}_{safe_mine_name}.md'
 report_path = f'/home/hanno/projects/MineSearch/documentation/{report_filename}'
 
-markdown_content = f'''# MineSearch v3.0.0 - {mine_name} Systematischer Test Workflow
+markdown_content = f'''# 🚨 MineSearch v3.0.0 - TEST-SIMULATION REPORT
+
+**⚠️ WARNUNG: DIES IST EIN TEST-SIMULATION REPORT**
+**ALLE DATEN SIND DUMMY-WERTE FÜR TEST-ZWECKE - NICHT PRODUKTIONSREIF!**
 
 **Test Datum:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
 **Test Parameter:**
-- **Mine:** {mine_name}
-- **Land:** {country}  
-- **Region:** {region}
-- **System Version:** v3.0.0 (Cache-frei)
+- **Mine:** {mine_name} (TEST-SIMULATION)
+- **Land:** {country} (TEST-SIMULATION)  
+- **Region:** {region} (TEST-SIMULATION)
+- **System Version:** v3.0.0 (TEST-SIMULATION - Cache-frei)
+- **Modus:** VOLLSTÄNDIGE SIMULATION MIT DUMMY-DATEN
 
 ---
 
-## 📊 Zusammenfassung
+## 📊 Zusammenfassung (SIMULATION)
 
-- **Getestete Modelle:** {total_tests}
-- **Einzelsuche Erfolgsrate:** {success_rate:.1f}%
-- **Batch-Suche Erfolgsrate:** {batch_success_rate:.1f}%
-- **Gesamterfolgsrate:** {test_results[\"summary\"][\"overall_success_rate\"]:.1f}%
-- **Test-Dauer:** {test_results[\"summary\"][\"test_duration_minutes\"]:.1f} Minuten
+🚨 **ALLE NACHFOLGENDEN WERTE SIND DUMMY-DATEN FÜR TEST-ZWECKE!**
+
+- **Simulierte Modelle:** {total_tests}
+- **Einzelsuche Simulation:** {success_rate:.1f}% (DUMMY-RATE)
+- **Batch-Suche Simulation:** {batch_success_rate:.1f}% (DUMMY-RATE)
+- **Gesamtsimulation:** {test_results[\"summary\"][\"overall_success_rate\"]:.1f}% (DUMMY-RATE)
+- **Simulierte Dauer:** {test_results[\"summary\"][\"test_duration_minutes\"]:.1f} Minuten (DUMMY-ZEIT)
 
 ---
 
-## 🔍 Phase 1: Einzelsuche Ergebnisse
+## 🔍 Phase 1: Einzelsuche SIMULATION
+
+⚠️ **ALLE FELDWERTE SIND DUMMY-DATEN - NICHT REAL!**
 
 '''
 
@@ -530,28 +557,30 @@ for model_name, result in test_results['phase1_results'].items():
     total_count = found_count + len(result['missing_fields'])
     completeness = (found_count / total_count * 100) if total_count > 0 else 0
     
-    markdown_content += f'''### {model_name}
-**Status:** {status_icon}
-- **Funktioniert:** {'JA' if result['status'] == 'SUCCESS' else 'NEIN'}
-- **Laufzeit:** {result['runtime_seconds']:.2f} Sekunden'''
+    markdown_content += f'''### {model_name} (SIMULATION)
+**Status:** {status_icon} (TEST-SIMULATION)
+- **Simulation erfolgreich:** {'JA' if result['status'] == 'SUCCESS' else 'NEIN'}
+- **Simulierte Laufzeit:** {result['runtime_seconds']:.2f} Sekunden (DUMMY-ZEIT)'''
     
     if result['found_fields']:
         markdown_content += f'''
-- **Gefundene Felder:** {found_count}/{total_count} ({completeness:.1f}% Vollständigkeit)'''
+- **🚨 SIMULIERTE DUMMY-FELDER:** {found_count}/{total_count} ({completeness:.1f}% SIMULATION)'''
+        markdown_content += f'''
+  **⚠️ WARNUNG: ALLE FELDWERTE SIND DUMMY-DATEN FÜR TEST-ZWECKE!**'''
         for field_name, field_value in result['found_fields'].items():
             markdown_content += f'''
-  - {field_name}: {field_value}'''
+  - {field_name}: {field_value} (DUMMY-WERT)'''
     
     if result['missing_fields']:
         missing_list = ', '.join(result['missing_fields'])
         markdown_content += f'''
-- **Nicht gefundene Felder:** {missing_list} ({len(result['missing_fields'])}/{total_count})'''
+- **Nicht simulierte Felder:** {missing_list} ({len(result['missing_fields'])}/{total_count})'''
     
     markdown_content += f'''
-- **Quality Score:** {result['quality_score']:.2f}
-- **Quellen gefunden:** {result['source_count']} verschiedene URLs
-- **Fehler/Probleme:** {'KEINE' if not result['errors'] else ', '.join(result['errors'])}
-- **Besonderheiten:** {result['notes']}
+- **Simulierte Quality:** {result['quality_score']:.2f} (DUMMY-SCORE)
+- **Simulierte Quellen:** {result['source_count']} URLs (DUMMY-ANZAHL)
+- **Test-Fehler:** {'KEINE' if not result['errors'] else ', '.join(result['errors'])}
+- **Simulation-Notes:** {result['notes']}
 
 '''
 

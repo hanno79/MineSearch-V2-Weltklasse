@@ -321,7 +321,7 @@ class BatchSourceCollector:
                         'domain': source.get('domain', '')[:100],
                         'model': model_id,
                         'created_at': datetime.now(),
-                        'reliability': source.get('reliability_score', 0.5),  # Default Reliability
+                        'reliability': source.get('reliability_score', None),  # REGEL 10: NULL statt 0.5 Fallback
                         'source_type': source.get('type', 'unknown')
                     })
                     

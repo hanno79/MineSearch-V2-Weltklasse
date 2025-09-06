@@ -795,7 +795,10 @@ function generateFieldDisplayGrid(structuredFields, priorityOrder) {
  * Erstellt Anzeige für ein einzelnes Feld mit Wert, Score und Quellenreferenzen
  */
 function generateSingleFieldDisplay(fieldName, fieldData) {
-    const value = fieldData.value || 'Nichts gefunden';  // PHASE 14.3: Einheitliche Frontend-Darstellung
+    // REGEL 10: NULL-Werte korrekt anzeigen
+    const value = fieldData.value !== null && fieldData.value !== undefined 
+        ? fieldData.value 
+        : null;  // NULL bleibt NULL - kein Fallback!
     const confidenceScore = fieldData.confidence_score || 0;
     const sourceNumbers = fieldData.global_source_numbers || [];
     const sourceCount = fieldData.source_count || 0;
@@ -1600,7 +1603,8 @@ async function showFieldSourceDetails(mineName, fieldName) {
  * Generiert HTML für Field-spezifische Source-Details
  */
 function generateFieldSourceDetailsHTML(mineName, fieldName, fieldData) {
-    const value = fieldData.value || 'Nicht verfügbar';
+    // REGEL 10: NULL-Werte korrekt anzeigen - kein Fallback!
+    const value = fieldData.value;
     const confidenceScore = fieldData.confidence_score || 0;
     const sourceReferences = fieldData.source_references || [];
     const globalSourceNumbers = fieldData.global_source_numbers || [];

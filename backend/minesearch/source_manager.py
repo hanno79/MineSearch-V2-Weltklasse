@@ -286,7 +286,7 @@ class SourceManager:
             'exchange': 0.8,
             'database': 0.7,
             'news': 0.6,
-            'industry': 0.5
+            'industry': 0.5  # Legitimer Score für Industrie-Quellen
         }
         
         base_score = base_scores.get(source_type, 0.4)
@@ -331,7 +331,7 @@ class SourceManager:
             'research': 0.8,
             'database': 0.7,
             'expert_knowledge': 0.6,
-            'corporate': 0.5,
+            'corporate': 0.5,  # Legitimer Score für Corporate-Quellen
             'mining_industry': 0.6,
             'unreliable_estimate': 0.1,  # KRITISCHE VERBESSERUNG 26.08.2025: Niedrigster Score für Schätzungen
             'general': 0.4
