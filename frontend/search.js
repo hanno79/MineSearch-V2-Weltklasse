@@ -47,6 +47,51 @@ function handleBatchCountInput() {
     }
 }
 
+// UI-Handler für Batch Options Toggle (Erweiterte Auswahl-Modi)
+function toggleBatchOptions() {
+    const selectedMode = document.querySelector('input[name="batch_mode"]:checked')?.value;
+    
+    // Alle Option-Divs verstecken
+    const rangeOptions = document.getElementById('range-options');
+    const randomOptions = document.getElementById('random-options');
+    
+    if (rangeOptions) rangeOptions.style.display = 'none';
+    if (randomOptions) randomOptions.style.display = 'none';
+    
+    // Je nach Modus entsprechende Optionen anzeigen
+    if (selectedMode === 'range' && rangeOptions) {
+        rangeOptions.style.display = 'block';
+        updateRangeInfo();
+    } else if (selectedMode === 'random' && randomOptions) {
+        randomOptions.style.display = 'block';
+    }
+}
+
+// Range-Info dynamisch aktualisieren
+function updateRangeInfo() {
+    const startPos = parseInt(document.getElementById('start-position')?.value || '1');
+    const count = parseInt(document.getElementById('range-count')?.value || '20');
+    const rangeInfo = document.getElementById('range-info');
+    
+    if (rangeInfo) {
+        const endPos = startPos + count - 1;
+        rangeInfo.textContent = `Sucht Minen ${startPos}-${endPos} aus der CSV`;
+    }
+}
+
+// Event Listeners für Range-Inputs
+document.addEventListener('DOMContentLoaded', function() {
+    const startInput = document.getElementById('start-position');
+    const countInput = document.getElementById('range-count');
+    
+    if (startInput) {
+        startInput.addEventListener('input', updateRangeInfo);
+    }
+    if (countInput) {
+        countInput.addEventListener('input', updateRangeInfo);
+    }
+});
+
 /**
  * SINGLE SEARCH: Startet eine Einzelsuche mit ausgewählten Modellen
  */
@@ -196,12 +241,18 @@ async function startBatchSearch() {
     const smartSearchEnabled = batchSmartSearchElement ? batchSmartSearchElement.checked : false;
     const comprehensiveSearchEnabled = batchComprehensiveElement ? batchComprehensiveElement.checked : false;
     
-    // NEUE FUNKTION: Batch Count Optionen auslesen
+    // ENHANCED BATCH: Batch Selection Optionen auslesen
     const batchModeElement = document.querySelector('input[name="batch_mode"]:checked');
     const batchCountElement = document.getElementById('batch-count');
+    const startPositionElement = document.getElementById('start-position');
+    const rangeCountElement = document.getElementById('range-count');
+    const randomCountElement = document.getElementById('random-count');
     
     const batchMode = batchModeElement ? batchModeElement.value : 'limited'; // Default: limited
     const batchCount = batchCountElement ? parseInt(batchCountElement.value) : 3; // Default: 3
+    const startPosition = startPositionElement ? parseInt(startPositionElement.value) : 1; // Default: 1
+    const rangeCount = rangeCountElement ? parseInt(rangeCountElement.value) : 20; // Default: 20
+    const randomCount = randomCountElement ? parseInt(randomCountElement.value) : 10; // Default: 10
     
     // Validierung
     if (batchMode === 'limited' && (isNaN(batchCount) || batchCount < 1 || batchCount > BATCH_MAX_COUNT)) {
@@ -366,7 +417,20 @@ async function startBatchSearch() {
                 chunkFormData.append('session_id', sessionId);
                 chunkFormData.append('search_type', comprehensiveSearchEnabled ? 'comprehensive' : 'standard');
                 chunkFormData.append('search_all', 'false');
+                
+                // ENHANCED BATCH: Map frontend modes to backend parameters
+                // Map frontend batch_mode to backend selection_mode
+                let selectionMode = 'first_n'; // Default fallback
+                if (batchMode === 'limited') selectionMode = 'first_n';
+                else if (batchMode === 'range') selectionMode = 'range';
+                else if (batchMode === 'random') selectionMode = 'random';
+                else if (batchMode === 'all') selectionMode = 'all';
+                
+                chunkFormData.append('selection_mode', selectionMode);
                 chunkFormData.append('count', currentCount.toString());
+                chunkFormData.append('start_position', startPosition.toString());
+                chunkFormData.append('range_count', rangeCount.toString());
+                chunkFormData.append('random_count', randomCount.toString());
                 chunkFormData.append('start_index', startIndex.toString());
                 chunkFormData.append('selected_models', selectedModels.join(','));
                 chunkFormData.append('twoPhase', twoPhaseEnabled.toString());
@@ -416,7 +480,20 @@ async function startBatchSearch() {
             batchFormData.append('session_id', sessionId);
             batchFormData.append('search_type', comprehensiveSearchEnabled ? 'comprehensive' : 'standard');
             batchFormData.append('search_all', 'false');
+            
+            // ENHANCED BATCH: Map frontend modes to backend parameters
+            // Map frontend batch_mode to backend selection_mode
+            let selectionMode = 'first_n'; // Default fallback
+            if (batchMode === 'limited') selectionMode = 'first_n';
+            else if (batchMode === 'range') selectionMode = 'range';
+            else if (batchMode === 'random') selectionMode = 'random';
+            else if (batchMode === 'all') selectionMode = 'all';
+            
+            batchFormData.append('selection_mode', selectionMode);
             batchFormData.append('count', desiredTotal.toString());
+            batchFormData.append('start_position', startPosition.toString());
+            batchFormData.append('range_count', rangeCount.toString());
+            batchFormData.append('random_count', randomCount.toString());
             batchFormData.append('start_index', '0');
             batchFormData.append('selected_models', selectedModels.join(','));
             batchFormData.append('twoPhase', twoPhaseEnabled.toString());
@@ -1512,6 +1589,8 @@ window.loadModelsForFilter = loadModelsForFilter;
 window.validateSearchForm = validateSearchForm;
 window.handleSearchOptionsChange = handleSearchOptionsChange;
 window.handleBatchCountInput = handleBatchCountInput;
+window.toggleBatchOptions = toggleBatchOptions;
+window.updateRangeInfo = updateRangeInfo;
 window.SearchState = SearchState;
 
 // Export UI Revolution functions

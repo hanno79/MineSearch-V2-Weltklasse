@@ -347,7 +347,7 @@ Canadian Malartic,Canada,Gold,Quebec</pre>
                         <div class="batch-count-options">
                             <div class="batch-option">
                                 <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer; padding: var(--space-md); border: 2px solid var(--success-200); border-radius: var(--radius-md); background: var(--success-50);">
-                                    <input type="radio" name="batch_mode" value="limited" checked id="batch-limited">
+                                    <input type="radio" name="batch_mode" value="limited" checked id="batch-limited" onchange="toggleBatchOptions()">
                                     <div>
                                         <strong>🧪 Nur erste <input type="number" id="batch-count" value="15" min="1" max="1000" oninput="handleBatchCountInput()" title="Große Batches können langsam sein. Nutzen Sie ggf. Pagination." style="width: 60px; margin: 0 5px; padding: 2px 5px; border: 1px solid var(--success-300); border-radius: 4px;"> Minen</strong>
                                         <div style="font-size: 0.875rem; color: var(--success-700); margin-top: 4px;">
@@ -361,8 +361,50 @@ Canadian Malartic,Canada,Gold,Quebec</pre>
                             </div>
                             
                             <div class="batch-option">
+                                <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer; padding: var(--space-md); border: 2px solid var(--blue-200); border-radius: var(--radius-md); background: var(--blue-50);">
+                                    <input type="radio" name="batch_mode" value="range" id="batch-range" onchange="toggleBatchOptions()">
+                                    <div>
+                                        <strong>📊 Range-Auswahl (Von-Bis)</strong>
+                                        <div style="font-size: 0.875rem; color: var(--blue-700); margin-top: 4px;">
+                                            Wählen Sie einen spezifischen Bereich aus der CSV-Liste
+                                        </div>
+                                        <div id="range-options" style="margin-top: 8px; display: none;">
+                                            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                                                <span style="font-weight: 500;">Start-Mine:</span>
+                                                <input type="number" id="start-position" value="1" min="1" style="width: 60px; padding: 4px 6px; border: 1px solid var(--blue-300); border-radius: 4px;">
+                                                <span style="font-weight: 500;">Anzahl:</span>
+                                                <input type="number" id="range-count" value="20" min="1" max="1000" style="width: 60px; padding: 4px 6px; border: 1px solid var(--blue-300); border-radius: 4px;">
+                                            </div>
+                                            <div id="range-info" style="font-size: 0.75rem; color: var(--blue-600); margin-top: 4px;">
+                                                Sucht Minen 1-20 aus der CSV
+                                            </div>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                            
+                            <div class="batch-option">
+                                <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer; padding: var(--space-md); border: 2px solid var(--purple-200); border-radius: var(--radius-md); background: var(--purple-50);">
+                                    <input type="radio" name="batch_mode" value="random" id="batch-random" onchange="toggleBatchOptions()">
+                                    <div>
+                                        <strong>🎲 Zufällige Auswahl</strong>
+                                        <div style="font-size: 0.875rem; color: var(--purple-700); margin-top: 4px;">
+                                            Zufällige Auswahl von Minen aus der gesamten CSV-Liste
+                                        </div>
+                                        <div id="random-options" style="margin-top: 8px; display: none;">
+                                            <div style="display: flex; gap: 12px; align-items: center;">
+                                                <span style="font-weight: 500;">Anzahl:</span>
+                                                <input type="number" id="random-count" value="10" min="1" max="1000" style="width: 60px; padding: 4px 6px; border: 1px solid var(--purple-300); border-radius: 4px;">
+                                                <span style="font-weight: 400;">zufällige Minen</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                            
+                            <div class="batch-option">
                                 <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer; padding: var(--space-md); border: 2px solid var(--gray-200); border-radius: var(--radius-md); background: var(--gray-50);">
-                                    <input type="radio" name="batch_mode" value="all" id="batch-all">
+                                    <input type="radio" name="batch_mode" value="all" id="batch-all" onchange="toggleBatchOptions()">
                                     <div>
                                         <strong>🚀 Alle Minen durchsuchen</strong>
                                         <div style="font-size: 0.875rem; color: var(--gray-600); margin-top: 4px;">
