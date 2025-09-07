@@ -231,13 +231,23 @@ Suche NUR nach den abgebauten Rohstoffen:
 - Resource Type
 Gib die EXAKTEN Rohstoffe zurück.""",
             
-            'Fördermenge/Jahr': """
-Suche NUR nach der jährlichen Produktion:
-- Annual Production
-- Yearly Output
-- Production Rate
-- Mining Volume per Year
-Gib die EXAKTE Menge mit Einheit zurück."""
+            'Fördermenge/Jahr Rohstoff': """
+Suche NUR nach spezifischer Rohstoffproduktion:
+- Gold: in Unzen (oz), Tonnen (t)
+- Kupfer: in Tonnen (t), Pfund (lbs)
+- Kohle: in Tonnen (t)
+- Annual Commodity Production
+- Refined Output
+Gib die EXAKTE Menge mit Einheit zurück.""",
+            
+            'Fördermenge/Jahr Abraum': """
+Suche NUR nach der gesamten Materialextraktion:
+- Total Material Mined
+- Waste Rock + Ore
+- Overburden Removal
+- Total Mining Volume
+- in Millionen Tonnen (Mt)
+Gib die EXAKTE Gesamtmenge inkl. Abraum zurück."""
         }
         
         # Füge field-spezifische Strategie hinzu
@@ -273,7 +283,8 @@ Gib die EXAKTE Menge mit Einheit zurück."""
             'Betreiber': ['Betreiber', 'Operator', 'Operating Company', 'Manager'],
             'Aktivitätsstatus': ['Aktivitätsstatus', 'Status', 'Operational Status', 'Mine Status'],
             'Rohstoff': ['Rohstoff', 'Commodity', 'Resource', 'Mineral'],
-            'Fördermenge/Jahr': ['Fördermenge/Jahr', 'Annual Production', 'Production Rate', 'Yearly Output'],
+            'Fördermenge/Jahr Rohstoff': ['Fördermenge/Jahr Rohstoff', 'Annual Commodity Production', 'Refined Production', 'Metal Production', 'Gold Production', 'Copper Production'],
+            'Fördermenge/Jahr Abraum': ['Fördermenge/Jahr Abraum', 'Total Material Mined', 'Mining Volume', 'Waste Rock', 'Overburden', 'Total Extraction'],
             'x-Koordinate': ['x-Koordinate', 'Latitude', 'Lat', 'X-Coordinate'],
             'y-Koordinate': ['y-Koordinate', 'Longitude', 'Lon', 'Long', 'Y-Coordinate'],
             'Country': ['Country', 'Land', 'Nation'],

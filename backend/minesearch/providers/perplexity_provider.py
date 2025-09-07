@@ -527,7 +527,8 @@ NUR ERLAUBT - Dokumentierte Web-Fakten:
 - Minentyp: [Aus technischen Dokumenten oder leer]
 - Produktionsstart: [Aus historischen Berichten oder leer]
 - Produktionsende: [Jahr mit Wiedereröffnung falls vorhanden (z.B. "2013 (reopened 2021)") oder leer]
-- Fördermenge/Jahr: [Aus Produktionsstatistiken oder leer]
+- Fördermenge/Jahr Rohstoff: [Spezifische Rohstoffproduktion aus Statistiken, z.B. '120,000 Unzen Gold' oder leer]
+- Fördermenge/Jahr Abraum: [Gesamte Materialextraktion inkl. Abraum, z.B. '2.3 Millionen Tonnen' oder leer]
 - Fläche der Mine in qkm: [Aus Genehmigungsdokumenten oder leer]
 - Quellenangaben: [NUR spezifische URLs - NIEMALS "Allgemeines Fachwissen"]
 
@@ -575,7 +576,8 @@ DEINE AUFGABE: Analysiere die bereitgestellten Quellen GRÜNDLICH und extrahiere
 - Minentyp: [Typ] [Quelle: Nummer]
 - Produktionsstart: [Jahr] [Quelle: Nummer]
 - Produktionsende: [Jahr] [Quelle: Nummer]
-- Fördermenge: [Menge/Jahr] [Quelle: Nummer]
+- Fördermenge Rohstoff: [Rohstoffproduktion/Jahr] [Quelle: Nummer]
+- Fördermenge Abraum: [Gesamte Extraktion/Jahr] [Quelle: Nummer]
 - Fläche: [km²] [Quelle: Nummer]
 - Restaurationskosten: [{currency}$ mit Jahr] [Quelle: Nummer]
 

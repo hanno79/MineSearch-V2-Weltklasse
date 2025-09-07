@@ -25,7 +25,10 @@ CSV_COLUMNS = [
     'Rohstoff',  # GEÄNDERT: Entfernt "(Gold/ Kupfer/ Kohle/ usw.)"
     'Minentyp',       # GEÄNDERT: Entfernt "(Untertage/ Open-Pit/ usw.)"
     'Produktionsstart',
-    'Produktionsende', 'Fördermenge/Jahr', 'Fläche der Mine in qkm',
+    'Produktionsende', 
+    'Fördermenge/Jahr Rohstoff',  # NEU: Getrennt für Rohstoff-Produktion (z.B. Unzen Gold)
+    'Fördermenge/Jahr Abraum',    # NEU: Getrennt für Gesamtextraktion inkl. Abraum (z.B. Millionen Tonnen)
+    'Fläche der Mine in qkm',
     'Quellenangaben'
 ]
 

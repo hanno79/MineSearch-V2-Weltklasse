@@ -495,7 +495,8 @@ Extrahiere ALLE verfügbaren Informationen für folgende Felder:
 
 8. PRODUKTION (Production)
    - Produktionsstart/-ende
-   - Jährliche Fördermengen
+   - Jährliche Rohstoffproduktion (spezifisch: Gold-Unzen, Kupfer-Tonnen, etc.)
+   - Jährliche Gesamtextraktion inkl. Abraum (Millionen Tonnen Material)
    - Reserven/Ressourcen
 
 9. FLÄCHE (Area)

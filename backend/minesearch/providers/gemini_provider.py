@@ -523,7 +523,8 @@ Deine Aufgabe ist die vollständige Analyse von Mining-Dokumenten ohne Einschrä
 - Minentyp: [NUR 'Untertage', 'Open-Pit', 'Hybrid' - NIEMALS 'etc' oder Templates] [Quelle: URL/Dokument]
 - Produktionsstart: [Jahr] [Quelle: URL/Dokument]
 - Produktionsende: [Jahr oder 'aktiv'] [Quelle: URL/Dokument]
-- Fördermenge: [Menge/Jahr mit Einheit] [Quelle: URL/Dokument]
+- Fördermenge Rohstoff: [Spezifische Rohstoffproduktion mit Einheit, z.B. '120,000 Unzen Gold'] [Quelle: URL/Dokument]
+- Fördermenge Abraum: [Gesamte Materialextraktion inkl. Abraum, z.B. '2.3 Millionen Tonnen'] [Quelle: URL/Dokument]
 - Fläche: [in km²] [Quelle: URL/Dokument]
 - Restaurationskosten: [Betrag in {currency}$ mit Jahr] [Quelle: URL/Dokument]
 

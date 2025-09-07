@@ -256,7 +256,8 @@ Deine Aufgabe ist die präzise Extraktion von Mining-Daten ohne jegliche Dummy-W
 - Minentyp: [Untertage/Open-Pit/etc] [Quelle: URL/Dokument]
 - Produktionsstart: [Jahr] [Quelle: URL/Dokument]
 - Produktionsende: [Jahr oder 'aktiv'] [Quelle: URL/Dokument]
-- Fördermenge: [Menge/Jahr mit Einheit] [Quelle: URL/Dokument]
+- Fördermenge Rohstoff: [Spezifische Rohstoffproduktion mit Einheit, z.B. '120,000 Unzen Gold'] [Quelle: URL/Dokument]
+- Fördermenge Abraum: [Gesamte Materialextraktion inkl. Abraum, z.B. '2.3 Millionen Tonnen'] [Quelle: URL/Dokument]
 - Fläche: [in km²] [Quelle: URL/Dokument]
 - Restaurationskosten: [Betrag in {currency}$ mit Jahr] [Quelle: URL/Dokument]
 

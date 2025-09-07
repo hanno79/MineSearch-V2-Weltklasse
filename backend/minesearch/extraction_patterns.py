@@ -190,13 +190,29 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'Ende:\s*(\d{4})', 
             r'geschlossen\s+(?:seit\s+)?(\d{4})'
         ],
-        'Fördermenge/Jahr': [
-            # BUGFIX 23.08.2025: Verbesserte Patterns für Fördermenge
-            r'Fördermenge/Jahr:\s*([^\n]+)',
-            r'Fördermenge:\s*([\d,]+(?:\.\d+)?)\s*([^\n]+)',
-            r'Produktion:\s*([\d,]+(?:\.\d+)?)\s*([^\n]+)',
-            r'produziert\s+(?:jährlich\s+)?([\d,]+(?:\.\d+)?)\s*([^\n]+)',
-            r'([\d,]+(?:\.\d+)?)\s*(oz|ounces|tonnes?|tons?|pounds?)\s*(?:Gold|Kupfer|Silver|Copper|annually|per year|jährlich)'
+        'Fördermenge/Jahr Rohstoff': [
+            # NEU 07.09.2025: Spezifische Patterns für Rohstoff-Produktion (Gold, Kupfer, etc.)
+            r'Fördermenge/Jahr Rohstoff:\s*([^\n]+)',
+            r'Gold production:\s*([\d,]+(?:\.\d+)?)\s*(oz|ounces|tonnes?|tons?)\s*(?:annually|per year)?',
+            r'Copper production:\s*([\d,]+(?:\.\d+)?)\s*(tonnes?|tons?|pounds?)\s*(?:annually|per year)?',
+            r'produziert\s+(?:jährlich\s+)?([\d,]+(?:\.\d+)?)\s*(oz|ounces|unzen)\s*(?:Gold|Au)',
+            r'produziert\s+(?:jährlich\s+)?([\d,]+(?:\.\d+)?)\s*(tonnes?|tons?|t)\s*(?:Kupfer|Copper|Cu)',
+            r'([\d,]+(?:\.\d+)?)\s*(oz|ounces|unzen)\s*(?:Gold|Au|of\s+gold)\s*(?:annually|per year|jährlich)?',
+            r'([\d,]+(?:\.\d+)?)\s*(tonnes?|tons?|t)\s*(?:Kupfer|Copper|Cu|of\s+copper)\s*(?:annually|per year|jährlich)?',
+            r'Rohstoffproduktion:\s*([\d,]+(?:\.\d+)?)\s*([^\n]+)',
+            r'Commodity production:\s*([\d,]+(?:\.\d+)?)\s*([^\n]+)'
+        ],
+        'Fördermenge/Jahr Abraum': [
+            # NEU 07.09.2025: Spezifische Patterns für Gesamtextraktion inkl. Abraum
+            r'Fördermenge/Jahr Abraum:\s*([^\n]+)',
+            r'Total material moved:\s*([\d,]+(?:\.\d+)?)\s*(million\s+tonnes?|Mt|million\s+tons?)',
+            r'Waste rock:\s*([\d,]+(?:\.\d+)?)\s*(million\s+tonnes?|Mt|million\s+tons?)',
+            r'Gesamtförderung:\s*([\d,]+(?:\.\d+)?)\s*(Millionen\s+Tonnen|Mt|million\s+tonnes?)',
+            r'Total extraction:\s*([\d,]+(?:\.\d+)?)\s*(million\s+tonnes?|Mt|million\s+tons?)',
+            r'([\d,]+(?:\.\d+)?)\s*(million\s+tonnes?|Mt|million\s+tons?)\s*(?:total|material|rock|ore and waste)',
+            r'Overburden:\s*([\d,]+(?:\.\d+)?)\s*(million\s+tonnes?|Mt|million\s+tons?)',
+            r'Strip ratio.*?([\d,]+(?:\.\d+)?)\s*(?:to\s+1|:1)',
+            r'Total mining rate:\s*([\d,]+(?:\.\d+)?)\s*(million\s+tonnes?|Mt|million\s+tons?)'
         ],
         'Fläche der Mine in qkm': [
             # BUGFIX 23.08.2025: Verbesserte Patterns für Fläche

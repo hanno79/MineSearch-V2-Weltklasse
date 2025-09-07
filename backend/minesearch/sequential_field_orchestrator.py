@@ -123,7 +123,8 @@ class SequentialFieldOrchestrator:
                 'Minentyp',
                 'Produktionsstart',
                 'Produktionsende',
-                'Fördermenge/Jahr',
+                'Fördermenge/Jahr Rohstoff',
+                'Fördermenge/Jahr Abraum',
                 'Restaurationskosten',
                 'Fläche der Mine in qkm',
                 'Jahr der Erstellung des Dokumentes',
@@ -573,7 +574,8 @@ class SequentialFieldOrchestrator:
             'Koordinaten': "Suche nach Latitude, Longitude, GPS, Coordinates, Koordinaten",
             'Aktivitätsstatus': "Suche nach Status, Active, Inactive, Operational, Closed, Under Development",
             'Rohstoff': "Suche nach Mineral, Commodity, Resource, Material, Gold, Copper, etc.",
-            'Fördermenge': "Suche nach Production, Output, Annual Production, Förderung, Menge"
+            'Fördermenge Rohstoff': "Suche nach spezifischer Rohstoffproduktion: Gold oz, Kupfer tons, etc.",
+            'Fördermenge Abraum': "Suche nach Gesamtmaterialextraktion: Total mining volume, Abraum, Waste rock"
         }
         
         for key, enhancement in field_enhancements.items():

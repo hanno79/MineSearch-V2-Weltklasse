@@ -413,11 +413,23 @@ def apply_enhanced_patterns_to_field(value: str, field: str) -> str:
         if cross_field_data['commodity']:
             return cross_field_data['commodity']
     
-    elif field == 'Fördermenge/Jahr':
-        # Cross-Field-Daten für Produktionsmenge
+    elif field == 'Fördermenge/Jahr Rohstoff':
+        # NEU 07.09.2025: Cross-Field-Daten für Rohstoff-Produktionsmenge
         cross_field_data = extract_cross_field_data(value)
         if cross_field_data['production']:
-            return cross_field_data['production']
+            # Prüfe ob es sich um Rohstoff-spezifische Produktion handelt (Unzen, spezifische Tonnage)
+            production_lower = cross_field_data['production'].lower()
+            if any(unit in production_lower for unit in ['oz', 'ounces', 'unzen', 'tonnes of', 'tons of']):
+                return cross_field_data['production']
+    
+    elif field == 'Fördermenge/Jahr Abraum':
+        # NEU 07.09.2025: Cross-Field-Daten für Gesamtextraktion
+        cross_field_data = extract_cross_field_data(value)
+        if cross_field_data['production']:
+            # Prüfe ob es sich um Gesamtextraktion handelt (Million Tonnen, Gesamtmaterial)
+            production_lower = cross_field_data['production'].lower()
+            if any(indicator in production_lower for indicator in ['million', 'mt', 'total', 'waste', 'overburden', 'material']):
+                return cross_field_data['production']
     
     elif field in ['Minentyp', 'Minentyp']:
         # Erweiterte Minentyp-Extraktion

@@ -486,7 +486,8 @@ NUR ERLAUBT - EXPLIZITE DOKUMENTENDATEN:
 - Minentyp: [Aus Mining Method-Section oder leer]
 - Produktionsstart: [Aus Operations History oder leer]
 - Produktionsende: [Jahr mit Wiedereröffnung falls vorhanden (z.B. "2013 (reopened 2021)") oder leer]
-- Fördermenge/Jahr: [Aus Production Statistics oder leer]
+- Fördermenge/Jahr Rohstoff: [Spezifische Rohstoffproduktion aus Production Statistics, z.B. '120,000 Unzen Gold' oder leer]
+- Fördermenge/Jahr Abraum: [Gesamte Materialextraktion aus Production Statistics, z.B. '2.3 Millionen Tonnen' oder leer]
 - Fläche der Mine in qkm: [Aus Site Description oder leer]
 - Quellenangaben: [Spezifische Dokument-Referenzen mit Seitenzahlen]
 
