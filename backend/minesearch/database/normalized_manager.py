@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from minesearch.database.manager import DatabaseManager
 from minesearch.value_normalizer import value_normalizer
+from minesearch.smart_value_extractor import SmartValueExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,10 @@ class NormalizedDatabaseManager(DatabaseManager):
     """
     Erweiterte Version des DatabaseManager für normalisiertes Schema
     """
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.smart_extractor = SmartValueExtractor()
     
     def normalize_mine_name(self, name: str) -> str:
         """Normalisiere Mine-Namen für Konsistenz und Deduplizierung"""
@@ -291,10 +296,20 @@ class NormalizedDatabaseManager(DatabaseManager):
                 
         return False
     
-    def get_or_create_company(self, company_name: str, company_type: str = 'owner', db_session: Optional[Session] = None) -> Optional[int]:
-        """Hole oder erstelle Unternehmen und gib ID zurück"""
+    def get_or_create_company(self, company_name: str, db_session: Optional[Session] = None) -> Optional[int]:
+        """Hole oder erstelle Unternehmen mit Smart Extractor für Satz-zu-Wert Konvertierung"""
         if not company_name or company_name in ['Nicht gefunden', 'Not found', 'Unknown']:
             return None
+        
+        # NEUE LOGIK: Smart Extractor für Sätze
+        if self.smart_extractor.is_sentence_like(company_name) or self.smart_extractor.should_reject_value(company_name):
+            logger.warning(f"[SMART_COMPANY] Satz erkannt, verwende Smart Extractor: '{company_name[:60]}...'")
+            extracted_company = self.smart_extractor.extract_company_from_text(company_name)
+            if not extracted_company:
+                logger.warning(f"[SMART_COMPANY] Kein Firmenname extrahierbar aus: '{company_name[:60]}...' → ABGELEHNT")
+                return None
+            company_name = extracted_company
+            logger.info(f"[SMART_COMPANY] Erfolgreich extrahiert: '{extracted_company}'")
         
         normalized_name = self.normalize_company_name(company_name)
         if not normalized_name:
@@ -312,11 +327,10 @@ class NormalizedDatabaseManager(DatabaseManager):
             if existing:
                 return existing[0]
             insert_result = db_session.execute(text("""
-                INSERT INTO companies (name, company_type) 
-                VALUES (:name, :company_type)
+                INSERT INTO companies (name) 
+                VALUES (:name)
             """), {
-                'name': company_name,
-                'company_type': company_type
+                'name': company_name
             })
             db_session.flush()
             return insert_result.lastrowid
@@ -334,11 +348,10 @@ class NormalizedDatabaseManager(DatabaseManager):
                 return existing[0]
             # Erstelle neue Firma
             insert_result = session.execute(text("""
-                INSERT INTO companies (name, company_type) 
-                VALUES (:name, :company_type)
+                INSERT INTO companies (name) 
+                VALUES (:name)
             """), {
-                'name': company_name,
-                'company_type': company_type
+                'name': company_name
             })
             session.commit()
             return insert_result.lastrowid
@@ -378,9 +391,19 @@ class NormalizedDatabaseManager(DatabaseManager):
             return insert_result.lastrowid
 
     def get_or_create_region(self, region_name: str, country_id: Optional[int] = None, db_session: Optional[Session] = None) -> Optional[int]:
-        """Hole oder erstelle Region und gib ID zurück"""
+        """Hole oder erstelle Region mit Smart Extractor für Satz-zu-Wert Konvertierung"""
         if not region_name or region_name in ['Nicht gefunden', 'Not found', 'Unknown']:
             return None
+            
+        # NEUE LOGIK: Smart Extractor für Sätze
+        if self.smart_extractor.is_sentence_like(region_name) or self.smart_extractor.should_reject_value(region_name):
+            logger.warning(f"[SMART_REGION] Satz erkannt, verwende Smart Extractor: '{region_name[:60]}...'")
+            extracted_region = self.smart_extractor.extract_region_from_text(region_name)
+            if not extracted_region:
+                logger.warning(f"[SMART_REGION] Keine Region extrahierbar aus: '{region_name[:60]}...' → ABGELEHNT")
+                return None
+            region_name = extracted_region
+            logger.info(f"[SMART_REGION] Erfolgreich extrahiert: '{extracted_region}'")
             
         # Externe Transaktion verwenden, falls bereitgestellt
         if db_session is not None:
@@ -412,9 +435,19 @@ class NormalizedDatabaseManager(DatabaseManager):
             return insert_result.lastrowid
 
     def get_or_create_mine_type(self, type_name: str, db_session: Optional[Session] = None) -> Optional[int]:
-        """Hole oder erstelle Minentyp und gib ID zurück - mit intelligenter Synonym-Erkennung"""
+        """Hole oder erstelle Minentyp mit Smart Extractor für Satz-zu-Wert Konvertierung"""
         if not type_name:
             return None
+        
+        # NEUE LOGIK: Smart Extractor für Sätze
+        if self.smart_extractor.is_sentence_like(type_name) or self.smart_extractor.should_reject_value(type_name):
+            logger.warning(f"[SMART_MINE_TYPE] Satz erkannt, verwende Smart Extractor: '{type_name[:60]}...'")
+            extracted_type = self.smart_extractor.extract_mine_type_from_text(type_name)
+            if not extracted_type:
+                logger.warning(f"[SMART_MINE_TYPE] Kein Minentyp extrahierbar aus: '{type_name[:60]}...' → ABGELEHNT")
+                return None
+            type_name = extracted_type
+            logger.info(f"[SMART_MINE_TYPE] Erfolgreich extrahiert: '{extracted_type}'")
         
         # INTELLIGENTE NORMALISIERUNG: Synonyme erkennen
         normalized_type = self._normalize_mine_type(type_name)
@@ -455,9 +488,19 @@ class NormalizedDatabaseManager(DatabaseManager):
             return insert_result.lastrowid
 
     def get_or_create_commodity(self, commodity_name: str, db_session: Optional[Session] = None) -> Optional[int]:
-        """Hole oder erstelle Rohstoff und gib ID zurück - mit intelligenter Synonym-Erkennung"""
+        """Hole oder erstelle Rohstoff mit Smart Extractor für Satz-zu-Wert Konvertierung"""
         if not commodity_name or commodity_name in ['Nicht gefunden', 'Not found', 'Unknown']:
             return None
+        
+        # NEUE LOGIK: Smart Extractor für Sätze
+        if self.smart_extractor.is_sentence_like(commodity_name) or self.smart_extractor.should_reject_value(commodity_name):
+            logger.warning(f"[SMART_COMMODITY] Satz erkannt, verwende Smart Extractor: '{commodity_name[:60]}...'")
+            extracted_commodity = self.smart_extractor.extract_commodity_from_text(commodity_name)
+            if not extracted_commodity:
+                logger.warning(f"[SMART_COMMODITY] Kein Rohstoff extrahierbar aus: '{commodity_name[:60]}...' → ABGELEHNT")
+                return None
+            commodity_name = extracted_commodity
+            logger.info(f"[SMART_COMMODITY] Erfolgreich extrahiert: '{extracted_commodity}'")
         
         # Synonyme für Rohstoffe
         commodity_synonyms = {
@@ -492,6 +535,10 @@ class NormalizedDatabaseManager(DatabaseManager):
         if normalized in commodity_synonyms:
             commodity_name = commodity_synonyms[normalized]
         else:
+            # Zusätzliche Validierung für unbekannte Werte
+            if len(commodity_name) > 50:
+                logger.warning(f"[SMART_COMMODITY] Unbekannter Rohstoff zu lang → ABGELEHNT: '{commodity_name[:60]}...'")
+                return None
             # Fallback: Title Case
             commodity_name = commodity_name.title()
             
@@ -526,9 +573,19 @@ class NormalizedDatabaseManager(DatabaseManager):
             return insert_result.lastrowid
 
     def get_or_create_activity_status(self, status_name: str, db_session: Optional[Session] = None) -> Optional[int]:
-        """Hole oder erstelle Aktivitätsstatus und gib ID zurück - mit intelligenter Synonym-Erkennung"""
+        """Hole oder erstelle Aktivitätsstatus mit Smart Extractor für Satz-zu-Wert Konvertierung"""
         if not status_name:
             return None
+        
+        # NEUE LOGIK: Smart Extractor für Sätze
+        if self.smart_extractor.is_sentence_like(status_name) or self.smart_extractor.should_reject_value(status_name):
+            logger.warning(f"[SMART_ACTIVITY] Satz erkannt, verwende Smart Extractor: '{status_name[:60]}...'")
+            extracted_status = self.smart_extractor.extract_activity_status_from_text(status_name)
+            if not extracted_status:
+                logger.warning(f"[SMART_ACTIVITY] Kein Status extrahierbar aus: '{status_name[:60]}...' → ABGELEHNT")
+                return None
+            status_name = extracted_status
+            logger.info(f"[SMART_ACTIVITY] Erfolgreich extrahiert: '{extracted_status}'")
         
         # INTELLIGENTE NORMALISIERUNG: Synonyme erkennen
         normalized_status = self._normalize_activity_status(status_name)
@@ -757,7 +814,7 @@ class NormalizedDatabaseManager(DatabaseManager):
                     # Firmen-Normalisierung  
                     elif 'eigentümer' in field_name.lower() or 'betreiber' in field_name.lower() or 'owner' in field_name.lower() or 'operator' in field_name.lower():
                         company_type = 'owner' if 'eigentümer' in field_name.lower() or 'owner' in field_name.lower() else 'operator'
-                        company_id = self.get_or_create_company(atomic_value, company_type, db_session=session)
+                        company_id = self.get_or_create_company(atomic_value, db_session=session)
                         logger.info(f"[NORMALIZATION] Company '{atomic_value}' ({company_type}) -> ID {company_id}")
                     
                     # Status-Normalisierung
@@ -991,7 +1048,7 @@ class NormalizedDatabaseManager(DatabaseManager):
                     # Firmen-Normalisierung  
                     elif 'eigentümer' in field_name.lower() or 'betreiber' in field_name.lower() or 'owner' in field_name.lower() or 'operator' in field_name.lower():
                         company_type = 'owner' if 'eigentümer' in field_name.lower() or 'owner' in field_name.lower() else 'operator'
-                        company_id = self.get_or_create_company(atomic_value, company_type, db_session=local_session)
+                        company_id = self.get_or_create_company(atomic_value, db_session=local_session)
                         logger.info(f"[NORMALIZATION] Company '{atomic_value}' ({company_type}) -> ID {company_id}")
                     
                     # Status-Normalisierung

@@ -76,8 +76,8 @@ def is_template_or_dummy_value(value: str, field: str = None) -> bool:
     # PHASE 2: CSV-HEADER-ÄHNLICHE TEMPLATE-PATTERNS
     template_patterns = [
         # Exact CSV header patterns that AI models often return as "examples"
-        r'^Rohstoffabbau \(Gold[/\s]*Kupfer[/\s]*Kohle[/\s]*usw\.?\)$',
-        r'^Minentyp \(Untertage[/\s]*Open-Pit[/\s]*usw\.?\)$', 
+        r'^Rohstoff$',
+        r'^Minentyp$', 
         r'^\(Gold[/\s]*Kupfer[/\s]*Kohle[/\s]*usw\.?\)$',
         r'^\(Untertage[/\s]*Open-Pit[/\s]*usw\.?\)$',
         r'^\(aktiv[/\s]*geplant[/\s]*geschlossen[/\s]*sonstiges\)$',
@@ -149,7 +149,53 @@ def is_template_or_dummy_value(value: str, field: str = None) -> bool:
         logger.warning(f"[TEMPLATE DETECTION] Expliziter Dummy-Wert: '{value_str}'")
         return True
     
-    # PHASE 6: UNIVERSELLE FELD-VALIDIERUNG GEGEN SCHÄTZUNGEN UND TEMPLATES
+    # PHASE 6: PROBLEMATISCHE DATENBANK-EINTRÄGE (User-Report 07.09.2025)
+    # Erkenne beschreibende Sätze die in Lookup-Tabellen gelandet sind
+    problematic_db_patterns = [
+        # Commodities-Tabelle Probleme
+        r'ist\s+eine?\s+bedeutende?\s+.*mine',  # "Ist Eine Bedeutende Untertage-Goldmine"
+        r'war\s+eine?\s+.*betrieb',             # "War Ein Kleiner Untertagebetrieb Für Kupfer"
+        r'für\s+kupfer\s+und\s+zink\s+handelt',  # "Für Kupfer Und Zink Handelt"
+        r'spezifisch\s+als.*in.*berichten',      # "Spezifisch Als Steatite In Produktionsberichten"
+        r'is\s+known\s+to\s+have\s+been',        # "Is known to have been operational"
+        r'exact\s+production\s+figures',         # "exact production figures and current owner"
+        r'project.*auf\s+sedar',                 # "Project" (Maple Gold) auf Sedar
+        
+        # Companies-Tabelle Probleme  
+        r'dokumentiert\s+im\s+.*bergbau',        # "Dokumentiert Im Quebec Bergbauregister"
+        r'mehrdeutige\s+eigentums',              # "Mehrdeutige Eigentumsverhältnisse"
+        r'ohne\s+aktuelle\s+primärquellen',     # "Ohne Aktuelle Primärquellen"
+        r'government\s+of.*\(\d+\.?\d*%\)',      # "Government of Mongolia (34%)"
+        
+        # Mine Types-Tabelle Probleme
+        r'open-pit/\d{4}//',                     # "Open-Pit/1998//5000 T/0.15/"
+        r'/\d{4}//.*t/',                         # "/1998//5000 T/" Pattern
+        r'https?://.*mern\.gouv',                # URLs in mine types
+        r'exploration\s+project/projet',         # "Exploration Project/Projet D'Exploration"
+        r'proposed.*projet',                     # "Proposed Open-Pit/Projet À Ciel Ouvert"
+        
+        # Allgemeine Satz-Patterns
+        r'im\s+norden\s+quebecs',               # "im Norden Quebecs"
+        r'von.*corporation.*betrieben',         # "von Newmont Corporation betrieben wird"
+        r'nur\s+von\s+\d{4}-\d{4}\s+aktiv',   # "nur von 1972-1975 aktiv war"
+        r'bestätigt.*produktionsberichten',     # "bestätigt In Produktionsberichten"
+        
+        # URL/Link Patterns
+        r'https?://',                            # Any URLs
+        r'www\.',                                # Web addresses
+        
+        # Prozent und Ownership Patterns
+        r'\(\d+\.?\d*%\)',                       # Percentage in parentheses
+        r'\d+\.?\d*%.*\d+\.?\d*%',              # Multiple percentages
+        r'billiton.*rio\s+tinto',               # Company ownership lists
+    ]
+    
+    for pattern in problematic_db_patterns:
+        if re.search(pattern, value_str, re.IGNORECASE):
+            logger.warning(f"[TEMPLATE DETECTION] Problematischer DB-Eintrag erkannt: '{value_str[:100]}...'")
+            return True
+    
+    # PHASE 7: UNIVERSELLE FELD-VALIDIERUNG GEGEN SCHÄTZUNGEN UND TEMPLATES
     
     # 6.1: QUELLEN-VALIDIERUNG FÜR ALLE FELDER (nicht nur Restaurationskosten)
     # Erkenne ungültige Quellen-Patterns in JEDEM Feldwert
@@ -841,7 +887,7 @@ def clean_field_value(value: str, field: str) -> str:
         prefixes_to_remove = [
             r'Untertage/ Open-Pit/ usw\.\):\s*',
             r'\(Untertage/ Open-Pit/ usw\.\):\s*',
-            r'Minentyp \(Untertage/ Open-Pit/ usw\.\):\s*',
+            r'Minentyp:\s*',
             r'Typ:\s*',
             r'Mine type:\s*',
             r'Type:\s*'
