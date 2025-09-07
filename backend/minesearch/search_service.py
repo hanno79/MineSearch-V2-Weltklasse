@@ -214,7 +214,21 @@ class MineSearchService:
             mine_name, name_variants, country, currency, restoration_terms
         )
         
-        # Provider-Optionen
+        # FIX 07.09.2025: Enhanced Source Discovery für ALLE Provider
+        # Damit alle Provider dieselben umfangreichen Quellen nutzen (wie OpenRouter)
+        logger.info(f"[SOURCE-DISCOVERY] Starte einheitliche Source Discovery für {mine_name}")
+        try:
+            discovered_sources = self.enhanced_discovery.discover_sources_for_mine(
+                mine_name=mine_name,
+                country=country,
+                region=region
+            )
+            logger.info(f"[SOURCE-DISCOVERY] {len(discovered_sources)} Quellen für alle Provider bereitgestellt")
+        except Exception as e:
+            logger.warning(f"[SOURCE-DISCOVERY] Fehler bei Discovery: {e}")
+            discovered_sources = []
+        
+        # Provider-Optionen (erweitert mit discovered_sources)
         options = {
             'mine_name': mine_name,
             'country': country,
@@ -222,7 +236,9 @@ class MineSearchService:
             'region': region,
             'currency': currency,
             'name_variants': name_variants,
-            'multilingual_terms': multilingual_terms
+            'multilingual_terms': multilingual_terms,
+            'discovered_sources': discovered_sources,  # FIX: Alle Provider bekommen dieselben Quellen
+            'use_all_sources': True  # Nutze alle verfügbaren Quellen
         }
         
         # ÄNDERUNG 14.07.2025: Führe Suche durch mit korrektem Model-Namen

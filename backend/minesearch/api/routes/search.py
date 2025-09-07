@@ -91,27 +91,16 @@ async def search_mine(
             except Exception as wrapper_error:
                 logger.warning(f"[SEARCH API] Wrapper-Fehler, versuche Original-Logic: {wrapper_error}")
                 
-                # Fallback auf Original-Logic
-                if ":" in model:  # Provider:Model Format (z.B. anthropic:claude-3.7-sonnet)
-                    logger.info(f"[SEARCH API] Verwende Enhanced Service für {model}")
-                    # Nutze Enhanced Service für Provider-basierte Suche
-                    result = await services.enhanced_search_service.search_single_model(
-                        model_id=model,
-                        mine_name=request.mine_name,
-                        country=request.country,
-                        commodity=request.commodity,
-                        region=request.region
-                    )
-                else:
-                    logger.info(f"[SEARCH API] Verwende Legacy Service für {model}")
-                    # Legacy Support für Perplexity-Modelle
-                    result = await services.mine_search_service.search_mine(
-                        mine_name=request.mine_name,
-                        country=request.country,
-                        commodity=request.commodity,
-                        model=model,
-                        region=request.region
-                    )
+                # FIX 07.09.2025: Unified Service für alle Modelle
+                # enhanced_search_service wurde entfernt - alle Modelle nutzen mine_search_service
+                logger.info(f"[SEARCH API] Verwende Mine Search Service für {model}")
+                result = await services.mine_search_service.search_mine(
+                    mine_name=request.mine_name,
+                    country=request.country,
+                    commodity=request.commodity,
+                    model=model,
+                    region=request.region
+                )
         
         # Berechne Response-Zeit
         response_time_ms = (datetime.now() - search_start_time).total_seconds() * 1000
