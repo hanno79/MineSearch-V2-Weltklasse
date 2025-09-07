@@ -1,0 +1,633 @@
+{
+  "cleaning_timestamp": "2025-09-07T07:54:23.472072",
+  "results": {
+    "dry_run": true,
+    "companies_cleaned": 49,
+    "mines_cleaned": 0,
+    "total_merges": 49,
+    "merge_decisions": [
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 13,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "merged_company": {
+          "id": 19,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 14,
+          "name": "Arcelormittal Mining Canada G.P"
+        },
+        "merged_company": {
+          "id": 20,
+          "name": "Arcelormittal Mining Canada G.P"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 15,
+          "name": "Hecla Mining Company"
+        },
+        "merged_company": {
+          "id": 21,
+          "name": "Hecla Mining Company"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 15,
+          "name": "Hecla Mining Company"
+        },
+        "merged_company": {
+          "id": 22,
+          "name": "Hecla Mining Company"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 13,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "merged_company": {
+          "id": 27,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 14,
+          "name": "Arcelormittal Mining Canada G.P"
+        },
+        "merged_company": {
+          "id": 28,
+          "name": "Arcelormittal Mining Canada G.P"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 15,
+          "name": "Hecla Mining Company"
+        },
+        "merged_company": {
+          "id": 29,
+          "name": "Hecla Mining Company"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 15,
+          "name": "Hecla Mining Company"
+        },
+        "merged_company": {
+          "id": 30,
+          "name": "Hecla Mining Company"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 13,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "merged_company": {
+          "id": 32,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 14,
+          "name": "Arcelormittal Mining Canada G.P"
+        },
+        "merged_company": {
+          "id": 33,
+          "name": "Arcelormittal Mining Canada G.P"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 15,
+          "name": "Hecla Mining Company"
+        },
+        "merged_company": {
+          "id": 34,
+          "name": "Hecla Mining Company"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 17,
+          "name": "Glencore plc (100%)"
+        },
+        "merged_company": {
+          "id": 35,
+          "name": "Glencore plc (100%)"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 25,
+          "name": "BHP Billiton (57.5%), Rio Tinto (30%), JECO Corp (12.5%)"
+        },
+        "merged_company": {
+          "id": 36,
+          "name": "BHP Billiton (57.5%), Rio Tinto (30%), JECO Corp (12.5%)"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 15,
+          "name": "Hecla Mining Company"
+        },
+        "merged_company": {
+          "id": 43,
+          "name": "Hecla Mining Company"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 15,
+          "name": "Hecla Mining Company"
+        },
+        "merged_company": {
+          "id": 46,
+          "name": "Hecla Mining Company"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 15,
+          "name": "Hecla Mining Company"
+        },
+        "merged_company": {
+          "id": 47,
+          "name": "Hecla Mining Company"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 37,
+          "name": "Freeport-McMoRan Inc. (90.64%), Government of Indonesia (9.36%)"
+        },
+        "merged_company": {
+          "id": 48,
+          "name": "Freeport-McMoRan Inc. (90.64%), Government of Indonesia (9.36%)"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 39,
+          "name": "Turquoise Hill Resources Ltd. (66%), Government of Mongolia (34%)"
+        },
+        "merged_company": {
+          "id": 49,
+          "name": "Turquoise Hill Resources Ltd. (66%), Government of Mongolia (34%)"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 15,
+          "name": "Hecla Mining Company"
+        },
+        "merged_company": {
+          "id": 88,
+          "name": "Hecla Mining Company"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 11,
+          "name": "Wesdome Gold Mines Ltd"
+        },
+        "merged_company": {
+          "id": 89,
+          "name": "Wesdome Gold Mines Ltd"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "exact_name_duplicate",
+        "kept_company": {
+          "id": 76,
+          "name": "SOQUEM (Société québécoise d'exploration minière)"
+        },
+        "merged_company": {
+          "id": 91,
+          "name": "SOQUEM (Société québécoise d'exploration minière)"
+        },
+        "reason": "Identical name"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 1,
+          "name": "SOQUEM Inc"
+        },
+        "merged_company": {
+          "id": 56,
+          "name": "Soquem Inc"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 1,
+          "name": "SOQUEM Inc"
+        },
+        "merged_company": {
+          "id": 57,
+          "name": "Soquem"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 10,
+          "name": "Agnico Eagle Mines Limited"
+        },
+        "merged_company": {
+          "id": 73,
+          "name": "Agnico Eagle Mines"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 11,
+          "name": "Wesdome Gold Mines Ltd"
+        },
+        "merged_company": {
+          "id": 89,
+          "name": "Wesdome Gold Mines Ltd"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 11,
+          "name": "Wesdome Gold Mines Ltd"
+        },
+        "merged_company": {
+          "id": 90,
+          "name": "Wesdome Gold Mines"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 13,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "merged_company": {
+          "id": 14,
+          "name": "Arcelormittal Mining Canada G.P"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 13,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "merged_company": {
+          "id": 19,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 13,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "merged_company": {
+          "id": 20,
+          "name": "Arcelormittal Mining Canada G.P"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 13,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "merged_company": {
+          "id": 27,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 13,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "merged_company": {
+          "id": 28,
+          "name": "Arcelormittal Mining Canada G.P"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 13,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "merged_company": {
+          "id": 32,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 13,
+          "name": "ArcelorMittal Mining Canada G.P"
+        },
+        "merged_company": {
+          "id": 33,
+          "name": "Arcelormittal Mining Canada G.P"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 25,
+          "name": "BHP Billiton (57.5%), Rio Tinto (30%), JECO Corp (12.5%)"
+        },
+        "merged_company": {
+          "id": 31,
+          "name": "BHP (57.5%), Rio Tinto (30%), JECO Corp (12.5%)"
+        },
+        "similarity": 0.898876404494382,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 25,
+          "name": "BHP Billiton (57.5%), Rio Tinto (30%), JECO Corp (12.5%)"
+        },
+        "merged_company": {
+          "id": 36,
+          "name": "BHP Billiton (57.5%), Rio Tinto (30%), JECO Corp (12.5%)"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 41,
+          "name": "IOC Rio Tinto Corp"
+        },
+        "merged_company": {
+          "id": 42,
+          "name": "Ioc Rio Tinto"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 52,
+          "name": "Arianne Phosphate Inc"
+        },
+        "merged_company": {
+          "id": 53,
+          "name": "Arianne Phosphate"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 54,
+          "name": "Quebec Precious Metals Corporation"
+        },
+        "merged_company": {
+          "id": 55,
+          "name": "Quebec Precious Metals"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 58,
+          "name": "Ressources Minières Radisson Inc"
+        },
+        "merged_company": {
+          "id": 59,
+          "name": "Ressources Minières Radisson"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 60,
+          "name": "IAMGOLD Corporation"
+        },
+        "merged_company": {
+          "id": 61,
+          "name": "Iamgold"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 63,
+          "name": "Focus Graphite Inc"
+        },
+        "merged_company": {
+          "id": 64,
+          "name": "Focus Graphite"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 67,
+          "name": "Glen Almond Mining Corporation"
+        },
+        "merged_company": {
+          "id": 68,
+          "name": "Glen Almond Mining"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 69,
+          "name": "Ressources Minières Vanstar Inc"
+        },
+        "merged_company": {
+          "id": 70,
+          "name": "Ressources Minières Vanstar"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 71,
+          "name": "Monarch Mining Corporation"
+        },
+        "merged_company": {
+          "id": 72,
+          "name": "Monarch Mining"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 74,
+          "name": "Mc Kinnon Resources Inc"
+        },
+        "merged_company": {
+          "id": 75,
+          "name": "Mc Kinnon Resources"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 77,
+          "name": "Radisson Mining Resources Inc"
+        },
+        "merged_company": {
+          "id": 78,
+          "name": "Radisson Mining Resources"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 79,
+          "name": "Maple Gold Mines Ltd"
+        },
+        "merged_company": {
+          "id": 80,
+          "name": "Maple Gold Mines"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 81,
+          "name": "Proprietary Resources Inc"
+        },
+        "merged_company": {
+          "id": 82,
+          "name": "Proprietary Resources"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      },
+      {
+        "type": "fuzzy_duplicate",
+        "kept_company": {
+          "id": 83,
+          "name": "SOMEX Inc"
+        },
+        "merged_company": {
+          "id": 84,
+          "name": "Somex"
+        },
+        "similarity": 1.0,
+        "reason": "Similar names (fuzzy match)"
+      }
+    ],
+    "backup_created": false
+  },
+  "backup_data": null,
+  "settings": {
+    "similarity_threshold": 0.85,
+    "database_path": "mines.db"
+  }
+}

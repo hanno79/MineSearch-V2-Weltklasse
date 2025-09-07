@@ -1,0 +1,9 @@
+{
+  "analysis_timestamp": "2025-09-06T23:56:53.860841",
+  "total_tables_analyzed": 30,
+  "total_exact_duplicates_found": 0,
+  "critical_severity": false,
+  "table_details": {
+    "sources": {
+      "total_rows": 629,
+      "exact_duplicates": 

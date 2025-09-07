@@ -1,0 +1,693 @@
+{
+  "migration_timestamp": "2025-09-07T08:04:19.998694",
+  "prevention_results": {
+    "database_constraints": false,
+    "application_guards": true,
+    "monitoring_setup": false,
+    "migration_backup": null,
+    "errors": []
+  },
+  "migration_backup": {
+    "companies": [
+      {
+        "id": 1,
+        "name": "SOQUEM Inc",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 18:54:57",
+        "updated_at": "2025-09-06 18:54:57",
+        "normalized_name": "soquem inc"
+      },
+      {
+        "id": 3,
+        "name": "Osisko Mining Inc",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 18:55:17",
+        "updated_at": "2025-09-06 18:55:17",
+        "normalized_name": "osisko mining inc"
+      },
+      {
+        "id": 6,
+        "name": "Newmont",
+        "country_id": null,
+        "company_type": "operator",
+        "created_at": "2025-09-06 18:56:11",
+        "updated_at": "2025-09-06 18:56:11",
+        "normalized_name": "newmont"
+      },
+      {
+        "id": 8,
+        "name": "Goldcorp",
+        "country_id": null,
+        "company_type": "operator",
+        "created_at": "2025-09-06 18:56:21",
+        "updated_at": "2025-09-06 18:56:21",
+        "normalized_name": "goldcorp"
+      },
+      {
+        "id": 10,
+        "name": "Agnico Eagle Mines Limited",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 18:57:26",
+        "updated_at": "2025-09-06 18:57:26",
+        "normalized_name": "agnico eagle mines limited"
+      },
+      {
+        "id": 11,
+        "name": "Wesdome Gold Mines Ltd",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 18:57:31",
+        "updated_at": "2025-09-06 18:57:31",
+        "normalized_name": "wesdome gold mines ltd"
+      },
+      {
+        "id": 12,
+        "name": "Wallbridge Mining Company Limited",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 18:57:54",
+        "updated_at": "2025-09-06 18:57:54",
+        "normalized_name": "wallbridge mining company limited"
+      },
+      {
+        "id": 13,
+        "name": "ArcelorMittal Mining Canada G.P",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 19:52:39",
+        "updated_at": "2025-09-06 19:52:39",
+        "normalized_name": "arcelormittal mining canada g.p"
+      },
+      {
+        "id": 15,
+        "name": "Hecla Mining Company",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 19:52:58",
+        "updated_at": "2025-09-06 19:52:58",
+        "normalized_name": "hecla mining company"
+      },
+      {
+        "id": 16,
+        "name": "Hecla Québec",
+        "country_id": null,
+        "company_type": "operator",
+        "created_at": "2025-09-06 19:52:58",
+        "updated_at": "2025-09-06 19:52:58",
+        "normalized_name": "hecla québec"
+      },
+      {
+        "id": 17,
+        "name": "Glencore plc (100%)",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 19:53:21",
+        "updated_at": "2025-09-06 19:53:21",
+        "normalized_name": "glencore plc (100%)"
+      },
+      {
+        "id": 18,
+        "name": "Glencore Canada",
+        "country_id": null,
+        "company_type": "operator",
+        "created_at": "2025-09-06 19:53:21",
+        "updated_at": "2025-09-06 19:53:21",
+        "normalized_name": "glencore canada"
+      },
+      {
+        "id": 23,
+        "name": "BHP Group Limited",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 19:54:44",
+        "updated_at": "2025-09-06 19:54:44",
+        "normalized_name": "bhp group limited"
+      },
+      {
+        "id": 24,
+        "name": "Bhp Olympic Dam Corporation Pty",
+        "country_id": null,
+        "company_type": "operator",
+        "created_at": "2025-09-06 19:54:44",
+        "updated_at": "2025-09-06 19:54:44",
+        "normalized_name": "bhp olympic dam corporation pty"
+      },
+      {
+        "id": 25,
+        "name": "BHP Billiton (57.5%), Rio Tinto (30%), JECO Corp (12.5%)",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 19:55:12",
+        "updated_at": "2025-09-06 19:55:12",
+        "normalized_name": "bhp billiton (57.5%), rio tinto (30%), jeco corp (12.5%)"
+      },
+      {
+        "id": 26,
+        "name": "Minera Escondida Ltda",
+        "country_id": null,
+        "company_type": "operator",
+        "created_at": "2025-09-06 19:55:12",
+        "updated_at": "2025-09-06 19:55:12",
+        "normalized_name": "minera escondida ltda"
+      },
+      {
+        "id": 37,
+        "name": "Freeport-McMoRan Inc. (90.64%), Government of Indonesia (9.36%)",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:04:30",
+        "updated_at": "2025-09-06 20:04:30",
+        "normalized_name": "freeport-mcmoran inc. (90.64%), government of indonesia (9.36%)"
+      },
+      {
+        "id": 38,
+        "name": "Pt Freeport Indonesia",
+        "country_id": null,
+        "company_type": "operator",
+        "created_at": "2025-09-06 20:04:30",
+        "updated_at": "2025-09-06 20:04:30",
+        "normalized_name": "pt freeport indonesia"
+      },
+      {
+        "id": 39,
+        "name": "Turquoise Hill Resources Ltd. (66%), Government of Mongolia (34%)",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:04:45",
+        "updated_at": "2025-09-06 20:04:45",
+        "normalized_name": "turquoise hill resources ltd. (66%), government of mongolia (34%)"
+      },
+      {
+        "id": 40,
+        "name": "Rio Tinto",
+        "country_id": null,
+        "company_type": "operator",
+        "created_at": "2025-09-06 20:04:45",
+        "updated_at": "2025-09-06 20:04:45",
+        "normalized_name": "rio tinto"
+      },
+      {
+        "id": 41,
+        "name": "IOC Rio Tinto Corp",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:11:43",
+        "updated_at": "2025-09-06 20:11:43",
+        "normalized_name": "ioc rio tinto corp"
+      },
+      {
+        "id": 44,
+        "name": "Glencore Canada Corporation (100%)",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:12:24",
+        "updated_at": "2025-09-06 20:12:24",
+        "normalized_name": "glencore canada corporation (100%)"
+      },
+      {
+        "id": 45,
+        "name": "ArcelorMittal",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:25:24",
+        "updated_at": "2025-09-06 20:25:24",
+        "normalized_name": "arcelormittal"
+      },
+      {
+        "id": 50,
+        "name": "Freeport-McMoRan Inc. (53.56%)/Sumitomo Metal Mining Co., Ltd. (21%)/Compañía de Minas Buenaventura S.A.A. (19.58%)/Other (5.86%)",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:27:15",
+        "updated_at": "2025-09-06 20:27:15",
+        "normalized_name": "freeport-mcmoran inc. (53.56%)/sumitomo metal mining co., ltd. (21%)/compañía de minas buenaventura s.a.a. (19.58%)/other (5.86%)"
+      },
+      {
+        "id": 51,
+        "name": "Freeport-Mcmoran",
+        "country_id": null,
+        "company_type": "operator",
+        "created_at": "2025-09-06 20:27:15",
+        "updated_at": "2025-09-06 20:27:15",
+        "normalized_name": "freeport-mcmoran"
+      },
+      {
+        "id": 52,
+        "name": "Arianne Phosphate Inc",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:32:29",
+        "updated_at": "2025-09-06 20:32:29",
+        "normalized_name": "arianne phosphate inc"
+      },
+      {
+        "id": 54,
+        "name": "Quebec Precious Metals Corporation",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:32:52",
+        "updated_at": "2025-09-06 20:32:52",
+        "normalized_name": "quebec precious metals corporation"
+      },
+      {
+        "id": 58,
+        "name": "Ressources Minières Radisson Inc",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:35:14",
+        "updated_at": "2025-09-06 20:35:14",
+        "normalized_name": "ressources minières radisson inc"
+      },
+      {
+        "id": 60,
+        "name": "IAMGOLD Corporation",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:35:29",
+        "updated_at": "2025-09-06 20:35:29",
+        "normalized_name": "iamgold corporation"
+      },
+      {
+        "id": 62,
+        "name": "Louvem Mines Ltée",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:36:53",
+        "updated_at": "2025-09-06 20:36:53",
+        "normalized_name": "louvem mines ltée"
+      },
+      {
+        "id": 63,
+        "name": "Focus Graphite Inc",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:37:46",
+        "updated_at": "2025-09-06 20:37:46",
+        "normalized_name": "focus graphite inc"
+      },
+      {
+        "id": 65,
+        "name": "Mehrdeutige Eigentumsverhältnisse Ohne Aktuelle Primärquellen",
+        "country_id": null,
+        "company_type": "operator",
+        "created_at": "2025-09-06 20:37:51",
+        "updated_at": "2025-09-06 20:37:51",
+        "normalized_name": "mehrdeutige eigentumsverhältnisse ohne aktuelle primärquellen"
+      },
+      {
+        "id": 66,
+        "name": "Res Radisson",
+        "country_id": null,
+        "company_type": "operator",
+        "created_at": "2025-09-06 20:42:45",
+        "updated_at": "2025-09-06 20:42:45",
+        "normalized_name": "res radisson"
+      },
+      {
+        "id": 67,
+        "name": "Glen Almond Mining Corporation",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:43:00",
+        "updated_at": "2025-09-06 20:43:00",
+        "normalized_name": "glen almond mining corporation"
+      },
+      {
+        "id": 69,
+        "name": "Ressources Minières Vanstar Inc",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:43:10",
+        "updated_at": "2025-09-06 20:43:10",
+        "normalized_name": "ressources minières vanstar inc"
+      },
+      {
+        "id": 71,
+        "name": "Monarch Mining Corporation",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 20:44:18",
+        "updated_at": "2025-09-06 20:44:18",
+        "normalized_name": "monarch mining corporation"
+      },
+      {
+        "id": 74,
+        "name": "Mc Kinnon Resources Inc",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 21:08:32",
+        "updated_at": "2025-09-06 21:08:32",
+        "normalized_name": null
+      },
+      {
+        "id": 76,
+        "name": "SOQUEM (Société québécoise d'exploration minière)",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 21:08:56",
+        "updated_at": "2025-09-06 21:08:56",
+        "normalized_name": null
+      },
+      {
+        "id": 77,
+        "name": "Radisson Mining Resources Inc",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 21:10:26",
+        "updated_at": "2025-09-06 21:10:26",
+        "normalized_name": null
+      },
+      {
+        "id": 79,
+        "name": "Maple Gold Mines Ltd",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 21:10:31",
+        "updated_at": "2025-09-06 21:10:31",
+        "normalized_name": null
+      },
+      {
+        "id": 81,
+        "name": "Proprietary Resources Inc",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 21:12:36",
+        "updated_at": "2025-09-06 21:12:36",
+        "normalized_name": null
+      },
+      {
+        "id": 83,
+        "name": "SOMEX Inc",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 21:16:19",
+        "updated_at": "2025-09-06 21:16:19",
+        "normalized_name": null
+      },
+      {
+        "id": 85,
+        "name": "SOQUEM inc. (100%)",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 21:20:04",
+        "updated_at": "2025-09-06 21:20:04",
+        "normalized_name": null
+      },
+      {
+        "id": 86,
+        "name": "Les Terrains Aurifères",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 21:21:22",
+        "updated_at": "2025-09-06 21:21:22",
+        "normalized_name": null
+      },
+      {
+        "id": 87,
+        "name": "Hecla Mining Company (100%)",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 21:28:21",
+        "updated_at": "2025-09-06 21:28:21",
+        "normalized_name": null
+      },
+      {
+        "id": 92,
+        "name": "atite Inc",
+        "country_id": null,
+        "company_type": "owner",
+        "created_at": "2025-09-06 21:36:27",
+        "updated_at": "2025-09-06 21:36:27",
+        "normalized_name": null
+      },
+      {
+        "id": 93,
+        "name": "Dokumentiert Im Quebec Bergbauregister Und Unternehmensberichten",
+        "country_id": null,
+        "company_type": "operator",
+        "created_at": "2025-09-06 21:36:27",
+        "updated_at": "2025-09-06 21:36:27",
+        "normalized_name": null
+      }
+    ],
+    "mines": [
+      {
+        "id": 1,
+        "name": "Kiena",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 18:39:54",
+        "updated_at": "2025-09-06 18:39:54"
+      },
+      {
+        "id": 2,
+        "name": "Lac Expanse",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 18:54:49",
+        "updated_at": "2025-09-06 18:54:49"
+      },
+      {
+        "id": 3,
+        "name": "Éléonore",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 18:56:06",
+        "updated_at": "2025-09-06 18:56:06"
+      },
+      {
+        "id": 4,
+        "name": "Aubelle",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 18:57:16",
+        "updated_at": "2025-09-06 18:57:16"
+      },
+      {
+        "id": 5,
+        "name": "Mont Wright",
+        "country_id": 2,
+        "region_id": 3,
+        "created_at": "2025-09-06 19:52:31",
+        "updated_at": "2025-09-06 19:52:31"
+      },
+      {
+        "id": 6,
+        "name": "Casa Berardi",
+        "country_id": 2,
+        "region_id": 3,
+        "created_at": "2025-09-06 19:52:53",
+        "updated_at": "2025-09-06 19:52:53"
+      },
+      {
+        "id": 7,
+        "name": "Raglan Mine",
+        "country_id": 2,
+        "region_id": 3,
+        "created_at": "2025-09-06 19:53:16",
+        "updated_at": "2025-09-06 19:53:16"
+      },
+      {
+        "id": 8,
+        "name": "Olympic Dam",
+        "country_id": 3,
+        "region_id": 4,
+        "created_at": "2025-09-06 19:54:39",
+        "updated_at": "2025-09-06 19:54:39"
+      },
+      {
+        "id": 9,
+        "name": "Escondida",
+        "country_id": 4,
+        "region_id": 5,
+        "created_at": "2025-09-06 19:55:07",
+        "updated_at": "2025-09-06 19:55:07"
+      },
+      {
+        "id": 10,
+        "name": "Grasberg",
+        "country_id": 5,
+        "region_id": 6,
+        "created_at": "2025-09-06 20:04:25",
+        "updated_at": "2025-09-06 20:04:25"
+      },
+      {
+        "id": 11,
+        "name": "Oyu Tolgoi",
+        "country_id": 6,
+        "region_id": 7,
+        "created_at": "2025-09-06 20:04:40",
+        "updated_at": "2025-09-06 20:04:40"
+      },
+      {
+        "id": 12,
+        "name": "Cerro Verde",
+        "country_id": 7,
+        "region_id": 8,
+        "created_at": "2025-09-06 20:27:10",
+        "updated_at": "2025-09-06 20:27:10"
+      },
+      {
+        "id": 13,
+        "name": "Newmont Goldstrike",
+        "country_id": 8,
+        "region_id": 9,
+        "created_at": "2025-09-06 20:27:28",
+        "updated_at": "2025-09-06 20:27:28"
+      },
+      {
+        "id": 14,
+        "name": "Lac à Paul",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 20:32:24",
+        "updated_at": "2025-09-06 20:32:24"
+      },
+      {
+        "id": 15,
+        "name": "Flintkote",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 20:33:52",
+        "updated_at": "2025-09-06 20:33:52"
+      },
+      {
+        "id": 16,
+        "name": "Ives",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 20:35:09",
+        "updated_at": "2025-09-06 20:35:09"
+      },
+      {
+        "id": 17,
+        "name": "Louvem",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 20:36:30",
+        "updated_at": "2025-09-06 20:36:30"
+      },
+      {
+        "id": 18,
+        "name": "Standard Graphite",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 20:37:41",
+        "updated_at": "2025-09-06 20:37:41"
+      },
+      {
+        "id": 19,
+        "name": "Glen Almond (Lac Cole)",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 20:42:37",
+        "updated_at": "2025-09-06 20:42:37"
+      },
+      {
+        "id": 20,
+        "name": "Wood-Cadillac",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 20:44:08",
+        "updated_at": "2025-09-06 20:44:08"
+      },
+      {
+        "id": 21,
+        "name": "Kazabazua-ouest",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 20:45:33",
+        "updated_at": "2025-09-06 20:45:33"
+      },
+      {
+        "id": 22,
+        "name": "Somex",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 21:06:36",
+        "updated_at": "2025-09-06 21:06:36"
+      },
+      {
+        "id": 23,
+        "name": "Lac Brulé (Mc Kinnon)",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 21:08:22",
+        "updated_at": "2025-09-06 21:08:22"
+      },
+      {
+        "id": 24,
+        "name": "Normétal",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 21:10:21",
+        "updated_at": "2025-09-06 21:10:21"
+      },
+      {
+        "id": 25,
+        "name": "Highwater",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 21:11:58",
+        "updated_at": "2025-09-06 21:11:58"
+      },
+      {
+        "id": 26,
+        "name": "New Bidlamaque",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 21:15:46",
+        "updated_at": "2025-09-06 21:15:46"
+      },
+      {
+        "id": 27,
+        "name": "Les Terrains Aurifères",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 21:19:40",
+        "updated_at": "2025-09-06 21:19:40"
+      },
+      {
+        "id": 28,
+        "name": "Fleming et Allan",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 21:20:59",
+        "updated_at": "2025-09-06 21:20:59"
+      },
+      {
+        "id": 29,
+        "name": "Aurora",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 21:27:57",
+        "updated_at": "2025-09-06 21:27:57"
+      },
+      {
+        "id": 30,
+        "name": "Aubin",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 21:33:50",
+        "updated_at": "2025-09-06 21:33:50"
+      },
+      {
+        "id": 31,
+        "name": "Stéatite d'Eastray",
+        "country_id": 1,
+        "region_id": 3,
+        "created_at": "2025-09-06 21:36:17",
+        "updated_at": "2025-09-06 21:36:17"
+      }
+    ]
+  },
+  "next_steps": [
+    "Teste neue UNIQUE-Constraints mit Test-Inserts",
+    "Integriere Guards in bestehende MineSearch-Application",
+    "Setup automatische wöchentliche Monitoring-Reports",
+    "Trainiere Team auf neue Safe-Insert-Funktionen"
+  ]
+}
