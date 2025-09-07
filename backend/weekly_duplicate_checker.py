@@ -23,7 +23,7 @@ import pandas as pd
 import json
 from datetime import datetime, timedelta
 import smtplib
-from email.mime.text import MimeText
+from email.mime.text import MIMEText
 
 
 class WeeklyDuplicateChecker:
