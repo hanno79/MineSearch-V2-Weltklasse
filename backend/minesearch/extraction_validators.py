@@ -43,8 +43,8 @@ def is_placeholder_value(value: str, field: str = None) -> bool:
     
     # Exakte CSV-Template-Strings
     exact_template_strings = [
-        'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)',  # Exakter CSV-Header
-        'Minentyp (Untertage/ Open-Pit/ usw.)',       # Exakter CSV-Header  
+        'Rohstoff',  # Exakter CSV-Header
+        'Minentyp',       # Exakter CSV-Header  
         'Aktivitätsstatus (aktiv/ geplant/ geschlossen/ sonstiges)',  # Exakter CSV-Header
         '(Gold/ Kupfer/ Kohle/ usw.)',                # Isolierter Template-Teil
         '(Untertage/ Open-Pit/ usw.)',                # Isolierter Template-Teil

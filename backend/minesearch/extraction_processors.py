@@ -827,7 +827,7 @@ def clean_field_value(value: str, field: str) -> str:
         if len(value) > 50:
             value = re.sub(r'\s+(Ltd\.?|Inc\.?|Corp\.?|Company|Corporation)\s*$', '', value, flags=re.I)
     
-    elif field == 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)':
+    elif field == 'Rohstoff':
         # Standardisiere Trennzeichen
         value = re.sub(r'[;/]', ', ', value)
         # Entferne Duplikate
@@ -835,7 +835,7 @@ def clean_field_value(value: str, field: str) -> str:
         minerals = list(dict.fromkeys(minerals))  # Erhält Reihenfolge
         value = ', '.join(minerals)
     
-    elif field == 'Minentyp (Untertage/ Open-Pit/ usw.)':
+    elif field == 'Minentyp':
         # DATENKONSISTENZ-FIX 19.07.2025: Entferne störendes Präfix
         # Entferne "(Untertage/ Open-Pit/ usw.): " oder ähnliche Präfixe
         prefixes_to_remove = [

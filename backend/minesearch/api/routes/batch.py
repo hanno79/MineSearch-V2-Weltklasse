@@ -912,7 +912,7 @@ async def batch_search(
             
             commodity = (mine.get("commodity", "") or 
                         mine.get("Commodity", "") or 
-                        mine.get("Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)", "") or
+                        mine.get("Rohstoff", "") or
                         mine.get("Rohstoff", "") or
                         mine.get("Produit", "") or  # Französisch
                         mine.get("Mineral", "") or
@@ -1320,7 +1320,7 @@ async def batch_search(
                         
                         # DEBUG: Log sample fields from best model
                         if best_structured_data:
-                            sample_fields = ['Country', 'Land', 'Region', 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)', 'Restaurationskosten', 'Eigentümer']
+                            sample_fields = ['Country', 'Land', 'Region', 'Rohstoff', 'Restaurationskosten', 'Eigentümer']
                             for field in sample_fields:
                                 if field in best_structured_data:
                                     value = best_structured_data[field]

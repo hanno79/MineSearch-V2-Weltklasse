@@ -402,7 +402,7 @@ def apply_enhanced_patterns_to_field(value: str, field: str) -> str:
     value = value.strip()
     
     # Feld-spezifische Verbesserungen
-    if field in ['Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)', 'Rohstoffe']:
+    if field in ['Rohstoff', 'Rohstoffe']:
         # 1. Prüfe auf Erklärungsformat "[ROHSTOFF]. [Beschreibung]..."
         commodity_from_explanation = extract_commodity_from_explanation(value)
         if commodity_from_explanation is not None:
@@ -419,7 +419,7 @@ def apply_enhanced_patterns_to_field(value: str, field: str) -> str:
         if cross_field_data['production']:
             return cross_field_data['production']
     
-    elif field in ['Minentyp (Untertage/ Open-Pit/ usw.)', 'Minentyp']:
+    elif field in ['Minentyp', 'Minentyp']:
         # Erweiterte Minentyp-Extraktion
         mine_type_extracted = extract_mine_type_from_complex_text(value)
         if mine_type_extracted is not None:

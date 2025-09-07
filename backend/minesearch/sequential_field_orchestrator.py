@@ -114,13 +114,13 @@ class SequentialFieldOrchestrator:
             default_critical_fields = [
                 'Country',
                 'Region',
-                'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)',
+                'Rohstoff',
                 'Eigentümer',
                 'Betreiber',
                 'Aktivitätsstatus',
                 'x-Koordinate',
                 'y-Koordinate',
-                'Minentyp (Untertage/ Open-Pit/ usw.)',
+                'Minentyp',
                 'Produktionsstart',
                 'Produktionsende',
                 'Fördermenge/Jahr',
@@ -572,7 +572,7 @@ class SequentialFieldOrchestrator:
             'Betreiber': "Suche nach Operator, Betreiber, Operating Company, Mine Operator",
             'Koordinaten': "Suche nach Latitude, Longitude, GPS, Coordinates, Koordinaten",
             'Aktivitätsstatus': "Suche nach Status, Active, Inactive, Operational, Closed, Under Development",
-            'Rohstoffabbau': "Suche nach Mineral, Commodity, Resource, Material, Gold, Copper, etc.",
+            'Rohstoff': "Suche nach Mineral, Commodity, Resource, Material, Gold, Copper, etc.",
             'Fördermenge': "Suche nach Production, Output, Annual Production, Förderung, Menge"
         }
         

@@ -224,7 +224,7 @@ Suche NUR nach dem aktuellen Status:
 - Care & Maintenance
 Gib den EXAKTEN Status zurück.""",
             
-            'Rohstoffabbau': """
+            'Rohstoff': """
 Suche NUR nach den abgebauten Rohstoffen:
 - Gold, Kupfer, Silber, etc.
 - Primary/Secondary Commodities
@@ -272,7 +272,7 @@ Gib die EXAKTE Menge mit Einheit zurück."""
             'Eigentümer': ['Eigentümer', 'Owner', 'Company', 'Corporation'],
             'Betreiber': ['Betreiber', 'Operator', 'Operating Company', 'Manager'],
             'Aktivitätsstatus': ['Aktivitätsstatus', 'Status', 'Operational Status', 'Mine Status'],
-            'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': ['Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)', 'Commodity', 'Resource', 'Mineral'],
+            'Rohstoff': ['Rohstoff', 'Commodity', 'Resource', 'Mineral'],
             'Fördermenge/Jahr': ['Fördermenge/Jahr', 'Annual Production', 'Production Rate', 'Yearly Output'],
             'x-Koordinate': ['x-Koordinate', 'Latitude', 'Lat', 'X-Coordinate'],
             'y-Koordinate': ['y-Koordinate', 'Longitude', 'Lon', 'Long', 'Y-Coordinate'],

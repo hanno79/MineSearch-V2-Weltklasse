@@ -22,7 +22,7 @@ CSV_COLUMNS = [
     'y-Koordinate', 'Aktivitätsstatus',
     'Restaurationskosten', 'Jahr der Aufnahme der Kosten',
     'Jahr der Erstellung des Dokumentes', 
-    'Rohstoffabbau',  # GEÄNDERT: Entfernt "(Gold/ Kupfer/ Kohle/ usw.)"
+    'Rohstoff',  # GEÄNDERT: Entfernt "(Gold/ Kupfer/ Kohle/ usw.)"
     'Minentyp',       # GEÄNDERT: Entfernt "(Untertage/ Open-Pit/ usw.)"
     'Produktionsstart',
     'Produktionsende', 'Fördermenge/Jahr', 'Fläche der Mine in qkm',

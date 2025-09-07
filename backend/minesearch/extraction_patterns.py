@@ -140,7 +140,7 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'(?:Technical\s+Report|NI\s*43-101).*?(\b(?:19|20)\d{2}\b)',
             r'(?:Report|Document|Bericht).*?\((\b(?:19|20)\d{2}\b)\)'
         ],
-        'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': [
+        'Rohstoff': [
             # BUGFIX 23.08.2025: Verbesserte Patterns für Rohstoffabbau
             r'Rohstoffabbau\s+\([^)]+\):\s*([^\n]+)',  # "Rohstoffabbau (Gold/...): Gold"
             r'Rohstoffe?:\s*([^\n]+)', 
@@ -154,7 +154,7 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'(?:primary|main|haupt).*?(?:commodity|mineral|rohstoff):\s*([^\n]+)',
             r'(Gold|Kupfer|Silver|Copper|Zinc|Lead|Nickel|Coal|Iron)(?:\s+(?:mine|mining|abbau))?'
         ],
-        'Minentyp (Untertage/ Open-Pit/ usw.)': [
+        'Minentyp': [
             r'Minentyp:\s*([^\n]+)', 
             r'Type:\s*([^\n]+)',
             r'((?:Open[- ]?Pit|Untertage|Underground|Tagebau)[^\n,]*)'

@@ -1,0 +1,23 @@
+{
+  "check_timestamp": "2025-09-07T08:50:56.307125",
+  "tables_checked": [
+    {
+      "table": "companies",
+      "description": "Company-Duplikate",
+      "duplicates_found": 0,
+      "affected_rows": 0,
+      "examples": []
+    },
+    {
+      "table": "mines",
+      "description": "Mine-Duplikate",
+      "duplicates_found": 0,
+      "affected_rows": 0,
+      "examples": []
+    }
+  ],
+  "duplicates_found": 0,
+  "prevention_effectiveness": 100.0,
+  "critical_issues": 0,
+  "recommendations": []
+}

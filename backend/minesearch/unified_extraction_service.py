@@ -135,7 +135,7 @@ AUSGABEFORMAT (JSON):
     "Restaurationskosten": "Betrag mit Währung, z.B. '75.6 Millionen CAD'",
     "Jahr der Aufnahme der Kosten": "YYYY",
     "Jahr der Erstellung des Dokumentes": "YYYY",
-    "Rohstoffabbau": "Gold, Kupfer, etc.",
+    "Rohstoff": "Gold, Kupfer, etc.",
     "Minentyp": "Untertage/Tagebau",
     "Produktionsstart": "YYYY",
     "Produktionsende": "YYYY",

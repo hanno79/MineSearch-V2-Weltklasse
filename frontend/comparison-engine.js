@@ -40,8 +40,8 @@ class ComparisonEngine {
             'Produktionsstart': 0.8,
             
             // Technische Daten
-            'Minentyp (Untertage/ Open-Pit/ usw.)': 0.85,
-            'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': 0.85,
+            'Minentyp': 0.85,
+            'Rohstoff': 0.85,
             'Aktivitätsstatus': 0.8,
             
             // Geografische Daten

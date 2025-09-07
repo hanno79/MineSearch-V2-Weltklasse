@@ -21,9 +21,9 @@ FIELD_CONSOLIDATION_MAP = {
     'region': 'Region',  # English -> German
     
     # CRITICAL FIX: Rohstoff-Duplikat-Elimination (erweitert)
-    'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': 'Rohstoffe',
+    'Rohstoff': 'Rohstoffe',
     'Rohstoffabbau (Gold/Kupfer/Kohle/usw.)': 'Rohstoffe',
-    'Rohstoffabbau': 'Rohstoffe',
+    'Rohstoff': 'Rohstoffe',
     'Commodity': 'Rohstoffe',
     'Commodities': 'Rohstoffe',
     'Rohstofftyp': 'Rohstoffe',
@@ -84,9 +84,9 @@ FIELD_RENAME_MAP = {
     'Jahr der Erstellung des Dokumentes': 'Dokumentenjahr', 
     'Jahr der Erstellung der Dokumentes': 'Dokumentenjahr',  # Alternative spelling
     'Fläche der Mine in qkm': 'Minenfläche in qkm',
-    'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)': 'Rohstoffe',
+    'Rohstoff': 'Rohstoffe',
     'Rohstoffabbau (Gold/Kupfer/Kohle/usw.)': 'Rohstoffe',  # Alternative spacing
-    'Minentyp (Untertage/ Open-Pit/ usw.)': 'Minentyp',
+    'Minentyp': 'Minentyp',
     
     # PHASE 1.3: Erweiterte zeitbezogene Felder
     'Jahr der Aufnahme der Kosten (YYYY)': 'Kostenjahr',

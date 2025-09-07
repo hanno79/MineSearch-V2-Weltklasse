@@ -149,7 +149,7 @@ class DataQualityCalculator:
             "completeness_percentage": round(data_completeness * 100),
             "quality_level": quality_level,
             "missing_critical_fields": [
-                col for col in ['Betreiber', 'Restaurationskosten', 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)'] 
+                col for col in ['Betreiber', 'Restaurationskosten', 'Rohstoff'] 
                 if not structured_data.get(col)
             ]
         }

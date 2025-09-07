@@ -330,7 +330,7 @@ def create_batch_results_table(results: List[Dict]) -> str:
             elif column == "Region":
                 # FIX 22.08.2025: Verwende echte Daten aus structured_data falls verfügbar  
                 value = structured_data.get(column) or result.get('region', '')
-            elif column == "Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)":
+            elif column == "Rohstoff":
                 # FIX 22.08.2025: Verwende echte Daten aus structured_data falls verfügbar
                 value = structured_data.get(column) or result.get('commodity', '')
             else:

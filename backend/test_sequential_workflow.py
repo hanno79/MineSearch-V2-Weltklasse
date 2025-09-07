@@ -368,13 +368,13 @@ class SequentialWorkflowTester:
                     """Mock field-by-field search"""
                     logger.info(f"🔍 Mock: Field Search Phase for {mine_name}")
                     
-                    fields_to_search = ["Eigentümer", "Betreiber", "Aktivitätsstatus", "Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)", "Country", "Region"]
+                    fields_to_search = ["Eigentümer", "Betreiber", "Aktivitätsstatus", "Rohstoff", "Country", "Region"]
                     
                     mock_field_results = {
                         "Eigentümer": "Agnico Eagle Mines Limited",
                         "Betreiber": "Canadian Malartic Corporation", 
                         "Aktivitätsstatus": "Active",
-                        "Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)": "Gold",
+                        "Rohstoff": "Gold",
                         "Country": "Canada",
                         "Region": "Quebec"
                     }

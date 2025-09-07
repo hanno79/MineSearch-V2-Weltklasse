@@ -342,7 +342,7 @@ class MultiModelSearchOrchestrator:
                     logger.info(f"[ORCHESTRATOR-DB-FIELDS] Saving {result.model_id}: {filled_fields}/{data_fields} fields with data")
                     
                     # LOG SAMPLE FIELDS vor Database-Save
-                    sample_fields = ['Country', 'Region', 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)']
+                    sample_fields = ['Country', 'Region', 'Rohstoff']
                     for field in sample_fields:
                         if field in structured_data:
                             value = structured_data[field]
@@ -532,7 +532,7 @@ class MultiModelSearchOrchestrator:
                     logger.info(f"[ORCHESTRATOR-FILLED] Model {model_id} found data in {filled_fields}/{len(structured_data)} fields")
                     
                     # DETAILED FIELD-BY-FIELD LOGGING für kritische Felder
-                    critical_fields = ['Country', 'Region', 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)', 'Restaurationskosten', 'Eigentümer']
+                    critical_fields = ['Country', 'Region', 'Rohstoff', 'Restaurationskosten', 'Eigentümer']
                     for field in critical_fields:
                         if field in structured_data:
                             value = structured_data[field]

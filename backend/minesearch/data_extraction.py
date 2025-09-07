@@ -203,7 +203,7 @@ class DataExtractor:
                 return False
         
         # 2.7: Rohstoff-Validierung
-        if field in ['Rohstoffabbau', 'Rohstoffe']:
+        if field in ['Rohstoff', 'Rohstoffe']:
             # Template-Strukturen mit "usw."
             if 'usw.' in value_lower or 'etc.' in value_lower:
                 logger.warning(f"[ULTRA QUALITY GATE] Template-Rohstoff mit 'usw.': '{value_str}' → ABGELEHNT")
@@ -401,7 +401,7 @@ class DataExtractor:
                 logger.debug(f"[DATA EXTRACTION] {field}: '{str(value)[:80]}...'")
             
             # Warne bei kritischen fehlenden Feldern
-            critical_fields = ['Eigentümer', 'Betreiber', 'Aktivitätsstatus', 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)']            
+            critical_fields = ['Eigentümer', 'Betreiber', 'Aktivitätsstatus', 'Rohstoff']            
             missing_critical = [f for f in critical_fields if not data.get(f)]
             if missing_critical:
                 logger.warning(f"[DATA EXTRACTION] Kritische Felder fehlen: {missing_critical}")
@@ -705,7 +705,7 @@ class DataExtractor:
             'x-Koordinate',
             'y-Koordinate',
             'Aktivitätsstatus',
-            'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)'
+            'Rohstoff'
         ]
         
         recovered_data = {}
@@ -735,7 +735,7 @@ class DataExtractor:
                     if recovery_value:
                         recovered_data[field] = recovery_value
                         
-                elif field == 'Rohstoffabbau (Gold/ Kupfer/ Kohle/ usw.)':
+                elif field == 'Rohstoff':
                     recovery_value = self._recover_commodity_data(content)
                     if recovery_value:
                         recovered_data[field] = recovery_value
