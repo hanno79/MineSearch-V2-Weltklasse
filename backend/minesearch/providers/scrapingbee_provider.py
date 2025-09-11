@@ -135,7 +135,7 @@ class ScrapingBeeProvider(AbstractProvider):
         6. Produktionsstart und -ende
         7. Fördermenge pro Jahr
         8. Fläche der Mine
-        9. Minentyp (Untertage/Open-Pit)
+        9. Minentyp
         10. Aktivitätsstatus
         
         Suche besonders nach:
@@ -659,11 +659,12 @@ AUSGABEFORMAT (JSON):
     "Aktivitätsstatus": "Aktiv/Geschlossen/Geplant",
     "Restaurationskosten": "Betrag mit Währung",
     "Jahr der Aufnahme der Kosten": "YYYY",
-    "Rohstoffabbau": "Gold, Kupfer, etc.",
+    "Rohstoff": "Gold, Kupfer, etc.",
     "Minentyp": "Untertage/Tagebau",
     "Produktionsstart": "YYYY",
     "Produktionsende": "YYYY",
-    "Fördermenge/Jahr": "Menge mit Einheit",
+    "Fördermenge/Jahr Rohstoff": "Rohstoff-Produktion (oz Gold, t Kupfer etc.)",
+    "Fördermenge/Jahr Abraum": "Gesamtmaterial (Millionen Tonnen, Material etc.)",
     "Fläche der Mine in qkm": "Fläche mit Einheit"
 }}
 

@@ -198,7 +198,7 @@ class GeminiProvider(AbstractProvider):
                         if 'Restaurationskosten' in extracted_data.get('data_with_sources', {}):
                             extracted_data['data_with_sources']['Restaurationskosten'] = {"value": "", "sources": []}
                 
-                # PHASE 1: Verwende discovered_sources als Basis-Quellen (wie Abacus Provider)
+                # PHASE 1: Verwende discovered_sources als Basis-Quellen für Multi-Source Mining
                 final_sources = []
                 for source in discovered_sources:
                     final_sources.append({

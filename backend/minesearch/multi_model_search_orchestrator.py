@@ -721,7 +721,7 @@ class MultiModelSearchOrchestrator:
         
         # 404-Fehler (meist ungültige API-Keys oder falsche Endpoints)
         elif "404" in error_lower:
-            # ENTFERNT 02.09.2025: Abacus spezielle Behandlung nicht mehr nötig
+            # Standard 404-Fehlerbehandlung für alle Provider
             return f"❌ {model_id}: Provider nicht erreichbar - möglicherweise fehlt API-Key oder falscher Endpoint"
         
         # Authentifizierungs-Fehler

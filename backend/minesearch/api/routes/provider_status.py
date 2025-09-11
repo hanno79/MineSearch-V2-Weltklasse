@@ -254,7 +254,6 @@ class ProviderStatusChecker:
         # PROVIDER-FIX-V3 29.08.2025: Entferne deaktivierte Provider die über OpenRouter laufen
         api_keys = {
             'openrouter': config.OPENROUTER_API_KEY,  # Hauptprovider für alle Premium-Modelle
-            # 'abacus': config.ABACUS_API_KEY,       # ENTFERNT 02.09.2025: Abacus Provider entfernt
             'tavily': config.TAVILY_API_KEY,          # Web-Search Provider
             'exa': config.EXA_API_KEY,                # Neural Search Provider
             'scrapingbee': config.SCRAPINGBEE_API_KEY,  # Scraping Provider

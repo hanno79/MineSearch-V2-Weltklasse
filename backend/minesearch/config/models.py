@@ -472,19 +472,6 @@ _apply_defaults_to_models(
     default_supports_web_search=False
 )
 
-# Abacus Modelle - ENTFERNT 02.09.2025: Abacus Provider komplett aus dem System entfernt
-# ABACUS_MODELS = {
-#     'deep-agent': {
-#         'id': 'deep-agent',
-#         'name': 'Deep Agent Research',
-#         'timeout': 300,
-#         'max_tokens': 10000,
-#         'description': 'Deep Research Agent für umfassende Mining-Analysen',
-#         'supports_web_search': True,
-#         'supports_deep_research': True,
-#         'is_free': False
-#     }
-# }
 
 # Tavily Modelle
 # WICHTIG: Tavily hat ein Query-Limit von 400 Zeichen
@@ -931,7 +918,6 @@ _apply_defaults_to_models(
 MODELS_CONFIG = {
     'perplexity': PERPLEXITY_MODELS,
     'openrouter': OPENROUTER_MODELS,
-    # 'abacus': ABACUS_MODELS,  # ENTFERNT 02.09.2025: Abacus Provider komplett entfernt
     'tavily': TAVILY_MODELS,
     'exa': EXA_MODELS,
     'scrapingbee': SCRAPINGBEE_MODELS,

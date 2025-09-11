@@ -41,7 +41,7 @@ class SourceRecord:
             "last_attempted_access": self.last_attempted_access.isoformat() if self.last_attempted_access else None,
             "total_searches": self.total_searches,
             "successful_searches": self.successful_searches,
-            "typical_content_types": self.typical_content_types,
+            "typical_content_types": [],  # Entfernt in Migration vom 04.09.2025
             "metadata": self.metadata
         }
     
@@ -67,9 +67,9 @@ class SourceRecord:
             success_rate = self.successful_searches / self.total_searches
             self.reliability_score = min(100, success_rate * 100)
             
-            # Füge Content-Type hinzu wenn neu
-            if content_type and content_type not in self.typical_content_types:
-                self.typical_content_types.append(content_type)
+            # Content-Type Funktionalität entfernt in Migration vom 04.09.2025
+            # typical_content_types wurde in normalisierte Tabellen migriert
+            pass  # Placeholder für zukünftige Content-Type Logik
     
     @property
     def success_rate(self) -> float:

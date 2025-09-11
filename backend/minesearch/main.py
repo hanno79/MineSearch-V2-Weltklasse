@@ -5,7 +5,7 @@ Version: 2.1
 Beschreibung: MineSearch 2.1 - Refactored Main Application
 """
 
-# ABACUS-FIX 18.07.2025: Force correct .env loading before any imports
+# ENV-LOADING 18.07.2025: Force correct .env loading before any imports
 from dotenv import load_dotenv
 from pathlib import Path
 # Lade Root-.env (Projektwurzel)

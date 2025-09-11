@@ -866,11 +866,12 @@ AUSGABEFORMAT (JSON):
     "Aktivitätsstatus": "Aktiv/Geschlossen/Geplant",
     "Restaurationskosten": "Betrag mit Währung",
     "Jahr der Aufnahme der Kosten": "YYYY",
-    "Rohstoffabbau": "Gold, Kupfer, etc.",
+    "Rohstoff": "Gold, Kupfer, etc.",
     "Minentyp": "Untertage/Tagebau",
     "Produktionsstart": "YYYY",
     "Produktionsende": "YYYY",
-    "Fördermenge/Jahr": "Menge mit Einheit",
+    "Fördermenge/Jahr Rohstoff": "Rohstoff-Produktion (oz Gold, t Kupfer etc.)",
+    "Fördermenge/Jahr Abraum": "Gesamtmaterial (Millionen Tonnen, Material etc.)",
     "Fläche der Mine in qkm": "Fläche mit Einheit"
 }}
 

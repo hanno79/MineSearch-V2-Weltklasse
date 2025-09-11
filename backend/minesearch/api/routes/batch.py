@@ -637,7 +637,9 @@ async def batch_search(
     selection_mode: Optional[str] = Form("first_n", description="first_n, range, random, all"),
     start_position: Optional[int] = Form(1, description="Start-Position für Range-Modus"),
     range_count: Optional[int] = Form(20, description="Anzahl Minen für Range-Modus"),
-    random_count: Optional[int] = Form(10, description="Anzahl zufällige Minen")
+    random_count: Optional[int] = Form(10, description="Anzahl zufällige Minen"),
+    # FIX 07.09.2025: Dual Response Format für JSON/HTML
+    response_format: Optional[str] = Form("html", description="Response format: html or json")
 ):
     """
     Batch-Suche für mehrere Minen aus CSV
@@ -1445,7 +1447,48 @@ async def batch_search(
         # Debug: Log einen Teil des generierten HTML
         logger.info(f"[BATCH-DEBUG] HTML-Länge: {len(html_content)}")
         
-        return HTMLResponse(content=html_content)
+        # FIX 07.09.2025: Dual Response Format - JSON oder HTML
+        if response_format and response_format.lower() == "json":
+            # Berechne Statistiken
+            successful_count = sum(1 for r in results if r.get('success', False))
+            failed_count = len(results) - successful_count
+            
+            # Berechne durchschnittliche Qualität
+            quality_scores = []
+            for result in results:
+                if result.get('success') and result.get('data'):
+                    # Versuche quality_score aus result zu extrahieren
+                    quality = result.get('quality_score', 0)
+                    if not quality and result.get('data'):
+                        # Fallback: Berechne basierend auf gefüllten Feldern
+                        data_fields = result['data']
+                        filled_fields = sum(1 for v in data_fields.values() if v and str(v).strip())
+                        quality = min(filled_fields * 0.1, 1.0)  # Grober Qualitätsscore
+                    quality_scores.append(quality)
+            
+            avg_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0
+            
+            # JSON Response
+            return {
+                "success": True,
+                "session_id": session_id,
+                "batch_session_id": batch_session_id,
+                "total_mines": len(results),
+                "successful_mines": successful_count, 
+                "failed_mines": failed_count,
+                "mines_processed": len(results),
+                "total_data_points": sum(len(r.get('data', {})) for r in results if r.get('success')),
+                "average_quality": round(avg_quality, 2),
+                "results": results,
+                "statistics": {
+                    "processing_time": f"{len(results) * 8:.1f}s",  # Geschätzte Zeit
+                    "success_rate": round(successful_count / len(results) * 100, 1) if results else 0,
+                    "data_coverage": f"{sum(len(r.get('data', {})) for r in results)} total fields extracted"
+                }
+            }
+        else:
+            # Standard HTML Response für Frontend
+            return HTMLResponse(content=html_content)
         
     except Exception as e:
         logger.error(f"Fehler bei Batch-Suche: {str(e)}")

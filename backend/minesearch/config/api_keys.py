@@ -13,7 +13,6 @@ class APIKeysConfig:
     # AI Provider API Keys
     PERPLEXITY_API_KEY = os.getenv('PERPLEXITY_API_KEY', '')
     OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
-    ABACUS_API_KEY = os.getenv('ABACUS_API_KEY', '')
     
     # Search Provider API Keys
     TAVILY_API_KEY = os.getenv('TAVILY_API_KEY', '')
@@ -37,7 +36,6 @@ class APIKeysConfig:
         return {
             'PERPLEXITY_API_KEY': cls.PERPLEXITY_API_KEY,
             'OPENROUTER_API_KEY': cls.OPENROUTER_API_KEY,
-            'ABACUS_API_KEY': cls.ABACUS_API_KEY,
             'TAVILY_API_KEY': cls.TAVILY_API_KEY,
             'EXA_API_KEY': cls.EXA_API_KEY,
             'SCRAPINGBEE_API_KEY': cls.SCRAPINGBEE_API_KEY,

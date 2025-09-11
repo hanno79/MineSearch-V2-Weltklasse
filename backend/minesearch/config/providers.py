@@ -15,7 +15,6 @@ except ImportError as e:
     class APIKeysConfig:
         PERPLEXITY_API_KEY = os.getenv('PERPLEXITY_API_KEY', '')
         OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
-        ABACUS_API_KEY = os.getenv('ABACUS_API_KEY', '')
         TAVILY_API_KEY = os.getenv('TAVILY_API_KEY', '')
         EXA_API_KEY = os.getenv('EXA_API_KEY', '')
         SCRAPINGBEE_API_KEY = os.getenv('SCRAPINGBEE_API_KEY', '')
@@ -31,7 +30,6 @@ except ImportError as e:
 from minesearch.config.models import (
     PERPLEXITY_MODELS,
     OPENROUTER_MODELS,
-    # ABACUS_MODELS,  # ENTFERNT 02.09.2025: Abacus Provider komplett entfernt
     TAVILY_MODELS,
     EXA_MODELS,
     SCRAPINGBEE_MODELS,
@@ -65,15 +63,6 @@ PROVIDERS_CONFIG = {
         'retry_attempts': 3,
         'retry_delay': 10
     },
-    # 'abacus': {  # ENTFERNT 02.09.2025: Abacus Provider komplett aus dem System entfernt
-    #     'enabled': False,
-    #     'api_key': APIKeysConfig.ABACUS_API_KEY,
-    #     'base_url': 'https://api.abacus.ai',
-    #     'models': ABACUS_MODELS,
-    #     'timeout': 600,
-    #     'retry_attempts': 2,
-    #     'retry_delay': 10
-    # },
     'tavily': {
         'enabled': True,  # Aktiviert für umfassende Tests
         'api_key': APIKeysConfig.TAVILY_API_KEY,
