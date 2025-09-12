@@ -2,7 +2,8 @@
 Author: rahn
 Datum: 11.09.2025
 Version: 1.0
-Beschreibung: CSV-Export-Funktionalität für konsolidierte Ergebnis-Verarbeitung (Refactoring aus consolidated_results.py)
+Beschreibung: CSV-Export-Funktionalität für konsolidierte Ergebnis-Verarbeitung (Refactoring aus
+consolidated_results.py)
 """
 
 import logging
@@ -24,16 +25,16 @@ router = APIRouter()
 
 class CSVFieldProcessor:
     """Prozessiert Felder für CSV-Export mit atomischen Werten und Quellenreferenzen"""
-    
+
     @staticmethod
     def process_field(field: str, result: Dict[str, Any]) -> str:
         """
         Hauptfunktion zur Feldverarbeitung für CSV-Export
-        
+
         Args:
             field: Feldname
             result: Result-Dictionary mit allen Daten
-            
+
         Returns:
             Verarbeiteter und für CSV optimierter Feldwert
         """
@@ -68,10 +69,11 @@ class CSVFieldProcessor:
 
                 if (
                     atomic_result.get('method') == 'atomic_normalized'
-                    and atomic_result.get('confidence_score', 0.0) >= 30.0
+                    and atomic_result.get("confidence_score", 0.0) >= 30.0
                 ):
                     atomic_value = atomic_result.get('display_value')
-                    logger.debug(f"[CSV-ATOMIC] Verwende atomischen Wert für {result['mine_name']}.{field}: {atomic_value}")
+                    logger.debug(f"[CSV-ATOMIC] Verwende atomischen Wert für
+{result['mine_name']}.{field}: {atomic_value}")
 
         except Exception as e:
             # Handle DB/session and atomic lookup errors internally; fall back to best_values
@@ -96,11 +98,11 @@ class CSVFieldProcessor:
             return []
 
         field_data = detailed_breakdown.get(field, {}) or {}
-        source_ids = field_data.get('global_source_numbers', []) or []
+        source_ids = field_data.get("global_source_numbers", []) or []
 
         # Fallback 1: structured_fields
         if not source_ids:
-            structured_fields = result.get('structured_fields', {}) or {}
+            structured_fields = result.get("structured_fields", {}) or {}
             if field in structured_fields:
                 source_ids = structured_fields[field].get('global_source_numbers', []) or []
 
@@ -153,14 +155,14 @@ class CSVFieldProcessor:
 def create_csv_headers_and_fields(all_fields: set) -> tuple[List[str], List[str]]:
     """
     Erstellt CSV-Header und Datenfeld-Mapping basierend auf FIELD_ORDER
-    
+
     Returns:
         tuple: (header_list, data_fields_list)
     """
     # FIX: Verwende FIELD_ORDER für CSV wie in UI, nicht alphabetische Sortierung
     ordered_fields = []
     unordered_fields = []
-    
+
     # Separate fields into ordered and unordered (exclude meta fields)
     for field in all_fields:
         if field.startswith('_'):  # Skip meta fields like _source_mapping
@@ -169,22 +171,22 @@ def create_csv_headers_and_fields(all_fields: set) -> tuple[List[str], List[str]
             ordered_fields.append(field)
         else:
             unordered_fields.append(field)
-    
+
     # Sort ordered fields by their position in FIELD_ORDER
     ordered_fields.sort(key=lambda x: FIELD_ORDER.index(x))
-    
+
     # Sort unordered fields alphabetically
     unordered_fields.sort()
-    
+
     # Combine for final field order (same as UI)
     sorted_fields = ordered_fields + unordered_fields
-    
+
     # USER REQUIREMENTS 30.07.2025: Header exakt nach gewünschter Reihenfolge
     # Mine | Land | Region | Zuverlässigkeit | Modelle | Letzte Aktualisierung | ...
-    
+
     header = []
     data_fields = []
-    
+
     # Metadaten-Felder zuerst (entsprechend FIELD_ORDER)
     metadata_mapping = {
         "Mine": ("Mine", "mine_name"),
@@ -194,45 +196,45 @@ def create_csv_headers_and_fields(all_fields: set) -> tuple[List[str], List[str]
         "Modelle": ("Modelle", "model_count"),
         "Letzte Aktualisierung": ("Letzte Aktualisierung", "last_updated")
     }
-    
+
     # Füge Metadaten-Felder in FIELD_ORDER Reihenfolge hinzu
     for field_name in FIELD_ORDER:
         if field_name in metadata_mapping:
             display_name, data_field = metadata_mapping[field_name]
             header.append(display_name)
             data_fields.append(data_field)
-    
+
     # Dann alle anderen Felder aus FIELD_ORDER (außer Metadaten, Details und redundantes Quellenangaben)
     excluded_field_keys = set(metadata_mapping.keys()) | {"Details", "Quellenangaben"}
     remaining_fields = [f for f in FIELD_ORDER if f not in excluded_field_keys and f in all_fields]
-    
+
     # Füge verbleibende Datenfelder hinzu
     for field_name in remaining_fields:
         header.append(field_name)
         data_fields.append(field_name)
-    
+
     # Ungeordnete Felder am Ende hinzufügen
     for field_name in unordered_fields:
         if field_name not in excluded_field_keys:
             header.append(field_name)
             data_fields.append(field_name)
-    
+
     return header, data_fields
 
 
 def process_csv_data_row(result: Dict, data_fields: List[str]) -> List[str]:
     """
     Verarbeitet eine Datenzeile für CSV-Export
-    
+
     Args:
         result: Result-Dictionary
         data_fields: Liste der Datenfelder
-        
+
     Returns:
         Liste der verarbeiteten Feldwerte
     """
     csv_row = []
-    
+
     for field in data_fields:
         if field == "mine_name":
             csv_row.append(result.get("mine_name", ""))
@@ -260,73 +262,73 @@ def process_csv_data_row(result: Dict, data_fields: List[str]) -> List[str]:
             # Reguläre Datenfelder mit CSVFieldProcessor verarbeiten
             processed_value = CSVFieldProcessor.process_field(field, result)
             csv_row.append(processed_value)
-    
+
     return csv_row
 
 
 def generate_csv_content(results: List[Dict], header: List[str], data_fields: List[str]) -> str:
     """
     Generiert CSV-Content aus Ergebnissen
-    
+
     Args:
         results: Liste der Ergebnis-Dictionaries
         header: CSV-Header
         data_fields: Entsprechende Datenfelder
-        
+
     Returns:
         CSV-Content als String
     """
     csv_lines = []
-    
+
     # Header hinzufügen
     csv_lines.append("|".join(header))
-    
+
     # Datenzeilen verarbeiten
     for result in results:
         csv_row = process_csv_data_row(result, data_fields)
         csv_lines.append("|".join(csv_row))
-    
+
     return "\n".join(csv_lines)
 
 
 def create_csv_metadata_footer(results: List[Dict], source_index: Dict) -> List[str]:
     """
     Erstellt Metadaten-Footer für CSV mit Quellenverzeichnis
-    
+
     Args:
         results: Liste der Ergebnisse
         source_index: Globaler Quellenindex
-        
+
     Returns:
         Liste der Footer-Zeilen
     """
     footer_lines = []
-    
+
     # Statistiken
     footer_lines.append("")  # Leerzeile
     footer_lines.append("# CSV-EXPORT STATISTIKEN")
     footer_lines.append(f"# Generiert am: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}")
     footer_lines.append(f"# Anzahl Minen: {len(results)}")
-    
+
     if source_index:
         footer_lines.append(f"# Anzahl Quellen: {len(source_index)}")
         footer_lines.append("")
         footer_lines.append("# QUELLENVERZEICHNIS")
-        
+
         # Sortiere Quellen nach Nummer
         sorted_sources = sorted(source_index.items(), key=lambda x: int(x[0]) if str(x[0]).isdigit() else 0)
-        
+
         for source_num, source_data in sorted_sources:
             if isinstance(source_data, dict):
-                url = source_data.get('url', 'Unbekannte Quelle')
-                title = source_data.get('title', '')
+                url = source_data.get("url", 'Unbekannte Quelle')
+                title = source_data.get("title", '')
                 if title:
                     footer_lines.append(f"# [{source_num}] {title} - {url}")
                 else:
                     footer_lines.append(f"# [{source_num}] {url}")
             else:
                 footer_lines.append(f"# [{source_num}] {source_data}")
-    
+
     return footer_lines
 
 
@@ -341,7 +343,7 @@ async def export_consolidated_csv(
 ):
     """
     Exportiere konsolidierte Ergebnisse als CSV mit | Trennzeichen
-    
+
     CSV-Format entspricht der UI-Darstellung mit:
     - Pipe-Trennzeichen (|)
     - Quellenreferenzen [1,2,3]
@@ -351,7 +353,7 @@ async def export_consolidated_csv(
     try:
         # Import hier um zirkuläre Abhängigkeiten zu vermeiden
         from .consolidated_results import get_consolidated_results
-        
+
         # Hole konsolidierte Daten (wiederverwendung der get_consolidated_results Logik)
         consolidated_data = await get_consolidated_results(
             country=country,
@@ -361,39 +363,40 @@ async def export_consolidated_csv(
             order=order,
             exclude_exa=exclude_exa
         )
-        
+
         if not consolidated_data["success"]:
             raise HTTPException(status_code=500, detail="Fehler beim Laden der Daten")
-        
+
         results = consolidated_data["data"]["consolidated_results"]
         source_index = consolidated_data["data"].get("global_source_index", {})
-        
+
         if not results:
             raise HTTPException(status_code=404, detail="Keine Daten für Export verfügbar")
-        
+
         # CSV-Header erstellen (alle möglichen Felder sammeln)
         all_fields = set()
         for result in results:
             all_fields.update(result["best_values"].keys())
-        
+
         # Header und Datenfelder erstellen
         header, data_fields = create_csv_headers_and_fields(all_fields)
-        
+
         # CSV-Content generieren
         csv_content = generate_csv_content(results, header, data_fields)
-        
+
         # Metadaten-Footer hinzufügen
         footer_lines = create_csv_metadata_footer(results, source_index)
         final_content = csv_content + "\n" + "\n".join(footer_lines)
-        
+
         # Create streaming response
         def generate():
+    """generate - TODO: Dokumentation hinzufügen"""
             yield final_content.encode('utf-8-sig')  # BOM für Excel-Kompatibilität
-        
+
         # Dateiname mit Timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"minesearch_export_{timestamp}.csv"
-        
+
         return StreamingResponse(
             generate(),
             media_type="text/csv",
@@ -402,7 +405,7 @@ async def export_consolidated_csv(
                 "Content-Type": "text/csv; charset=utf-8"
             }
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:

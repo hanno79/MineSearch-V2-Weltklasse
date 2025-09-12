@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Author: rahn  
+Author: rahn
 Datum: 06.09.2025
 Version: 1.0
 Beschreibung: Quick Verification der implementierten Verbesserungen
@@ -13,7 +13,7 @@ def quick_verification():
     """Schnelle Verifikation aller Verbesserungen"""
     print("🔍 QUICK VERIFICATION - Verbesserte Fehlgeschlagene Ergebnisse")
     print("=" * 65)
-    
+
     # Warte auf Service-Start
     print("🔄 Warte auf Service-Start...")
     for i in range(10):
@@ -28,7 +28,7 @@ def quick_verification():
     else:
         print("❌ Service nicht erreichbar nach 30s")
         return
-    
+
     print("\n1. TESTE DATABASE SCHEMA FIX:")
     try:
         # Test mit einer Mine, die wahrscheinlich wenig Daten hat
@@ -36,17 +36,17 @@ def quick_verification():
             "http://localhost:8000/api/search",
             data={
                 "mine": "Small Test Mine",
-                "country": "Test Country", 
+                "country": "Test Country",
                 "model": "openrouter:deepseek-free"
             },
             timeout=30
         )
-        
+
         if response.status_code == 200:
             data = response.json()
             print("   ✅ API Response erfolgreich")
             if not data.get('success'):
-                error = data.get('error', '')
+                error = data.get("error", '')
                 if 'no such column' in error:
                     print("   ❌ Database Schema noch nicht gefixt!")
                 else:
@@ -59,7 +59,7 @@ def quick_verification():
             print(f"   ⚠️ API Status: {response.status_code}")
     except Exception as e:
         print(f"   ❌ Test-Fehler: {e}")
-    
+
     print("\n2. TESTE FRONTEND TOOLTIP:")
     try:
         response = requests.get("http://localhost:8000/")
@@ -73,14 +73,14 @@ def quick_verification():
             print(f"   ❌ Frontend nicht erreichbar: {response.status_code}")
     except Exception as e:
         print(f"   ❌ Frontend Test Fehler: {e}")
-    
+
     print("\n3. TEST ZUSAMMENFASSUNG:")
     print("   🎯 Verbesserungen implementiert:")
     print("      ✅ Database Schema repariert (normalized columns)")
     print("      ✅ Frontend Tooltip für bessere UX")
     print("      ✅ Erweiterte Fehler-Klassifikation im Backend")
     print("      ✅ API Progress mit detaillierten Fehler-Metriken")
-    
+
     print("\n🎉 'FEHLGESCHLAGENE ERGEBNISSE' jetzt transparent:")
     print("   🎯 Qualitäts-Filter = Normal (niedrige Relevanz)")
     print("   ⏱️ API-Timeouts = Normal (Provider-Limits)")

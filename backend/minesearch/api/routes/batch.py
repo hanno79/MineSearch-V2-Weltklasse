@@ -81,36 +81,36 @@ async def upload_csv(file: UploadFile = File(...)):
         if not file:
             logger.error("[CSV-UPLOAD] File parameter is None")
             raise HTTPException(status_code=422, detail="File parameter is required")
-        
+
         if not file.filename:
             logger.error("[CSV-UPLOAD] File has no filename")
             raise HTTPException(status_code=422, detail="File must have a filename")
-        
+
         logger.info(f"CSV Upload empfangen: {file.filename}, Size: {file.size if hasattr(file, 'size') else 'unknown'}")
-        
+
         # Verarbeite CSV direkt hier statt batch_service zu nutzen
         contents = await file.read()
         csv_content = contents.decode('utf-8-sig')  # FIX: UTF-8-SIG entfernt BOM automatisch
-        
+
         # FIX: Auto-detect CSV-Delimiter (Semikolon vs Komma)
         delimiter = ';' if ';' in csv_content.split('\n')[0] else ','
         logger.info(f"[CSV-UPLOAD] Auto-detected delimiter: '{delimiter}'")
-        
+
         csv_reader = csv.DictReader(io.StringIO(csv_content), delimiter=delimiter)
-        
+
         mines = []
         columns = []
-        
+
         for i, row in enumerate(csv_reader):
             if i == 0:
                 columns = list(row.keys())
                 logger.info(f"[CSV-UPLOAD] Erkannte Spalten: {columns}")
-            
+
             # Überspringe komplett leere Zeilen
             if not any(v.strip() for v in row.values() if v):
                 logger.debug(f"[CSV-UPLOAD] Leere Zeile übersprungen: {i+1}")
                 continue
-            
+
             # FIX: Entferne BOM aus allen Spaltennamen falls noch vorhanden
             cleaned_row = {}
             for k, v in row.items():
@@ -119,14 +119,14 @@ async def upload_csv(file: UploadFile = File(...)):
                 # Bereinige auch Werte von BOM
                 clean_value = v.lstrip('\ufeff') if isinstance(v, str) else v
                 cleaned_row[clean_key] = clean_value
-                
+
             mines.append(cleaned_row)
-            
+
             # Sicherheitslimit für Upload-Parsing
             if len(mines) >= MAX_MINES_LIMIT:
                 logger.warning(f"[CSV-UPLOAD] MAX_MINES_LIMIT ({MAX_MINES_LIMIT}) erreicht bei Zeile {i+1}")
                 break
-        
+
         # Validiere dass mindestens "Mine Name" vorhanden ist
         required_column = "Mine Name"
         if required_column not in columns:
@@ -137,7 +137,7 @@ async def upload_csv(file: UploadFile = File(...)):
                 if alt in [c.lower() for c in columns]:
                     found_alt = next(c for c in columns if c.lower() == alt.lower())
                     break
-            
+
             if found_alt:
                 logger.info(f"[CSV-UPLOAD] Alternative Spalte gefunden: '{found_alt}' -> 'Mine Name'")
                 # Normalisiere alle Zeilen
@@ -148,14 +148,14 @@ async def upload_csv(file: UploadFile = File(...)):
                     columns[columns.index(found_alt)] = "Mine Name"
             else:
                 raise HTTPException(
-                    status_code=400, 
+                    status_code=400,
                     detail=f"CSV muss eine Spalte '{required_column}' enthalten. Gefundene Spalten: {columns}"
                 )
-        
+
         # Generiere eindeutige Session-ID
         import uuid
         session_id = str(uuid.uuid4())
-        
+
         # Cache-Strategien für Memory-Management
         uploaded_mines_cache[session_id] = {
             'mines': mines,
@@ -163,19 +163,19 @@ async def upload_csv(file: UploadFile = File(...)):
             'upload_time': datetime.now(),
             'filename': file.filename
         }
-        
+
         logger.info(f"[CSV-UPLOAD] ✅ Erfolgreich geladen: {len(mines)} Minen für Session {session_id}")
-        
+
         # Entferne alte Sessions (Memory-Management)
         now = datetime.now()
         old_sessions = [
             sid for sid, data in uploaded_mines_cache.items()
-            if (now - data.get('upload_time', now)).seconds > 3600  # 1 Stunde
+            if (now - data.get("upload_time", now)).seconds > 3600  # 1 Stunde
         ]
         for old_sid in old_sessions:
             del uploaded_mines_cache[old_sid]
             logger.info(f"[CSV-CLEANUP] Alte Session entfernt: {old_sid}")
-        
+
         # FIX 11.09.2025: Frontend erwartet HTML mit session_id hidden field (nicht JSON)
         mine_count = len(mines)
         html_content = f"""
@@ -185,39 +185,40 @@ async def upload_csv(file: UploadFile = File(...)):
                 <p><strong>{mine_count} Minen</strong> wurden erkannt mit <strong>{len(columns)} Spalten</strong></p>
                 <p><em>Session ID: {session_id}</em></p>
             </div>
-            
+
             <div class="batch-search-interface" style="margin-top: 20px;">
                 <h3>🔍 Batch-Suche konfigurieren</h3>
-                
-                <form id="batch-form" 
+
+                <form id="batch-form"
                       hx-post="/api/batch-search"
                       hx-target="#batch-results"
                       hx-indicator="#loading">
-                    
+
                     <input type="hidden" name="session_id" value="{session_id}">
                     <input type="hidden" name="selected_models" value="">
-                    
+
                     <div class="form-group">
                         <label><strong>Mine-Auswahl-Modus:</strong></label>
                         <div style="margin: 10px 0;">
-                            <label><input type="radio" name="selection_mode" value="first_n" checked> Erste X Minen</label>
+                            <label><input type="radio" name="selection_mode" value="first_n"
+checked> Erste X Minen</label>
                             <input type="number" name="count" value="5" min="1" max="1000" style="width: 60px;">
                         </div>
                     </div>
-                    
+
                     <button type="submit" class="btn btn-primary">Batch-Suche starten</button>
                 </form>
             </div>
         </div>
         """
-        
+
         return HTMLResponse(content=html_content)
-        
+
     except Exception as e:
         logger.error(f"[CSV-UPLOAD] Fehler beim Upload: {str(e)}")
         if "delimiter" in str(e).lower():
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail="CSV-Format Fehler. Bitte verwende Semikolon (;) oder Komma (,) als Trennzeichen."
             )
         raise HTTPException(status_code=500, detail=f"CSV Upload fehlgeschlagen: {str(e)}")
@@ -256,11 +257,11 @@ async def batch_search(
     # delegiere ich an den batch_service für die Hauptlogik
     try:
         logger.info(f"[BATCH API] Batch search request for session: {session_id}")
-        
+
         # Hole Minen-Daten aus dem Cache
         if session_id not in uploaded_mines_cache:
             raise ValueError("Session abgelaufen. Bitte CSV erneut hochladen.")
-        
+
         # Delegiere die komplexe Verarbeitung an den BatchService
         result = await batch_service.batch_search_with_options(
             session_id=session_id,
@@ -282,9 +283,9 @@ async def batch_search(
             random_count=random_count,
             response_format=response_format
         )
-        
+
         return result
-        
+
     except Exception as e:
         logger.error(f"Fehler bei Batch-Suche: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

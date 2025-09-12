@@ -11,13 +11,13 @@ from datetime import datetime
 
 def create_missing_tables():
     """Erstellt field_definitions und mine_data_fields Tabellen"""
-    
+
     conn = sqlite3.connect('mines.db')
     cursor = conn.cursor()
-    
+
     print("🔧 FEHLENDE TABELLEN ERSTELLEN")
     print("=" * 80)
-    
+
     try:
         # 1. Erstelle field_definitions Tabelle
         print("📋 Erstelle field_definitions Tabelle...")
@@ -33,8 +33,8 @@ def create_missing_tables():
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
         """)
-        
-        # 2. Erstelle mine_data_fields Tabelle  
+
+        # 2. Erstelle mine_data_fields Tabelle
         print("📋 Erstelle mine_data_fields Tabelle...")
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS mine_data_fields (
@@ -58,62 +58,62 @@ def create_missing_tables():
             source_id INTEGER,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            
+
             -- Foreign Keys
             FOREIGN KEY (mine_id) REFERENCES mines(id) ON DELETE CASCADE,
             FOREIGN KEY (search_result_id) REFERENCES search_sessions(id) ON DELETE CASCADE
         )
         """)
-        
+
         # 3. Erstelle Indizes für Performance
         print("📋 Erstelle Indizes...")
         cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_mine_data_fields_mine_id 
+        CREATE INDEX IF NOT EXISTS idx_mine_data_fields_mine_id
         ON mine_data_fields(mine_id)
         """)
-        
+
         cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_mine_data_fields_search_result_id 
+        CREATE INDEX IF NOT EXISTS idx_mine_data_fields_search_result_id
         ON mine_data_fields(search_result_id)
         """)
-        
+
         cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_mine_data_fields_field_name 
+        CREATE INDEX IF NOT EXISTS idx_mine_data_fields_field_name
         ON mine_data_fields(field_name)
         """)
-        
+
         cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_mine_data_fields_model_used 
+        CREATE INDEX IF NOT EXISTS idx_mine_data_fields_model_used
         ON mine_data_fields(model_used)
         """)
-        
+
         print("✅ Alle Tabellen und Indizes erfolgreich erstellt!")
-        
+
         # 4. Zeige Tabellen-Strukturen
         print("\n📋 FIELD_DEFINITIONS STRUKTUR:")
         cursor.execute("PRAGMA table_info(field_definitions)")
         columns = cursor.fetchall()
         for col in columns:
             print(f"   - {col[1]:<20} {col[2]:<15} {'NOT NULL' if col[3] else 'NULL'}")
-            
+
         print("\n📋 MINE_DATA_FIELDS STRUKTUR:")
         cursor.execute("PRAGMA table_info(mine_data_fields)")
         columns = cursor.fetchall()
         for col in columns:
             print(f"   - {col[1]:<25} {col[2]:<15} {'NOT NULL' if col[3] else 'NULL'}")
-            
+
         print("\n🔗 FOREIGN KEYS (mine_data_fields):")
         cursor.execute("PRAGMA foreign_key_list(mine_data_fields)")
         fks = cursor.fetchall()
         for fk in fks:
             print(f"   - {fk[3]} -> {fk[2]}.{fk[4]}")
-            
+
         # 5. Füge Standard-Feldnamen hinzu
         print("\n📊 Füge Standard-Feldnamen zu field_definitions hinzu...")
-        
+
         standard_fields = [
             ('Name', 'Mine Name', 'text'),
-            ('Country', 'Country', 'text'), 
+            ('Country', 'Country', 'text'),
             ('Region', 'Region/Province', 'text'),
             ('Eigentümer', 'Owner', 'text'),
             ('Betreiber', 'Operator', 'text'),
@@ -131,27 +131,27 @@ def create_missing_tables():
             ('Fläche der Mine in qkm', 'Mine Area (km²)', 'numeric'),
             ('Quellenangaben', 'Sources', 'text')
         ]
-        
+
         for field_name, display_name, data_type in standard_fields:
             cursor.execute("""
             INSERT OR IGNORE INTO field_definitions (field_name, display_name, data_type)
             VALUES (?, ?, ?)
             """, (field_name, display_name, data_type))
-        
+
         # Final count
         cursor.execute("SELECT COUNT(*) FROM field_definitions")
         count = cursor.fetchone()[0]
         print(f"✅ {count} Standard-Feldnamen in field_definitions gespeichert")
-            
+
         conn.commit()
-        
+
     except Exception as e:
         print(f"❌ Fehler: {e}")
         conn.rollback()
         raise
     finally:
         conn.close()
-    
+
     print(f"\n✅ Fehlende Tabellen erfolgreich erstellt!")
     print("🎯 System ist jetzt bereit für vollständige Suchergebnis-Speicherung")
 

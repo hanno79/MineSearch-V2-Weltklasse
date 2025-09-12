@@ -23,10 +23,10 @@ SessionLocal = None
 def init_db():
     """Initialisiere Datenbank-Verbindung"""
     global engine, SessionLocal
-    
+
     config = Config()
-    database_url = config.get('DATABASE_URL', 'sqlite:///./mines.db')
-    
+    database_url = config.get("DATABASE_URL", 'sqlite:///./mines.db')
+
     # PERFORMANCE FIX 02.09.2025: Connection Pooling konfiguriert für bessere Performance
     engine_args = {
         "pool_size": 10,  # Basis-Pool-Größe
@@ -35,7 +35,7 @@ def init_db():
         "pool_pre_ping": True,  # Connection-Validierung
         "pool_recycle": 3600,  # Connections recyceln nach 1h
     }
-    
+
     if database_url.startswith('sqlite'):
         # SQLite-spezifische Optimierungen
         engine_args.update({
@@ -46,14 +46,14 @@ def init_db():
             "pool_size": 5,  # SQLite braucht weniger Connections
             "max_overflow": 10,
         })
-    
+
     engine = create_engine(database_url, **engine_args)
-    
+
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    
+
     # Erstelle Tabellen
     Base.metadata.create_all(bind=engine)
-    
+
     logger.info(f"Datenbank initialisiert: {database_url}")
 
 
@@ -61,7 +61,7 @@ def get_db() -> Generator[Session, None, None]:
     """Dependency für FastAPI/andere Frameworks"""
     if SessionLocal is None:
         init_db()
-    
+
     db = SessionLocal()
     try:
         yield db
@@ -73,5 +73,5 @@ def get_session() -> Session:
     """Hole neue Datenbank-Session"""
     if SessionLocal is None:
         init_db()
-    
+
     return SessionLocal()

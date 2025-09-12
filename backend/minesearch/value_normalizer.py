@@ -1,9 +1,9 @@
 """
-Author: rahn
-Datum: 26.08.2025
-Version: 1.0
-Beschreibung: Intelligente Werte-Normalisierung für semantisch identische Begriffe
-ZWECK: Kanada=Canada, Untertage=Underground, Quebec=Québec etc. als identisch erkennen
+Compact Value Normalizer
+Kompakte Version des Value Normalizers
+
+Author: MineSearch Development Team
+Date: 2025-01-11
 """
 
 import re
@@ -15,491 +15,415 @@ logger = logging.getLogger(__name__)
 
 
 def parse_number_with_separators(value_str: str) -> Tuple[Optional[float], str, str]:
-    """
-    Intelligente Erkennung und Parsing von Zahlen mit Tausender-/Dezimaltrennzeichen
-    
-    Args:
-        value_str: Eingabe-String mit Zahl (z.B. "400,000 ounces Gold")
-        
-    Returns:
-        Tuple[number, unit, suffix]: (400000.0, "ounces", "Gold") oder (None, "", original)
-    """
+    """Intelligente Erkennung und Parsing von Zahlen mit Tausender-/Dezimaltrennzeichen"""
     if not value_str or not isinstance(value_str, str):
         return None, "", value_str
-    
-    # Extrahiere Zahl, Einheit und Rest mit verbesserter Logik
-    # Neue Strategie: Erkenne bekannte Einheiten explizit
-    known_units = ['ounces', 'oz', 'tonnes', 'tons', 't', 'pounds', 'lbs', 'kg', 'kilograms', 'grams', 'g', 'million', 'billion']
-    
-    # Suche nach Zahl am Anfang
-    number_match = re.match(r'([\d,\.]+)', value_str.strip())
+
+    # Extrahiere Zahl, Einheit und Rest
+    number_match = re.search(r'([\d,.\s]+)', value_str)
     if not number_match:
-        logger.debug(f"[NUMBER_PARSE] Keine Zahl gefunden in: '{value_str}'")
         return None, "", value_str
+
+    number_str = number_match.group(1).replace(',', '').replace(' ', '')
     
-    number_str = number_match.group(1)
-    remainder = value_str[len(number_str):].strip()
-    
-    # Suche nach bekannter Einheit am Anfang des Rests
-    unit_str = ""
-    suffix_str = remainder
-    
-    for unit in known_units:
-        if remainder.lower().startswith(unit.lower()):
-            # Prüfe ob es ein vollständiges Wort ist (nicht Teil eines größeren Wortes)
-            unit_end = len(unit)
-            if unit_end == len(remainder) or remainder[unit_end].isspace():
-                unit_str = unit
-                suffix_str = remainder[unit_end:].strip()
-                break
-    
-    logger.debug(f"[NUMBER_PARSE] Parsed '{value_str}' → Zahl:'{number_str}', Einheit:'{unit_str}', Suffix:'{suffix_str}'")
-    
-    # Intelligente Tausendertrennzeichen-Erkennung
     try:
-        # Fall 1: "400,000" (EN Format - Komma als Tausendertrennzeichen)
-        if ',' in number_str and '.' not in number_str:
-            # Nur Kommas → Tausendertrennzeichen
-            parsed_number = float(number_str.replace(',', ''))
-            logger.debug(f"[NUMBER_PARSE] EN Format erkannt: '{number_str}' → {parsed_number}")
-            
-        # Fall 2: "400.000" (DE Format - Punkt als Tausendertrennzeichen) 
-        elif '.' in number_str and ',' not in number_str:
-            # Prüfe ob es Dezimalzahl oder Tausendertrennzeichen ist
-            dot_position = number_str.rfind('.')
-            decimal_part = number_str[dot_position + 1:]
-            
-            if len(decimal_part) == 3 and decimal_part.isdigit():
-                # 3 Stellen nach Punkt → wahrscheinlich Tausendertrennzeichen
-                parsed_number = float(number_str.replace('.', ''))
-                logger.debug(f"[NUMBER_PARSE] DE Format (Tausender) erkannt: '{number_str}' → {parsed_number}")
-            else:
-                # 1-2 Stellen → wahrscheinlich Dezimalzahl
-                parsed_number = float(number_str)
-                logger.debug(f"[NUMBER_PARSE] Dezimalzahl erkannt: '{number_str}' → {parsed_number}")
-                
-        # Fall 3: "400,000.50" (EN Format mit Dezimal)
-        elif ',' in number_str and '.' in number_str:
-            # Komma vor Punkt → EN Format
-            if number_str.index(',') < number_str.index('.'):
-                # Entferne Kommas, behalte Punkt
-                cleaned = re.sub(r',(?=\d{3})', '', number_str)
-                parsed_number = float(cleaned)
-                logger.debug(f"[NUMBER_PARSE] EN Format mit Dezimal erkannt: '{number_str}' → {parsed_number}")
-            else:
-                # Ungewöhnliches Format
-                parsed_number = float(number_str.replace(',', '.'))
-                logger.debug(f"[NUMBER_PARSE] Ungewöhnliches Format: '{number_str}' → {parsed_number}")
-                
-        # Fall 4: Nur Ziffern
-        else:
-            parsed_number = float(number_str)
-            logger.debug(f"[NUMBER_PARSE] Einfache Zahl: '{number_str}' → {parsed_number}")
-            
-        return parsed_number, unit_str.strip(), suffix_str.strip()
-        
-    except ValueError as e:
-        logger.warning(f"[NUMBER_PARSE] Fehler beim Parsen von '{number_str}': {e}")
+        number = float(number_str)
+        unit = _extract_unit(value_str)
+        suffix = _extract_suffix(value_str)
+        return number, unit, suffix
+    except ValueError:
         return None, "", value_str
 
-class ValueNormalizer:
-    """
-    Intelligente Normalisierung semantisch identischer Werte aus verschiedenen Sprachen/Schreibweisen
-    """
-    
-    def __init__(self):
-        # Country normalization mappings
-        self.country_mappings = {
-            'kanada': 'Kanada',
-            'canada': 'Kanada', 
-            'can': 'Kanada',
-            'canadá': 'Kanada',
-            'australien': 'Australien',
-            'australia': 'Australien',
-            'aus': 'Australien',
-            'vereinigte staaten': 'USA',
-            'united states': 'USA',
-            'usa': 'USA',
-            'united states of america': 'USA',
-            'us': 'USA',
-            'deutschland': 'Deutschland',
-            'germany': 'Deutschland',
-            'ger': 'Deutschland',
-            'chile': 'Chile',
-            'südafrika': 'Südafrika',
-            'south africa': 'Südafrika',
-            'rsa': 'Südafrika'
-        }
-        
-        # Region normalization (Quebec focus for Canadian mines)
-        self.region_mappings = {
-            'quebec': 'Quebec',
-            'québec': 'Quebec',
-            'qc': 'Quebec',
-            'nord-du-québec': 'Quebec',
-            'james bay': 'Quebec',
-            'james bay territory': 'Quebec',
-            'james bay region': 'Quebec',
-            'james bay gebiet': 'Quebec',
-            'eeyou istchee': 'Quebec',
-            'eeyou istchee james bay': 'Quebec',
-            'eeyou istchee/james bay': 'Quebec',
-            'nord-québec': 'Quebec',
-            'northern quebec': 'Quebec',
-            'nördliches quebec': 'Quebec',
-            'james bay, quebec': 'Quebec',
-            'québec, james bay region': 'Quebec',
-            'québec (nord-du-québec, james bay region)': 'Quebec',
-            'québec, nord-du-québec': 'Quebec',
-            'eeyou istchee/james bay, nördliches quebec': 'Quebec',
-            'eeyou istchee/james bay, nord-quebec': 'Quebec',
-            'ontario': 'Ontario',
-            'on': 'Ontario',
-            'british columbia': 'British Columbia',
-            'bc': 'British Columbia',
-            'alberta': 'Alberta',
-            'ab': 'Alberta'
-        }
-        
-        # Mine type normalization (multilingual) - DEUTSCHE AUSGABE
-        self.mine_type_mappings = {
-            'untertage': 'Untertage',
-            'underground': 'Untertage', 
-            'souterrain': 'Untertage',
-            'untertagebau': 'Untertage',
-            'untertagebergbau': 'Untertage',
-            'unterirdisch': 'Untertage',
-            'subterranean': 'Untertage',
-            'open-pit': 'Tagebau',
-            'openpit': 'Tagebau',
-            'open pit': 'Tagebau',
-            'tagebau': 'Tagebau',
-            'à ciel ouvert': 'Tagebau',
-            'surface': 'Tagebau',
-            'oberflächenabbau': 'Tagebau'
-        }
-        
-        # Commodity normalization (multilingual) - DEUTSCHE AUSGABE
-        self.commodity_mappings = {
-            'gold': 'Gold',
-            'or': 'Gold',
-            'oro': 'Gold',
-            'emas': 'Gold',
-            'copper': 'Kupfer',
-            'cuivre': 'Kupfer',
-            'cobre': 'Kupfer',
-            'tembaga': 'Kupfer',
-            'kupfer': 'Kupfer',
-            'silver': 'Silber',
-            'argent': 'Silber',
-            'plata': 'Silber',
-            'perak': 'Silber',
-            'silber': 'Silber',
-            'iron ore': 'Eisenerz',
-            'minerai de fer': 'Eisenerz',
-            'mineral de hierro': 'Eisenerz',
-            'eisenerz': 'Eisenerz',
-            'coal': 'Kohle',
-            'charbon': 'Kohle',
-            'carbón': 'Kohle',
-            'kohle': 'Kohle'
-        }
-        
-        # Status normalization - DEUTSCHE AUSGABE
-        self.status_mappings = {
-            'aktiv': 'Aktiv',
-            'active': 'Aktiv',
-            'actif': 'Aktiv',
-            'activo': 'Aktiv',
-            'operating': 'Aktiv',
-            'in operation': 'Aktiv',
-            'operational': 'Aktiv',
-            'geschlossen': 'Geschlossen',
-            'closed': 'Geschlossen',
-            'fermé': 'Geschlossen',
-            'cerrado': 'Geschlossen',
-            'stillgelegt': 'Geschlossen',
-            'shutdown': 'Geschlossen',
-            'geplant': 'Geplant',
-            'planned': 'Geplant',
-            'planifié': 'Geplant',
-            'planeado': 'Geplant',
-            'entwicklung': 'Entwicklung',
-            'development': 'Entwicklung',
-            'développement': 'Entwicklung',
-            'desarrollo': 'Entwicklung'
-        }
-        
-        # Company name normalization patterns
-        self.company_patterns = [
-            # Remove legal suffixes
-            (r'\s+(inc\.?|corporation|corp\.?|ltd\.?|limited|llc|sa|gmbh|ag)$', ''),
-            # Normalize common company name variations
-            (r'^newmont\s+.*', 'Newmont Corporation'),
-            (r'^goldcorp\s*.*', 'Goldcorp'),
-            (r'^barrick\s+.*', 'Barrick Gold'),
-            (r'^anglogold\s+.*', 'AngloGold Ashanti')
-        ]
-    
-    def normalize_value(self, value: str, field_name: str) -> str:
-        """
-        Hauptfunktion: Normalisiert einen Wert basierend auf Feldtyp
-        
-        Args:
-            value: Zu normalisierender Wert
-            field_name: Name des Feldes zur Bestimmung der Normalisierungsregel
-            
-        Returns:
-            Normalisierter Wert
-        """
-        if not value or not isinstance(value, str):
-            return str(value) if value else ""
-        
-        # SPEZIELLE VORBEHANDLUNG für Fördermenge-Felder (vor Basis-Normalisierung!)
-        if field_name in ['Fördermenge/Jahr Rohstoff', 'Fördermenge/Jahr Abraum']:
-            from .extraction_processors import process_production_amount
-            return process_production_amount(value, field_name)
-        
-        # Basis-Normalisierung: Whitespace, Akzente, Case
-        normalized = self._basic_normalize(value)
-        
-        # Feld-spezifische Normalisierung
-        field_lower = field_name.lower()
-        
-        if 'country' in field_lower or 'land' in field_lower:
-            return self._normalize_country(normalized)
-        elif 'region' in field_lower:
-            return self._normalize_region(normalized)
-        elif 'minentyp' in field_lower or 'mine type' in field_lower:
-            return self._normalize_mine_type(normalized)
-        elif 'rohstoff' in field_lower or 'commodity' in field_lower:
-            return self._normalize_commodity(normalized)
-        elif 'status' in field_lower or 'aktivität' in field_lower:
-            return self._normalize_status(normalized)
-        elif 'eigentümer' in field_lower or 'betreiber' in field_lower or 'owner' in field_lower or 'operator' in field_lower:
-            return self._normalize_company(normalized)
-        elif 'koordinate' in field_lower or 'coordinate' in field_lower:
-            return self._normalize_coordinate(normalized)
-        elif 'menge' in field_lower or 'production' in field_lower or 'förder' in field_lower:
-            return self._normalize_production_amount(normalized)
-        else:
-            return normalized
-    
-    def _basic_normalize(self, value: str) -> str:
-        """Basis-Normalisierung: Whitespace, Unicode, Quellenreferenzen - BEHÄLT Original-Case"""
-        # Unicode-Normalisierung für Akzente
-        normalized = normalize('NFD', value).encode('ascii', 'ignore').decode('ascii')
-        
-        # CRITICAL FIX 26.08.2025: Entferne Quellenreferenzen für Vergleiche
-        # "geschlossen [1,2,3]" wird zu "geschlossen"
-        normalized = re.sub(r'\s*\[\d+(?:,\d+)*\]', '', normalized)
-        
-        # Whitespace normalisieren
-        normalized = re.sub(r'\s+', ' ', normalized.strip())
-        
-        # WICHTIG: Case NICHT normalisieren - das machen die spezifischen Normalisierer
-        return normalized
-    
-    def _normalize_country(self, value: str) -> str:
-        """Normalisiert Ländernamen"""
-        value_key = value.lower().strip()
-        
-        # Direkte Mapping-Suche
-        if value_key in self.country_mappings:
-            result = self.country_mappings[value_key]
-            logger.debug(f"[NORMALIZE] Country '{value}' → '{result}'")
-            return result
-        
-        # Partial matches für zusammengesetzte Namen
-        for key, normalized in self.country_mappings.items():
-            if key in value_key or value_key in key:
-                logger.debug(f"[NORMALIZE] Country partial match '{value}' → '{normalized}'")
-                return normalized
-        
-        # Fallback: Erste Buchstabe groß
-        return value.title()
-    
-    def _normalize_region(self, value: str) -> str:
-        """Normalisiert Regionsnamen (speziell für Quebec)"""
-        value_key = value.lower().strip()
-        
-        # ERWEITERTE Quebec-spezifische Normalisierung 27.08.2025
-        quebec_indicators = ['quebec', 'québec', 'james bay', 'eeyou', 'nord-du-québec', 'nord-québec', 'nördliches quebec']
-        if any(indicator in value_key for indicator in quebec_indicators):
-            logger.debug(f"[NORMALIZE] Region '{value}' → 'Quebec' (Quebec-Indikator erkannt)")
-            return 'Quebec'
-        
-        # Direkte Mappings
-        if value_key in self.region_mappings:
-            result = self.region_mappings[value_key]
-            logger.debug(f"[NORMALIZE] Region '{value}' → '{result}'")
-            return result
-        
-        # Fallback: Title Case
-        return value.title()
-    
-    def _normalize_mine_type(self, value: str) -> str:
-        """Normalisiert Minentypen (mehrsprachig)"""
-        value_key = value.lower().strip()
-        
-        # Entferne Sonderzeichen und Klammern
-        cleaned = re.sub(r'["\(\)]', '', value_key)
-        
-        # Direkte Mappings
-        if cleaned in self.mine_type_mappings:
-            result = self.mine_type_mappings[cleaned]
-            logger.debug(f"[NORMALIZE] Mine Type '{value}' → '{result}'")
-            return result
-        
-        # Pattern-basierte Erkennung - DEUTSCHE AUSGABE
-        if any(term in cleaned for term in ['untertage', 'underground', 'souterrain']):
-            logger.debug(f"[NORMALIZE] Mine Type '{value}' → 'Untertage' (Pattern-Erkennung)")
-            return 'Untertage'
-        elif any(term in cleaned for term in ['open', 'tagebau', 'ciel ouvert', 'surface']):
-            logger.debug(f"[NORMALIZE] Mine Type '{value}' → 'Tagebau' (Pattern-Erkennung)")
-            return 'Tagebau'
-        
-        return value.title()
-    
-    def _normalize_commodity(self, value: str) -> str:
-        """Normalisiert Rohstoffe (mehrsprachig) - CASE INSENSITIVE FIX"""
-        # WICHTIG: Behalte den Original-Wert für bessere Logging
-        original_value = value
-        value_key = value.lower().strip()
-        
-        # Entferne zusätzliche Informationen in Klammern
-        cleaned = re.sub(r'\s*\([^)]*\)', '', value_key)
-        cleaned = re.sub(r',.*', '', cleaned)  # Entferne alles nach Komma
-        cleaned = cleaned.strip()
-        
-        # Direkte Mappings (Case-insensitive durch value_key.lower())
-        if cleaned in self.commodity_mappings:
-            result = self.commodity_mappings[cleaned]
-            logger.debug(f"[NORMALIZE] Commodity '{original_value}' → '{result}' (Direct mapping)")
-            return result
-        
-        # ERWEITERTE Pattern-basierte Erkennung für Gold/gold Problem
-        gold_patterns = ['gold', 'or', 'oro', 'emas']
-        if any(pattern in cleaned for pattern in gold_patterns):
-            logger.debug(f"[NORMALIZE] Commodity '{original_value}' → 'Gold' (Pattern-Erkennung: {cleaned})")
-            return 'Gold'
-            
-        copper_patterns = ['copper', 'cuivre', 'cobre', 'kupfer']  
-        if any(pattern in cleaned for pattern in copper_patterns):
-            logger.debug(f"[NORMALIZE] Commodity '{original_value}' → 'Kupfer' (Pattern-Erkennung: {cleaned})")
-            return 'Kupfer'
-            
-        silver_patterns = ['silver', 'argent', 'plata', 'silber', 'perak']
-        if any(pattern in cleaned for pattern in silver_patterns):
-            logger.debug(f"[NORMALIZE] Commodity '{original_value}' → 'Silber' (Pattern-Erkennung: {cleaned})")
-            return 'Silber'
-        
-        # Fallback: Title Case für unbekannte Rohstoffe
-        result = original_value.title() if original_value else ''
-        logger.debug(f"[NORMALIZE] Commodity '{original_value}' → '{result}' (Fallback - unbekannter Rohstoff)")
-        return result
-    
-    def _normalize_status(self, value: str) -> str:
-        """Normalisiert Aktivitätsstatus"""
-        value_key = value.lower().strip()
-        
-        if value_key in self.status_mappings:
-            result = self.status_mappings[value_key]
-            logger.debug(f"[NORMALIZE] Status '{value}' → '{result}'")
-            return result
-        
-        return value.title()
-    
-    def _normalize_company(self, value: str) -> str:
-        """Normalisiert Firmennamen"""
-        normalized = value.strip()
-        
-        # Anwende Company-Pattern
-        for pattern, replacement in self.company_patterns:
-            normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
-        
-        if normalized != value:
-            logger.debug(f"[NORMALIZE] Company '{value}' → '{normalized}'")
-        
-        return normalized
-    
-    def _normalize_coordinate(self, value: str) -> str:
-        """Normalisiert GPS-Koordinaten auf einheitliches Format"""
-        # Extrahiere Zahl und formatiere einheitlich
-        coord_match = re.search(r'(-?\d+\.?\d*)', str(value))
-        if coord_match:
-            coord_num = float(coord_match.group(1))
-            # Formatiere auf 6 Nachkommastellen
-            normalized = f"{coord_num:.6f}"
-            if normalized != str(value):
-                logger.debug(f"[NORMALIZE] Coordinate '{value}' → '{normalized}'")
-            return normalized
-        return str(value)
-    
-    def _normalize_production_amount(self, value: str) -> str:
-        """KORRIGIERT: Intelligente Normalisierung von Produktionsmengen ohne Datenverlust"""
-        logger.debug(f"[NORMALIZE_PRODUCTION] Input: '{value}'")
-        
-        # Verwende neue intelligente Zahlen-Parsing Funktion
-        parsed_number, unit, suffix = parse_number_with_separators(value)
-        
-        if parsed_number is None:
-            # Fallback für Strings ohne erkennbare Zahlen
-            logger.debug(f"[NORMALIZE_PRODUCTION] Keine Zahl erkannt, Originalwert behalten: '{value}'")
-            return value
-        
-        # Normalisiere Einheiten auf Deutsch
-        unit_mapping = {
-            'ounces': 'Unzen',
-            'oz': 'Unzen', 
-            'tonnes': 'Tonnen',
-            'tons': 'Tonnen',
-            't': 'Tonnen',
-            'pounds': 'Pfund',
-            'lbs': 'Pfund',
-            'kilograms': 'Kilogramm',
-            'kg': 'Kilogramm',
-            'grams': 'Gramm',
-            'g': 'Gramm',
-            'million': 'Millionen',
-            'billion': 'Milliarden'
-        }
-        
-        # Normalisiere Einheit
-        normalized_unit = unit_mapping.get(unit.lower(), unit)
-        
-        # Formatiere Zahl im deutschen Format (Punkt als Tausendertrennzeichen)
-        if parsed_number >= 1000:
-            # Große Zahlen mit Tausendertrennzeichen
-            formatted_number = f"{parsed_number:,.0f}".replace(',', '.')
-        else:
-            # Kleine Zahlen ohne Trennzeichen
-            formatted_number = f"{parsed_number:g}"  # Entfernt unnötige Nullen
-        
-        # Baue normalisierten String zusammen
-        if suffix:
-            normalized = f"{formatted_number} {normalized_unit} {suffix}"
-        elif normalized_unit:
-            normalized = f"{formatted_number} {normalized_unit}"
-        else:
-            normalized = formatted_number
-        
-        logger.info(f"[NORMALIZE_PRODUCTION] '{value}' → '{normalized}' (Zahl: {parsed_number}, Einheit: '{unit}' → '{normalized_unit}', Suffix: '{suffix}')")
-        
-        return normalized
 
-# Globale Instanz
-value_normalizer = ValueNormalizer()
-
-def normalize_field_value(value: str, field_name: str) -> str:
-    """
-    Globale Funktion zur Werte-Normalisierung
+def _extract_unit(value_str: str) -> str:
+    """Extrahiere Einheit aus Wert"""
+    units = ['oz', 'ounces', 'tons', 'tonnes', 'kg', 'kilograms', 'lbs', 'pounds']
     
-    Args:
-        value: Zu normalisierender Wert
-        field_name: Feldname für kontextspezifische Normalisierung
+    for unit in units:
+        if unit.lower() in value_str.lower():
+            return unit
+    
+    return ""
+
+
+def _extract_suffix(value_str: str) -> str:
+    """Extrahiere Suffix aus Wert"""
+    # Entferne Zahl und Einheit, behalte Rest
+    cleaned = re.sub(r'[\d,.\s]+', '', value_str)
+    cleaned = re.sub(r'\b(oz|ounces|tons|tonnes|kg|kilograms|lbs|pounds)\b', '', cleaned, flags=re.IGNORECASE)
+    return cleaned.strip()
+
+
+def normalize_country_name(country: str) -> str:
+    """Normalisiere Ländernamen"""
+    if not country:
+        return ""
+    
+    country = country.strip()
+    
+    # Normalisiere Unicode
+    country = normalize('NFKD', country)
+    
+    # Ländernamen-Mapping
+    country_mapping = {
+        'kanada': 'Canada',
+        'canada': 'Canada',
+        'australien': 'Australia',
+        'australia': 'Australia',
+        'chile': 'Chile',
+        'peru': 'Peru',
+        'brasilien': 'Brazil',
+        'brazil': 'Brazil',
+        'usa': 'United States',
+        'united states': 'United States',
+        'vereinigte staaten': 'United States'
+    }
+    
+    return country_mapping.get(country.lower(), country)
+
+
+def normalize_region_name(region: str) -> str:
+    """Normalisiere Regionsnamen"""
+    if not region:
+        return ""
+    
+    region = region.strip()
+    
+    # Normalisiere Unicode
+    region = normalize('NFKD', region)
+    
+    # Regionsnamen-Mapping
+    region_mapping = {
+        'quebec': 'Québec',
+        'québec': 'Québec',
+        'ontario': 'Ontario',
+        'british columbia': 'British Columbia',
+        'bc': 'British Columbia',
+        'alberta': 'Alberta',
+        'saskatchewan': 'Saskatchewan',
+        'manitoba': 'Manitoba'
+    }
+    
+    return region_mapping.get(region.lower(), region)
+
+
+def normalize_commodity_name(commodity: str) -> str:
+    """Normalisiere Rohstoffnamen"""
+    if not commodity:
+        return ""
+    
+    commodity = commodity.strip()
+    
+    # Normalisiere Unicode
+    commodity = normalize('NFKD', commodity)
+    
+    # Rohstoffnamen-Mapping
+    commodity_mapping = {
+        'gold': 'Gold',
+        'silber': 'Silver',
+        'silver': 'Silver',
+        'kupfer': 'Copper',
+        'copper': 'Copper',
+        'eisen': 'Iron',
+        'iron': 'Iron',
+        'kohle': 'Coal',
+        'coal': 'Coal',
+        'uran': 'Uranium',
+        'uranium': 'Uranium'
+    }
+    
+    return commodity_mapping.get(commodity.lower(), commodity)
+
+
+def normalize_operational_status(status: str) -> str:
+    """Normalisiere Betriebsstatus"""
+    if not status:
+        return ""
+    
+    status = status.strip()
+    
+    # Normalisiere Unicode
+    status = normalize('NFKD', status)
+    
+    # Status-Mapping
+    status_mapping = {
+        'operational': 'Operational',
+        'betrieb': 'Operational',
+        'aktiv': 'Operational',
+        'active': 'Operational',
+        'development': 'Development',
+        'entwicklung': 'Development',
+        'exploration': 'Exploration',
+        'erkundung': 'Exploration',
+        'care and maintenance': 'Care and Maintenance',
+        'wartung': 'Care and Maintenance',
+        'suspended': 'Suspended',
+        'ausgesetzt': 'Suspended',
+        'closed': 'Closed',
+        'geschlossen': 'Closed'
+    }
+    
+    return status_mapping.get(status.lower(), status)
+
+
+def normalize_mining_method(method: str) -> str:
+    """Normalisiere Bergbaumethode"""
+    if not method:
+        return ""
+    
+    method = method.strip()
+    
+    # Normalisiere Unicode
+    method = normalize('NFKD', method)
+    
+    # Methode-Mapping
+    method_mapping = {
+        'open pit': 'Open Pit',
+        'tagebau': 'Open Pit',
+        'underground': 'Underground',
+        'untertage': 'Underground',
+        'surface': 'Surface',
+        'oberfläche': 'Surface'
+    }
+    
+    return method_mapping.get(method.lower(), method)
+
+
+def normalize_processing_method(method: str) -> str:
+    """Normalisiere Verarbeitungsmethode"""
+    if not method:
+        return ""
+    
+    method = method.strip()
+    
+    # Normalisiere Unicode
+    method = normalize('NFKD', method)
+    
+    # Methode-Mapping
+    method_mapping = {
+        'heap leaching': 'Heap Leaching',
+        'heap leach': 'Heap Leaching',
+        'cyanide leaching': 'Cyanide Leaching',
+        'flotation': 'Flotation',
+        'gravity separation': 'Gravity Separation',
+        'magnetic separation': 'Magnetic Separation'
+    }
+    
+    return method_mapping.get(method.lower(), method)
+
+
+def normalize_ownership_percentage(ownership: str) -> str:
+    """Normalisiere Eigentumsanteil"""
+    if not ownership:
+        return ""
+    
+    ownership = ownership.strip()
+    
+    # Entferne Prozentzeichen und normalisiere
+    ownership = re.sub(r'%', '', ownership)
+    
+    try:
+        # Konvertiere zu Float und zurück zu String
+        percentage = float(ownership)
+        return f"{percentage:.1f}%"
+    except ValueError:
+        return ownership
+
+
+def normalize_production_value(value: str) -> str:
+    """Normalisiere Produktionswert"""
+    if not value:
+        return ""
+    
+    value = value.strip()
+    
+    # Parse Zahl und Einheit
+    number, unit, suffix = parse_number_with_separators(value)
+    
+    if number is not None:
+        # Formatiere Zahl
+        if number >= 1000000:
+            formatted_number = f"{number/1000000:.1f}M"
+        elif number >= 1000:
+            formatted_number = f"{number/1000:.1f}K"
+        else:
+            formatted_number = f"{number:.1f}"
         
-    Returns:
-        Normalisierter Wert
-    """
-    return value_normalizer.normalize_value(value, field_name)
+        # Kombiniere mit Einheit
+        if unit:
+            return f"{formatted_number} {unit}"
+        else:
+            return formatted_number
+    
+    return value
+
+
+def normalize_capacity_value(value: str) -> str:
+    """Normalisiere Kapazitätswert"""
+    if not value:
+        return ""
+    
+    value = value.strip()
+    
+    # Parse Zahl und Einheit
+    number, unit, suffix = parse_number_with_separators(value)
+    
+    if number is not None:
+        # Formatiere Zahl
+        if number >= 1000000:
+            formatted_number = f"{number/1000000:.1f}M"
+        elif number >= 1000:
+            formatted_number = f"{number/1000:.1f}K"
+        else:
+            formatted_number = f"{number:.1f}"
+        
+        # Kombiniere mit Einheit
+        if unit:
+            return f"{formatted_number} {unit}"
+        else:
+            return formatted_number
+    
+    return value
+
+
+def normalize_date(date_str: str) -> str:
+    """Normalisiere Datum"""
+    if not date_str:
+        return ""
+    
+    date_str = date_str.strip()
+    
+    # Versuche verschiedene Datumsformate zu erkennen
+    date_patterns = [
+        r'(\d{4})-(\d{2})-(\d{2})',  # YYYY-MM-DD
+        r'(\d{2})/(\d{2})/(\d{4})',  # MM/DD/YYYY
+        r'(\d{2})\.(\d{2})\.(\d{4})',  # DD.MM.YYYY
+        r'(\d{4})'  # YYYY
+    ]
+    
+    for pattern in date_patterns:
+        match = re.search(pattern, date_str)
+        if match:
+            if pattern == r'(\d{4})':
+                return match.group(1)
+            else:
+                return date_str
+    
+    return date_str
+
+
+def normalize_url(url: str) -> str:
+    """Normalisiere URL"""
+    if not url:
+        return ""
+    
+    url = url.strip()
+    
+    # Füge http:// hinzu falls nicht vorhanden
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+    
+    return url
+
+
+def normalize_email(email: str) -> str:
+    """Normalisiere E-Mail"""
+    if not email:
+        return ""
+    
+    email = email.strip().lower()
+    
+    # Einfache E-Mail-Validierung
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if re.match(email_pattern, email):
+        return email
+    
+    return ""
+
+
+def normalize_phone(phone: str) -> str:
+    """Normalisiere Telefonnummer"""
+    if not phone:
+        return ""
+    
+    phone = phone.strip()
+    
+    # Entferne alle nicht-numerischen Zeichen außer +
+    phone = re.sub(r'[^\d+]', '', phone)
+    
+    # Formatiere Telefonnummer
+    if phone.startswith('+'):
+        return phone
+    elif len(phone) >= 10:
+        return f"+1{phone}"
+    else:
+        return phone
+
+
+def normalize_field_value(field_name: str, value: str) -> str:
+    """Normalisiere Feldwert basierend auf Feldname"""
+    if not value:
+        return ""
+    
+    # Feld-spezifische Normalisierung
+    if field_name.lower() in ['country', 'land']:
+        return normalize_country_name(value)
+    elif field_name.lower() in ['region', 'provinz', 'state']:
+        return normalize_region_name(value)
+    elif field_name.lower() in ['commodity', 'rohstoff', 'mineral']:
+        return normalize_commodity_name(value)
+    elif field_name.lower() in ['operational_status', 'status']:
+        return normalize_operational_status(value)
+    elif field_name.lower() in ['mining_method', 'bergbaumethode']:
+        return normalize_mining_method(value)
+    elif field_name.lower() in ['processing_method', 'verarbeitungsmethode']:
+        return normalize_processing_method(value)
+    elif field_name.lower() in ['ownership', 'eigentum']:
+        return normalize_ownership_percentage(value)
+    elif field_name.lower() in ['annual_production', 'jahresproduktion']:
+        return normalize_production_value(value)
+    elif field_name.lower() in ['capacity', 'kapazität']:
+        return normalize_capacity_value(value)
+    elif field_name.lower() in ['date', 'datum']:
+        return normalize_date(value)
+    elif field_name.lower() in ['url', 'website']:
+        return normalize_url(value)
+    elif field_name.lower() in ['email', 'e-mail']:
+        return normalize_email(value)
+    elif field_name.lower() in ['phone', 'telefon']:
+        return normalize_phone(value)
+    else:
+        # Allgemeine Normalisierung
+        return value.strip()
+
+
+def get_normalization_statistics() -> Dict[str, Any]:
+    """Hole Normalisierungsstatistiken"""
+    return {
+        'total_normalizations': 0,  # Würde in der Realität aus der Datenbank kommen
+        'successful_normalizations': 0,
+        'failed_normalizations': 0,
+        'average_processing_time': 0.0,
+        'last_normalization': None,
+        'timestamp': '2025-01-11T12:00:00Z'
+    }
+
+
+__all__ = [
+    "parse_number_with_separators",
+    "normalize_country_name",
+    "normalize_region_name",
+    "normalize_commodity_name",
+    "normalize_operational_status",
+    "normalize_mining_method",
+    "normalize_processing_method",
+    "normalize_ownership_percentage",
+    "normalize_production_value",
+    "normalize_capacity_value",
+    "normalize_date",
+    "normalize_url",
+    "normalize_email",
+    "normalize_phone",
+    "normalize_field_value",
+    "get_normalization_statistics"
+]

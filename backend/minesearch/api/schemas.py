@@ -49,7 +49,7 @@ class HealthStatus(str, Enum):
 
 class BaseRequest(BaseModel):
     """Basis-Schema für alle Requests"""
-    
+
     class Config:
         str_strip_whitespace = True
         validate_assignment = True
@@ -58,21 +58,21 @@ class BaseRequest(BaseModel):
 
 class BaseResponse(BaseModel):
     """Basis-Schema für alle Responses"""
-    
+
     success: bool = Field(..., description="Erfolg-Status der Operation")
     timestamp: datetime = Field(default_factory=datetime.now, description="Response-Timestamp")
     request_id: Optional[str] = Field(None, description="Eindeutige Request-ID")
-    
+
     class Config:
         extra = "allow"  # Erlaubt zusätzliche Felder in Responses
 
 
 class PaginationRequest(BaseModel):
     """Schema für Pagination-Parameter"""
-    
+
     page: int = Field(1, ge=1, le=1000, description="Seitennummer (1-1000)")
     limit: int = Field(25, ge=1, le=100, description="Anzahl Einträge pro Seite (1-100)")
-    
+
     @property
     def offset(self) -> int:
         """Berechnet Offset für Datenbankabfragen"""
@@ -81,7 +81,7 @@ class PaginationRequest(BaseModel):
 
 class PaginationResponse(BaseModel):
     """Schema für paginierte Responses"""
-    
+
     page: int = Field(..., description="Aktuelle Seite")
     limit: int = Field(..., description="Einträge pro Seite")
     total_count: int = Field(..., description="Gesamtanzahl Einträge")
@@ -96,33 +96,33 @@ class PaginationResponse(BaseModel):
 
 class MineLocation(BaseModel):
     """Schema für Mine-Standortdaten"""
-    
+
     country: Optional[str] = Field(None, max_length=100, description="Land")
     region: Optional[str] = Field(None, max_length=100, description="Region/Bundesstaat")
     coordinates: Optional[Dict[str, float]] = Field(None, description="GPS-Koordinaten")
-    
+
     @validator('coordinates')
     def validate_coordinates(cls, v):
         """Validiert GPS-Koordinaten"""
         if v is None:
             return v
-        
+
         required_keys = {'latitude', 'longitude'}
         if not required_keys.issubset(v.keys()):
             raise ValueError("Koordinaten müssen 'latitude' und 'longitude' enthalten")
-        
+
         lat, lng = v['latitude'], v['longitude']
         if not (-90 <= lat <= 90):
             raise ValueError("Latitude muss zwischen -90 und 90 liegen")
         if not (-180 <= lng <= 180):
             raise ValueError("Longitude muss zwischen -180 und 180 liegen")
-        
+
         return v
 
 
 class MineProduction(BaseModel):
     """Schema für Mine-Produktionsdaten"""
-    
+
     commodity: Optional[str] = Field(None, max_length=100, description="Hauptrohstoff")
     production_volume: Optional[str] = Field(None, description="Produktionsvolumen")
     production_unit: Optional[str] = Field(None, max_length=50, description="Einheit")
@@ -131,7 +131,7 @@ class MineProduction(BaseModel):
 
 class MineOperational(BaseModel):
     """Schema für operative Mine-Daten"""
-    
+
     status: Optional[str] = Field(None, max_length=50, description="Betriebsstatus")
     operator: Optional[str] = Field(None, max_length=200, description="Betreiber")
     owner: Optional[str] = Field(None, max_length=200, description="Eigentümer")
@@ -141,7 +141,7 @@ class MineOperational(BaseModel):
 
 class MineFinancial(BaseModel):
     """Schema für finanzielle Mine-Daten"""
-    
+
     market_cap: Optional[str] = Field(None, description="Marktkapitalisierung")
     revenue: Optional[str] = Field(None, description="Umsatz")
     currency: Optional[str] = Field(None, max_length=10, description="Währung")
@@ -149,7 +149,7 @@ class MineFinancial(BaseModel):
 
 class ComprehensiveMineData(BaseModel):
     """Vollständiges Schema für alle Mine-Daten"""
-    
+
     basic_info: Dict[str, Any] = Field(..., description="Grundinformationen")
     location: Optional[MineLocation] = Field(None, description="Standortdaten")
     production: Optional[MineProduction] = Field(None, description="Produktionsdaten")
@@ -165,10 +165,10 @@ class ComprehensiveMineData(BaseModel):
 
 class SingleSearchRequest(BaseRequest):
     """Schema für Einzel-Mine-Suche"""
-    
+
     mine_name: str = Field(
-        ..., 
-        min_length=2, 
+        ...,
+        min_length=2,
         max_length=200,
         description="Name der Mine (2-200 Zeichen)"
     )
@@ -176,7 +176,7 @@ class SingleSearchRequest(BaseRequest):
     location: Optional[MineLocation] = Field(None, description="Standortfilter")
     commodity: Optional[str] = Field(None, max_length=100, description="Rohstofffilter")
     search_type: SearchType = Field(SearchType.SINGLE, description="Suchtyp")
-    
+
     @validator('mine_name')
     def validate_mine_name(cls, v):
         """Validiert Mine-Namen"""
@@ -187,18 +187,18 @@ class SingleSearchRequest(BaseRequest):
 
 class MultiModelSearchRequest(BaseRequest):
     """Schema für Multi-Modell-Suche"""
-    
+
     mine_name: str = Field(..., min_length=2, max_length=200)
     model_ids: List[str] = Field(
-        ..., 
-        min_items=2, 
+        ...,
+        min_items=2,
         max_items=100,  # PHASE 3: Erhöht für alle 55+ verfügbaren Modelle
         description="Liste der Modell-IDs (2-100 Modelle)"
     )
     location: Optional[MineLocation] = Field(None)
     commodity: Optional[str] = Field(None, max_length=100)
     comparison_enabled: bool = Field(True, description="Modell-Vergleich aktivieren")
-    
+
     @validator('model_ids')
     def validate_model_ids(cls, v):
         """Validiert Modell-IDs Liste"""
@@ -209,7 +209,7 @@ class MultiModelSearchRequest(BaseRequest):
 
 class BatchMineEntry(BaseModel):
     """Einzelner Eintrag für Batch-Suche"""
-    
+
     mine_name: str = Field(..., min_length=2, max_length=200)
     location: Optional[MineLocation] = Field(None)
     commodity: Optional[str] = Field(None, max_length=100)
@@ -218,7 +218,7 @@ class BatchMineEntry(BaseModel):
 
 class BatchSearchRequest(BaseRequest):
     """Schema für Batch-Suche"""
-    
+
     mines: List[BatchMineEntry] = Field(
         ...,
         min_items=1,
@@ -241,7 +241,7 @@ class BatchSearchRequest(BaseRequest):
         False,
         description="Prioritätsbasierte Verarbeitung"
     )
-    
+
     @validator('mines')
     def validate_batch_mines(cls, v):
         """Validiert Batch-Minen auf Duplikate"""
@@ -255,12 +255,12 @@ class BatchSearchRequest(BaseRequest):
 
 
 # =============================================================================
-# SEARCH RESPONSE SCHEMAS  
+# SEARCH RESPONSE SCHEMAS
 # =============================================================================
 
 class SearchMetadata(BaseModel):
     """Metadaten für Suchergebnisse"""
-    
+
     search_duration: float = Field(..., description="Suchdauer in Sekunden")
     model_used: str = Field(..., description="Verwendetes Modell")
     provider: str = Field(..., description="Verwendeter Provider")
@@ -272,7 +272,7 @@ class SearchMetadata(BaseModel):
 
 class SingleSearchResponse(BaseResponse):
     """Response für Einzel-Mine-Suche"""
-    
+
     data: Optional[ComprehensiveMineData] = Field(None, description="Mine-Daten")
     error: Optional[str] = Field(None, description="Fehlermeldung")
     metadata: SearchMetadata = Field(..., description="Such-Metadaten")
@@ -280,9 +280,9 @@ class SingleSearchResponse(BaseResponse):
 
 class MultiModelSearchResponse(BaseResponse):
     """Response für Multi-Modell-Suche"""
-    
+
     data: Optional[Dict[str, ComprehensiveMineData]] = Field(
-        None, 
+        None,
         description="Mine-Daten pro Modell"
     )
     comparison: Optional[Dict[str, Any]] = Field(
@@ -298,7 +298,7 @@ class MultiModelSearchResponse(BaseResponse):
 
 class BatchSearchItem(BaseModel):
     """Einzelnes Ergebnis in Batch-Response"""
-    
+
     mine_name: str = Field(..., description="Mine-Name")
     status: str = Field(..., description="Verarbeitungsstatus")
     data: Optional[ComprehensiveMineData] = Field(None, description="Mine-Daten")
@@ -308,7 +308,7 @@ class BatchSearchItem(BaseModel):
 
 class BatchSearchResponse(BaseResponse):
     """Response für Batch-Suche"""
-    
+
     results: List[BatchSearchItem] = Field(..., description="Batch-Ergebnisse")
     summary: Dict[str, Any] = Field(..., description="Batch-Zusammenfassung")
     total_processed: int = Field(..., description="Anzahl verarbeiteter Minen")
@@ -322,7 +322,7 @@ class BatchSearchResponse(BaseResponse):
 
 class ModelPerformanceStats(BaseModel):
     """Modell-Performance-Statistiken"""
-    
+
     model_id: str = Field(..., description="Modell-ID")
     total_requests: int = Field(..., description="Gesamtanzahl Anfragen")
     successful_requests: int = Field(..., description="Erfolgreiche Anfragen")
@@ -334,7 +334,7 @@ class ModelPerformanceStats(BaseModel):
 
 class SystemHealthResponse(BaseResponse):
     """System-Health-Response"""
-    
+
     status: HealthStatus = Field(..., description="Gesamtstatus")
     components: Dict[str, Dict[str, Any]] = Field(..., description="Komponenten-Status")
     uptime: float = Field(..., description="System-Uptime in Sekunden")
@@ -348,7 +348,7 @@ class SystemHealthResponse(BaseResponse):
 
 class ModelConfiguration(BaseModel):
     """Modell-Konfiguration"""
-    
+
     model_id: str = Field(..., description="Modell-ID")
     provider: ModelProvider = Field(..., description="Provider")
     enabled: bool = Field(True, description="Modell aktiviert")
@@ -360,7 +360,7 @@ class ModelConfiguration(BaseModel):
 
 class SearchConfiguration(BaseModel):
     """Such-Konfiguration"""
-    
+
     cache_enabled: bool = Field(True, description="Cache aktiviert")
     cache_ttl: int = Field(3600, ge=60, le=86400, description="Cache-TTL in Sekunden")
     max_concurrent_searches: int = Field(10, ge=1, le=50, description="Max. parallele Suchen")
@@ -376,11 +376,12 @@ class SearchConfiguration(BaseModel):
 def validate_request_schema(schema_class: BaseModel):
     """
     Decorator für Request-Schema-Validierung
-    
+
     Args:
         schema_class: Pydantic-Schema-Klasse
     """
     def decorator(func):
+    """decorator - TODO: Dokumentation hinzufügen"""
         async def wrapper(*args, **kwargs):
             # Implementierung würde hier Request validieren
             return await func(*args, **kwargs)
@@ -391,11 +392,12 @@ def validate_request_schema(schema_class: BaseModel):
 def validate_response_schema(schema_class: BaseModel):
     """
     Decorator für Response-Schema-Validierung
-    
+
     Args:
         schema_class: Pydantic-Schema-Klasse
     """
     def decorator(func):
+    """decorator - TODO: Dokumentation hinzufügen"""
         async def wrapper(*args, **kwargs):
             result = await func(*args, **kwargs)
             # Implementierung würde hier Response validieren

@@ -18,14 +18,14 @@ from minesearch.config.models import MODELS_CONFIG
 # REGEL 10 FIX 29.08.2025: Entfernung von Template-auslösenden "/ usw." Patterns aus Feldnamen
 # Diese Patterns haben AI-Modelle dazu verleitet, Template-Antworten zu generieren!
 CSV_COLUMNS = [
-    'Name', 'Country', 'Region', 'Eigentümer', 'Betreiber', 'x-Koordinate', 
+    'Name', 'Country', 'Region', 'Eigentümer', 'Betreiber', 'x-Koordinate',
     'y-Koordinate', 'Aktivitätsstatus',
     'Restaurationskosten', 'Jahr der Aufnahme der Kosten',
-    'Jahr der Erstellung des Dokumentes', 
+    'Jahr der Erstellung des Dokumentes',
     'Rohstoff',  # GEÄNDERT: Entfernt "(Gold/ Kupfer/ Kohle/ usw.)"
     'Minentyp',       # GEÄNDERT: Entfernt "(Untertage/ Open-Pit/ usw.)"
     'Produktionsstart',
-    'Produktionsende', 
+    'Produktionsende',
     'Fördermenge/Jahr Rohstoff',  # NEU: Getrennt für Rohstoff-Produktion (z.B. Unzen Gold)
     'Fördermenge/Jahr Abraum',    # NEU: Getrennt für Gesamtextraktion inkl. Abraum (z.B. Millionen Tonnen)
     'Fläche der Mine in qkm',
@@ -33,7 +33,7 @@ CSV_COLUMNS = [
 ]
 
 # Batch-Suche Konfiguration - TRANSPARENCY FIX 30.08.2025
-BATCH_USE_CACHE_DEFAULT = False     # Batch-Suchen nutzen standardmäßig keinen Cache  
+BATCH_USE_CACHE_DEFAULT = False     # Batch-Suchen nutzen standardmäßig keinen Cache
 BATCH_CACHE_HOURS_DEFAULT = 0       # Keine alten Daten für Batch-Suchen verwenden
 BATCH_SHOW_DATA_SOURCE = True       # Zeige Datenherkunft in Tabellen
 BATCH_FORCE_NEW_SESSION = True      # Erzwinge neue Session für Isolation
@@ -61,12 +61,12 @@ else:
 
 class Config(APIKeysConfig):
     """Zentrale Konfigurationsklasse - KISS Prinzip"""
-    
+
     # Server Einstellungen
     HOST = os.getenv('HOST', '0.0.0.0')
     PORT = int(os.getenv('PORT', 8000))
     DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
-    
+
     # Datenbank: URL bevorzugt; falls nicht vorhanden, aus DATABASE_PATH ableiten
     _ROOT = Path(__file__).resolve().parents[3]
     _db_url_env = os.getenv('DATABASE_URL')
@@ -78,22 +78,22 @@ class Config(APIKeysConfig):
         # Absoluten Pfad bilden, dann als sqlite URL
         _db_path_abs = (_ROOT / _db_path).resolve()
         DATABASE_URL = f"sqlite:///{_db_path_abs}"
-    
+
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
-    
+
     # API Einstellungen
     API_TIMEOUT = int(os.getenv('API_TIMEOUT', 30))  # Sekunden
     MAX_RETRIES = int(os.getenv('MAX_RETRIES', 3))
-    
+
     # Default Modell - FIX 02.09.2025: Zurück zu OpenRouter Standard
     # BrightData-Fallback entfernt - echte Fehler sollen sichtbar werden
     DEFAULT_MODEL = os.getenv('DEFAULT_MODEL', 'openrouter:deepseek-free')
     PERPLEXITY_TEMPERATURE = float(os.getenv('PERPLEXITY_TEMPERATURE', 0.2))
-    
+
     # Provider Konfiguration
     PROVIDERS = PROVIDERS_CONFIG
-    
+
     # Modell Konfigurationen
     PERPLEXITY_MODELS = MODELS_CONFIG['perplexity']
     ANTHROPIC_MODELS = MODELS_CONFIG['anthropic']
@@ -104,7 +104,7 @@ class Config(APIKeysConfig):
     OPENROUTER_MODELS = MODELS_CONFIG['openrouter']
     EXA_MODELS = MODELS_CONFIG['exa']
     TAVILY_MODELS = MODELS_CONFIG['tavily']
-    
+
     # Globale Mining-Begriffe und Abkürzungen
     MINING_ABBREVIATIONS = {
         'technical_reports': ['NI 43-101', 'JORC', 'SAMREC', 'PERC', 'SME', 'CRIRSCO'],
@@ -118,7 +118,7 @@ class Config(APIKeysConfig):
             'Mo': 'Molybdenum', 'Pt': 'Platinum', 'Pd': 'Palladium', 'REE': 'Rare Earth'
         }
     }
-    
+
     # Priorisierte Domains für Mining-Daten
     PRIORITY_MINING_DOMAINS = {
         'tier1': [  # Regierungsseiten und offizielle Datenbanken
@@ -135,7 +135,7 @@ class Config(APIKeysConfig):
             'northernminer.com', 'miningweekly.com', 'minexploration.com'
         ]
     }
-    
+
     # PDF-Suchmuster für technische Dokumente
     PDF_SEARCH_PATTERNS = [
         '*technical-report*.pdf', '*NI-43-101*.pdf', '*feasibility*.pdf',
@@ -143,7 +143,7 @@ class Config(APIKeysConfig):
         '*reclamation*.pdf', '*rehabilitation*.pdf', '*annual-report*.pdf',
         '*sustainability-report*.pdf', '*resource-estimate*.pdf'
     ]
-    
+
     # Defaults für den Sequential Field Orchestrator
     _SEQUENTIAL_DEFAULTS: Dict[str, Any] = {
         'max_sources_per_model': 50,
@@ -168,6 +168,7 @@ class Config(APIKeysConfig):
         """
 
         def _parse_int(name: str, default: int, min_value: int = 1) -> int:
+    """_parse_int - TODO: Dokumentation hinzufügen"""
             raw = os.getenv(name)
             if raw is None or str(raw).strip() == '':
                 return default
@@ -179,7 +180,9 @@ class Config(APIKeysConfig):
                 raise ValueError(f"Ungültiger Wert für {name}: {value} (Minimum: {min_value}).")
             return value
 
-        def _parse_float(name: str, default: float, min_value: Optional[float] = None, max_value: Optional[float] = None) -> float:
+        def _parse_float(name: str, default: float, min_value: Optional[float] = None, max_value:
+    """_parse_float - TODO: Dokumentation hinzufügen"""
+Optional[float] = None) -> float:
             raw = os.getenv(name)
             if raw is None or str(raw).strip() == '':
                 return default
@@ -194,6 +197,7 @@ class Config(APIKeysConfig):
             return value
 
         def _parse_bool(name: str, default: bool) -> bool:
+    """_parse_bool - TODO: Dokumentation hinzufügen"""
             raw = os.getenv(name)
             if raw is None or str(raw).strip() == '':
                 return default
@@ -262,40 +266,40 @@ class Config(APIKeysConfig):
                     raise ValueError(f"Ungültiger Wert für Override '{key}': {value}")
 
         return settings
-    
+
     @classmethod
     def validate(cls):
         """Validiere kritische Konfiguration beim Start"""
         errors = []
         warnings = []
-        
+
         # Multi-Provider Validierung
         providers_configured = False
-        
-        if cls.PROVIDERS.get('perplexity', {}).get('enabled'):
+
+        if cls.PROVIDERS.get("perplexity", {}).get('enabled'):
             if not cls.PERPLEXITY_API_KEY:
                 warnings.append("PERPLEXITY_API_KEY nicht gesetzt - Perplexity Provider deaktiviert")
                 cls.PROVIDERS['perplexity']['enabled'] = False
             else:
                 providers_configured = True
-        
-        if cls.PROVIDERS.get('openrouter', {}).get('enabled'):
+
+        if cls.PROVIDERS.get("openrouter", {}).get('enabled'):
             if not cls.OPENROUTER_API_KEY:
                 warnings.append("OPENROUTER_API_KEY nicht gesetzt - OpenRouter Provider deaktiviert")
                 cls.PROVIDERS['openrouter']['enabled'] = False
             else:
                 providers_configured = True
-        
+
         if not providers_configured:
             errors.append("Kein Provider konfiguriert - mindestens ein API-Key muss gesetzt sein")
-        
+
         # Zeige Warnungen
         for warning in warnings:
             print(f"⚠️  WARNUNG: {warning}")
-            
+
         if errors:
             raise ValueError(f"Konfigurationsfehler: {', '.join(errors)}")
-    
+
     @classmethod
     def get_summary(cls):
         """Gibt Konfigurations-Zusammenfassung zurueck"""

@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
             logger.warning("Einige Provider sind möglicherweise nicht verfügbar.")
             # Im Notfall: Lass System trotz fehlender API-Keys starten
             logger.warning("System startet trotzdem im eingeschränkten Modus...")
-        
+
         try:
             if FORCE_REFRESH:
                 logger.info("🔄 FORCE_REFRESH aktiv - Registry wird komplett neu aufgebaut")
@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI):
         except Exception as provider_error:
             logger.warning(f"Provider-Initialisierung fehlgeschlagen: {provider_error}")
             logger.warning("System läuft ohne Such-Provider weiter...")
-            
+
     except Exception as e:
         logger.error(f"Fehler bei Provider-Initialisierung: {type(e).__name__}: {e}")
         logger.warning("System startet trotzdem im Notfall-Modus...")
@@ -106,7 +106,7 @@ setup_exception_handlers(app)
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend")
 app.mount("/static", StaticFiles(directory=frontend_path), name="static")
 
-# Statische Dateien für CSV-Zugriff  
+# Statische Dateien für CSV-Zugriff
 project_root = os.path.join(os.path.dirname(__file__), "..", "..")
 app.mount("/csv", StaticFiles(directory=project_root), name="csv")
 
@@ -128,7 +128,7 @@ else:
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     if config.DEBUG:
         uvicorn.run("backend.minesearch.main:app", host=config.HOST, port=config.PORT, reload=True)
     else:

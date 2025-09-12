@@ -32,7 +32,7 @@ db_manager = DatabaseManager()
 __all__ = [
     'Base',
     'Source',
-    'Mine', 
+    'Mine',
     'SearchResult',
     'ModelStatistics',
     'FieldConsistency',

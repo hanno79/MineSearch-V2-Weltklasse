@@ -1,6 +1,6 @@
 """
 Author: rahn
-Datum: 27.08.2025  
+Datum: 27.08.2025
 Version: 1.0
 Beschreibung: Datenbank-Viewer API für Read-Only Zugriff auf alle Tabellen
 """
@@ -68,18 +68,18 @@ NORMALIZED_STRUCTURE = {
 
 def categorize_table(table_name: str, row_count: int) -> str:
     """Kategorisiert Tabellen basierend auf normalisierter Struktur"""
-    
+
     # Durchsuche die normalisierte Struktur
     for category, tables in NORMALIZED_STRUCTURE.items():
         if table_name in tables:
             return category
-    
+
     # Fallback für unbekannte Tabellen (sollte nicht vorkommen)
     return "❓ Unbekannt"
 
 # Wichtige Tabellen für Quick-Access (aktualisiert nach Schema-Analyse)
 IMPORTANT_TABLES = [
-    'mines', 'mine_data_fields', 'search_sessions', 
+    'mines', 'mine_data_fields', 'search_sessions',
     'countries', 'commodities', 'companies', 'activity_statuses', 'mine_types',
     'sources', 'field_type_mapping'
 ]
@@ -92,30 +92,30 @@ async def get_all_tables():
             preparer = session.bind.dialect.identifier_preparer
             # Alle Tabellen aus sqlite_master
             result = session.execute(text("""
-                SELECT name, type FROM sqlite_master 
+                SELECT name, type FROM sqlite_master
                 WHERE type='table' AND name NOT LIKE 'sqlite_%'
                 ORDER BY name
             """))
             all_tables = result.fetchall()
-            
+
             # Zähle Einträge für jede Tabelle und kategorisiere dynamisch
             table_info = []
             categories_found = {}
-            
+
             for table_name, table_type in all_tables:
                 try:
                     quoted_table = preparer.quote(table_name)
                     count_result = session.execute(text(f"SELECT COUNT(*) FROM {quoted_table}"))
                     count = count_result.fetchone()[0]
-                    
+
                     # Dynamische Kategorisierung
                     category = categorize_table(table_name, count)
-                    
+
                     # Sammle gefundene Kategorien für Statistik
                     if category not in categories_found:
                         categories_found[category] = []
                     categories_found[category].append(table_name)
-                    
+
                     table_info.append({
                         "name": table_name,
                         "type": table_type,
@@ -127,12 +127,12 @@ async def get_all_tables():
                     logger.warning(f"Fehler beim Zählen von Tabelle {table_name}: {e}")
                     table_info.append({
                         "name": table_name,
-                        "type": table_type, 
+                        "type": table_type,
                         "row_count": 0,
                         "category": "Error",
                         "is_important": False
                     })
-            
+
             return {
                 "success": True,
                 "tables": table_info,
@@ -143,7 +143,7 @@ async def get_all_tables():
                 "normalized": True,  # Flag für normalisierte DB
                 "category_count": len(categories_found)
             }
-            
+
     except Exception as e:
         logger.error(f"Fehler beim Laden der Tabellen: {e}")
         raise HTTPException(status_code=500, detail=f"Fehler: {str(e)}")
@@ -163,13 +163,13 @@ async def get_table_data(
         with db_manager.get_session() as session:
             # Validiere Tabelle existiert
             check_table = session.execute(text("""
-                SELECT name FROM sqlite_master 
+                SELECT name FROM sqlite_master
                 WHERE type='table' AND name = :table_name
             """), {"table_name": table_name})
-            
+
             if not check_table.fetchone():
                 raise HTTPException(status_code=404, detail=f"Tabelle '{table_name}' nicht gefunden")
-            
+
             # Hole Spalten-Info (mit sicherem Quoting des Tabellennamens)
             preparer = session.bind.dialect.identifier_preparer
             quoted_table = preparer.quote(table_name)
@@ -220,22 +220,22 @@ async def get_table_data(
             # Pagination mittels gebundener Parameter (sichere Integers)
             offset = (page - 1) * limit
             base_query += " LIMIT :limit OFFSET :offset"
-            
+
             # Führe Queries aus
             total_result = session.execute(text(count_query), filter_params)
             total_count = total_result.fetchone()[0]
-            
+
             data_params = {**filter_params, "limit": int(limit), "offset": int(offset)}
             data_result = session.execute(text(base_query), data_params)
             rows = data_result.fetchall()
-            
+
             # Konvertiere zu Dictionary und formatiere Daten
             formatted_rows = []
             for row in rows:
                 row_dict = {}
                 for i, column in enumerate(columns):
                     value = row[i] if i < len(row) else None
-                    
+
                     # Formatiere spezielle Datentypen
                     if value is None:
                         formatted_value = None
@@ -254,11 +254,11 @@ async def get_table_data(
                         formatted_value = value.isoformat()
                     else:
                         formatted_value = value
-                    
+
                     row_dict[column] = formatted_value
-                
+
                 formatted_rows.append(row_dict)
-            
+
             return {
                 "success": True,
                 "data": {
@@ -282,7 +282,7 @@ async def get_table_data(
                     }
                 }
             }
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -297,24 +297,24 @@ async def get_table_schema(table_name: str):
             # Table Info
             result = session.execute(text(f"PRAGMA table_info({table_name})"))
             columns = result.fetchall()
-            
+
             if not columns:
                 raise HTTPException(status_code=404, detail=f"Tabelle '{table_name}' nicht gefunden")
-            
+
             # Foreign Keys
             fk_result = session.execute(text(f"PRAGMA foreign_key_list({table_name})"))
             foreign_keys = fk_result.fetchall()
-            
+
             # Indices
             idx_result = session.execute(text(f"PRAGMA index_list({table_name})"))
             indices = idx_result.fetchall()
-            
+
             schema_info = {
                 "table_name": table_name,
                 "columns": [
                     {
                         "id": col[0],
-                        "name": col[1], 
+                        "name": col[1],
                         "type": col[2],
                         "not_null": bool(col[3]),
                         "default_value": col[4],
@@ -324,7 +324,7 @@ async def get_table_schema(table_name: str):
                 "foreign_keys": [
                     {
                         "id": fk[0],
-                        "seq": fk[1], 
+                        "seq": fk[1],
                         "table": fk[2],
                         "from": fk[3],
                         "to": fk[4]
@@ -338,12 +338,12 @@ async def get_table_schema(table_name: str):
                     } for idx in indices
                 ]
             }
-            
+
             return {
                 "success": True,
                 "schema": schema_info
             }
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -360,28 +360,28 @@ async def export_table_csv(
     try:
         from io import StringIO
         import csv
-        
+
         with db_manager.get_session() as session:
             preparer = session.bind.dialect.identifier_preparer
             # Validiere Tabelle
             check_table = session.execute(text("""
-                SELECT name FROM sqlite_master 
+                SELECT name FROM sqlite_master
                 WHERE type='table' AND name = :table_name
             """), {"table_name": table_name})
-            
+
             if not check_table.fetchone():
                 raise HTTPException(status_code=404, detail=f"Tabelle '{table_name}' nicht gefunden")
-            
+
             # Hole Spalten
             quoted_table = preparer.quote(table_name)
             column_result = session.execute(text(f"PRAGMA table_info({quoted_table})"))
             columns = [col[1] for col in column_result.fetchall()]
             quoted_columns = {name: preparer.quote(name) for name in columns}
-            
+
             # Validiere Filterspalte
             if filter_column is not None and filter_column not in columns:
                 raise HTTPException(status_code=400, detail=f"Ungültige Spalte für Filter: '{filter_column}'")
-            
+
             # Baue Query mit optionalem Filter
             query = f"SELECT * FROM {quoted_table}"
             params = {}
@@ -389,19 +389,19 @@ async def export_table_csv(
                 quoted_filter_col = quoted_columns[filter_column]
                 query += f" WHERE {quoted_filter_col} LIKE :filter_value"
                 params["filter_value"] = f"%{filter_value}%"
-            
+
             # Daten laden (max 10000 Einträge für CSV)
             query += " LIMIT 10000"
             result = session.execute(text(query), params)
             rows = result.fetchall()
-            
+
             # CSV generieren
             output = StringIO()
             writer = csv.writer(output)
-            
+
             # Header
             writer.writerow(columns)
-            
+
             # Daten
             for row in rows:
                 # Konvertiere alle Werte zu Strings
@@ -414,12 +414,12 @@ async def export_table_csv(
                     else:
                         formatted_row.append(str(value))
                 writer.writerow(formatted_row)
-            
+
             csv_content = output.getvalue()
             output.close()
-            
+
             from fastapi.responses import Response
-            
+
             return Response(
                 content=csv_content,
                 media_type="text/csv",
@@ -427,7 +427,7 @@ async def export_table_csv(
                     "Content-Disposition": f"attachment; filename={table_name}_export.csv"
                 }
             )
-            
+
     except HTTPException:
         raise
     except Exception as e:

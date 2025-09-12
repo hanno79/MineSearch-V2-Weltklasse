@@ -10,6 +10,7 @@ import sqlite3
 from minesearch.database.db_utils import get_normalized_db_path, get_sqlite_connection
 
 def clean_database():
+    """clean_database - TODO: Dokumentation hinzufügen"""
     print('🗑️ Bereinige Statistik- und Ergebnis-Tabellen...')
 
     # Verbinde zur Datenbank
@@ -18,9 +19,9 @@ def clean_database():
 
     # Statistik-Tabellen leeren
     tables_to_clear = [
-        'model_statistics', 
-        'model_summary', 
-        'field_statistics', 
+        'model_statistics',
+        'model_summary',
+        'field_statistics',
         'field_consistency',
         'search_results',
         'mines'

@@ -24,39 +24,39 @@ async def get_template_alerts(
 ) -> Dict[str, Any]:
     """
     Hole aktuelle Template-Alerts
-    
+
     Returns:
         Dictionary mit Alerts und Statistiken
     """
     try:
         alerts = template_monitor.analyze_patterns(days_back, min_occurrences)
-        
+
         # Filter nach Schweregrad falls angegeben
         if severity:
             alerts = [a for a in alerts if a.severity == severity.lower()]
-        
+
         # Konvertiere zu Dictionaries
         alert_data = [alert.to_dict() for alert in alerts]
-        
+
         # Statistiken
         stats = {
             'total_alerts': len(alert_data),
             'by_severity': {},
             'most_affected_fields': {},
-            'recent_alerts': len([a for a in alerts if 
+            'recent_alerts': len([a for a in alerts if
                                 (datetime.now() - a.last_seen).days <= 1])
         }
-        
+
         # Gruppiere nach Schweregrad
         for alert in alerts:
             severity = alert.severity
             stats['by_severity'][severity] = stats['by_severity'].get(severity, 0) + 1
-        
+
         # Gruppiere nach Feldern
         for alert in alerts:
             field = alert.field
             stats['most_affected_fields'][field] = stats['most_affected_fields'].get(field, 0) + 1
-        
+
         return {
             'success': True,
             'data': {
@@ -65,7 +65,7 @@ async def get_template_alerts(
                 'generated_at': datetime.now().isoformat()
             }
         }
-        
+
     except Exception as e:
         logger.error(f"[TEMPLATE_MONITOR_API] Fehler beim Abrufen der Alerts: {e}")
         raise HTTPException(status_code=500, detail=f"Fehler beim Abrufen der Template-Alerts: {str(e)}")
@@ -74,13 +74,13 @@ async def get_template_alerts(
 async def get_rule10_violations() -> Dict[str, Any]:
     """
     Prüfe auf REGEL 10 Verstöße
-    
+
     Returns:
         Dictionary mit detaillierten Verstoß-Informationen
     """
     try:
         violations = template_monitor.check_for_rule10_violations()
-        
+
         return {
             'success': True,
             'data': {
@@ -95,7 +95,7 @@ async def get_rule10_violations() -> Dict[str, Any]:
                 'rule10_status': 'VIOLATED' if violations['total_violations'] > 0 else 'COMPLIANT'
             }
         }
-        
+
     except Exception as e:
         logger.error(f"[TEMPLATE_MONITOR_API] Fehler bei REGEL 10 Prüfung: {e}")
         raise HTTPException(status_code=500, detail=f"Fehler bei REGEL 10 Prüfung: {str(e)}")
@@ -104,13 +104,13 @@ async def get_rule10_violations() -> Dict[str, Any]:
 async def generate_monitoring_report() -> Dict[str, Any]:
     """
     Generiere vollständigen Template-Monitoring Report
-    
+
     Returns:
         Dictionary mit formatiertem Report
     """
     try:
         report_text = template_monitor.generate_report()
-        
+
         return {
             'success': True,
             'data': {
@@ -118,7 +118,7 @@ async def generate_monitoring_report() -> Dict[str, Any]:
                 'generated_at': datetime.now().isoformat()
             }
         }
-        
+
     except Exception as e:
         logger.error(f"[TEMPLATE_MONITOR_API] Fehler bei Report-Generierung: {e}")
         raise HTTPException(status_code=500, detail=f"Fehler bei Report-Generierung: {str(e)}")
@@ -134,7 +134,7 @@ async def record_suspicious_pattern(
 ) -> Dict[str, Any]:
     """
     Erfasse manuell ein verdächtiges Pattern
-    
+
     Args:
         pattern_type: Art des Patterns
         field: Betroffenes Feld
@@ -142,7 +142,7 @@ async def record_suspicious_pattern(
         value: Verdächtiger Wert
         source_info: Quelleninformation (optional)
         severity: Schweregrad
-    
+
     Returns:
         Bestätigung der Erfassung
     """
@@ -150,7 +150,7 @@ async def record_suspicious_pattern(
         template_monitor.record_pattern(
             pattern_type, field, mine_name, value, source_info, severity
         )
-        
+
         return {
             'success': True,
             'data': {
@@ -158,7 +158,7 @@ async def record_suspicious_pattern(
                 'recorded_at': datetime.now().isoformat()
             }
         }
-        
+
     except Exception as e:
         logger.error(f"[TEMPLATE_MONITOR_API] Fehler beim Erfassen des Patterns: {e}")
         raise HTTPException(status_code=500, detail=f"Fehler beim Erfassen: {str(e)}")
@@ -167,7 +167,7 @@ async def record_suspicious_pattern(
 async def get_monitor_status() -> Dict[str, Any]:
     """
     Status des Template-Monitoring Systems
-    
+
     Returns:
         System-Status Informationen
     """
@@ -180,10 +180,10 @@ async def get_monitor_status() -> Dict[str, Any]:
                 conn.execute("SELECT 1")
         except Exception:
             db_connected = False
-        
+
         # Hole letzte Aktivität
         recent_alerts = template_monitor.analyze_patterns(days_back=1, min_occurrences=1)
-        
+
         return {
             'success': True,
             'data': {
@@ -199,7 +199,7 @@ async def get_monitor_status() -> Dict[str, Any]:
                 'last_check': datetime.now().isoformat()
             }
         }
-        
+
     except Exception as e:
         logger.error(f"[TEMPLATE_MONITOR_API] Fehler beim Status-Abruf: {e}")
         return {
@@ -212,27 +212,28 @@ async def get_monitor_status() -> Dict[str, Any]:
         }
 
 @router.delete("/clear-patterns")
-async def clear_old_patterns(days_back: int = Query(30, description="Lösche Pattern älter als X Tage")) -> Dict[str, Any]:
+async def clear_old_patterns(days_back: int = Query(30, description="Lösche Pattern älter als X
+Tage")) -> Dict[str, Any]:
     """
     Lösche alte Pattern-Einträge zur Datenbankbereinigung
-    
+
     Args:
         days_back: Lösche Einträge älter als X Tage
-        
+
     Returns:
         Bestätigung der Bereinigung
     """
     try:
         cutoff_date = datetime.now() - timedelta(days=days_back)
-        
+
         import sqlite3
         with sqlite3.connect(template_monitor.db_path) as conn:
             cursor = conn.execute(
-                "DELETE FROM template_patterns WHERE detected_at < ?", 
+                "DELETE FROM template_patterns WHERE detected_at < ?",
                 (cutoff_date.isoformat(),)
             )
             deleted_count = cursor.rowcount
-        
+
         return {
             'success': True,
             'data': {
@@ -241,7 +242,7 @@ async def clear_old_patterns(days_back: int = Query(30, description="Lösche Pat
                 'cleaned_at': datetime.now().isoformat()
             }
         }
-        
+
     except Exception as e:
         logger.error(f"[TEMPLATE_MONITOR_API] Fehler bei Pattern-Bereinigung: {e}")
         raise HTTPException(status_code=500, detail=f"Fehler bei Bereinigung: {str(e)}")

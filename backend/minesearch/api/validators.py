@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class BaseAPIRequest(BaseModel):
     """Basis-Schema für alle API-Requests"""
-    
+
     class Config:
         str_strip_whitespace = True
         validate_assignment = True
@@ -27,7 +27,7 @@ class BaseAPIRequest(BaseModel):
 
 class BaseAPIResponse(BaseModel):
     """Standardisiertes Response-Schema für alle API-Endpoints"""
-    
+
     success: bool = Field(..., description="Erfolg-Status der Operation")
     data: Optional[Dict[str, Any]] = Field(None, description="Response-Daten bei Erfolg")
     error: Optional[str] = Field(None, description="Fehlermeldung bei Fehler")
@@ -42,25 +42,25 @@ class BaseAPIResponse(BaseModel):
 
 class MineSearchValidator(BaseAPIRequest):
     """Validierung für Mine-Search-Requests"""
-    
+
     mine_name: str = Field(
-        ..., 
-        min_length=2, 
+        ...,
+        min_length=2,
         max_length=200,
         description="Name der Mine (2-200 Zeichen)"
     )
     country: Optional[str] = Field(
-        None, 
+        None,
         max_length=100,
         description="Land (max. 100 Zeichen)"
     )
     commodity: Optional[str] = Field(
-        None, 
+        None,
         max_length=100,
         description="Rohstoff (max. 100 Zeichen)"
     )
     region: Optional[str] = Field(
-        None, 
+        None,
         max_length=100,
         description="Region (max. 100 Zeichen)"
     )
@@ -68,13 +68,13 @@ class MineSearchValidator(BaseAPIRequest):
         ...,
         description="AI-Modell ID für die Suche"
     )
-    
+
     @validator('mine_name')
     def validate_mine_name(cls, v):
         """Validiert Mine-Namen auf gefährliche Eingaben"""
         if not v or not v.strip():
             raise ValueError("Mine-Name darf nicht leer sein")
-        
+
         # Blockiere potentiell gefährliche Zeichen
         dangerous_patterns = [
             r'<script.*?>',
@@ -84,67 +84,67 @@ class MineSearchValidator(BaseAPIRequest):
             r'DROP\s+TABLE',
             r'INSERT\s+INTO'
         ]
-        
+
         for pattern in dangerous_patterns:
             if re.search(pattern, v, re.IGNORECASE):
                 raise ValueError(f"Ungültige Zeichen im Mine-Namen erkannt")
-        
+
         return v.strip()
-    
+
     @validator('model_id')
     def validate_model_id(cls, v):
         """Validiert Modell-IDs"""
         if not v or not v.strip():
             raise ValueError("Modell-ID darf nicht leer sein")
-        
+
         # Erlaubte Modell-Präfixe
         valid_prefixes = ['openrouter:', 'perplexity:', 'anthropic:', 'openai:']
-        
+
         if not any(v.startswith(prefix) for prefix in valid_prefixes):
             # Füge Default-Präfix hinzu wenn keiner vorhanden
             v = f"openrouter:{v}"
-        
+
         return v
 
 
 class MultiSearchValidator(BaseAPIRequest):
     """Validierung für Multi-Model-Search-Requests"""
-    
+
     mine_name: str = Field(..., min_length=2, max_length=200)
     country: Optional[str] = Field(None, max_length=100)
     commodity: Optional[str] = Field(None, max_length=100)
     region: Optional[str] = Field(None, max_length=100)
     model_ids: List[str] = Field(
-        ..., 
-        min_items=1, 
+        ...,
+        min_items=1,
         max_items=100,  # PHASE 3: Erhöht für alle 55+ verfügbaren Modelle
         description="Liste der Modell-IDs (1-100 Modelle)"
     )
-    
+
     @validator('model_ids')
     def validate_model_ids(cls, v):
         """Validiert Liste von Modell-IDs"""
         if not v:
             raise ValueError("Mindestens ein Modell muss angegeben werden")
-        
+
         if len(v) > 100:  # PHASE 3: Erhöht für alle 55+ verfügbaren Modelle
             raise ValueError("Maximal 100 Modelle pro Multi-Search erlaubt")
-        
+
         # Validiere jede Modell-ID
         validated_ids = []
         for model_id in v:
             if not model_id or not model_id.strip():
                 continue
-            
+
             valid_prefixes = ['openrouter:', 'perplexity:', 'anthropic:', 'openai:']
             if not any(model_id.startswith(prefix) for prefix in valid_prefixes):
                 model_id = f"openrouter:{model_id}"
-            
+
             validated_ids.append(model_id)
-        
+
         if not validated_ids:
             raise ValueError("Mindestens ein gültiges Modell muss angegeben werden")
-        
+
         return validated_ids
 
 
@@ -154,7 +154,7 @@ class MultiSearchValidator(BaseAPIRequest):
 
 class BatchMineItem(BaseModel):
     """Einzelne Mine für Batch-Processing"""
-    
+
     mine_name: str = Field(..., min_length=2, max_length=200)
     country: Optional[str] = Field(None, max_length=100)
     commodity: Optional[str] = Field(None, max_length=100)
@@ -163,7 +163,7 @@ class BatchMineItem(BaseModel):
 
 class BatchSearchValidator(BaseAPIRequest):
     """Validierung für Batch-Search-Requests"""
-    
+
     mines: List[BatchMineItem] = Field(
         ...,
         min_items=1,
@@ -182,13 +182,13 @@ class BatchSearchValidator(BaseAPIRequest):
         le=20,
         description="Parallelitätslimit (1-20)"
     )
-    
+
     @validator('mines')
     def validate_batch_size(cls, v):
         """Validiert Batch-Größe"""
         if len(v) > 100:
             raise ValueError("Batch-Größe überschreitet Maximum von 100 Minen")
-        
+
         # Prüfe auf Duplikate
         seen_mines = set()
         for mine in v:
@@ -196,7 +196,7 @@ class BatchSearchValidator(BaseAPIRequest):
             if key in seen_mines:
                 logger.warning(f"Duplikat erkannt in Batch: {mine.mine_name}")
             seen_mines.add(key)
-        
+
         return v
 
 
@@ -206,8 +206,9 @@ class BatchSearchValidator(BaseAPIRequest):
 
 class ValidationError(Exception):
     """Custom Validation Error"""
-    
+
     def __init__(self, message: str, field: str = None, code: str = None):
+    """__init__ - TODO: Dokumentation hinzufügen"""
         self.message = message
         self.field = field
         self.code = code or "VALIDATION_ERROR"
@@ -217,20 +218,20 @@ class ValidationError(Exception):
 def validate_request(validator_class: BaseModel, data: Dict[str, Any]) -> BaseModel:
     """
     Zentrale Request-Validierung
-    
+
     Args:
         validator_class: Pydantic-Modell für Validierung
         data: Request-Daten
-        
+
     Returns:
         Validiertes Pydantic-Modell
-        
+
     Raises:
         HTTPException: Bei Validierungsfehlern
     """
     try:
         return validator_class(**data)
-    
+
     except ValueError as e:
         logger.error(f"[VALIDATION] Request validation failed: {str(e)}")
         raise HTTPException(
@@ -242,7 +243,7 @@ def validate_request(validator_class: BaseModel, data: Dict[str, Any]) -> BaseMo
                 "field": getattr(e, 'field', None)
             }
         )
-    
+
     except Exception as e:
         logger.error(f"[VALIDATION] Unexpected validation error: {str(e)}")
         raise HTTPException(
@@ -258,34 +259,34 @@ def validate_request(validator_class: BaseModel, data: Dict[str, Any]) -> BaseMo
 def sanitize_string_input(value: str, max_length: int = 200) -> str:
     """
     Bereinigt String-Eingaben von potentiell gefährlichen Inhalten
-    
+
     Args:
         value: Zu bereinigender String
         max_length: Maximale Länge
-        
+
     Returns:
         Bereinigter String
     """
     if not value:
         return ""
-    
+
     # Entferne gefährliche HTML/Script-Tags
     value = re.sub(r'<[^>]*>', '', value)
-    
+
     # Entferne SQL-Injection-Pattern
     sql_patterns = [
         r"(\bSELECT\b|\bFROM\b|\bWHERE\b|\bDROP\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b)",
         r"(\bUNION\b|\bOR\b\s+\d+\s*=\s*\d+|\bAND\b\s+\d+\s*=\s*\d+)",
         r"(--|\/\*|\*\/|;)"
     ]
-    
+
     for pattern in sql_patterns:
         value = re.sub(pattern, '', value, flags=re.IGNORECASE)
-    
+
     # Begrenze Länge
     if len(value) > max_length:
         value = value[:max_length]
-    
+
     return value.strip()
 
 
@@ -294,21 +295,22 @@ def sanitize_string_input(value: str, max_length: int = 200) -> str:
 # =============================================================================
 
 def build_success_response(
+    """build_success_response - TODO: Dokumentation hinzufügen"""
     data: Dict[str, Any],
     request_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Erstellt standardisierte Erfolgs-Response
-    
+
     Args:
         data: Response-Daten
         request_id: Optional Request-ID
-        
+
     Returns:
         Standardisierte Success-Response
     """
     from datetime import datetime
-    
+
     return {
         "success": True,
         "data": data,
@@ -320,6 +322,7 @@ def build_success_response(
 
 
 def build_error_response(
+    """build_error_response - TODO: Dokumentation hinzufügen"""
     error_message: str,
     error_code: str = "GENERIC_ERROR",
     request_id: Optional[str] = None,
@@ -327,18 +330,17 @@ def build_error_response(
 ) -> Dict[str, Any]:
     """
     Erstellt standardisierte Error-Response
-    
+
     Args:
         error_message: Fehlermeldung
         error_code: Spezifischer Error-Code
         request_id: Optional Request-ID
         status_code: HTTP-Status-Code
-        
+
     Returns:
         Standardisierte Error-Response
     """
-    from datetime import datetime
-    
+
     return {
         "success": False,
         "data": None,

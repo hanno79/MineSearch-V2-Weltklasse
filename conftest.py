@@ -1,3 +1,10 @@
+"""
+Author: rahn
+Datum: 11.09.2025
+Version: 1.0
+Beschreibung: Test-Datei für conftest
+"""
+
 import os
 from pathlib import Path
 

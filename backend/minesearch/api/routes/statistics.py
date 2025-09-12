@@ -27,7 +27,7 @@ router.include_router(statistics_advanced_router)
 __all__ = [
     'router',
     'STATISTICS_FIELD_ORDER',
-    'statistics_calculator', 
+    'statistics_calculator',
     'statistics_analyzer',
     'statistics_time_analyzer'
 ]
@@ -61,7 +61,7 @@ def calculate_field_coverage(field_data: dict) -> float:
     return statistics_calculator.calculate_avg_field_coverage([])
 
 def calculate_reliability_trend(queries: list) -> list:
-    """Backward compatibility function"""  
+    """Backward compatibility function"""
     return statistics_calculator.calculate_reliability_trend(queries)
 
 def calculate_field_breakdown(queries: list) -> dict:

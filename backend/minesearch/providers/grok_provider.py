@@ -29,19 +29,20 @@ logger = logging.getLogger(__name__)
 
 class GrokProvider(AbstractProvider):
     """Provider für xAI Grok mit Real-time Informationen"""
-    
+
     def __init__(self, api_key: str, config: Dict[str, Any]):
+    """__init__ - TODO: Dokumentation hinzufügen"""
         super().__init__(api_key, config)
         self.api_url = "https://api.x.ai/v1/chat/completions"
         self.models = self._init_models()
         self.data_extractor = DataExtractor()
-    
+
     def _init_models(self) -> Dict[str, ModelConfig]:
         """Initialisiere verfügbare Modelle"""
         models = {}
-        
+
         # Konvertiere die GROK_MODELS Konfiguration
-        for model_key, model_config in self.config.get('models', {}).items():
+        for model_key, model_config in self.config.get("models", {}).items():
             models[model_key] = ModelConfig(
                 id=model_config['id'],
                 name=model_config['name'],
@@ -49,17 +50,17 @@ class GrokProvider(AbstractProvider):
                 max_tokens=model_config['max_tokens'],
                 description=model_config['description'],
                 provider='grok',
-                supports_web_search=model_config.get('supports_web_search', True),
-                supports_deep_research=model_config.get('supports_deep_research', False),
+                supports_web_search=model_config.get("supports_web_search", True),
+                supports_deep_research=model_config.get("supports_deep_research", False),
                 is_free=False
             )
-        
+
         return models
-    
+
     async def search(self, query: str, model_id: str, options: Dict[str, Any]) -> SearchResult:
         """Führe Suche mit Grok durch"""
         start_time = datetime.now()
-        
+
         # Hole Model-Config
         model_config = self.models.get(model_id)
         if not model_config:
@@ -71,17 +72,17 @@ class GrokProvider(AbstractProvider):
                 metadata={},
                 error=f"Unbekanntes Modell: {model_id}"
             )
-        
+
         # ÄNDERUNG 06.07.2025: Grok für Real-time Informationen
-        mine_name = options.get('mine_name', '')
+        mine_name = options.get("mine_name", '')
         country = options.get('country')
         region = options.get('region')
         commodity = options.get('commodity')
-        sources = options.get('sources', [])
-        
+        sources = options.get("sources", [])
+
         # ÄNDERUNG 08.07.2025: Nutze discovered_sources wenn vorhanden
-        discovered_sources = options.get('discovered_sources', [])
-        
+        discovered_sources = options.get("discovered_sources", [])
+
         # Erstelle erweiterte Query mit Grok's Real-time Stärken
         enhanced_query = self._build_enhanced_query(
             query=query,
@@ -93,7 +94,7 @@ class GrokProvider(AbstractProvider):
             discovered_sources=discovered_sources,
             focus='realtime_data'
         )
-        
+
         try:
             # API-Call mit Grok (OpenAI-kompatible API)
             async with httpx.AsyncClient(timeout=model_config.timeout) as client:
@@ -115,12 +116,12 @@ class GrokProvider(AbstractProvider):
                                 "content": enhanced_query
                             }
                         ],
-                        "temperature": options.get('temperature', 0.1),
+                        "temperature": options.get("temperature", 0.1),
                         "max_tokens": model_config.max_tokens,
                         "stream": False
                     }
                 )
-                
+
                 if response.status_code != 200:
                     error_msg = self._handle_api_error(response)
                     return SearchResult(
@@ -131,22 +132,22 @@ class GrokProvider(AbstractProvider):
                         metadata={'status_code': response.status_code},
                         error=error_msg
                     )
-                
+
                 # Parse Response
                 result = response.json()
                 content = result["choices"][0]["message"]["content"]
-                
+
                 # Extrahiere strukturierte Daten
                 extracted_data = self.data_extractor.extract_structured_data_with_sources(content, mine_name, country)
-                
+
                 # Extrahiere Quellen aus der Antwort
                 sources_from_response = extract_sources_from_content(content)
-                
+
                 # Kombiniere mit übergebenen Quellen
                 all_sources = sources + sources_from_response
-                
+
                 duration = (datetime.now() - start_time).total_seconds()
-                
+
                 return SearchResult(
                     success=True,
                     content=content,
@@ -157,12 +158,12 @@ class GrokProvider(AbstractProvider):
                         'provider': 'grok',
                         'structured_data_with_sources': extracted_data['data_with_sources'],
                         'source_index': extracted_data['source_index'],
-                        'usage': result.get('usage', {}),
+                        'usage': result.get("usage", {}),
                         'realtime_search': True
                     },
                     search_duration=duration
                 )
-                
+
         except httpx.TimeoutException:
             return SearchResult(
                 success=False,
@@ -182,12 +183,13 @@ class GrokProvider(AbstractProvider):
                 metadata={},
                 error=str(e)
             )
-    
+
     def _build_enhanced_query(self, query: str, mine_name: str, country: Optional[str],
-                            region: Optional[str], commodity: Optional[str], 
+    """_build_enhanced_query - TODO: Dokumentation hinzufügen"""
+                            region: Optional[str], commodity: Optional[str],
                             sources: List[Dict], discovered_sources: List[Dict], focus: str) -> str:
         """Erstelle erweiterte Query mit speziellem Fokus"""
-        
+
         # Basis-Query
         enhanced_query = f"MINE: {mine_name}\n"
         if country:
@@ -196,9 +198,9 @@ class GrokProvider(AbstractProvider):
             enhanced_query += f"REGION: {region}\n"
         if commodity:
             enhanced_query += f"ROHSTOFF: {commodity}\n"
-        
+
         enhanced_query += f"\n{query}\n"
-        
+
         # Grok's Stärke: Real-time Informationen und X/Twitter Integration
         if focus == 'realtime_data':
             enhanced_query += """
@@ -245,69 +247,69 @@ ZEITLICHER FOKUS:
 - Unterscheide zwischen historischen und real-time Daten
 - Suche nach "BREAKING" oder "UPDATE" Meldungen
 """
-        
+
         # ÄNDERUNG 08.07.2025: Nutze discovered_sources für bessere Abdeckung
         # Kombiniere discovered_sources und sources
         all_sources = discovered_sources + sources
-        
+
         if all_sources:
             enhanced_query += f"\n\n🔍 NUTZE DIESE {len(all_sources)} VERIFIZIERTEN QUELLEN:\n"
             enhanced_query += "Diese stammen aus unserer Mining-Datenbank und X/Twitter:\n\n"
-            
+
             # Gruppiere nach Quellentyp
             twitter_sources = []
             gov_sources = []
             other_sources = []
-            
+
             for source in all_sources:
-                url = source.get('url', source.get('value', ''))
+                url = source.get("url", source.get('value', ''))
                 if 'twitter.com' in url or 'x.com' in url:
                     twitter_sources.append(url)
                 elif source.get('type') == 'government':
                     gov_sources.append(url)
                 else:
                     other_sources.append(url)
-            
+
             if twitter_sources:
                 enhanced_query += "X/TWITTER QUELLEN (Real-time Updates):\n"
                 for i, url in enumerate(twitter_sources[:10], 1):
                     enhanced_query += f"[T{i}] {url}\n"
                 enhanced_query += "\n"
-            
+
             if gov_sources:
                 enhanced_query += "REGIERUNGSQUELLEN (Offizielle Daten):\n"
                 for i, url in enumerate(gov_sources[:10], 1):
                     enhanced_query += f"[G{i}] {url}\n"
                 enhanced_query += "\n"
-            
+
             if other_sources:
                 enhanced_query += "WEITERE QUELLEN:\n"
                 for i, url in enumerate(other_sources[:20], 1):
                     enhanced_query += f"[{i}] {url}\n"
-            
+
             enhanced_query += "\n⚡ WICHTIG: Suche zusätzlich nach AKTUELLEREN Real-time Updates!"
             enhanced_query += "\nNutze deine X/Twitter Integration für Breaking News!"
         else:
             enhanced_query += "\n\n⚡ Suche besonders nach AKTUELLEN Quellen und Real-time Updates!"
             enhanced_query += "\nNutze deine X/Twitter Integration für Mining-News!"
-        
+
         return enhanced_query
-    
+
     def _handle_api_error(self, response: httpx.Response) -> str:
         """Behandle API-Fehler mit benutzerfreundlichen Nachrichten"""
         if response.status_code == 401:
             return """🔐 xAI Grok API Authentifizierung fehlgeschlagen.
-            
+
 🔑 Der API-Key ist ungültig oder fehlt.
 → Bitte prüfen Sie Ihre .env Datei
 → Generieren Sie einen neuen Key unter: https://console.x.ai/"""
-        
+
         elif response.status_code == 429:
             try:
                 error_data = response.json()
                 if "rate_limit" in str(error_data).lower():
                     return """⏱️ Grok Rate Limit erreicht.
-                    
+
 → Zu viele Anfragen pro Minute
 → Bitte warten Sie 60 Sekunden"""
                 else:
@@ -318,37 +320,37 @@ ZEITLICHER FOKUS:
             except (KeyError, AttributeError) as e:
                 logger.warning(f"[GROK] Unerwartete Rate-Limit-Struktur: {e}")
                 return "⏱️ Rate Limit erreicht. Bitte warten Sie einen Moment."
-        
+
         elif response.status_code == 503:
             return "🔧 Grok API ist momentan überlastet. Bitte versuchen Sie es später erneut."
-        
+
         elif response.status_code == 400:
             return f"❌ Ungültige Anfrage: {response.text[:200]}"
-        
+
         else:
             return f"API Fehler: {response.status_code} - {response.text[:200]}"
-    
+
     def get_models(self) -> Dict[str, ModelConfig]:
         """Gibt verfügbare Modelle zurück"""
         return self.models
-    
+
     def validate_config(self) -> bool:
         """Validiert Provider-Konfiguration"""
         if not self.api_key:
             logger.error("[GROK] Kein API-Key konfiguriert")
             return False
-        
+
         if not self.models:
             logger.error("[GROK] Keine Modelle konfiguriert")
             return False
-        
+
         return True
-    
+
     async def extract_from_sources(self, sources: List[Dict], model_id: str, options: Dict[str, Any]) -> SearchResult:
         """
         Nutze Grok für Real-time Verifizierung und Updates
         """
-        
+
         if not sources:
             return SearchResult(
                 success=False,
@@ -358,9 +360,9 @@ ZEITLICHER FOKUS:
                 metadata={},
                 error="Keine Quellen zum Analysieren"
             )
-        
-        mine_name = options.get('mine_name', '')
-        
+
+        mine_name = options.get("mine_name", '')
+
         # Erstelle spezielle Query für Real-time Updates
         query = f"""REAL-TIME VERIFIZIERUNG für {mine_name}
 
@@ -384,22 +386,22 @@ NUTZE DEINE EINZIGARTIGEN FÄHIGKEITEN:
 - Breaking News Alerts
 
 Markiere deutlich welche Informationen AKTUALISIERT wurden!"""
-        
+
         # Setze sources in options für die search Methode
         options['sources'] = sources
-        
+
         # Nutze normale search Methode mit spezieller Query
         return await self.search(query, model_id, options)
-    
+
     def get_system_prompt(self, options: Dict[str, Any]) -> str:
         """
         RULE 10 COMPLIANCE 26.08.2025: Verschärfter System-Prompt für Grok
         STRIKT VERBOTEN: UPDATE-Marker in Datenfeldern, Jahr-als-Kosten-Bugs
         """
-        currency = options.get('currency', 'USD')
-        
+        currency = options.get("currency", 'USD')
+
         universal_instructions = SpecializedPrompts.get_universal_anti_template_instructions()
-        
+
         # Grok-spezifischer Prompt für Real-time Daten mit RULE 10 Compliance
         return f"""🚫 RULE 10 COMPLIANCE - GROK REAL-TIME ANTI-ESTIMATION RESEARCHER 🚫
 

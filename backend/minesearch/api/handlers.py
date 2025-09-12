@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def setup_exception_handlers(app: FastAPI):
     """Konfiguriert Exception Handler für die FastAPI App"""
-    
+
     @app.exception_handler(ValueError)
     async def value_error_handler(request: Request, exc: ValueError):
         logger.error(f"ValueError: {str(exc)}")
@@ -21,7 +21,7 @@ def setup_exception_handlers(app: FastAPI):
             status_code=400,
             content={"detail": str(exc)}
         )
-    
+
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
         logger.error(f"Unerwarteter Fehler: {str(exc)}")

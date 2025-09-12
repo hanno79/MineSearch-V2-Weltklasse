@@ -1,3 +1,10 @@
+"""
+Author: rahn
+Datum: 11.09.2025
+Version: 1.0
+Beschreibung: Funktionalität für debug provider registry
+"""
+
 #!/usr/bin/env python3
 """
 Debug the provider registry to see how many models are available
@@ -8,7 +15,6 @@ sys.path.append('/app/backend')
 
 from minesearch.providers.registry import provider_registry
 
-print("🔍 DEBUG: Provider Registry Analysis")
 print("=" * 50)
 
 # Get all models from registry

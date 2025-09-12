@@ -12,35 +12,37 @@ logger = logging.getLogger(__name__)
 
 class ServiceContainer:
     """Singleton Container für alle Services"""
-    
+
     _instance: Optional['ServiceContainer'] = None
     _initialized = False
-    
+
     def __new__(cls):
+    """__new__ - TODO: Dokumentation hinzufügen"""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
+    """__init__ - TODO: Dokumentation hinzufügen"""
         if self._initialized:
             return
-        
+
         # PERFORMANCE FIX 02.09.2025: Eager loading für bessere Performance
         # Services werden beim Start initialisiert statt lazy loading
         self._mine_search_service = None
         self._benchmark_service = None
         # CONSOLIDATION 09.08.2025: Entfernte obsolete Services:
-        # - enhanced_search_service (search_service_multi_enhanced)  
+        # - enhanced_search_service (search_service_multi_enhanced)
         # - multi_search_service (search_service_multi)
         # - validation_service (validation_service)
         # - web_fetch_service (nicht mehr verwendet)
-        
+
         # Eager initialization
         self._pre_initialize_services()
-        
+
         self._initialized = True
         logger.info("[SERVICE-CONTAINER] Initialized with eager loading")
-    
+
     @property
     def mine_search_service(self):
         """Lazy loading MineSearchService"""
@@ -49,10 +51,10 @@ class ServiceContainer:
             self._mine_search_service = MineSearchService()
             logger.info("[SERVICE-CONTAINER] MineSearchService created")
         return self._mine_search_service
-    
+
     # CONSOLIDATION 09.08.2025: enhanced_search_service und multi_search_service entfernt
     # Alle Multi-Provider-Funktionalität ist jetzt in MineSearchService integriert
-    
+
     @property
     def benchmark_service(self):
         """Lazy loading ModelBenchmarkService"""
@@ -61,32 +63,30 @@ class ServiceContainer:
             self._benchmark_service = ModelBenchmarkService()
             logger.info("[SERVICE-CONTAINER] ModelBenchmarkService created")
         return self._benchmark_service
-    
+
     # CONSOLIDATION 09.08.2025: web_fetch_service und validation_service entfernt
     # - web_fetch_service: Nicht mehr verwendet
     # - validation_service: War defekter Adapter zu gelöschtem minesearch_v2
-    
+
     def _pre_initialize_services(self):
         """PERFORMANCE FIX 02.09.2025: Eager initialization für bessere Performance"""
         try:
             # Initialize critical services at startup
-            from minesearch.search_service import MineSearchService
-            from minesearch.model_benchmark_service import ModelBenchmarkService
-            
+
             logger.info("[SERVICE-CONTAINER] Pre-initializing services...")
-            
+
             self._mine_search_service = MineSearchService()
             logger.info("[SERVICE-CONTAINER] MineSearchService pre-initialized")
-            
+
             self._benchmark_service = ModelBenchmarkService()
             logger.info("[SERVICE-CONTAINER] ModelBenchmarkService pre-initialized")
-            
+
             logger.info("[SERVICE-CONTAINER] All services pre-initialized successfully")
-            
+
         except Exception as e:
             logger.error(f"[SERVICE-CONTAINER] Pre-initialization failed: {e}")
             # Fallback to lazy loading if pre-init fails
-    
+
     def reset(self):
         """Reset für Tests"""
         self._mine_search_service = None

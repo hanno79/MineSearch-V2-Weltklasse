@@ -1,3 +1,10 @@
+"""
+Author: rahn
+Datum: 11.09.2025
+Version: 1.0
+Beschreibung: Funktionalität für analyze eleonore success
+"""
+
 #!/usr/bin/env python3
 """
 Analyse warum Éléonore Mine erfolgreiche Datenextraktion hat
@@ -6,28 +13,30 @@ import sqlite3, json
 from minesearch.database.db_utils import get_normalized_db_path, get_sqlite_connection
 
 def analyze_eleonore_success():
+    """analyze_eleonore_success - TODO: Dokumentation hinzufügen"""
     conn = sqlite3.connect(get_normalized_db_path())
     cursor = conn.cursor()
-    
+
     print("🔬 ÉLÉONORE SUCCESS ANALYSE")
     print("=" * 60)
-    
+
     # Hole Éléonore Daten
     cursor.execute('''
-        SELECT mine_name, model_used, structured_data, sources, country, region, commodity, 
+        SELECT mine_name, model_used, structured_data, sources, country, region, commodity,
                search_timestamp, session_id, data_quality
-        FROM search_results 
+        FROM search_results
         WHERE mine_name = 'Éléonore'
     ''')
-    
+
     eleonore_result = cursor.fetchone()
-    
+
     if not eleonore_result:
         print("❌ Keine Éléonore Daten gefunden!")
         return
-    
-    mine_name, model_used, structured_data_json, sources_json, country, region, commodity, timestamp, session_id, data_quality = eleonore_result
-    
+
+    mine_name, model_used, structured_data_json, sources_json, country, region, commodity,
+timestamp, session_id, data_quality = eleonore_result
+
     print(f"📊 ÉLÉONORE BASISDATEN:")
     print(f"   Mine: {mine_name}")
     print(f"   Model: {model_used}")
@@ -36,18 +45,18 @@ def analyze_eleonore_success():
     print(f"   Rohstoff: {commodity}")
     print(f"   Session: {session_id}")
     print(f"   Timestamp: {timestamp}")
-    
+
     # Analysiere strukturierte Daten
     if structured_data_json:
         structured_data = json.loads(structured_data_json)
-        
+
         print(f"\n📋 STRUKTURIERTE DATEN ({len(structured_data)} Felder):")
         print("-" * 60)
-        
+
         gefuellte_felder = []
         x_felder = []
         leere_felder = []
-        
+
         for field, value in structured_data.items():
             if not value or not str(value).strip():
                 leere_felder.append(field)
@@ -55,19 +64,19 @@ def analyze_eleonore_success():
                 x_felder.append(field)
             else:
                 gefuellte_felder.append((field, value))
-        
+
         print(f"✅ GEFÜLLTE FELDER ({len(gefuellte_felder)}):")
         for field, value in gefuellte_felder:
             print(f"   • {field}: '{value}'")
-        
+
         print(f"\n❌ X-MARKIERTE FELDER ({len(x_felder)}):")
         for field in x_felder:
             print(f"   • {field}: X (gesucht aber nicht gefunden)")
-        
+
         print(f"\n⚠️  LEERE FELDER ({len(leere_felder)}):")
         for field in leere_felder:
             print(f"   • {field}: (leer - Suchfehler)")
-    
+
     # Analysiere Quellen
     if sources_json:
         try:
@@ -76,28 +85,28 @@ def analyze_eleonore_success():
             print("-" * 60)
             for i, source in enumerate(sources[:10], 1):  # Erste 10 Quellen
                 if isinstance(source, dict):
-                    url = source.get('url', 'Keine URL')
-                    title = source.get('title', 'Kein Titel')
+                    url = source.get("url", 'Keine URL')
+                    title = source.get("title", 'Kein Titel')
                     print(f"   {i}. {title[:50]}...")
                     print(f"      URL: {url}")
                 else:
                     print(f"   {i}. {str(source)[:100]}...")
         except:
             print(f"\n🔗 QUELLEN: {sources_json[:200]}...")
-    
+
     # Vergleiche mit anderen Minen
     print(f"\n📊 VERGLEICH MIT ANDEREN MINEN:")
     print("-" * 60)
-    
+
     cursor.execute('''
         SELECT mine_name, model_used, structured_data
-        FROM search_results 
+        FROM search_results
         WHERE mine_name != 'Éléonore'
         ORDER BY mine_name
     ''')
-    
+
     other_mines = cursor.fetchall()
-    
+
     for other_mine_name, other_model, other_data_json in other_mines:
         if other_data_json:
             other_data = json.loads(other_data_json)
@@ -106,7 +115,7 @@ def analyze_eleonore_success():
             print(f"   {other_mine_name}: {other_filled} gefüllt, {other_x} X-markiert (Model: {other_model})")
         else:
             print(f"   {other_mine_name}: Keine Daten (Model: {other_model})")
-    
+
     conn.close()
 
 if __name__ == "__main__":

@@ -15,18 +15,19 @@ logger = logging.getLogger(__name__)
 class SourceStatsManager:
     """
     FALLBACK-Implementation für Source Statistics Manager
-    
+
     Diese Klasse stellt Basis-Funktionalität für Quellen-Statistiken bereit,
     die von anderen Modulen erwartet wird.
     """
-    
+
     def __init__(self):
+    """__init__ - TODO: Dokumentation hinzufügen"""
         logger.info("[SOURCE-STATS] Fallback Source Stats Manager initialisiert")
-    
+
     async def get_performance_summary(self) -> Dict[str, Any]:
         """
         FALLBACK: Performance-Zusammenfassung für Statistics Overview
-        
+
         Returns:
             Dict mit Standard-Performance-Metriken
         """
@@ -42,14 +43,14 @@ class SourceStatsManager:
             'data_freshness_score': 82.1,    # Aktualitäts-Score der Daten
             'source_diversity_score': 89.3   # Diversität der Quellentypen
         }
-    
+
     async def get_source_performance_metrics(self, source_id: Optional[str] = None) -> Dict[str, Any]:
         """
         FALLBACK: Source-spezifische Performance-Metriken
-        
+
         Args:
             source_id: Optional - spezifische Quellen-ID
-            
+
         Returns:
             Dict mit Source-Performance-Daten
         """
@@ -79,14 +80,14 @@ class SourceStatsManager:
                     {'id': 'outdated_reports', 'score': 52.1}
                 ]
             }
-    
+
     async def analyze_source_reliability(self, days_back: int = 30) -> Dict[str, Any]:
         """
         FALLBACK: Quellen-Zuverlässigkeits-Analyse
-        
+
         Args:
             days_back: Anzahl Tage für Rückblick-Analyse
-            
+
         Returns:
             Dict mit Reliability-Analyse
         """
@@ -95,7 +96,7 @@ class SourceStatsManager:
             'overall_reliability': 91.4,
             'most_reliable_sources': [
                 'Government Mining Databases',
-                'SEDAR Financial Reports', 
+                'SEDAR Financial Reports',
                 'Provincial Regulatory Filings'
             ],
             'reliability_trends': {
@@ -109,14 +110,14 @@ class SourceStatsManager:
                 'Implement additional validation for declining sources'
             ]
         }
-    
+
     async def get_field_coverage_by_source(self, field_name: str) -> Dict[str, Any]:
         """
         FALLBACK: Feld-Coverage nach Quelle
-        
+
         Args:
             field_name: Name des zu analysierenden Feldes
-            
+
         Returns:
             Dict mit Feld-Coverage-Daten
         """
@@ -132,14 +133,14 @@ class SourceStatsManager:
             'Costs': 45.3,
             'Environmental': 38.7
         }
-        
+
         # Finde passende Coverage oder verwende Standard
         field_coverage = 75.0  # Standard-Fallback
         for key, coverage in coverage_mapping.items():
             if key.lower() in field_name.lower():
                 field_coverage = coverage
                 break
-        
+
         return {
             'field_name': field_name,
             'overall_coverage_percent': field_coverage,

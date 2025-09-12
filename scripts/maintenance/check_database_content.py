@@ -12,6 +12,7 @@ from pathlib import Path
 import importlib.util
 
 def _ensure_backend_on_sys_path() -> None:
+    """_ensure_backend_on_sys_path - TODO: Dokumentation hinzufügen"""
     # Bevor wir sys.path verändern, prüfen wir, ob das Paket bereits installiert/auffindbar ist
     if importlib.util.find_spec('minesearch') is not None:
         return
@@ -58,7 +59,7 @@ with db_manager.get_session() as session:
     # 1. Prüfe search_results Tabelle mit korrekten Spalten
     print('\n📊 SEARCH_RESULTS TABELLE:')
     result = session.execute(text('''
-        SELECT 
+        SELECT
             id,
             mine_name,
             model_used,
@@ -66,27 +67,27 @@ with db_manager.get_session() as session:
             structured_data,
             success,
             search_timestamp
-        FROM search_results 
-        ORDER BY search_timestamp DESC 
+        FROM search_results
+        ORDER BY search_timestamp DESC
         LIMIT 3
     '''))
-    
+
     for row in result:
         print(f'\n🔍 ID: {row[0]} | Mine: {row[1]}')
         print(f'📱 Model: {row[2]}')
         print(f'⏱️ Duration: {row[3]}ms')
         print(f'✅ Success: {row[5]}')
-        
+
         # Parse structured_data
         if row[4]:
             try:
-                data = json.loads(row[4]) if isinstance(row[4], str) else row[4]
+                data_dict = json.loads(row[4]) if isinstance(row[4], str) else row[4]
                 if isinstance(data, dict):
                     na_values = ['N/A', '', None, 'null']
                     filled_fields = len([v for v in data.values() if v and str(v) not in na_values])
                     total_fields = len(data)
                     print(f'📊 Structured Data: {filled_fields}/{total_fields} Felder gefüllt')
-                    
+
                     # Zeige alle Felder mit Werten
                     filled = [(k,v) for k,v in data.items() if v and str(v) not in na_values]
                     print(f'🎯 Gefüllte Felder ({len(filled)}):')
@@ -104,11 +105,11 @@ with db_manager.get_session() as session:
                 print(f'❌ Structured Data: Parse-Fehler - {e}')
         else:
             print(f'📊 Structured Data: NULL/Leer')
-    
+
     # 2. Prüfe model_statistics_comprehensive Tabelle
     print('\n\n📊 MODEL_STATISTICS_COMPREHENSIVE TABELLE:')
     result = session.execute(text('''
-        SELECT 
+        SELECT
             model_id,
             total_searches,
             successful_searches,
@@ -120,7 +121,7 @@ with db_manager.get_session() as session:
         WHERE model_id LIKE '%glm-4.5-air%'
         LIMIT 3
     '''))
-    
+
     for row in result:
         print(f'\n📱 Model: {row[0]}')
         print(f'🔍 Total Searches: {row[1]} | Successful: {row[2]}')
@@ -128,11 +129,11 @@ with db_manager.get_session() as session:
         print(f'🎯 Completeness Score: {row[4]}')
         print(f'🔄 Consistency Score: {row[5]}')
         print(f'🏆 Overall Score: {row[6]}')
-    
+
     # 3. Prüfe ob Aggregation funktioniert
     print('\n\n📊 AGGREGATION CHECK:')
     result = session.execute(text('''
-        SELECT 
+        SELECT
             model_used,
             COUNT(*) as count,
             AVG(search_duration) as avg_duration
@@ -140,7 +141,7 @@ with db_manager.get_session() as session:
         WHERE model_used LIKE '%glm-4.5-air%'
         GROUP BY model_used
     '''))
-    
+
     for row in result:
         print(f'\n📱 Model: {row[0]}')
         print(f'🔍 Count: {row[1]}')

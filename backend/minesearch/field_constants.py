@@ -4,6 +4,9 @@ Zentraler Ort für Feld-bezogene Konstanten.
 Hinweis: Diese Konstanten werden u. a. genutzt, um die Tabelle
 `prohibited_field_patterns` in SQLite zu befüllen und Trigger-Checks
 gegen Feldnamen-als-Werte durchzuführen.
+
+Author: MineSearch Development Team
+Date: 2025-01-11
 """
 
 from typing import List

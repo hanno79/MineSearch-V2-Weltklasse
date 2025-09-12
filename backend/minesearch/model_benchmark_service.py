@@ -11,9 +11,11 @@ router = APIRouter()
 class ModelBenchmarkService:
     """Dummy benchmark service class"""
     def __init__(self):
+    """__init__ - TODO: Dokumentation hinzufügen"""
         pass
-    
+
     def get_status(self):
+    """get_status - TODO: Dokumentation hinzufügen"""
         return {"status": "disabled"}
 
 @router.get("/benchmark/status")

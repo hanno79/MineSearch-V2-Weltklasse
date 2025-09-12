@@ -26,7 +26,7 @@ except ImportError:
 def safe_write_to_file(filepath: str, content: str, mode: str = 'a'):
     """
     Thread-safe, cross-platform file writing with locking
-    
+
     Args:
         filepath: Path to the file
         content: Content to write
@@ -95,7 +95,7 @@ def safe_write_to_file(filepath: str, content: str, mode: str = 'a'):
                 return
             except Exception as e:
                 logger.warning(f"filelock file locking failed, falling back: {e}")
-    
+
         # Final fallback: Use in-process thread lock (not multi-process safe)
         with file_write_lock:
             with open(filepath, mode, encoding='utf-8') as f:
@@ -103,7 +103,7 @@ def safe_write_to_file(filepath: str, content: str, mode: str = 'a'):
                 f.flush()
                 if hasattr(os, 'fsync'):
                     os.fsync(f.fileno())
-    
+
     except Exception as e:
         logger.error(f"All file writing methods failed for {filepath}: {e}")
         # Last resort: log content instead of writing to file
@@ -116,7 +116,7 @@ def create_batch_debug_logger():
     Uses the application's thread-safe logging infrastructure
     """
     debug_logger = logging.getLogger(f"{__name__}.batch_debug")
-    
+
     # Only add handler if not already configured
     if not debug_logger.handlers:
         try:
@@ -138,7 +138,7 @@ def create_batch_debug_logger():
             debug_logger.addHandler(handler)
             debug_logger.setLevel(logging.INFO)
             debug_logger.propagate = False
-    
+
     return debug_logger
 
 # Initialize the batch debug logger with error handling
@@ -154,38 +154,38 @@ def count_filled_fields(structured_data):
     """Zählt echte (nicht-leere) Felder in structured_data"""
     if not structured_data:
         return 0
-    return len([v for v in structured_data.values() 
+    return len([v for v in structured_data.values()
                 if v and str(v).strip() and str(v).strip() not in ['', 'None', 'null', 'nichts gefunden']])
 
 def is_weak_result(result_data):
     """
     Prüft ob ein Suchergebnis Enhancement benötigt
-    
+
     Returns True wenn:
     - Weniger als 8 echte Felder gefüllt sind
     - 3 oder mehr kritische Felder fehlen
     """
-    if not result_data or not result_data.get('success', False):
+    if not result_data or not result_data.get("success", False):
         return True
-        
-    data = result_data.get('data', {})
-    structured_data = data.get('structured_data', {})
-    
+
+    data = result_data.get("data", {})
+    structured_data = data.get("structured_data", {})
+
     # Zähle gefüllte Felder
     filled_fields = count_filled_fields(structured_data)
-    
+
     # Definiere kritische Felder
     critical_fields = [
-        'Restaurationskosten', 
-        'Jahr der Aufnahme der Kosten', 
-        'Jahr der Erstellung des Dokumentes', 
-        'Fläche der Mine in qkm', 
+        'Restaurationskosten',
+        'Jahr der Aufnahme der Kosten',
+        'Jahr der Erstellung des Dokumentes',
+        'Fläche der Mine in qkm',
         'Fördermenge/Jahr'
     ]
-    
+
     # Zähle fehlende kritische Felder
-    missing_critical = [f for f in critical_fields 
-                       if f not in structured_data or not structured_data[f] 
+    missing_critical = [f for f in critical_fields
+                       if f not in structured_data or not structured_data[f]
                        or str(structured_data[f]).strip() in ['', 'None', 'null', 'nichts gefunden']]
-    
+
     return filled_fields < 8 or len(missing_critical) >= 3

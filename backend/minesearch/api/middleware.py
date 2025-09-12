@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 
 def setup_middleware(app: FastAPI):
     """Konfiguriert alle Middleware für die FastAPI App"""
-    
+
     # CORS konfigurieren - Frontend-Ports hinzufügen
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            "http://localhost:3000", 
+            "http://localhost:3000",
             "http://127.0.0.1:3000",
             "http://localhost:8080",  # Frontend-Port hinzugefügt
             "http://127.0.0.1:8080",  # Frontend-Port hinzugefügt
@@ -29,5 +29,5 @@ def setup_middleware(app: FastAPI):
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     logger.info("Middleware erfolgreich konfiguriert")

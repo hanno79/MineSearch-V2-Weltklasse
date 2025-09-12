@@ -15,8 +15,9 @@ logger = logging.getLogger(__name__)
 
 class ModelTierStrategy:
     """Implementiert kaskadierende Modell-Auswahl basierend auf Performance"""
-    
+
     def __init__(self):
+    """__init__ - TODO: Dokumentation hinzufügen"""
         # ÄNDERUNG 14.07.2025: Kostenlose Modelle als Tier 1 priorisieren - Kimi K2 als primäres Fallback
         self.tier_definitions = {
             'tier_1_free_primary': {
@@ -84,7 +85,7 @@ class ModelTierStrategy:
                 'cost_warning': True  # Warnung bei Verwendung
             }
         }
-        
+
         # Performance-Tracking
         self.model_performance = defaultdict(lambda: {
             'success_rate': 0.0,
@@ -93,7 +94,7 @@ class ModelTierStrategy:
             'calls': 0,
             'failures': 0
         })
-        
+
         # Kritische Felder für verschiedene Fokus-Bereiche
         self.critical_fields = {
             'financial': ['Restaurationskosten', 'Marktkapitalisierung', 'Jahresumsatz', 'EBITDA'],
@@ -101,15 +102,15 @@ class ModelTierStrategy:
             'operational': ['Eigentümer', 'Betreiber', 'Status', 'Produktionsstart'],
             'production': ['Fördermenge', 'Rohstoffe', 'Produktionsende', 'Reserven']
         }
-    
+
     def get_models_for_phase(self, phase: str, current_results: Dict[str, Any] = None) -> List[str]:
         """
         Wählt Modelle basierend auf aktueller Phase und bisherigen Ergebnissen
-        
+
         Args:
             phase: 'source_discovery', 'initial_extraction', 'deep_extraction', 'fallback'
             current_results: Bisherige Ergebnisse für adaptive Auswahl
-            
+
         Returns:
             Liste von Modell-IDs für diese Phase
         """
@@ -119,122 +120,124 @@ class ModelTierStrategy:
             for tier in self.tier_definitions.values():
                 all_models.extend(tier['models'])
             return list(set(all_models))  # Dedupliziert
-        
+
         elif phase == 'initial_extraction':
             # Phase 2: Top-Performer für erste Extraktion
             models = []
             models.extend(self.tier_definitions['tier_1_financial']['models'])
             models.extend(self.tier_definitions['tier_1_technical']['models'])
             return models
-        
+
         elif phase == 'deep_extraction':
             # Phase 3: Umfassende Modelle für fehlende Daten
             missing_fields = self._identify_missing_fields(current_results)
             return self._select_models_for_missing_fields(missing_fields)
-        
+
         elif phase == 'fallback':
             # Phase 4: Alle verbleibenden Modelle
             return self.tier_definitions['tier_3_fallback']['models']
-        
+
         else:
             logger.warning(f"Unbekannte Phase: {phase}")
             return []
-    
+
     def is_premium_model(self, model_id: str) -> bool:
         """
         Prüft ob ein Modell kostenpflichtig ist
-        
+
         Args:
             model_id: Modell-ID (z.B. 'perplexity:sonar-pro')
-            
+
         Returns:
             True wenn kostenpflichtig, False wenn kostenlos
         """
         # ÄNDERUNG 14.07.2025: Kostenkontrolle für Premium-Modelle
         for tier_name, tier_config in self.tier_definitions.items():
             if model_id in tier_config['models']:
-                return tier_config.get('cost_warning', False)
+                return tier_config.get("cost_warning", False)
         return False
-    
+
     def get_cost_warning_message(self, model_id: str) -> str:
         """
         Erstellt Warnung für kostenpflichtige Modelle
-        
+
         Args:
             model_id: Modell-ID
-            
+
         Returns:
             Warnung-String
         """
         if self.is_premium_model(model_id):
-            return f"⚠️ KOSTENPFLICHTIG: {model_id} verursacht Kosten! Verwende openrouter:kimi-k2 für kostenlose Alternative."
+            return f"⚠️ KOSTENPFLICHTIG: {model_id} verursacht Kosten! Verwende openrouter:kimi-k2
+für kostenlose Alternative."
         return ""
-    
-    def should_continue_to_next_tier(self, current_results: Dict[str, Any], 
+
+    def should_continue_to_next_tier(self, current_results: Dict[str, Any],
+    """should_continue_to_next_tier - TODO: Dokumentation hinzufügen"""
                                    current_tier: str) -> bool:
         """
         Entscheidet ob die nächste Tier aktiviert werden soll
-        
+
         Args:
             current_results: Aktuelle Ergebnisse
             current_tier: Aktuelle Tier
-            
+
         Returns:
             True wenn nächste Tier aktiviert werden soll
         """
         if not current_results or 'data' not in current_results:
             return True
-        
-        data = current_results.get('data', {})
-        
+
+        data_dict = current_results.get("data", {})
+
         # Berechne Abdeckung für kritische Felder
         coverage = self._calculate_critical_field_coverage(data)
-        
+
         # Hole Threshold für aktuelle Tier
         tier_config = self.tier_definitions.get(current_tier, {})
-        threshold = tier_config.get('threshold', 0.7)
-        
+        threshold = tier_config.get("threshold", 0.7)
+
         # Entscheide basierend auf Coverage
         should_continue = coverage < threshold
-        
+
         logger.info(f"[TIER-STRATEGY] Coverage: {coverage:.2f}, Threshold: {threshold}, "
                    f"Continue: {should_continue}")
-        
+
         return should_continue
-    
+
     def update_model_performance(self, model_id: str, result: Dict[str, Any]):
         """Aktualisiert Performance-Metriken für ein Modell"""
         perf = self.model_performance[model_id]
         perf['calls'] += 1
-        
+
         if result.get('success'):
-            data = result.get('data', {})
-            sources = result.get('sources', [])
-            
+            data_dict = result.get("data", {})
+            sources = result.get("sources", [])
+
             # Zähle gefüllte Felder
             filled_fields = len([v for v in data.values() if v and str(v).strip()])
-            
+
             # Update Durchschnittswerte
             perf['avg_fields_found'] = (
-                (perf['avg_fields_found'] * (perf['calls'] - 1) + filled_fields) / 
+                (perf['avg_fields_found'] * (perf['calls'] - 1) + filled_fields) /
                 perf['calls']
             )
             perf['avg_sources_found'] = (
-                (perf['avg_sources_found'] * (perf['calls'] - 1) + len(sources)) / 
+                (perf['avg_sources_found'] * (perf['calls'] - 1) + len(sources)) /
                 perf['calls']
             )
             perf['success_rate'] = (perf['calls'] - perf['failures']) / perf['calls']
         else:
             perf['failures'] += 1
             perf['success_rate'] = (perf['calls'] - perf['failures']) / perf['calls']
-    
+
     def get_specialized_models_for_field(self, field_name: str) -> List[str]:
         """
         Gibt spezialisierte Modelle für ein bestimmtes Feld zurück
-        
+
         Args:
             field_name: Name des gesuchten Felds
-            
+
         Returns:
             Liste von Modell-IDs die für dieses Feld gut performen
         """
@@ -271,10 +274,10 @@ class ModelTierStrategy:
                 'perplexity:sonar-pro'
             ]
         }
-        
-        return field_specializations.get(field_name, 
+
+        return field_specializations.get(field_name,
                                        self.tier_definitions['tier_2_comprehensive']['models'])
-    
+
     def _identify_missing_fields(self, results: Dict[str, Any]) -> Set[str]:
         """Identifiziert fehlende kritische Felder"""
         if not results or 'data' not in results:
@@ -283,54 +286,54 @@ class ModelTierStrategy:
             for fields in self.critical_fields.values():
                 all_critical.update(fields)
             return all_critical
-        
-        data = results.get('data', {})
+
+        data_dict = results.get("data", {})
         missing = set()
-        
+
         for category, fields in self.critical_fields.items():
             for field in fields:
                 if not data.get(field) or not str(data[field]).strip():
                     missing.add(field)
-        
+
         return missing
-    
+
     def _select_models_for_missing_fields(self, missing_fields: Set[str]) -> List[str]:
         """Wählt optimale Modelle für fehlende Felder"""
         selected_models = set()
-        
+
         # Für jedes fehlende Feld, füge spezialisierte Modelle hinzu
         for field in missing_fields:
             specialized = self.get_specialized_models_for_field(field)
             selected_models.update(specialized[:3])  # Top 3 pro Feld
-        
+
         # Füge einige allgemeine Modelle hinzu
         selected_models.update(self.tier_definitions['tier_2_comprehensive']['models'][:2])
-        
+
         return list(selected_models)
-    
+
     def _calculate_critical_field_coverage(self, data: Dict[str, Any]) -> float:
         """Berechnet Abdeckung kritischer Felder (0.0 - 1.0)"""
         if not data:
             return 0.0
-        
+
         total_critical = 0
         filled_critical = 0
-        
+
         for fields in self.critical_fields.values():
             for field in fields:
                 total_critical += 1
                 if data.get(field) and str(data[field]).strip():
                     filled_critical += 1
-        
+
         return filled_critical / total_critical if total_critical > 0 else 0.0
-    
+
     def get_tier_summary(self) -> Dict[str, Any]:
         """Gibt Zusammenfassung der Tier-Performance zurück"""
         summary = {}
-        
+
         for tier_name, tier_config in self.tier_definitions.items():
             tier_performance = []
-            
+
             for model_id in tier_config['models']:
                 if model_id in self.model_performance:
                     perf = self.model_performance[model_id]
@@ -342,14 +345,14 @@ class ModelTierStrategy:
                             'avg_sources': round(perf['avg_sources_found'], 1),
                             'calls': perf['calls']
                         })
-            
+
             # Sortiere nach Erfolgsrate
             tier_performance.sort(key=lambda x: x['success_rate'], reverse=True)
-            
+
             summary[tier_name] = {
                 'focus': tier_config['focus'],
                 'threshold': tier_config['threshold'],
                 'models': tier_performance
             }
-        
+
         return summary

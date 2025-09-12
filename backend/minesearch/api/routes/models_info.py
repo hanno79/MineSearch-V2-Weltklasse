@@ -50,7 +50,7 @@ async def get_model_info(model_id: str):
                 "success": False,
                 "error": f"Modell {model_id} nicht gefunden"
             }
-        
+
         return {
             "success": True,
             "model": {

@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 def normalize_accents(text: str) -> str:
     """
     Normalisiere französische und andere Akzente für bessere Suche
-    
+
     Args:
         text: Text mit möglichen Akzenten
-        
+
     Returns:
         Text ohne Akzente
     """
@@ -32,36 +32,36 @@ def normalize_accents(text: str) -> str:
         'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u', 'ū': 'u', 'ů': 'u', 'ű': 'u', 'ŭ': 'u',
         'ç': 'c', 'ć': 'c', 'č': 'c', 'ĉ': 'c', 'ċ': 'c'
     }
-    
+
     result = text
     for accented, normalized in accent_map.items():
         result = result.replace(accented, normalized)
         result = result.replace(accented.upper(), normalized.upper())
-    
+
     return result
 
 
 def get_country_config(country: str) -> Dict:
     """
     Hole länderspezifische Konfiguration
-    
+
     Args:
         country: Landname
-        
+
     Returns:
         Länderkonfiguration oder Standard-Fallback
     """
     if not country:
         return {}
-    
+
     country_lower = country.lower()
-    
+
     # Suche passende Konfiguration
     for country_key, config_data in COUNTRY_CONFIG.items():
         if country_key.lower() in country_lower or country_lower in country_key.lower():
             logger.debug(f"[COUNTRY CONFIG] Gefunden für '{country}': {country_key}")
             return config_data
-    
+
     # Standard-Fallback
     logger.debug(f"[COUNTRY CONFIG] Kein Match für '{country}', verwende Standard")
     return {'languages': ['en'], 'currency': 'USD'}
@@ -70,53 +70,53 @@ def get_country_config(country: str) -> Dict:
 def generate_multilingual_search_terms(country_config: Dict[str, Any]) -> Dict[str, List[str]]:
     """
     ÄNDERUNG 04.07.2025: Generiere mehrsprachige Suchbegriffe aus country_config
-    
+
     Args:
         country_config: Länderspezifische Konfiguration
-        
+
     Returns:
         Dict mit Kategorien und mehrsprachigen Begriffen
     """
     if not country_config or not isinstance(country_config, dict):
         return {}
-    
+
     # Hole Mining-Begriffe für das Land
-    mining_terms = country_config.get('mining_terms', {})
-    
+    mining_terms = country_config.get("mining_terms", {})
+
     return mining_terms
 
 
 def generate_name_variants(mine_name: str) -> List[str]:
     """
     Generiere erweiterte Suchvarianten für Minennamen
-    
+
     Args:
         mine_name: Originalname der Mine
-        
+
     Returns:
         Liste von Namensvarianten
     """
     variants = set()
-    
+
     # Original Name
     variants.add(mine_name)
-    
+
     # ÄNDERUNG 07.07.2025: Erweiterte Akzent-Behandlung
     # Generiere BEIDE Versionen: mit und ohne Akzente
     normalized = normalize_accents(mine_name)
     if normalized != mine_name:
         variants.add(normalized)
-        
+
         # Füge auch Versionen mit alternativen Akzenten hinzu
         # z.B. Quebec → Québec, Montreal → Montréal
         accent_alternatives = generate_accent_alternatives(mine_name)
         variants.update(accent_alternatives)
-    
+
     # Erweiterte Präfix/Suffix-Varianten
-    mine_prefixes = ['Mine', 'mine', 'Project', 'project', 'Property', 'property', 
+    mine_prefixes = ['Mine', 'mine', 'Project', 'project', 'Property', 'property',
                      'Deposit', 'deposit', 'Operation', 'operation', 'Site', 'site',
                      'Mina', 'mina', 'Proyecto', 'proyecto']  # Spanisch hinzugefügt
-    
+
     # Prüfe ob Name bereits ein Präfix hat
     has_prefix = False
     for prefix in mine_prefixes:
@@ -128,17 +128,17 @@ def generate_name_variants(mine_name: str) -> List[str]:
             variants.add(without_prefix.capitalize())
             variants.add(without_prefix.upper())
             variants.add(without_prefix.lower())
-            
+
             # Füge auch Akzent-Varianten des Namens ohne Präfix hinzu
             variants.update(generate_accent_alternatives(without_prefix))
             break
-    
+
     # Füge verschiedene Präfixe hinzu wenn noch keines vorhanden
     if not has_prefix:
         for prefix in ['Mine', 'Project', 'Property', 'Mina', 'Proyecto']:
             variants.add(f"{prefix} {mine_name}")
             variants.add(f"{prefix.lower()} {mine_name.lower()}")
-    
+
     # Phonetische Ähnlichkeiten
     phonetic_replacements = [
         ('ck', 'k'), ('k', 'ck'),
@@ -148,7 +148,7 @@ def generate_name_variants(mine_name: str) -> List[str]:
         ('c', 'k'), ('c', 's'),
         ('x', 'ks'), ('ks', 'x')
     ]
-    
+
     current_variants = list(variants)
     for variant in current_variants:
         for old, new in phonetic_replacements:
@@ -156,7 +156,7 @@ def generate_name_variants(mine_name: str) -> List[str]:
                 new_variant = variant.lower().replace(old, new)
                 variants.add(new_variant)
                 variants.add(new_variant.capitalize())
-    
+
     # Variante ohne Bindestriche und mit Bindestrichen
     if '-' in mine_name:
         variants.add(mine_name.replace('-', ' '))
@@ -166,47 +166,47 @@ def generate_name_variants(mine_name: str) -> List[str]:
         words = mine_name.split()
         if len(words) > 1:
             variants.add('-'.join(words))
-    
+
     # Entferne Klammern und deren Inhalt (z.B. "Mine Name (Gold)")
     if "(" in mine_name and ")" in mine_name:
         without_brackets = re.sub(r'\s*\([^)]*\)', '', mine_name).strip()
         variants.add(without_brackets)
         variants.add(normalize_accents(without_brackets))
         variants.update(generate_accent_alternatives(without_brackets))
-        
+
         # Füge auch Varianten mit dem Inhalt der Klammern hinzu
         bracket_content = re.search(r'\(([^)]+)\)', mine_name)
         if bracket_content:
             commodity = bracket_content.group(1)
             variants.add(f"{without_brackets} {commodity}")
             variants.add(f"{commodity} {without_brackets}")
-    
+
     # Gross-/Kleinschreibungsvarianten
     for variant in list(variants):
         variants.add(variant.upper())
         variants.add(variant.lower())
         variants.add(variant.title())
-    
+
     # Entferne leere Strings und Duplikate
     variants = {v.strip() for v in variants if v.strip()}
-    
+
     logger.debug(f"[NAME VARIANTS] {mine_name} → {len(variants)} Varianten generiert")
-    
+
     return list(variants)
 
 
 def generate_accent_alternatives(text: str) -> List[str]:
     """
     NEUE FUNKTION: Generiere alternative Schreibweisen mit Akzenten
-    
+
     Args:
         text: Text für den Akzent-Alternativen generiert werden sollen
-        
+
     Returns:
         Liste von Textvarianten mit alternativen Akzenten
     """
     alternatives = set()
-    
+
     # Häufige Akzent-Alternativen (ohne Akzent → mit Akzent)
     accent_additions = {
         'Quebec': 'Québec',
@@ -225,7 +225,7 @@ def generate_accent_alternatives(text: str) -> List[str]:
         'Stephane': 'Stéphane',
         'Therese': 'Thérèse'
     }
-    
+
     # Prüfe ob eines der Wörter im Text vorkommt
     for word_without, word_with in accent_additions.items():
         # Prüfe ob das Wort ohne Akzent im Text vorkommt
@@ -237,19 +237,19 @@ def generate_accent_alternatives(text: str) -> List[str]:
                 alternatives.add(alternative)
             # Füge auch die exakte Akzent-Version hinzu
             alternatives.add(word_with)
-        
+
         # Prüfe auch umgekehrt (mit Akzent → ohne)
         if word_with.lower() in text.lower():
             pattern = re.compile(re.escape(word_with), re.IGNORECASE)
             alternative = pattern.sub(word_without, text)
             if alternative != text:
                 alternatives.add(alternative)
-    
+
     # Generische Akzent-Muster
     # e → é am Wortende (französisch)
     if text.endswith('e'):
         alternatives.add(text[:-1] + 'é')
-    
+
     # a → á (spanisch/portugiesisch)
     if 'a' in text.lower():
         for match in re.finditer(r'a', text, re.IGNORECASE):
@@ -258,45 +258,45 @@ def generate_accent_alternatives(text: str) -> List[str]:
             # Nur erste paar Varianten, sonst zu viele
             if len(alternatives) > 5:
                 break
-    
+
     return list(alternatives)
 
 
 def clean_extracted_value(value: str) -> str:
     """
     Bereinige extrahierte Werte von Markup und Quellen-Referenzen
-    
+
     Args:
         value: Zu bereinigender Wert
-        
+
     Returns:
         Bereinigter Wert
     """
     if not value:
         return value
-    
+
     # ÄNDERUNG 30.06.2025: Try-catch für Bereinigung (Regel 13)
     try:
         # Entferne ** Markierungen
         value = value.replace('**', '').strip()
-        
+
         # Entferne [Quelle: ...] Referenzen
         value = re.sub(r'\[Quelle:[^\]]+\]', '', value).strip()
-        
+
         # Entferne inline Quellen-Nummern wie [1], [2][3] etc.
         value = re.sub(r'\[\d+\](?:\[\d+\])*', '', value).strip()
-        
+
         # Entferne einzelne eckige Klammern und andere Reste
         value = re.sub(r'[\[\]]', '', value).strip()
-        
+
         # Entferne führende/nachfolgende Sonderzeichen
         value = value.strip(' -.,;:')
-        
+
         # Entferne mehrfache Leerzeichen
         value = ' '.join(value.split())
-        
+
         return value
-        
+
     except Exception as e:
         logger.error(f"[CLEAN ERROR] Fehler beim Bereinigen von '{value[:50]}...': {str(e)}")
         return value
@@ -309,10 +309,10 @@ def clean_extracted_value(value: str) -> str:
 def validate_url(url: str) -> bool:
     """
     Validiere eine URL
-    
+
     Args:
         url: Zu validierende URL
-        
+
     Returns:
         True wenn gültig, False sonst
     """
@@ -323,69 +323,69 @@ def validate_url(url: str) -> bool:
         r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...oder IP
         r'(?::\d+)?'  # optional port
         r'(?:/?|[/?]\S+)$', re.IGNORECASE)
-    
+
     return bool(url_pattern.match(url))
 
 
 def extract_year_from_text(text: str) -> Optional[str]:
     """
     Extrahiere ein valides Jahr (1900-2030) aus Text
-    
+
     Args:
         text: Text mit möglichem Jahr
-        
+
     Returns:
         Jahr als String oder None
     """
     # Suche nach 4-stelligen Zahlen zwischen 1900 und 2030
     years = re.findall(r'\b(19\d{2}|20[0-3]\d)\b', text)
-    
+
     if years:
         # Nimm das aktuellste Jahr
         return max(years)
-    
+
     return None
 
 
 def format_currency(amount: float, currency: str = "USD", is_planned: bool = False) -> str:
     """
     Formatiere Währungsbeträge
-    
+
     Args:
         amount: Betrag
         currency: Währungscode
         is_planned: Ob es geplante Kosten sind
-        
+
     Returns:
         Formatierter Währungsstring
     """
     formatted = f"${amount:,.0f} {currency}"
-    
+
     if is_planned:
         formatted += " (geplant)"
-    
+
     return formatted
 
 
 def is_valid_coordinate(lat: Any, lon: Any) -> bool:
     """
     Prüfe ob Koordinaten gültig sind
-    
+
     Args:
         lat: Latitude
         lon: Longitude
-        
+
     Returns:
         True wenn gültige Koordinaten
     """
     try:
         lat_val = float(lat)
         lon_val = float(lon)
-        
+
         # Latitude: -90 bis 90
         # Longitude: -180 bis 180
         return -90 <= lat_val <= 90 and -180 <= lon_val <= 180
-        
+
     except (TypeError, ValueError):
         return False
 
@@ -393,49 +393,49 @@ def is_valid_coordinate(lat: Any, lon: Any) -> bool:
 def sanitize_filename(filename: str) -> str:
     """
     Bereinige Dateinamen für sichere Verwendung
-    
+
     Args:
         filename: Ursprünglicher Dateiname
-        
+
     Returns:
         Bereinigter Dateiname
     """
     # Entferne ungültige Zeichen
     filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
-    
+
     # Entferne führende/nachfolgende Punkte und Leerzeichen
     filename = filename.strip('. ')
-    
+
     # Begrenze Länge
     if len(filename) > 200:
         filename = filename[:200]
-    
+
     return filename
 
 
 def normalize_mine_name_for_grouping(mine_name: str) -> str:
     """
     Normalisiere Minennamen für Duplikat-Erkennung und Gruppierung
-    
+
     Diese Funktion erweitert normalize_accents() um Suffix-Behandlung,
     damit "Eleonore" und "Eleonore Mine" als dieselbe Mine erkannt werden.
-    
+
     Args:
         mine_name: Originalname der Mine
-        
+
     Returns:
         Normalisierter Name für Gruppierung (lowercase)
     """
     if not mine_name:
         return ""
-    
+
     # Schritt 1: Entferne Akzente
     normalized = normalize_accents(mine_name.strip())
-    
+
     # Schritt 2: Entferne gängige Mine-Suffixe (Case-insensitive)
     suffixes = [
         ' Mine', ' mine', ' MINE',
-        ' Project', ' project', ' PROJECT', 
+        ' Project', ' project', ' PROJECT',
         ' Property', ' property', ' PROPERTY',
         ' Deposit', ' deposit', ' DEPOSIT',
         ' Operation', ' operation', ' OPERATION',
@@ -443,12 +443,12 @@ def normalize_mine_name_for_grouping(mine_name: str) -> str:
         ' Mina', ' mina', ' MINA',  # Spanisch
         ' Proyecto', ' proyecto', ' PROYECTO'  # Spanisch
     ]
-    
+
     for suffix in suffixes:
         if normalized.endswith(suffix):
             normalized = normalized[:-len(suffix)].strip()
             break
-    
+
     # Schritt 3: Entferne auch Präfixe falls vorhanden
     prefixes = [
         'Mine ', 'mine ', 'MINE ',
@@ -457,14 +457,15 @@ def normalize_mine_name_for_grouping(mine_name: str) -> str:
         'Mina ', 'mina ', 'MINA ',
         'Proyecto ', 'proyecto ', 'PROYECTO '
     ]
-    
+
     for prefix in prefixes:
         if normalized.startswith(prefix):
             normalized = normalized[len(prefix):].strip()
             break
-    
+
     # Schritt 4: Lowercase für konsistente Gruppierung
     return normalized.lower()
 
 
-# ÄNDERUNG 01.07.2025: Duplizierte Funktionen entfernt - diese existieren bereits in source_discovery.py und data_extraction.py  # Entferne Duplikate und sortiere
+# ÄNDERUNG 01.07.2025: Duplizierte Funktionen entfernt - diese existieren bereits in
+source_discovery.py und data_extraction.py  # Entferne Duplikate und sortiere

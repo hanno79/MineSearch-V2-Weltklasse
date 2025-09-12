@@ -15,7 +15,7 @@ from typing import Optional
 def get_normalized_db_path() -> str:
     """
     Hole den normalisierten DB-Pfad für Root-Level-Scripts
-    
+
     Returns:
         Absoluter Pfad zur normalisierten Hauptdatenbank
     """
@@ -25,19 +25,19 @@ def get_normalized_db_path() -> str:
 def get_sqlite_connection(database_url: Optional[str] = None) -> sqlite3.Connection:
     """
     Erstelle SQLite-Verbindung mit korrekten Einstellungen für Root-Level-Scripts
-    
+
     Returns:
         SQLite-Connection mit Foreign Keys aktiviert
     """
     db_path = get_normalized_db_path()
     conn = sqlite3.connect(db_path)
-    
+
     # Aktiviere Foreign Key Constraints
     conn.execute("PRAGMA foreign_keys=ON")
-    
+
     # Row Factory für dict-ähnlichen Zugriff
     conn.row_factory = sqlite3.Row
-    
+
     return conn
 
 # Legacy-Kompatibilität

@@ -17,31 +17,27 @@ from sqlalchemy import text
 
 def test_transaction_debug():
     """Testet Transaktionen und Commits sehr detailliert"""
-    
-    print("🔍 [TRANSACTION-DEBUG] Detailliertes Transaktions-Debugging...")
-    
+
+
     db_manager = NormalizedDatabaseManager()
-    
+
     # Test-Daten
     test_data = {
         'Country': 'Transaction-Test-Land',
         'Region': 'Transaction-Test-Region'
     }
-    
+
     try:
         # 1. Teste mit eigener Session (wie im ELSE-Zweig)
-        print("\n📊 [TRANSACTION-DEBUG] Teste mit eigener Session...")
-        
+
         with db_manager.get_session() as session:
-            print("✅ [TRANSACTION-DEBUG] Session erstellt")
-            
+
             # Manueller INSERT wie in der save_mine_field_data Funktion
             for field_name, field_value in test_data.items():
                 if not field_value:
                     continue
-                    
-                print(f"📝 [TRANSACTION-DEBUG] Füge ein: {field_name} = {field_value}")
-                
+
+
                 session.execute(text("""
                     INSERT INTO mine_data_fields (
                         search_result_id, mine_id, field_name, raw_value, normalized_value,
@@ -66,50 +62,43 @@ def test_transaction_debug():
                     'source_name': 'transaction-test',
                     'model_used': 'transaction-test-model'
                 })
-                
-            print("💾 [TRANSACTION-DEBUG] Daten eingefügt, vor Commit...")
-            
+
+
             # Prüfe in derselben Session
             result = session.execute(text("""
                 SELECT COUNT(*) FROM mine_data_fields WHERE model_used = 'transaction-test-model'
             """))
             count_before_commit = result.fetchone()[0]
-            print(f"📊 [TRANSACTION-DEBUG] Vor Commit in derselben Session: {count_before_commit} Einträge")
-            
+
             # Commit
             session.commit()
-            print("✅ [TRANSACTION-DEBUG] Session committed")
-            
+
             # Prüfe nach Commit in derselben Session
             result = session.execute(text("""
                 SELECT COUNT(*) FROM mine_data_fields WHERE model_used = 'transaction-test-model'
             """))
             count_after_commit = result.fetchone()[0]
-            print(f"📊 [TRANSACTION-DEBUG] Nach Commit in derselben Session: {count_after_commit} Einträge")
-        
+
         # 2. Prüfe mit neuer Session (wie wenn man von außen schaut)
-        print("\n🔍 [TRANSACTION-DEBUG] Prüfe mit neuer Session...")
-        
+
         import sqlite3
         conn = sqlite3.connect(get_normalized_db_path())
         cursor = conn.cursor()
-        
+
         cursor.execute('SELECT COUNT(*) FROM mine_data_fields WHERE model_used = ?', ('transaction-test-model',))
         count_external = cursor.fetchone()[0]
-        print(f"📊 [TRANSACTION-DEBUG] Von externer SQLite Verbindung: {count_external} Einträge")
-        
+
         if count_external > 0:
-            cursor.execute('SELECT field_name, raw_value FROM mine_data_fields WHERE model_used = ?', ('transaction-test-model',))
-            print("📋 [TRANSACTION-DEBUG] Gefundene Einträge:")
+            cursor.execute('SELECT field_name, raw_value FROM mine_data_fields WHERE model_used =
+?', ('transaction-test-model',))
             for row in cursor.fetchall():
                 print(f"  - {row[0]}: '{row[1]}'")
-        
+
         conn.close()
-        
+
         return count_external > 0
-        
+
     except Exception as e:
-        print(f"❌ [TRANSACTION-DEBUG] Fehler: {e}")
         import traceback
 from minesearch.database.db_utils import get_normalized_db_path, get_sqlite_connection
         traceback.print_exc()
@@ -117,4 +106,3 @@ from minesearch.database.db_utils import get_normalized_db_path, get_sqlite_conn
 
 if __name__ == "__main__":
     success = test_transaction_debug()
-    print(f"\n🎯 [TRANSACTION-DEBUG] Test: {'✅ ERFOLGREICH' if success else '❌ FEHLGESCHLAGEN'}")

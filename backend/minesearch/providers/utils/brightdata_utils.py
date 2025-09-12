@@ -15,18 +15,18 @@ logger = logging.getLogger(__name__)
 
 class BrightdataExtractor:
     """Extractor für strukturierte Daten aus Brightdata-Ergebnissen"""
-    
+
     @staticmethod
     def extract_mining_data(content: str, options: Dict[str, Any]) -> Dict[str, Any]:
         """Extrahiert Mining-spezifische Daten aus dem Content"""
-        
-        mine_name = options.get('mine_name', '')
-        
+
+        mine_name = options.get("mine_name", '')
+
         # REGEL 10 COMPLIANCE 30.08.2025: Keine Fallback-Werte - nur None oder echte Daten
         extracted_data = {
             'Name': mine_name,
-            'Country': options.get('country', ''),
-            'Region': options.get('region', None),
+            'Country': options.get("country", ''),
+            'Region': options.get("region", None),
             'Eigentümer': None,
             'Betreiber': None,
             'x-Koordinate': None,
@@ -35,7 +35,7 @@ class BrightdataExtractor:
             'Restaurationskosten': None,
             'Jahr der Aufnahme der Kosten': None,
             'Jahr der Erstellung des Dokumentes': None,
-            'Rohstoffabbau': options.get('commodity', None),
+            'Rohstoffabbau': options.get("commodity", None),
             'Minentyp': None,
             'Produktionsstart': None,
             'Produktionsende': None,
@@ -43,9 +43,9 @@ class BrightdataExtractor:
             'Fläche der Mine in qkm': None,
             'Quellenangaben': None
         }
-        
+
         content_lower = content.lower()
-        
+
         # FLEXIBLERE Koordinaten-Extraktion 30.08.2025
         coord_patterns = [
             # Standard Latitude/Longitude Pattern
@@ -68,7 +68,7 @@ class BrightdataExtractor:
             # In Tabellen
             r'<td[^>]*>.*?(-?\d+\.?\d+).*?</td>.*?<td[^>]*>.*?(-?\d+\.?\d+).*?</td>'
         ]
-        
+
         for pattern in coord_patterns:
             match = re.search(pattern, content_lower)
             if match:
@@ -79,7 +79,7 @@ class BrightdataExtractor:
                 elif len(match.groups()) == 2:
                     extracted_data['y-Koordinate'] = match.group(1)
                     extracted_data['x-Koordinate'] = match.group(2)
-        
+
         # FLEXIBLERE Eigentümer/Betreiber Pattern 30.08.2025
         owner_patterns = [
             # Standard English
@@ -93,8 +93,10 @@ class BrightdataExtractor:
             r'betrieben von[:\s]+([^,\n\.<>]{3,100})',
             r'im besitz von[:\s]+([^,\n\.<>]{3,100})',
             # Company mentions
-            r'([A-Z][a-z]+\s+(?:Corp|Corporation|Company|Ltd|Limited|Inc|Incorporated|AG|GmbH|SA|Holdings|Mining|Mines|Resources))',
-            r'([A-Z][a-zA-Z\s&]+(?:Corp|Corporation|Company|Ltd|Limited|Inc|Incorporated|AG|GmbH|SA|Holdings|Mining|Mines|Resources))',
+
+r'([A-Z][a-z]+\s+(?:Corp|Corporation|Company|Ltd|Limited|Inc|Incorporated|AG|GmbH|SA|Holdings|Mining|Mines|Resources))',
+
+r'([A-Z][a-zA-Z\s&]+(?:Corp|Corporation|Company|Ltd|Limited|Inc|Incorporated|AG|GmbH|SA|Holdings|Mining|Mines|Resources))',
             # In Tabellen
             r'<td[^>]*>.*?owner.*?</td>.*?<td[^>]*>([^<]{3,50})</td>',
             r'<td[^>]*>.*?operator.*?</td>.*?<td[^>]*>([^<]{3,50})</td>',
@@ -103,7 +105,7 @@ class BrightdataExtractor:
             r'mining company[:\s]+([^,\n\.<>]{3,100})',
             r'parent company[:\s]+([^,\n\.<>]{3,100})'
         ]
-        
+
         for pattern in owner_patterns:
             match = re.search(pattern, content_lower)
             if match:
@@ -112,7 +114,7 @@ class BrightdataExtractor:
                     extracted_data['Eigentümer'] = company
                 else:
                     extracted_data['Betreiber'] = company
-        
+
         # FLEXIBLERE Restaurationskosten Pattern 30.08.2025
         cost_patterns = [
             # Standard English
@@ -128,13 +130,14 @@ class BrightdataExtractor:
             r'wiederherstellungskosten[:\s]+([0-9,\.]+)\s*(millionen?|milliarden?|mio|mrd|euro|€|\$|dollar|usd)?',
             r'rückbaukosten[:\s]+([0-9,\.]+)\s*(millionen?|milliarden?|mio|mrd|euro|€|\$|dollar|usd)?',
             # Verschiedene Währungen und Formate
-            r'([0-9,\.]+)\s*(million|billion|mio|mrd)?\s*(euro|€|\$|dollar|usd|cad|eur).*?(?:closure|restoration|aro|reclamation)',
+
+r'([0-9,\.]+)\s*(million|billion|mio|mrd)?\s*(euro|€|\$|dollar|usd|cad|eur).*?(?:closure|restoration|aro|reclamation)',
             r'([0-9,\.]+)\s*(€|\$)\s*(million|billion|mio|mrd)?.*?(?:closure|restoration|cost)',
             # In Tabellen
             r'<td[^>]*>.*?cost.*?</td>.*?<td[^>]*>([^<]{1,30})</td>',
             r'<td[^>]*>.*?aro.*?</td>.*?<td[^>]*>([^<]{1,30})</td>'
         ]
-        
+
         for pattern in cost_patterns:
             match = re.search(pattern, content_lower)
             if match:
@@ -147,46 +150,46 @@ class BrightdataExtractor:
                 else:
                     extracted_data['Restaurationskosten'] = f"${value}"
                 break
-        
+
         # Status
         status_patterns = [
             r'status[:\s]+(\w+)',
             r'(operating|closed|suspended|care and maintenance|abandoned)',
             r'mine status[:\s]+([^,\n]+)'
         ]
-        
+
         for pattern in status_patterns:
             match = re.search(pattern, content_lower)
             if match:
                 extracted_data['Aktivitätsstatus'] = match.group(1).strip().title()
                 break
-        
+
         # Minentyp
         mine_type_patterns = [
             r'mine type[:\s]+([^,\n]+)',
             r'(open[\s-]?pit|underground|surface|subsurface)\s+mine',
             r'mining method[:\s]+([^,\n]+)'
         ]
-        
+
         for pattern in mine_type_patterns:
             match = re.search(pattern, content_lower)
             if match:
                 mine_type = match.group(1) if len(match.groups()) > 0 else match.group(0)
                 extracted_data['Minentyp'] = mine_type.strip().title()
                 break
-        
+
         # Produktionsdaten
         prod_patterns = [
             r'production[:\s]+([0-9,\.]+)\s*(tonnes?|tons?|mt|million tonnes?)',
             r'annual production[:\s]+([0-9,\.]+)\s*(tonnes?|tons?|mt)'
         ]
-        
+
         for pattern in prod_patterns:
             match = re.search(pattern, content_lower)
             if match:
                 extracted_data['Fördermenge/Jahr'] = f"{match.group(1)} {match.group(2)}"
                 break
-        
+
         # Jahr der Kostenaufnahme
         year_pattern = r'(19|20)\d{2}'
         if extracted_data['Restaurationskosten'] != '-':
@@ -195,23 +198,23 @@ class BrightdataExtractor:
             year_match = re.findall(year_pattern, cost_section)
             if year_match:
                 extracted_data['Jahr der Aufnahme der Kosten'] = year_match[-1]
-        
+
         return extracted_data
 
 
 class BrightdataDataProcessor:
     """Prozessor für Brightdata-Scraped-Daten"""
-    
+
     @staticmethod
     def process_search_results(results: List[Dict[str, Any]], options: Dict[str, Any]) -> Dict[str, Any]:
         """Verarbeitet Brightdata-Suchergebnisse zu strukturierten Daten"""
-        
+
         # REGEL 10 COMPLIANCE 30.08.2025: Basis-Struktur ohne Fallback-Werte
-        mine_name = options.get('mine_name', '')
+        mine_name = options.get("mine_name", '')
         structured_data = {
             'Name': mine_name,
-            'Country': options.get('country', ''),
-            'Region': options.get('region', None),
+            'Country': options.get("country", ''),
+            'Region': options.get("region", None),
             'Eigentümer': None,
             'Betreiber': None,
             'x-Koordinate': None,
@@ -220,7 +223,7 @@ class BrightdataDataProcessor:
             'Restaurationskosten': None,
             'Jahr der Aufnahme der Kosten': None,
             'Jahr der Erstellung des Dokumentes': None,
-            'Rohstoffabbau': options.get('commodity', None),
+            'Rohstoffabbau': options.get("commodity", None),
             'Minentyp': None,
             'Produktionsstart': None,
             'Produktionsende': None,
@@ -228,7 +231,7 @@ class BrightdataDataProcessor:
             'Fläche der Mine in qkm': None,
             'Quellenangaben': None
         }
-        
+
         # REGEL 10 COMPLIANCE 30.08.2025: Aggregiere Daten nur mit echten Werten
         for result in results:
             # Überschreibe nur wenn echte Daten gefunden wurden
@@ -237,26 +240,26 @@ class BrightdataDataProcessor:
                     # Zusätzliche Validierung: Keine versteckten Fallback-Werte
                     if str(value).strip() not in ['-', 'N/A', 'Unknown', 'None', 'null']:
                         structured_data[key] = value
-        
+
         # Sammle Quellen
         sources = []
         for idx, result in enumerate(results):
             if result.get('url'):
                 sources.append(result['url'])
-        
+
         if sources:
             structured_data['Quellenangaben'] = '; '.join(sources[:3])  # Max 3 Quellen
-        
+
         return structured_data
-    
+
     @staticmethod
     def build_search_urls(mine_name: str, country: str = None, commodity: str = None) -> List[str]:
         """VERBESSERTE Mining-spezifische URLs 30.08.2025"""
-        
+
         urls = []
         from urllib.parse import quote
         encoded_mine = quote(mine_name.replace(' ', '+'))
-        
+
         # 1. GOVERNMENT MINING DATABASES - Höchste Priorität für offizielle Daten
         if country:
             if country.lower() in ['kanada', 'canada']:
@@ -280,7 +283,7 @@ class BrightdataDataProcessor:
                     f"https://www.usgs.gov/centers/nmic/mineral-resources-data-system",
                     f"https://edx.netl.doe.gov/dataset?q={encoded_mine}"
                 ])
-        
+
         # 2. MINING INTELLIGENCE PLATFORMS - Spezialisierte Datenbanken
         urls.extend([
             f"https://www.mineralinfo.fr/mines-monde",
@@ -290,7 +293,7 @@ class BrightdataDataProcessor:
             f"https://www.miningglobal.com/search?q={encoded_mine}",
             f"https://www.globaldata.com/store/search/?q={encoded_mine}+mine"
         ])
-        
+
         # 3. TECHNICAL REPORTS & FINANCIAL FILINGS
         urls.extend([
             f"https://www.sedarplus.ca/search?q={encoded_mine}",
@@ -298,7 +301,7 @@ class BrightdataDataProcessor:
             f"https://disclosure.spsx.com.au/gns/search.jsp",  # ASX filings
             f"https://webfiles.thecse.com/"  # CSE filings
         ])
-        
+
         # 4. ENVIRONMENTAL & CLOSURE DATA SOURCES
         urls.extend([
             f"https://www.epa.gov/superfund-redevelopment/mine-scarred-lands",
@@ -307,7 +310,7 @@ class BrightdataDataProcessor:
             f"https://projects.eia.gov/powerplant-cleanup-costs/",  # Closure cost references
             f"https://www.canada.ca/en/environment-climate-change/services/environmental-indicators.html"
         ])
-        
+
         # 5. MINING INDUSTRY DATABASES & NEWS ARCHIVES
         urls.extend([
             f"https://www.mining.com/tag/{encoded_mine.replace('+', '-')}/",
@@ -317,7 +320,7 @@ class BrightdataDataProcessor:
             f"https://www.miningmagazine.com/search/?q={mine_name}",
             f"https://www.mining-journal.com/search/?q={mine_name}"
         ])
-        
+
         # 6. COMMODITY-SPECIFIC SOURCES
         if commodity:
             commodity_encoded = quote(commodity.replace(' ', '+'))
@@ -327,44 +330,44 @@ class BrightdataDataProcessor:
                 f"https://www.platts.com/search?query={mine_name}+{commodity}",
                 f"https://www.fastmarkets.com/search?q={mine_name}+{commodity}"
             ])
-        
+
         logger.info(f"[BrightData-URLs] Generated {len(urls)} mining-specific URLs for {mine_name}")
         return urls
-    
+
     @staticmethod
     def parse_table_data(html_content: str) -> List[Dict[str, Any]]:
         """Extrahiert Tabellendaten aus HTML"""
         tables = []
-        
+
         # Einfache Tabellen-Extraktion
         table_pattern = r'<table[^>]*>(.*?)</table>'
         table_matches = re.findall(table_pattern, html_content, re.IGNORECASE | re.DOTALL)
-        
+
         for table_html in table_matches:
             # Extrahiere Zeilen
             row_pattern = r'<tr[^>]*>(.*?)</tr>'
             rows = re.findall(row_pattern, table_html, re.IGNORECASE | re.DOTALL)
-            
+
             if rows:
                 table_data = []
                 for row in rows:
                     # Extrahiere Zellen
                     cell_pattern = r'<t[dh][^>]*>(.*?)</t[dh]>'
                     cells = re.findall(cell_pattern, row, re.IGNORECASE | re.DOTALL)
-                    
+
                     # Bereinige HTML-Tags
                     clean_cells = []
                     for cell in cells:
                         clean_text = re.sub(r'<[^>]+>', '', cell).strip()
                         clean_cells.append(clean_text)
-                    
+
                     if clean_cells:
                         table_data.append(clean_cells)
-                
+
                 if table_data:
                     tables.append({
                         'type': 'html_table',
                         'data': table_data
                     })
-        
+
         return tables

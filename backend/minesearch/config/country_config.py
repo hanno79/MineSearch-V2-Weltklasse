@@ -10,8 +10,8 @@ COUNTRY_CONFIG = {
     'kanada': {
         'languages': ['en', 'fr'],
         'currency': 'CAD',
-        'regions': ['Quebec', 'Ontario', 'British Columbia', 'Alberta', 
-                   'Manitoba', 'Saskatchewan', 'Nova Scotia', 'New Brunswick', 
+        'regions': ['Quebec', 'Ontario', 'British Columbia', 'Alberta',
+                   'Manitoba', 'Saskatchewan', 'Nova Scotia', 'New Brunswick',
                    'Newfoundland and Labrador', 'Prince Edward Island',
                    'Northwest Territories', 'Yukon', 'Nunavut'],
         'mining_terms': {
@@ -20,10 +20,10 @@ COUNTRY_CONFIG = {
             'owner': ['owner', 'propriétaire', 'eigentümer', 'propietario', 'belongs to', 'gehört', 'property of'],
             'commodity': ['commodity', 'produit', 'minerai', 'mineral', 'minéral'],
             'restoration_costs': [
-                'restoration costs', 'closure costs', 'reclamation costs', 
+                'restoration costs', 'closure costs', 'reclamation costs',
                 'coûts de restauration', 'coûts de fermeture', 'coûts de réhabilitation',
                 'asset retirement obligation', 'ARO', 'obligation de mise hors service',
-                'environmental liability', 'passif environnemental', 
+                'environmental liability', 'passif environnemental',
                 'closure bond', 'garantie financière', 'financial assurance',
                 'provision for closure', 'provision pour fermeture',
                 'decommissioning costs', 'site rehabilitation', 'mine closure provision',
@@ -41,8 +41,8 @@ COUNTRY_CONFIG = {
     'canada': {  # Englische Variante
         'languages': ['en', 'fr'],
         'currency': 'CAD',
-        'regions': ['Quebec', 'Ontario', 'British Columbia', 'Alberta', 
-                   'Manitoba', 'Saskatchewan', 'Nova Scotia', 'New Brunswick', 
+        'regions': ['Quebec', 'Ontario', 'British Columbia', 'Alberta',
+                   'Manitoba', 'Saskatchewan', 'Nova Scotia', 'New Brunswick',
                    'Newfoundland and Labrador', 'Prince Edward Island',
                    'Northwest Territories', 'Yukon', 'Nunavut'],
         'mining_terms': {
@@ -51,10 +51,10 @@ COUNTRY_CONFIG = {
             'owner': ['owner', 'propriétaire', 'eigentümer', 'propietario', 'belongs to', 'gehört', 'property of'],
             'commodity': ['commodity', 'produit', 'minerai', 'mineral', 'minéral'],
             'restoration_costs': [
-                'restoration costs', 'closure costs', 'reclamation costs', 
+                'restoration costs', 'closure costs', 'reclamation costs',
                 'coûts de restauration', 'coûts de fermeture', 'coûts de réhabilitation',
                 'asset retirement obligation', 'ARO', 'obligation de mise hors service',
-                'environmental liability', 'passif environnemental', 
+                'environmental liability', 'passif environnemental',
                 'closure bond', 'garantie financière', 'financial assurance',
                 'provision for closure', 'provision pour fermeture',
                 'decommissioning costs', 'site rehabilitation', 'mine closure provision',
@@ -72,8 +72,8 @@ COUNTRY_CONFIG = {
     'australien': {
         'languages': ['en'],
         'currency': 'AUD',
-        'regions': ['Western Australia', 'Queensland', 'New South Wales', 
-                   'Victoria', 'South Australia', 'Tasmania', 
+        'regions': ['Western Australia', 'Queensland', 'New South Wales',
+                   'Victoria', 'South Australia', 'Tasmania',
                    'Northern Territory'],
         'mining_terms': {
             'mine': ['mine', 'mining operation', 'project', 'property', 'deposit'],
@@ -94,14 +94,14 @@ COUNTRY_CONFIG = {
                 'care and maintenance costs', 'ongoing monitoring costs'
             ]
         },
-        'priority_domains': ['ga.gov.au', 'dmp.wa.gov.au', 'sarig.sa.gov.au', 
+        'priority_domains': ['ga.gov.au', 'dmp.wa.gov.au', 'sarig.sa.gov.au',
                            'minedex.dmirs.wa.gov.au', 'asx.com.au']
     },
     'australia': {  # Englische Variante
         'languages': ['en'],
         'currency': 'AUD',
-        'regions': ['Western Australia', 'Queensland', 'New South Wales', 
-                   'Victoria', 'South Australia', 'Tasmania', 
+        'regions': ['Western Australia', 'Queensland', 'New South Wales',
+                   'Victoria', 'South Australia', 'Tasmania',
                    'Northern Territory'],
         'mining_terms': {
             'mine': ['mine', 'mining operation', 'project', 'property', 'deposit'],
@@ -122,13 +122,13 @@ COUNTRY_CONFIG = {
                 'care and maintenance costs', 'ongoing monitoring costs'
             ]
         },
-        'priority_domains': ['ga.gov.au', 'dmp.wa.gov.au', 'sarig.sa.gov.au', 
+        'priority_domains': ['ga.gov.au', 'dmp.wa.gov.au', 'sarig.sa.gov.au',
                            'minedex.dmirs.wa.gov.au', 'asx.com.au']
     },
     'indonesien': {
         'languages': ['id', 'en'],
         'currency': 'IDR',
-        'regions': ['Kalimantan', 'Sulawesi', 'Papua', 'Sumatra', 
+        'regions': ['Kalimantan', 'Sulawesi', 'Papua', 'Sumatra',
                    'Java', 'Nusa Tenggara', 'Maluku'],
         'mining_terms': {
             'mine': ['tambang', 'mine', 'proyek', 'project', 'lokasi penambangan'],
@@ -156,7 +156,7 @@ COUNTRY_CONFIG = {
     'indonesia': {  # Englische Variante
         'languages': ['id', 'en'],
         'currency': 'IDR',
-        'regions': ['Kalimantan', 'Sulawesi', 'Papua', 'Sumatra', 
+        'regions': ['Kalimantan', 'Sulawesi', 'Papua', 'Sumatra',
                    'Java', 'Nusa Tenggara', 'Maluku'],
         'mining_terms': {
             'mine': ['tambang', 'mine', 'proyek', 'project', 'lokasi penambangan'],

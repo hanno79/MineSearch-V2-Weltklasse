@@ -1,3 +1,10 @@
+"""
+Author: rahn
+Datum: 11.09.2025
+Version: 1.0
+Beschreibung: Funktionalität für update all field names
+"""
+
 #!/usr/bin/env python3
 """
 Automatisch generiertes Update-Skript für Feldnamen-Umbenennung
@@ -14,11 +21,11 @@ REPLACEMENTS = [
     (r"'Rohstoffabbau \(Gold/ Kupfer/ Kohle/ usw\.\)'", "'Rohstoff'"),
     (r'"Minentyp \(Untertage/ Open-Pit/ usw\.\)"', '"Minentyp"'),
     (r"'Minentyp \(Untertage/ Open-Pit/ usw\.\)'", "'Minentyp'"),
-    
+
     # In Kommentaren und Strings
     (r'Rohstoffabbau \(Gold/ Kupfer/ Kohle/ usw\.\)', 'Rohstoff'),
     (r'Minentyp \(Untertage/ Open-Pit/ usw\.\)', 'Minentyp'),
-    
+
     # Kurze Versionen (nur Rohstoffabbau → Rohstoff)
     (r'"Rohstoffabbau"', '"Rohstoff"'),
     (r"'Rohstoffabbau'", "'Rohstoff'"),
@@ -38,7 +45,7 @@ FILES_TO_UPDATE = [
     'backend/minesearch/api/routes/consolidated_field_utils.py',
     'backend/minesearch/providers/base_provider.py',
     'backend/minesearch/unified_extraction_service.py',
-    
+
     # Frontend-Dateien
     'frontend/display.js',
     'frontend/comparison-engine.js',
@@ -50,11 +57,11 @@ def update_file(filepath):
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
-        
+
         original = content
         for pattern, replacement in REPLACEMENTS:
             content = re.sub(pattern, replacement, content)
-        
+
         if content != original:
             with open(filepath, 'w', encoding='utf-8') as f:
                 f.write(content)
