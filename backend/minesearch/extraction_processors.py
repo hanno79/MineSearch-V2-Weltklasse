@@ -339,7 +339,31 @@ def is_template_or_dummy_value(value: str, field: str = None) -> bool:
             logger.error(f"[CRITICAL DB PROTECTION] Feldname als Wert erkannt: '{value_str}' im Feld '{field}' → BLOCKIERT")
             return True
     
-    # PHASE 8: ZUSÄTZLICHE SCHUTZMANAHMEN
+    # PHASE 8: SPEZIFISCHE FELDVALIDIERUNG FÜR "FÖRDERMENGE/JAHR ROHSTOFF"
+    if field == 'Fördermenge/Jahr Rohstoff':
+        # NEUE REGEL: Lehne Werte ab, die nur den Rohstoffnamen ohne Mengenangabe enthalten
+        commodity_only_patterns = [
+            r'^(Gold|Kupfer|Silber|Kohle|Eisenerz|Copper|Silver|Coal|Iron|Zinc|Nickel|Lead|Uranium|Lithium)$',
+            r'^(gold|copper|silver|coal|iron|zinc|nickel|lead|uranium|lithium)$',
+            r'^(Or|Cuivre|Argent|Fer|Charbon)$',  # Französisch
+            r'^(Oro|Cobre|Plata|Hierro|Carbón)$',  # Spanisch
+        ]
+        
+        for pattern in commodity_only_patterns:
+            if re.match(pattern, value_str.strip(), re.IGNORECASE):
+                logger.warning(f"[FIELD VALIDATION] Nur-Rohstoff-Wert ohne Menge abgelehnt in 'Fördermenge/Jahr Rohstoff': '{value_str}' → BLOCKIERT")
+                return True
+        
+        # Zusätzlich: Prüfe ob numerische Werte oder Mengenangaben vorhanden sind
+        has_numbers = re.search(r'\d', value_str)
+        has_units = re.search(r'(unzen|ounces|tonnen|tonnes|tons|pfund|pounds|kg|kilogram|million|thousand|tausend)', value_str, re.IGNORECASE)
+        
+        if not has_numbers and not has_units:
+            # Kein numerischer Wert und keine Einheiten = wahrscheinlich nur Rohstoffname
+            logger.warning(f"[FIELD VALIDATION] Fördermenge ohne Zahlen/Einheiten abgelehnt: '{value_str}' → BLOCKIERT")
+            return True
+
+    # PHASE 9: ZUSÄTZLICHE SCHUTZMANAHMEN
     # Erkenne weitere problematische Muster die auf Feldverschiebung hindeuten
     if len(value_str) < 50:  # Nur kurze Werte prüfen um Performance zu schonen
         # Prüfe ob der Wert ein anderer Feldname ist (Cross-Field-Contamination)
@@ -406,6 +430,87 @@ def normalize_field_value(value: str) -> str:
     # CRITICAL-FIX 19.08.2025: Alle anderen Werte (inkl. echte Daten) bleiben UNVERÄNDERT
     # Keine aggressive Pattern-Matching oder LEER-Konvertierung mehr
     return value
+
+
+def process_production_amount(value: str, field_name: str) -> str:
+    """
+    NEUE FUNKTION: Spezialisierte Verarbeitung von Fördermengen für korrekte Trennung von Menge und Rohstoff
+    
+    Args:
+        value: Extrahierter Produktionswert (z.B. "400,000 ounces Gold")
+        field_name: Name des Feldes ('Fördermenge/Jahr Rohstoff' oder 'Fördermenge/Jahr Abraum')
+        
+    Returns:
+        Verarbeiteter und normalisierter Produktionswert
+    """
+    if not value or not isinstance(value, str):
+        return value
+    
+    # Verwende intelligente Zahlen-Parsing aus value_normalizer
+    from minesearch.value_normalizer import parse_number_with_separators
+    
+    parsed_number, unit, suffix = parse_number_with_separators(value)
+    
+    if parsed_number is None:
+        logger.debug(f"[PRODUCTION_PROCESS] Keine Zahl gefunden in '{value}' → Originalwert behalten")
+        return value
+    
+    logger.info(f"[PRODUCTION_PROCESS] Feld '{field_name}': '{value}' → Zahl: {parsed_number}, Einheit: '{unit}', Rohstoff: '{suffix}'")
+    
+    # Prüfe auf verdächtig kleine Werte (wahrscheinlich fehlende Tausendertrennzeichen)
+    if parsed_number < 1000 and ('thousand' in value.lower() or 'million' in value.lower()):
+        logger.warning(f"[PRODUCTION_PROCESS] Verdächtig kleine Zahl mit 'thousand/million' Kontext: {parsed_number} in '{value}'")
+    
+    # Normalisiere Einheiten auf Deutsch
+    unit_mapping = {
+        'ounces': 'Unzen',
+        'oz': 'Unzen',
+        'tonnes': 'Tonnen', 
+        'tons': 'Tonnen',
+        't': 'Tonnen',
+        'pounds': 'Pfund',
+        'lbs': 'Pfund',
+        'kg': 'Kilogramm',
+        'kilograms': 'Kilogramm',
+        'million': 'Millionen',
+        'billion': 'Milliarden'
+    }
+    
+    normalized_unit = unit_mapping.get(unit.lower(), unit) if unit else ""
+    
+    # Formatiere Zahl mit deutschen Tausendertrennzeichen
+    if parsed_number >= 1000:
+        formatted_number = f"{parsed_number:,.0f}".replace(',', '.')
+    else:
+        formatted_number = f"{parsed_number:g}"
+    
+    # Für 'Fördermenge/Jahr Rohstoff': Vollständige Info mit Rohstoff
+    if field_name == 'Fördermenge/Jahr Rohstoff':
+        if suffix and normalized_unit:
+            result = f"{formatted_number} {normalized_unit} {suffix}"
+        elif normalized_unit:
+            result = f"{formatted_number} {normalized_unit}"
+        else:
+            result = value  # Fallback für unvollständige Daten
+            
+    # Für 'Fördermenge/Jahr Abraum': Nur Menge und Einheit
+    elif field_name == 'Fördermenge/Jahr Abraum':
+        if normalized_unit:
+            result = f"{formatted_number} {normalized_unit}"
+        else:
+            result = formatted_number
+            
+    # Andere Felder: Standard-Verarbeitung
+    else:
+        if suffix and normalized_unit:
+            result = f"{formatted_number} {normalized_unit} {suffix}"
+        elif normalized_unit:
+            result = f"{formatted_number} {normalized_unit}"
+        else:
+            result = formatted_number
+    
+    logger.info(f"[PRODUCTION_PROCESS] Normalisiert: '{value}' → '{result}'")
+    return result
 
 
 def process_restoration_costs(value: str, full_match: str, currency: str) -> str:
@@ -906,3 +1011,75 @@ def clean_field_value(value: str, field: str) -> str:
     value = normalize_field_value(value)
     
     return value
+
+
+def extract_restoration_cost_year(content: str, restoration_cost_value: str = None) -> Optional[str]:
+    """
+    Extrahiert das Jahr der Restaurationskosten aus Text oder Restaurationskosten-Wert
+    
+    ERWEITERT 11.09.2025: Intelligente Jahr-Extraktion für normalisiertes Schema
+    
+    Args:
+        content: Vollständiger Textinhalt
+        restoration_cost_value: Bereits extrahierter Restaurationskostenwert (optional)
+        
+    Returns:
+        Jahr als String (YYYY) oder None wenn nicht gefunden
+    """
+    import re
+    
+    # Pattern 1: Jahr direkt bei Restaurationskosten in Klammern/Brackets
+    # z.B. "$25.8 Million CAD (2023)", "Restoration costs: $12.8M [2022]"
+    year_patterns = [
+        # Jahr in Klammern nach Kostenwert
+        r'\$?\s*[\d,]+(?:\.\d+)?\s*(?:M|million|k|thousand)?\s*(?:CAD|USD|EUR)?\s*[\(\[\s]+(\d{4})[\)\]\s]*',
+        # Restaurationskosten mit Jahr in Klammern
+        r'(?:restoration|closure|environmental|ARO)\s+(?:costs?|provision).*?[\(\[\s]+(\d{4})[\)\]\s]*',
+        # Jahr vor Kostenwert
+        r'(\d{4})\s+(?:restoration|closure|environmental|ARO)\s+(?:costs?|estimate|provision)',
+        # Pattern: "costs as of YYYY" oder "Stand YYYY"
+        r'(?:costs?|provision|estimate)\s+(?:as\s+of|Stand|per|dated)\s+(\d{4})',
+        # Jahr in Dokumentzusammenhang mit Kosten
+        r'(\d{4})\s+(?:study|report|assessment).*?(?:restoration|closure|environmental)',
+        r'(?:study|report|assessment)\s+.*?(\d{4}).*?(?:restoration|closure|environmental)',
+        # Allgemeine Jahr-Kosten Patterns
+        r'(?:financial|cost)\s+(?:assessment|evaluation).*?(\d{4})',
+        r'(\d{4})\s+(?:financial|cost)\s+(?:assessment|evaluation)',
+    ]
+    
+    # Prüfe zuerst im spezifischen Restaurationskosten-Wert
+    if restoration_cost_value:
+        for pattern in year_patterns:
+            match = re.search(pattern, restoration_cost_value, re.IGNORECASE)
+            if match:
+                year = match.group(1)
+                # Validiere Jahr (1990-2030)
+                if 1990 <= int(year) <= 2030:
+                    logger.debug(f"[COST-YEAR] Jahr aus Restaurationskosten-Wert extrahiert: {year}")
+                    return year
+    
+    # Falls nicht gefunden, suche im gesamten Content
+    if content:
+        # Suche nach Restaurationskosten-spezifischen Jahr-Patterns
+        restoration_content_patterns = [
+            # Suche Restaurationskosten und nächstes Jahr in Nähe
+            r'(?:restoration|closure|environmental|ARO)\s+(?:costs?|provision)[\s\S]{0,100}?(\d{4})',
+            r'(\d{4})[\s\S]{0,50}?(?:restoration|closure|environmental|ARO)\s+(?:costs?|provision)',
+            # Finanzielle Bewertung mit Jahr
+            r'(?:financial\s+assurance|cost\s+estimate)[\s\S]{0,50}?(\d{4})',
+            r'(\d{4})[\s\S]{0,50}?(?:financial\s+assurance|cost\s+estimate)',
+            # Technischer Report mit Jahr
+            r'(?:technical\s+report|feasibility\s+study)[\s\S]{0,100}?(\d{4})',
+        ]
+        
+        for pattern in restoration_content_patterns:
+            match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
+            if match:
+                year = match.group(1)
+                # Validiere Jahr
+                if 1990 <= int(year) <= 2030:
+                    logger.debug(f"[COST-YEAR] Jahr aus Content-Kontext extrahiert: {year}")
+                    return year
+    
+    logger.debug("[COST-YEAR] Kein Jahr für Restaurationskosten gefunden")
+    return None

@@ -139,7 +139,7 @@ AUSGABEFORMAT (JSON):
     "Minentyp": "Untertage/Tagebau",
     "Produktionsstart": "YYYY",
     "Produktionsende": "YYYY",
-    "Fördermenge/Jahr Rohstoff": "spezifische Rohstoffproduktion mit Einheit, z.B. '120,000 Unzen Gold'",
+    "Fördermenge/Jahr Rohstoff": "NUR die Produktionsmenge mit Einheit, z.B. '120,000 Unzen' oder '2.5 Millionen Tonnen' - OHNE Rohstoffname!",
     "Fördermenge/Jahr Abraum": "gesamte Materialextraktion inkl. Abraum mit Einheit, z.B. '2.3 Millionen Tonnen'",
     "Fläche der Mine in qkm": "Fläche mit Einheit",
     "Quellenangaben": "URLs oder Dokumenttitel"

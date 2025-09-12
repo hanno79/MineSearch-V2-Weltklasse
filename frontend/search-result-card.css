@@ -1,0 +1,376 @@
+/**
+ * Author: rahn
+ * Datum: 11.09.2025
+ * Version: 1.0
+ * Beschreibung: CSS Styles für SearchResult Card Komponente
+ */
+
+/* ============================================
+   SEARCH RESULT CARD BASE STYLES
+   ============================================ */
+
+.search-result-card {
+    background: #ffffff;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.search-result-card:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
+}
+
+/* Qualitäts-basierte Farbcodierung */
+.search-result-card.high-quality {
+    border-left: 6px solid #10b981;
+}
+
+.search-result-card.medium-quality {
+    border-left: 6px solid #f59e0b;
+}
+
+.search-result-card.low-quality {
+    border-left: 6px solid #ef4444;
+}
+
+/* ============================================
+   TIER 1: KOMPAKTE ÜBERSICHT
+   ============================================ */
+
+.card-tier-1 {
+    padding: 20px;
+}
+
+.mine-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+
+.mine-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.quality-indicator {
+    flex-shrink: 0;
+    margin-left: 12px;
+}
+
+.quality-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    min-width: 40px;
+}
+
+.quality-badge.excellent {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.quality-badge.good {
+    background: #ddd6fe;
+    color: #5b21b6;
+}
+
+.quality-badge.fair {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.quality-badge.poor {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* ============================================
+   KEY METRICS (TIER 1 DATEN)
+   ============================================ */
+
+.key-metrics {
+    margin-bottom: 16px;
+}
+
+.metric-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.metric-row:last-child {
+    border-bottom: none;
+}
+
+.metric-icon {
+    font-size: 1.1rem;
+    width: 24px;
+    flex-shrink: 0;
+    margin-right: 12px;
+}
+
+.metric-value {
+    font-size: 0.95rem;
+    color: #374151;
+    font-weight: 500;
+    flex-grow: 1;
+}
+
+.metric-value.status-aktiv,
+.metric-value.status-active {
+    color: #10b981;
+}
+
+.metric-value.status-geschlossen,
+.metric-value.status-closed {
+    color: #ef4444;
+}
+
+.metric-value.status-geplant,
+.metric-value.status-planned {
+    color: #f59e0b;
+}
+
+/* ============================================
+   CARD ACTIONS
+   ============================================ */
+
+.card-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #f3f4f6;
+}
+
+.expand-button {
+    background: #f3f4f6;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    transition: all 0.2s ease;
+}
+
+.expand-button:hover {
+    background: #e5e7eb;
+    color: #1f2937;
+}
+
+.action-button {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    margin-left: 8px;
+}
+
+.action-button:hover {
+    background: #2563eb;
+}
+
+.action-button.secondary {
+    background: #6b7280;
+}
+
+.action-button.secondary:hover {
+    background: #4b5563;
+}
+
+/* ============================================
+   TIER 2: ERWEITERTE DETAILS
+   ============================================ */
+
+.card-tier-2 {
+    border-top: 1px solid #e5e7eb;
+    background: #f9fafb;
+    padding: 20px;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 500px;
+        padding-top: 20px;
+        padding-bottom: 20px;
+    }
+}
+
+.extended-data {
+    margin-bottom: 16px;
+}
+
+.extended-row {
+    display: flex;
+    align-items: flex-start;
+    padding: 6px 0;
+    margin-bottom: 4px;
+}
+
+.extended-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+    font-weight: 500;
+    width: 140px;
+    flex-shrink: 0;
+}
+
+.extended-value {
+    font-size: 0.875rem;
+    color: #374151;
+    font-weight: 400;
+    flex-grow: 1;
+    word-break: break-word;
+}
+
+.no-extended-data {
+    text-align: center;
+    color: #9ca3af;
+    font-style: italic;
+    padding: 20px 0;
+}
+
+.technical-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+@media (max-width: 768px) {
+    .search-result-card {
+        margin-bottom: 16px;
+    }
+    
+    .card-tier-1,
+    .card-tier-2 {
+        padding: 16px;
+    }
+    
+    .mine-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .card-actions {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+    }
+    
+    .card-actions > * {
+        margin-left: 0;
+        text-align: center;
+    }
+    
+    .extended-row {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .extended-label {
+        width: auto;
+        font-weight: 600;
+    }
+    
+    .technical-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.text-muted {
+    color: #6b7280;
+}
+
+.text-success {
+    color: #10b981;
+}
+
+.text-warning {
+    color: #f59e0b;
+}
+
+.text-danger {
+    color: #ef4444;
+}
+
+.font-semibold {
+    font-weight: 600;
+}
+
+.text-sm {
+    font-size: 0.875rem;
+}
+
+.text-xs {
+    font-size: 0.75rem;
+}
+
+/* ============================================
+   LOADING STATE
+   ============================================ */
+
+.search-result-card.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.search-result-card.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    margin: -12px 0 0 -12px;
+    border: 2px solid #e5e7eb;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

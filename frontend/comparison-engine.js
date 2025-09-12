@@ -185,7 +185,7 @@ class ComparisonEngine {
         
         // Gruppiere ähnliche Werte
         fieldData.values.forEach(entry => {
-            const normalizedValue = this.normalizeValue(entry.value);
+            const normalizedValue = this.normalizeValue(entry.value, fieldName);
             
             if (!valueGroups[normalizedValue]) {
                 valueGroups[normalizedValue] = [];
@@ -317,11 +317,30 @@ class ComparisonEngine {
     /**
      * VALUE NORMALIZATION: Normalisiert Werte für besseren Vergleich
      */
-    normalizeValue(value) {
+    normalizeValue(value, fieldName = '') {
         if (typeof value !== 'string') return String(value);
         
         // PHASE 1: Entferne Quellenreferenzen [1,2,3] vor der Normalisierung
         let normalized = value.replace(/\s*\[\d+(?:,\d+)*\]/g, '').trim();
+        
+        // PHASE 1.5: SPEZIALBEHANDLUNG FÜR PRODUKTIONS-FELDER
+        const productionFields = [
+            'fördermenge/jahr', 
+            'fördermenge/jahr rohstoff', 
+            'production', 
+            'annual production',
+            'produktionsmenge'
+        ];
+        
+        const isProductionField = productionFields.some(field => 
+            fieldName.toLowerCase().includes(field.toLowerCase())
+        );
+        
+        if (isProductionField && this.containsNumericValue(normalized)) {
+            // Für Produktionsfelder: Nur Normalisierung, KEINE Mapping-Anwendung
+            // Behalte numerische Werte mit Einheiten
+            return this.normalizeProductionValue(normalized);
+        }
         
         // PHASE 2: Sprachspezifische Normalisierung (semantische Äquivalenz)
         const lowerValue = normalized.toLowerCase();
@@ -392,6 +411,204 @@ class ComparisonEngine {
         // PHASE 3: Nur noch Whitespace normalisieren (KEINE radikale Sonderzeichen-Entfernung)
         return normalized.replace(/\s+/g, ' ').trim();
     }
+
+    /**
+     * NEUE FUNKTION: Prüft ob Wert numerische Daten enthält
+     */
+    containsNumericValue(value) {
+        return /\d/.test(value) && (/\d[\s,]*\d|\d+[.,]\d+|\d+\s*(million|thousand|tausend|millionen|tonnen|tonnes|tons|oz|ounces|unzen|kg)/i.test(value));
+    }
+
+    /**
+     * NEUE FUNKTION: Spezielle Normalisierung für Produktionswerte
+     */
+    normalizeProductionValue(value) {
+        // Standardisiere Einheiten und behalte numerische Werte
+        let normalized = value;
+        
+        // Einheiten-Mapping
+        const unitMappings = {
+            'oz': 'Unzen',
+            'ounces': 'Unzen',
+            'tonnes': 'Tonnen',
+            'tons': 'Tonnen',
+            't/year': 'Tonnen/Jahr',
+            't/yr': 'Tonnen/Jahr',
+            'million': 'Millionen',
+            'thousand': 'Tausend',
+            'tausend': 'Tausend',
+            'millionen': 'Millionen'
+        };
+        
+        // Ersetze Einheiten
+        for (const [english, german] of Object.entries(unitMappings)) {
+            const regex = new RegExp(`\\b${english}\\b`, 'gi');
+            normalized = normalized.replace(regex, german);
+        }
+        
+        // Behalte Tausender-Trennzeichen
+        return normalized.trim();
+    }
+
+    /**
+     * NEUE FUNKTION: Prüft ob Feld numerische Daten erwartet
+     */
+    isNumericField(fieldName) {
+        const numericFields = [
+            'fördermenge/jahr',
+            'fördermenge/jahr rohstoff',
+            'fördermenge/jahr abraum',
+            'production',
+            'annual production',
+            'restaurationskosten',
+            'restoration',
+            'x-koordinate',
+            'y-koordinate',
+            'koordinate',
+            'coordinate',
+            'fläche',
+            'area',
+            'produktionsstart',
+            'produktionsende',
+            'production start',
+            'production end'
+        ];
+        
+        const fieldLower = fieldName.toLowerCase();
+        return numericFields.some(numField => 
+            fieldLower.includes(numField) || numField.includes(fieldLower)
+        );
+    }
+
+    /**
+     * NEUE FUNKTION: Berechnet intelligenten Konsens für numerische Felder
+     */
+    calculateNumericConsensus(fieldData, fieldName) {
+        const numericValues = [];
+        const allValues = [];
+        
+        // Extrahiere numerische Werte
+        fieldData.values.forEach(entry => {
+            const value = entry.value;
+            allValues.push(entry);
+            
+            // Versuche numerischen Wert zu extrahieren
+            const numericMatch = this.extractNumericValue(value);
+            if (numericMatch) {
+                numericValues.push({
+                    ...entry,
+                    numericValue: numericMatch.value,
+                    unit: numericMatch.unit,
+                    originalValue: value
+                });
+            }
+        });
+        
+        // Wenn weniger als 2 numerische Werte, verwende Standard-Konsens
+        if (numericValues.length < 2) {
+            return null;
+        }
+        
+        // Berechne Durchschnitt für numerische Konsens-Ermittlung
+        const values = numericValues.map(v => v.numericValue);
+        const average = values.reduce((a, b) => a + b, 0) / values.length;
+        const median = this.calculateMedian(values);
+        
+        // Verwende Median für stabileren Konsens
+        const consensusValue = median;
+        
+        // Finde ähnliche Werte (innerhalb von 20% vom Median)
+        const threshold = median * 0.2;
+        const consensusEntries = numericValues.filter(v => 
+            Math.abs(v.numericValue - median) <= threshold
+        );
+        
+        if (consensusEntries.length >= 2) {
+            // Erstelle repräsentativen Wert mit häufigstem Unit
+            const units = consensusEntries.map(v => v.unit).filter(u => u);
+            const mostCommonUnit = this.getMostFrequent(units) || '';
+            
+            const formattedValue = this.formatNumericConsensus(consensusValue, mostCommonUnit);
+            
+            return {
+                value: formattedValue,
+                models: consensusEntries.map(v => v.model),
+                confidence: consensusEntries.reduce((sum, v) => sum + v.confidence, 0) / consensusEntries.length,
+                count: consensusEntries.length
+            };
+        }
+        
+        return null;
+    }
+
+    /**
+     * HILFSFUNKTION: Extrahiert numerischen Wert aus String
+     */
+    extractNumericValue(value) {
+        if (!value || typeof value !== 'string') return null;
+        
+        // Pattern für Zahlen mit Kommas/Punkten
+        const numPattern = /(\d+(?:[,\.]\d+)*(?:\.\d+)?)\s*([a-zA-Z\/]*)/;
+        const match = value.match(numPattern);
+        
+        if (match) {
+            let numStr = match[1].replace(/,/g, ''); // Entferne Kommas
+            const unit = (match[2] || '').trim();
+            
+            const num = parseFloat(numStr);
+            if (!isNaN(num)) {
+                return {
+                    value: num,
+                    unit: unit
+                };
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * HILFSFUNKTION: Berechnet Median
+     */
+    calculateMedian(values) {
+        const sorted = [...values].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        
+        if (sorted.length % 2 === 0) {
+            return (sorted[mid - 1] + sorted[mid]) / 2;
+        } else {
+            return sorted[mid];
+        }
+    }
+
+    /**
+     * HILFSFUNKTION: Findet häufigstes Element
+     */
+    getMostFrequent(arr) {
+        if (!arr.length) return null;
+        
+        const counts = {};
+        arr.forEach(item => counts[item] = (counts[item] || 0) + 1);
+        
+        return Object.keys(counts).reduce((a, b) => 
+            counts[a] > counts[b] ? a : b
+        );
+    }
+
+    /**
+     * HILFSFUNKTION: Formatiert numerischen Konsens-Wert
+     */
+    formatNumericConsensus(value, unit) {
+        // Formatiere Zahl mit deutschen Tausendertrennzeichen
+        let formattedNumber;
+        if (value >= 1000) {
+            formattedNumber = new Intl.NumberFormat('de-DE').format(Math.round(value));
+        } else {
+            formattedNumber = value.toFixed(value % 1 === 0 ? 0 : 2);
+        }
+        
+        return unit ? `${formattedNumber} ${unit}` : formattedNumber;
+    }
     
     /**
      * CONSENSUS DETECTION: Erkennt Consensus über mehrere Modelle
@@ -406,8 +623,16 @@ class ComparisonEngine {
         };
         
         Object.entries(analysis.fieldAnalysis).forEach(([fieldName, fieldData]) => {
-            const bestAgreement = fieldData.agreements
+            let bestAgreement = fieldData.agreements
                 .sort((a, b) => b.count - a.count)[0];
+            
+            // SPEZIALBEHANDLUNG FÜR NUMERISCHE FELDER
+            if (this.isNumericField(fieldName) && fieldData.values.length >= 2) {
+                const numericConsensus = this.calculateNumericConsensus(fieldData, fieldName);
+                if (numericConsensus) {
+                    bestAgreement = numericConsensus;
+                }
+            }
             
             if (bestAgreement && bestAgreement.count >= 2) {
                 const consensusStrength = bestAgreement.count / fieldData.values.length;
@@ -444,7 +669,7 @@ class ComparisonEngine {
         
         Object.entries(analysis.fieldAnalysis).forEach(([fieldName, fieldData]) => {
             if (fieldData.values.length >= 2) {
-                const uniqueValues = [...new Set(fieldData.values.map(v => this.normalizeValue(v.value)))];
+                const uniqueValues = [...new Set(fieldData.values.map(v => this.normalizeValue(v.value, fieldName)))];
                 
                 if (uniqueValues.length >= 2) {
                     discrepancies.push({
@@ -471,7 +696,7 @@ class ComparisonEngine {
      * DISCREPANCY SEVERITY: Berechnet Schwere von Diskrepanzen
      */
     calculateDiscrepancySeverity(fieldData) {
-        const valueCount = [...new Set(fieldData.values.map(v => this.normalizeValue(v.value)))].length;
+        const valueCount = [...new Set(fieldData.values.map(v => this.normalizeValue(v.value, fieldData.fieldName || '')))].length;
         const fieldWeight = fieldData.weight;
         const confidenceSpread = Math.max(...fieldData.values.map(v => v.confidence)) - 
                                 Math.min(...fieldData.values.map(v => v.confidence));
