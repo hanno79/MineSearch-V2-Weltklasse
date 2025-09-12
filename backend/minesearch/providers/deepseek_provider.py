@@ -147,7 +147,7 @@ Gib die Informationen strukturiert und vollständig zurück.
             raise ValueError(f"Unbekanntes Modell: {model_key}")
             
         model = self.models[model_key]
-        mine_type = options.get('mine_type', 'Unknown')
+        mine_type = options.get('mine_type')  # REGEL 10: NULL statt 'Unknown' Fallback
         country = options.get('country')
         language = options.get('language', 'de')
         

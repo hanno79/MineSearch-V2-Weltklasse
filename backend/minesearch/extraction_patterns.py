@@ -129,7 +129,18 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'(?:Kosten|costs?)\s+(?:von|from|Stand)\s+(\d{4})', 
             r'(?:per|as\s+of)\s+(\d{4})',
             r'(?:Stand|status|as\s+of):\s*(?:\w+\s+)?(\d{4})',
-            r'(\d{4})\s+(?:Kosten|costs|liabilities)'
+            r'(\d{4})\s+(?:Kosten|costs|liabilities)',
+            # ERWEITERT: Jahr direkt in Restaurationskosten-Kontexten
+            r'(?:restoration|closure|rehabilitation|Restauration)\s+(?:costs?|kosten).*?[\(\[\s](\d{4})[\)\]\s]',
+            r'\$\s*[\d,]+(?:\.\d+)?\s*(?:M|million|k|thousand)?\s*(?:CAD|USD)?\s*[\(\[\s](\d{4})[\)\]\s]',
+            r'(?:environmental|closure|rehabilitation)\s+(?:provision|liability).*?(\d{4})',
+            r'(\d{4})\s+(?:restoration|closure|ARO|environmental)\s+(?:estimate|assessment|costs?)',
+            # Kombinierte Patterns: Kosten und Jahr in einem Satz
+            r'(?:restoration|closure)\s+(?:costs?|provision)\s+of\s+.*?(\d{4})',
+            r'(\d{4})\s+(?:assessment|evaluation)\s+.*?(?:restoration|closure|environmental)',
+            # Pattern für Perplexity-artige Formate mit Jahresangabe
+            r'.*?restoration.*?\$[\d,]+(?:\.\d+)?.*?(\d{4})',
+            r'(\d{4}).*?(?:study|report|assessment).*?(?:restoration|closure|environmental)'
         ],
         'Jahr der Erstellung des Dokumentes': [
             r'(?:Dokument|Report|Bericht)\s+(?:vom|von|dated|from)\s+(\b(?:19|20)\d{2}\b)',

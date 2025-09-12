@@ -187,7 +187,7 @@ class OpenRouterProvider(AbstractProvider):
                     sources.append({
                         'url': source.get('url', ''),
                         'title': source.get('title', source.get('url', '')),
-                        'type': source.get('type', 'unknown'),
+                        'type': source.get('type'),  # REGEL 10: NULL statt 'unknown' Fallback
                         'reliability': source.get('reliability_score')  # REGEL 10: Keine 0.5 Fallbacks
                     })
                 

@@ -372,7 +372,7 @@ class DatabaseCleanupTool:
             "",
             "💾 BACKUP-INFO:",
             f"   Backup-Pfad: {self.backup_path}",
-            f"   Backup-Größe: {os.path.getsize(self.backup_path) if os.path.exists(self.backup_path) else 'N/A'} Bytes",
+            f"   Backup-Größe: {os.path.getsize(self.backup_path) if os.path.exists(self.backup_path) else '[nicht vorhanden]'} Bytes",  # REGEL 10: Keine N/A Fallbacks
             "",
             "⚠️  WICHTIG:",
             "   - Backup vor Wiederherstellung prüfen",

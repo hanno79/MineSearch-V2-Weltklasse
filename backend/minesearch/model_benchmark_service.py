@@ -1,3 +1,9 @@
+"""
+Author: rahn
+Datum: 11.09.2025
+Version: 1.0
+Beschreibung: Service-Layer-Implementation
+"""
 from fastapi import APIRouter
 
 router = APIRouter()

@@ -1,3 +1,9 @@
+"""
+Author: rahn
+Datum: 11.09.2025
+Version: 1.0
+Beschreibung: Test-Suite
+"""
 import sys
 import os
 import pytest

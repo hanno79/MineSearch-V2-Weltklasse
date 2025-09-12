@@ -5539,22 +5539,27 @@ details ul {
     border-color: #9ca3af;
 }
 
-/* Database Table Container */
+/* Database Table Container - Fixe Höhe für Sticky Headers */
 .database-table-container {
     background: white;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     overflow: hidden;
-    min-height: 400px;
+    height: 70vh;  /* Feste Höhe statt min-height für Sticky Headers */
+    max-height: 800px;  /* Maximale Höhe begrenzen */
     position: relative;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Database Table Wrapper - Horizontale Scrollbars für breite Tabellen */
+/* Database Table Wrapper - Vertikales und horizontales Scrollen für Sticky Headers */
 #database-table-wrapper {
     overflow-x: auto;
-    overflow-y: visible;
+    overflow-y: auto;  /* Vertikales Scrollen aktivieren */
+    flex: 1;  /* Nimmt verfügbaren Platz im Flex-Container */
     max-width: 100%;
     border-radius: 6px;
+    position: relative;
     /* Webkit Scrollbar Styling für bessere UX */
     scrollbar-width: thin;
     scrollbar-color: #cbd5e1 #f8fafc;
@@ -5629,6 +5634,7 @@ details ul {
     z-index: 10;
     white-space: nowrap; /* Verhindert Zeilenumbrüche in Headern */
     color: #374151;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Schatten für bessere Sichtbarkeit beim Scrollen */
 }
 
 .database-table td {

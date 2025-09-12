@@ -552,7 +552,7 @@ def _get_exclusion_reason(field_name: str) -> str:
         "Produktionsende": "Aktive/geplante Minen ausgeschlossen (haben logisch kein Produktionsende)",
         "Fördermenge/Jahr": "Nicht-produzierende Minen ausgeschlossen (haben keine aktuellen Fördermengen)"
     }
-    return exclusion_reasons.get(field_name, "Conditional logic angewendet")
+    return exclusion_reasons.get(field_name) or "Conditional logic angewendet"  # REGEL 10: Keine direkten Fallbacks
 
 @router.get("/field-comparison")
 async def get_field_comparison():

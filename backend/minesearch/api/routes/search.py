@@ -319,7 +319,7 @@ async def search_mine_html(request: MineSearchRequest, model: str):
         if result["success"]:
             return {"html": create_result_card(result["data"])}
         else:
-            return {"html": create_error_card(result.get("error", "Unbekannter Fehler"))}
+            return {"html": create_error_card(result.get("error") or "Ein Fehler ist aufgetreten")}  # REGEL 10: Keine "Unbekannter Fehler" Fallbacks
     except Exception as e:
         logger.error(f"Fehler bei HTML-Suche: {str(e)}")
         return {"html": create_error_card(str(e))}

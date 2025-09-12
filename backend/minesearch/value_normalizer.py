@@ -8,10 +8,99 @@ ZWECK: Kanada=Canada, Untertage=Underground, Quebec=Québec etc. als identisch e
 
 import re
 import logging
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 from unicodedata import normalize
 
 logger = logging.getLogger(__name__)
+
+
+def parse_number_with_separators(value_str: str) -> Tuple[Optional[float], str, str]:
+    """
+    Intelligente Erkennung und Parsing von Zahlen mit Tausender-/Dezimaltrennzeichen
+    
+    Args:
+        value_str: Eingabe-String mit Zahl (z.B. "400,000 ounces Gold")
+        
+    Returns:
+        Tuple[number, unit, suffix]: (400000.0, "ounces", "Gold") oder (None, "", original)
+    """
+    if not value_str or not isinstance(value_str, str):
+        return None, "", value_str
+    
+    # Extrahiere Zahl, Einheit und Rest mit verbesserter Logik
+    # Neue Strategie: Erkenne bekannte Einheiten explizit
+    known_units = ['ounces', 'oz', 'tonnes', 'tons', 't', 'pounds', 'lbs', 'kg', 'kilograms', 'grams', 'g', 'million', 'billion']
+    
+    # Suche nach Zahl am Anfang
+    number_match = re.match(r'([\d,\.]+)', value_str.strip())
+    if not number_match:
+        logger.debug(f"[NUMBER_PARSE] Keine Zahl gefunden in: '{value_str}'")
+        return None, "", value_str
+    
+    number_str = number_match.group(1)
+    remainder = value_str[len(number_str):].strip()
+    
+    # Suche nach bekannter Einheit am Anfang des Rests
+    unit_str = ""
+    suffix_str = remainder
+    
+    for unit in known_units:
+        if remainder.lower().startswith(unit.lower()):
+            # Prüfe ob es ein vollständiges Wort ist (nicht Teil eines größeren Wortes)
+            unit_end = len(unit)
+            if unit_end == len(remainder) or remainder[unit_end].isspace():
+                unit_str = unit
+                suffix_str = remainder[unit_end:].strip()
+                break
+    
+    logger.debug(f"[NUMBER_PARSE] Parsed '{value_str}' → Zahl:'{number_str}', Einheit:'{unit_str}', Suffix:'{suffix_str}'")
+    
+    # Intelligente Tausendertrennzeichen-Erkennung
+    try:
+        # Fall 1: "400,000" (EN Format - Komma als Tausendertrennzeichen)
+        if ',' in number_str and '.' not in number_str:
+            # Nur Kommas → Tausendertrennzeichen
+            parsed_number = float(number_str.replace(',', ''))
+            logger.debug(f"[NUMBER_PARSE] EN Format erkannt: '{number_str}' → {parsed_number}")
+            
+        # Fall 2: "400.000" (DE Format - Punkt als Tausendertrennzeichen) 
+        elif '.' in number_str and ',' not in number_str:
+            # Prüfe ob es Dezimalzahl oder Tausendertrennzeichen ist
+            dot_position = number_str.rfind('.')
+            decimal_part = number_str[dot_position + 1:]
+            
+            if len(decimal_part) == 3 and decimal_part.isdigit():
+                # 3 Stellen nach Punkt → wahrscheinlich Tausendertrennzeichen
+                parsed_number = float(number_str.replace('.', ''))
+                logger.debug(f"[NUMBER_PARSE] DE Format (Tausender) erkannt: '{number_str}' → {parsed_number}")
+            else:
+                # 1-2 Stellen → wahrscheinlich Dezimalzahl
+                parsed_number = float(number_str)
+                logger.debug(f"[NUMBER_PARSE] Dezimalzahl erkannt: '{number_str}' → {parsed_number}")
+                
+        # Fall 3: "400,000.50" (EN Format mit Dezimal)
+        elif ',' in number_str and '.' in number_str:
+            # Komma vor Punkt → EN Format
+            if number_str.index(',') < number_str.index('.'):
+                # Entferne Kommas, behalte Punkt
+                cleaned = re.sub(r',(?=\d{3})', '', number_str)
+                parsed_number = float(cleaned)
+                logger.debug(f"[NUMBER_PARSE] EN Format mit Dezimal erkannt: '{number_str}' → {parsed_number}")
+            else:
+                # Ungewöhnliches Format
+                parsed_number = float(number_str.replace(',', '.'))
+                logger.debug(f"[NUMBER_PARSE] Ungewöhnliches Format: '{number_str}' → {parsed_number}")
+                
+        # Fall 4: Nur Ziffern
+        else:
+            parsed_number = float(number_str)
+            logger.debug(f"[NUMBER_PARSE] Einfache Zahl: '{number_str}' → {parsed_number}")
+            
+        return parsed_number, unit_str.strip(), suffix_str.strip()
+        
+    except ValueError as e:
+        logger.warning(f"[NUMBER_PARSE] Fehler beim Parsen von '{number_str}': {e}")
+        return None, "", value_str
 
 class ValueNormalizer:
     """
@@ -165,6 +254,11 @@ class ValueNormalizer:
         """
         if not value or not isinstance(value, str):
             return str(value) if value else ""
+        
+        # SPEZIELLE VORBEHANDLUNG für Fördermenge-Felder (vor Basis-Normalisierung!)
+        if field_name in ['Fördermenge/Jahr Rohstoff', 'Fördermenge/Jahr Abraum']:
+            from .extraction_processors import process_production_amount
+            return process_production_amount(value, field_name)
         
         # Basis-Normalisierung: Whitespace, Akzente, Case
         normalized = self._basic_normalize(value)
@@ -343,16 +437,54 @@ class ValueNormalizer:
         return str(value)
     
     def _normalize_production_amount(self, value: str) -> str:
-        """Normalisiert Produktionsmengen (einheitliche Formatierung)"""
-        # Normalisiere Tausendertrennzeichen
-        normalized = value.replace(',', '.')
+        """KORRIGIERT: Intelligente Normalisierung von Produktionsmengen ohne Datenverlust"""
+        logger.debug(f"[NORMALIZE_PRODUCTION] Input: '{value}'")
         
-        # Normalisiere Leerzeichen um Zahlen
-        normalized = re.sub(r'(\d+)\s*\.\s*(\d+)', r'\1.\2', normalized)
-        normalized = re.sub(r'(\d+)\s+', r'\1 ', normalized)
+        # Verwende neue intelligente Zahlen-Parsing Funktion
+        parsed_number, unit, suffix = parse_number_with_separators(value)
         
-        if normalized != value:
-            logger.debug(f"[NORMALIZE] Production '{value}' → '{normalized}'")
+        if parsed_number is None:
+            # Fallback für Strings ohne erkennbare Zahlen
+            logger.debug(f"[NORMALIZE_PRODUCTION] Keine Zahl erkannt, Originalwert behalten: '{value}'")
+            return value
+        
+        # Normalisiere Einheiten auf Deutsch
+        unit_mapping = {
+            'ounces': 'Unzen',
+            'oz': 'Unzen', 
+            'tonnes': 'Tonnen',
+            'tons': 'Tonnen',
+            't': 'Tonnen',
+            'pounds': 'Pfund',
+            'lbs': 'Pfund',
+            'kilograms': 'Kilogramm',
+            'kg': 'Kilogramm',
+            'grams': 'Gramm',
+            'g': 'Gramm',
+            'million': 'Millionen',
+            'billion': 'Milliarden'
+        }
+        
+        # Normalisiere Einheit
+        normalized_unit = unit_mapping.get(unit.lower(), unit)
+        
+        # Formatiere Zahl im deutschen Format (Punkt als Tausendertrennzeichen)
+        if parsed_number >= 1000:
+            # Große Zahlen mit Tausendertrennzeichen
+            formatted_number = f"{parsed_number:,.0f}".replace(',', '.')
+        else:
+            # Kleine Zahlen ohne Trennzeichen
+            formatted_number = f"{parsed_number:g}"  # Entfernt unnötige Nullen
+        
+        # Baue normalisierten String zusammen
+        if suffix:
+            normalized = f"{formatted_number} {normalized_unit} {suffix}"
+        elif normalized_unit:
+            normalized = f"{formatted_number} {normalized_unit}"
+        else:
+            normalized = formatted_number
+        
+        logger.info(f"[NORMALIZE_PRODUCTION] '{value}' → '{normalized}' (Zahl: {parsed_number}, Einheit: '{unit}' → '{normalized_unit}', Suffix: '{suffix}')")
         
         return normalized
 

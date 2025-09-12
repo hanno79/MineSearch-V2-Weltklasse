@@ -275,10 +275,11 @@ def create_batch_results_table(results: List[Dict]) -> str:
             structured_data = {}
         
         # TRANSPARENCY FIX 30.08.2025: Bestimme Datenquelle für Anzeige
-        data_source = "unknown"
+        # REGEL 10 COMPLIANCE: NULL statt "unknown" Fallback
+        data_source = None  # REGEL 10: NULL statt versteckter Fallback-Wert
         source_icon = "❓"
         source_color = "#666666"
-        source_tooltip = "Unbekannte Datenquelle"
+        source_tooltip = "Keine Datenquelle verfügbar"  # REGEL 10: Explizite Kennzeichnung
         
         if success and data:
             individual_results = data.get('individual_results', [])

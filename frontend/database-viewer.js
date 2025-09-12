@@ -671,6 +671,20 @@ function setupDatabaseEventListeners() {
             applyDatabaseFilter();
         }
     });
+    
+    // Smooth Scroll Enhancement für Database Table
+    const tableWrapper = document.getElementById('database-table-wrapper');
+    if (tableWrapper) {
+        // Sanfte Scroll-Performance für große Tabellen
+        tableWrapper.style.scrollBehavior = 'smooth';
+        
+        // Optional: Scroll-Position bei Tab-Wechsel merken
+        tableWrapper.addEventListener('scroll', () => {
+            if (databaseViewer.currentTable) {
+                sessionStorage.setItem(`scrollPos_${databaseViewer.currentTable}`, tableWrapper.scrollTop);
+            }
+        });
+    }
 }
 
 /**

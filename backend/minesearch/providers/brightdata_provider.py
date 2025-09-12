@@ -34,7 +34,7 @@ from minesearch.specialized_prompts_impl import SpecializedPrompts
 
 logger = logging.getLogger(__name__)
 
-def _save_debug_html(html_content: str, url: str, mine_name: str = "unknown") -> Optional[str]:
+def _save_debug_html(html_content: str, url: str, mine_name: str = None) -> Optional[str]:  # REGEL 10: NULL statt 'unknown' Fallback
     """
     DEBUGGING 30.08.2025: Speichere HTML für Debug-Analyse
     """
@@ -331,7 +331,7 @@ class BrightdataProvider(AbstractProvider):
             all_sources.append({
                 'url': source.get('url', ''),
                 'title': source.get('title', source.get('url', '')),
-                'type': source.get('type', 'unknown'),
+                'type': source.get('type'),  # REGEL 10: NULL statt 'unknown' Fallback
                 'reliability': source.get('reliability_score')  # REGEL 10: Keine 0.5 Fallbacks
             })
         
@@ -436,7 +436,7 @@ class BrightdataProvider(AbstractProvider):
             all_sources.append({
                 'url': source.get('url', ''),
                 'title': source.get('title', source.get('url', '')),
-                'type': source.get('type', 'unknown'),
+                'type': source.get('type'),  # REGEL 10: NULL statt 'unknown' Fallback
                 'reliability': source.get('reliability_score')  # REGEL 10: Keine 0.5 Fallbacks
             })
         
@@ -584,7 +584,7 @@ class BrightdataProvider(AbstractProvider):
             all_sources.append({
                 'url': source.get('url', ''),
                 'title': source.get('title', source.get('url', '')),
-                'type': source.get('type', 'unknown'),
+                'type': source.get('type'),  # REGEL 10: NULL statt 'unknown' Fallback
                 'reliability': source.get('reliability_score')  # REGEL 10: Keine 0.5 Fallbacks
             })
         
@@ -816,8 +816,8 @@ class BrightdataProvider(AbstractProvider):
         content += "Detaillierte Funde:\n" + "-"*30 + "\n"
         for i, (data, source) in enumerate(zip(scraped_data, sources), 1):
             if data:
-                content += f"\nQuelle {i}: {source.get('title', 'N/A')}\n"
-                content += f"URL: {source.get('value', 'N/A')}\n"
+                content += f"\nQuelle {i}: {source.get('title', '')}\n"  # REGEL 10: NULL statt 'N/A'
+                content += f"URL: {source.get('value', '')}\n"  # REGEL 10: NULL statt 'N/A'
                 
                 for key, value in data.items():
                     if value and key != 'mine_name' and key != 'title':

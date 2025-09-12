@@ -19,7 +19,7 @@ class SourceRecord:
     domain: str
     country: Optional[str] = None
     region: Optional[str] = None
-    source_type: str = "unknown"  # government, exchange, industry, database, document
+    source_type: str = None  # REGEL 10: NULL statt "unknown" Fallback-Wert
     reliability_score: float = 50.0  # 0-100
     last_successful_access: Optional[datetime] = None
     last_attempted_access: Optional[datetime] = None

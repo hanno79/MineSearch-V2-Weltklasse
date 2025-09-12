@@ -388,7 +388,7 @@ def _identify_mining_region(longitude: float) -> Optional[str]:
     elif 60 <= longitude <= 180:
         return "Asia/Oceania"
     else:
-        return "Unknown"
+        return None  # REGEL 10: NULL statt "Unknown" Fallback
 
 
 def validate_restoration_cost(value: str, currency: str = 'USD') -> Optional[str]:

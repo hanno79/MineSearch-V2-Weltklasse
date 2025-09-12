@@ -38,12 +38,13 @@ from .consolidated_processors import (
     process_best_value_algorithm,
     create_global_source_index
 )
-from .consolidated_exporters import export_consolidated_csv
+from .consolidated_exporters import router as export_router
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# CSV export functionality available via import
+# Include CSV export routes from consolidated_exporters
+router.include_router(export_router)
 
 
 @router.get("/results")
@@ -513,7 +514,3 @@ async def get_mine_statistics(mine_name: str, days_back: int = Query(30)):
             'error': f'Fehler beim Laden der Mine-Statistiken: {str(e)}',
             'mine_name': mine_name
         }
-
-
-# Add CSV export route from consolidated_exporters
-router.get("/results/export/csv")(export_consolidated_csv)

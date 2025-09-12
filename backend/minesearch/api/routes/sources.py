@@ -480,7 +480,7 @@ async def seed_sources_database(
                 "message": result["message"],
                 "data": {
                     "existing_count": result.get("existing_count", 0),
-                    "action": result.get("action", "skipped")
+                    "action": result.get("action") or "skipped"  # REGEL 10: Keine direkten Fallbacks
                 }
             }
             

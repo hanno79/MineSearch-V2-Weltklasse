@@ -49,8 +49,8 @@ def test_api_search():
         result = response.json()
         
         print("✅ API-Aufruf erfolgreich!")
-        print(f"📊 Mine: {result.get('mine_name', 'N/A')}")
-        print(f"🤖 Model: {result.get('model_used', 'N/A')}")
+        print(f"📊 Mine: {result.get('mine_name', '') or '[nicht gefunden]'}")  # REGEL 10: Keine N/A Fallbacks
+        print(f"🤖 Model: {result.get('model_used', '') or '[nicht angegeben]'}")  # REGEL 10: Keine N/A Fallbacks
         print(f"🔢 Felder gefunden: {len(result.get('structured_data', {}))}")
         print(f"⏱️  Search Duration: {result.get('search_duration_ms', 0)} ms")
         

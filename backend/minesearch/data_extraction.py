@@ -22,7 +22,8 @@ from minesearch.extraction_processors import (
     process_restoration_costs, process_activity_status,
     split_country_region, find_region_from_content,
     process_sources, post_process_data, clean_field_value,
-    is_template_or_dummy_value, extract_core_value
+    is_template_or_dummy_value, extract_core_value,
+    extract_restoration_cost_year
 )
 from minesearch.source_manager import SourceManager
 from minesearch.field_name_blacklist import is_field_name_value
@@ -251,6 +252,9 @@ class DataExtractor:
             Dict mit extrahierten Daten und Quellen-Mapping
         """
         try:
+            # Speichere Content für später verfügbare Jahr-Extraktion
+            self._current_content = content
+            
             # Reset SourceManager für neue Extraktion
             self.source_manager = SourceManager()
             
@@ -942,6 +946,19 @@ class DataExtractor:
                 data['Restaurationskosten'] = validated
             else:
                 data['Restaurationskosten'] = ""
+        
+        # ERWEITERT 11.09.2025: Intelligente Jahr-Extraktion für Restaurationskosten
+        # Falls Restaurationskosten vorhanden, aber kein Jahr: Extrahiere aus Content oder Kostenwert
+        if data.get('Restaurationskosten') and not data.get('Jahr der Aufnahme der Kosten'):
+            # Versuche Jahr aus Restaurationskosten-Wert oder Content zu extrahieren
+            content = getattr(self, '_current_content', '')  # Falls verfügbar
+            extracted_year = extract_restoration_cost_year(
+                content, 
+                data.get('Restaurationskosten')
+            )
+            if extracted_year:
+                data['Jahr der Aufnahme der Kosten'] = extracted_year
+                logger.info(f"[COST-YEAR-AUTO] Jahr der Aufnahme der Kosten automatisch extrahiert: {extracted_year}")
         
         # Jahre
         if data.get('Jahr der Aufnahme der Kosten'):

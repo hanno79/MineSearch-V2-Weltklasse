@@ -25,7 +25,7 @@ class SourceReference:
     id: int
     url: str
     title: str = ""
-    type: str = "unknown"
+    type: str = None  # REGEL 10: NULL statt "unknown" Fallback-Wert
     reliability: float = None  # REGEL 10: Keine Fallback-Werte - nur echte Zuverlässigkeit oder None
 
 
@@ -45,7 +45,7 @@ class SourceManager:
         self.next_id = 1
         self.field_sources: Dict[str, List[int]] = {}
     
-    def add_source(self, url: str, title: str = "", source_type: str = "unknown", reliability: float = None) -> int:
+    def add_source(self, url: str, title: str = "", source_type: str = None, reliability: float = None) -> int:
         """
         Fügt eine neue Quelle hinzu oder gibt existierende ID zurück
         
