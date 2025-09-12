@@ -79,7 +79,7 @@ function updateRangeInfo() {
     }
 }
 
-// Event Listeners für Range-Inputs
+// Event Listeners für Range-Inputs und Form-Handling
 document.addEventListener('DOMContentLoaded', function() {
     const startInput = document.getElementById('start-position');
     const countInput = document.getElementById('range-count');
@@ -90,12 +90,28 @@ document.addEventListener('DOMContentLoaded', function() {
     if (countInput) {
         countInput.addEventListener('input', updateRangeInfo);
     }
+    
+    // DASHLANE-FIX: Moderner Form-Event-Handler
+    const singleSearchForm = document.getElementById('single-search-form');
+    if (singleSearchForm) {
+        singleSearchForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            startSingleSearch(event);
+        });
+    }
 });
 
 /**
  * SINGLE SEARCH: Startet eine Einzelsuche mit ausgewählten Modellen
+ * @param {Event} event - Das Form-Submit Event (optional)
  */
-function startSingleSearch() {
+function startSingleSearch(event) {
+    // DASHLANE-FIX: Verhindere Browser/Extension-Interferenz
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
     // PROGRESSIVE MODEL SELECTION FIX: Verwende neues Model Selection System
     const selectedModels = window.progressiveModelSelection?.getSelectedModels() || 
                            Array.from(document.querySelectorAll('input[name="model"]:checked')).map(cb => cb.value);

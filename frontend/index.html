@@ -287,7 +287,12 @@
                     </div>
                 </div>
                 
-                <form id="single-search-form" onsubmit="startSingleSearch(); return false;">
+                <form id="single-search-form" 
+                      autocomplete="off" 
+                      novalidate 
+                      data-dashlane-rid="" 
+                      data-1p-ignore=""
+                      data-lpignore="true">
                     <div class="form-group">
                         <label for="mine_name">Mine Name: <span class="required">*</span></label>
                         <input type="text" id="mine_name" name="mine_name" 
