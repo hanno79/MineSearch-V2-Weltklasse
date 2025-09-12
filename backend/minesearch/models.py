@@ -266,7 +266,7 @@ None) -> SearchSession:
                 # NORMALISIERUNG FIX 04.09.2025: JSON-Spalten entfernt
                 typical_content_types=[],
                 metadata={}
-             for db_source in db_sources])
+            ) for db_source in db_sources])
         return records
 
     def save_to_file(self, filepath: str):

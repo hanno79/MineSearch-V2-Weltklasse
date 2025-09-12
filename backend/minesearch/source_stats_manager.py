@@ -21,7 +21,7 @@ class SourceStatsManager:
     """
 
     def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         logger.info("[SOURCE-STATS] Fallback Source Stats Manager initialisiert")
 
     async def get_performance_summary(self) -> Dict[str, Any]:

@@ -45,7 +45,7 @@ class AbstractProvider(ABC):
     """Abstrakte Basis-Klasse für alle Search-Provider"""
 
     def __init__(self, api_key: str, config: Dict[str, Any]):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         self.api_key = api_key
         self.config = config
         self.name = self.__class__.__name__.replace('Provider', '').lower()
@@ -169,13 +169,13 @@ class AbstractProvider(ABC):
         return result
 
     def _build_single_field_query(
-    """_build_single_field_query - TODO: Dokumentation hinzufügen"""
         self,
         field_name: str,
         mine_name: str,
         sources: List[Dict[str, Any]],
         options: Optional[Dict[str, Any]] = None
     ) -> str:
+        """_build_single_field_query - TODO: Dokumentation hinzufügen"""
         """
         Erstellt eine fokussierte Query für ein einzelnes Feld
         """
@@ -280,16 +280,13 @@ Gib die EXAKTE Gesamtmenge inkl. Abraum zurück."""
 
         # Standard-Varianten
         field_mapping = {
-            'Restaurationskosten': ['Restaurationskosten', 'Mine Closure Cost', 'Decommissioning
-Cost', 'Restoration Cost'],
+            'Restaurationskosten': ['Restaurationskosten', 'Mine Closure Cost', 'Decommissioning Cost', 'Restoration Cost'],
             'Eigentümer': ['Eigentümer', 'Owner', 'Company', 'Corporation'],
             'Betreiber': ['Betreiber', 'Operator', 'Operating Company', 'Manager'],
             'Aktivitätsstatus': ['Aktivitätsstatus', 'Status', 'Operational Status', 'Mine Status'],
             'Rohstoff': ['Rohstoff', 'Commodity', 'Resource', 'Mineral'],
-            'Fördermenge/Jahr Rohstoff': ['Fördermenge/Jahr Rohstoff', 'Annual Commodity
-Production', 'Refined Production', 'Metal Production', 'Gold Production', 'Copper Production'],
-            'Fördermenge/Jahr Abraum': ['Fördermenge/Jahr Abraum', 'Total Material Mined', 'Mining
-Volume', 'Waste Rock', 'Overburden', 'Total Extraction'],
+            'Fördermenge/Jahr Rohstoff': ['Fördermenge/Jahr Rohstoff', 'Annual Commodity Production', 'Refined Production', 'Metal Production', 'Gold Production', 'Copper Production'],
+            'Fördermenge/Jahr Abraum': ['Fördermenge/Jahr Abraum', 'Total Material Mined', 'Mining Volume', 'Waste Rock', 'Overburden', 'Total Extraction'],
             'x-Koordinate': ['x-Koordinate', 'Latitude', 'Lat', 'X-Coordinate'],
             'y-Koordinate': ['y-Koordinate', 'Longitude', 'Lon', 'Long', 'Y-Coordinate'],
             'Country': ['Country', 'Land', 'Nation'],
@@ -303,9 +300,8 @@ Volume', 'Waste Rock', 'Overburden', 'Total Extraction'],
 
         return list(set(variants))  # Remove duplicates
 
-    def format_search_query(self, mine_name: str, country: Optional[str],
-    """format_search_query - TODO: Dokumentation hinzufügen"""
-                          commodity: Optional[str], options: Dict[str, Any]) -> str:
+    def format_search_query(self, mine_name: str, country: Optional[str], commodity: Optional[str], options: Dict[str, Any]) -> str:
+        """format_search_query - TODO: Dokumentation hinzufügen"""
         """
         Formatiert die Suchanfrage für diesen Provider
         Kann von Subklassen überschrieben werden für provider-spezifische Formatierung

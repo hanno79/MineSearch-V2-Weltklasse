@@ -57,8 +57,7 @@ class SearchResult(Base):
     )
 
     def __repr__(self):
-        return f"<SearchResult(id={self.id}, mine='{self.mine_name}', field='{self.field_name}',
-value='{self.extracted_value[:50] if self.extracted_value else None}...')>"
+        return f"<SearchResult(id={self.id}, mine='{self.mine_name}', field='{self.field_name}', value='{self.extracted_value[:50] if self.extracted_value else None}...')>"
 
     def to_dict(self):
         """Konvertiert SearchResult zu Dictionary"""
@@ -116,8 +115,7 @@ class ModelPerformance(Base):
     )
 
     def __repr__(self):
-        return f"<ModelPerformance(id={self.id}, model='{self.model_id}', field='{self.field_name}',
-success_rate={self.success_rate:.2f})>"
+        return f"<ModelPerformance(id={self.id}, model='{self.model_id}', field='{self.field_name}', success_rate={self.success_rate:.2f})>"
 
     def to_dict(self):
         """Konvertiert ModelPerformance zu Dictionary"""

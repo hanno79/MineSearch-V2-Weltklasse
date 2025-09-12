@@ -134,8 +134,7 @@ class SearchSession(Base):
     )
 
     def __repr__(self):
-        return f"<SearchSession(id={self.id}, session_id='{self.session_id}',
-mine='{self.mine_name}', status='{self.status}')>"
+        return f"<SearchSession(id={self.id}, session_id='{self.session_id}', mine='{self.mine_name}', status='{self.status}')>"
 
     def to_dict(self):
         """Konvertiert SearchSession zu Dictionary"""

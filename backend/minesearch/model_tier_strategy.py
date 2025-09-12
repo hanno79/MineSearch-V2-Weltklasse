@@ -17,7 +17,7 @@ class ModelTierStrategy:
     """Implementiert kaskadierende Modell-Auswahl basierend auf Performance"""
 
     def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         # ÄNDERUNG 14.07.2025: Kostenlose Modelle als Tier 1 priorisieren - Kimi K2 als primäres Fallback
         self.tier_definitions = {
             'tier_1_free_primary': {
@@ -168,13 +168,11 @@ class ModelTierStrategy:
             Warnung-String
         """
         if self.is_premium_model(model_id):
-            return f"⚠️ KOSTENPFLICHTIG: {model_id} verursacht Kosten! Verwende openrouter:kimi-k2
-für kostenlose Alternative."
+            return f"⚠️ KOSTENPFLICHTIG: {model_id} verursacht Kosten! Verwende openrouter:kimi-k2 für kostenlose Alternative."
         return ""
 
-    def should_continue_to_next_tier(self, current_results: Dict[str, Any],
-    """should_continue_to_next_tier - TODO: Dokumentation hinzufügen"""
-                                   current_tier: str) -> bool:
+    def should_continue_to_next_tier(self, current_results: Dict[str, Any], current_tier: str) -> bool:
+        """should_continue_to_next_tier - TODO: Dokumentation hinzufügen"""
         """
         Entscheidet ob die nächste Tier aktiviert werden soll
 

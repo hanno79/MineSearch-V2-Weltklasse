@@ -12,7 +12,14 @@ import logging
 from datetime import datetime
 import json
 
-from minesearch.database import db_manager
+try:
+    from minesearch.database import db_manager
+except ImportError:
+    # Fallback für Import-Probleme
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+    from backend.minesearch.database import db_manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -88,7 +95,16 @@ IMPORTANT_TABLES = [
 async def get_all_tables():
     """Gibt eine Liste aller verfügbaren Tabellen zurück"""
     try:
-        with db_manager.get_session() as session:
+        # Defensive: Stelle sicher, dass DB vorhanden ist und öffne Session robust
+        if not hasattr(db_manager, 'get_session'):
+            logger.error("Database manager nicht initialisiert")
+            raise HTTPException(status_code=503, detail={"message": "Datenbankmanager nicht verfügbar"})
+        
+        session = db_manager.get_session()
+        if not session:
+            logger.error("Session konnte nicht erstellt werden")
+            raise HTTPException(status_code=503, detail={"message": "Keine Datenbankverbindung"})
+        try:
             preparer = session.bind.dialect.identifier_preparer
             # Alle Tabellen aus sqlite_master
             result = session.execute(text("""
@@ -143,10 +159,16 @@ async def get_all_tables():
                 "normalized": True,  # Flag für normalisierte DB
                 "category_count": len(categories_found)
             }
+        finally:
+            try:
+                session.close()
+            except Exception:
+                pass
 
     except Exception as e:
         logger.error(f"Fehler beim Laden der Tabellen: {e}")
-        raise HTTPException(status_code=500, detail=f"Fehler: {str(e)}")
+        # Liefere strukturierte Fehlermeldung statt hartem 500 ohne Details
+        raise HTTPException(status_code=500, detail={"message": str(e)})
 
 @router.get("/table/{table_name}")
 async def get_table_data(
@@ -160,7 +182,15 @@ async def get_table_data(
 ):
     """Gibt Daten einer spezifischen Tabelle zurück"""
     try:
-        with db_manager.get_session() as session:
+        if not hasattr(db_manager, 'get_session'):
+            logger.error("Database manager nicht initialisiert")
+            raise HTTPException(status_code=503, detail={"message": "Datenbankmanager nicht verfügbar"})
+        
+        session = db_manager.get_session()
+        if not session:
+            logger.error("Session konnte nicht erstellt werden")
+            raise HTTPException(status_code=503, detail={"message": "Keine Datenbankverbindung"})
+        try:
             # Validiere Tabelle existiert
             check_table = session.execute(text("""
                 SELECT name FROM sqlite_master
@@ -282,12 +312,17 @@ async def get_table_data(
                     }
                 }
             }
+        finally:
+            try:
+                session.close()
+            except Exception:
+                pass
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Fehler beim Laden von Tabelle {table_name}: {e}")
-        raise HTTPException(status_code=500, detail=f"Fehler: {str(e)}")
+        raise HTTPException(status_code=500, detail={"message": str(e)})
 
 @router.get("/schema/{table_name}")
 async def get_table_schema(table_name: str):
@@ -361,7 +396,8 @@ async def export_table_csv(
         from io import StringIO
         import csv
 
-        with db_manager.get_session() as session:
+        session = db_manager.get_session()
+        try:
             preparer = session.bind.dialect.identifier_preparer
             # Validiere Tabelle
             check_table = session.execute(text("""
@@ -427,9 +463,14 @@ async def export_table_csv(
                     "Content-Disposition": f"attachment; filename={table_name}_export.csv"
                 }
             )
+        finally:
+            try:
+                session.close()
+            except Exception:
+                pass
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Fehler beim CSV-Export von {table_name}: {e}")
-        raise HTTPException(status_code=500, detail=f"Fehler: {str(e)}")
+        raise HTTPException(status_code=500, detail={"message": str(e)})

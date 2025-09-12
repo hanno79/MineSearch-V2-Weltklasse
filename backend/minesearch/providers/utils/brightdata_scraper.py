@@ -17,7 +17,7 @@ class BrightdataScraper:
     """Scraper-Implementierungen für verschiedene Brightdata-APIs"""
 
     def __init__(self, customer_id: str, password: str):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         self.customer_id = customer_id
         self.password = password
 
@@ -32,8 +32,7 @@ class BrightdataScraper:
             proxy_url = f"http://{self.customer_id}-zone-web_unlocker:@brd.superproxy.io:22225"
         else:
             # Kurze customer_id - füge Präfix hinzu
-            proxy_url =
-f"http://brd-customer-{self.customer_id}-zone-web_unlocker:{self.password}@brd.superproxy.io:22225"
+            proxy_url = f"http://brd-customer-{self.customer_id}-zone-web_unlocker:{self.password}@brd.superproxy.io:22225"
 
         default_headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'

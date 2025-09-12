@@ -95,15 +95,15 @@ class Config(APIKeysConfig):
     PROVIDERS = PROVIDERS_CONFIG
 
     # Modell Konfigurationen
-    PERPLEXITY_MODELS = MODELS_CONFIG['perplexity']
-    ANTHROPIC_MODELS = MODELS_CONFIG['anthropic']
-    GEMINI_MODELS = MODELS_CONFIG['gemini']
-    GROK_MODELS = MODELS_CONFIG['grok']
-    OPENAI_MODELS = MODELS_CONFIG['openai']
-    # DEEPSEEK_MODELS = MODELS_CONFIG['deepseek']  # ENTFERNT 06.08.2025: DeepSeek nur über OpenRouter
-    OPENROUTER_MODELS = MODELS_CONFIG['openrouter']
-    EXA_MODELS = MODELS_CONFIG['exa']
-    TAVILY_MODELS = MODELS_CONFIG['tavily']
+    PERPLEXITY_MODELS = MODELS_CONFIG.get('perplexity', {})
+    ANTHROPIC_MODELS = MODELS_CONFIG.get('anthropic', {})
+    GEMINI_MODELS = MODELS_CONFIG.get('gemini', {})
+    GROK_MODELS = MODELS_CONFIG.get('grok', {})
+    OPENAI_MODELS = MODELS_CONFIG.get('openai', {})
+    # DEEPSEEK_MODELS = MODELS_CONFIG.get('deepseek', {})  # ENTFERNT 06.08.2025: DeepSeek nur über OpenRouter
+    OPENROUTER_MODELS = MODELS_CONFIG.get('openrouter', {})
+    EXA_MODELS = MODELS_CONFIG.get('exa', {})
+    TAVILY_MODELS = MODELS_CONFIG.get('tavily', {})
 
     # Globale Mining-Begriffe und Abkürzungen
     MINING_ABBREVIATIONS = {
@@ -168,7 +168,7 @@ class Config(APIKeysConfig):
         """
 
         def _parse_int(name: str, default: int, min_value: int = 1) -> int:
-    """_parse_int - TODO: Dokumentation hinzufügen"""
+            """_parse_int - TODO: Dokumentation hinzufügen"""
             raw = os.getenv(name)
             if raw is None or str(raw).strip() == '':
                 return default
@@ -180,9 +180,8 @@ class Config(APIKeysConfig):
                 raise ValueError(f"Ungültiger Wert für {name}: {value} (Minimum: {min_value}).")
             return value
 
-        def _parse_float(name: str, default: float, min_value: Optional[float] = None, max_value:
-    """_parse_float - TODO: Dokumentation hinzufügen"""
-Optional[float] = None) -> float:
+        def _parse_float(name: str, default: float, min_value: Optional[float] = None, max_value: Optional[float] = None) -> float:
+            """_parse_float - TODO: Dokumentation hinzufügen"""
             raw = os.getenv(name)
             if raw is None or str(raw).strip() == '':
                 return default
@@ -197,7 +196,7 @@ Optional[float] = None) -> float:
             return value
 
         def _parse_bool(name: str, default: bool) -> bool:
-    """_parse_bool - TODO: Dokumentation hinzufügen"""
+            """_parse_bool - TODO: Dokumentation hinzufügen"""
             raw = os.getenv(name)
             if raw is None or str(raw).strip() == '':
                 return default

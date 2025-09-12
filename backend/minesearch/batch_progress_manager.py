@@ -43,7 +43,7 @@ class ProgressUpdate:
     timestamp: datetime = None
 
     def __post_init__(self):
-    """__post_init__ - TODO: Dokumentation hinzufügen"""
+        """__post_init__ - TODO: Dokumentation hinzufügen"""
         if self.timestamp is None:
             self.timestamp = datetime.now()
 
@@ -86,7 +86,7 @@ class SessionProgress:
     updates_history: List[ProgressUpdate] = None
 
     def __post_init__(self):
-    """__post_init__ - TODO: Dokumentation hinzufügen"""
+        """__post_init__ - TODO: Dokumentation hinzufügen"""
         if self.updates_history is None:
             self.updates_history = []
 
@@ -94,7 +94,7 @@ class BatchProgressManager:
     """Zentraler Manager für Batch-Fortschritt"""
 
     def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         self.sessions: Dict[str, SessionProgress] = {}
         self.lock = threading.RLock()
         self._websocket_connections: Dict[str, List] = {}
@@ -248,9 +248,7 @@ class BatchProgressManager:
         self.update_progress(
             session_id=session_id,
             state=ProgressState.SOURCE_DISCOVERY,
-            message=f"Verarbeite Mine {mine_index + 1}/{self.sessions.get(session_id,
-SessionProgress('', datetime.now(), datetime.now(), ProgressState.PROCESSING_CSV, '')).total_mines}:
-{mine_name}",
+            message=f"Verarbeite Mine {mine_index + 1}/{self.sessions.get(session_id, SessionProgress('', datetime.now(), datetime.now(), ProgressState.PROCESSING_CSV, '')).total_mines}: {mine_name}",
             current_mine_index=mine_index,
             current_mine_name=mine_name,
             completed_models=0  # Reset model counter for new mine
@@ -293,8 +291,7 @@ SessionProgress('', datetime.now(), datetime.now(), ProgressState.PROCESSING_CSV
             self.update_progress(
                 session_id=session_id,
                 state=ProgressState.MODEL_EXECUTION,
-                message=f"Modell {model_name} {'erfolgreich' if success else 'fehlgeschlagen'} -
-{session.completed_models}/{session.total_models} abgeschlossen",
+                message=f"Modell {model_name} {'erfolgreich' if success else 'fehlgeschlagen'} - {session.completed_models}/{session.total_models} abgeschlossen",
                 completed_models=session.completed_models,
                 successful_results=session.successful_results,
                 failed_results=session.failed_results
@@ -346,8 +343,7 @@ SessionProgress('', datetime.now(), datetime.now(), ProgressState.PROCESSING_CSV
             self.update_progress(
                 session_id=session_id,
                 state=ProgressState.MINE_COMPLETE,
-                message=f"Mine '{mine_name}' abgeschlossen -
-{session.completed_mines}/{session.total_mines} Minen fertig",
+                message=f"Mine '{mine_name}' abgeschlossen - {session.completed_mines}/{session.total_mines} Minen fertig",
                 completed_mines=session.completed_mines
             )
 
@@ -358,8 +354,7 @@ SessionProgress('', datetime.now(), datetime.now(), ProgressState.PROCESSING_CSV
             self.update_progress(
                 session_id=session_id,
                 state=ProgressState.BATCH_COMPLETE,
-                message=f"Batch-Suche abgeschlossen! {session.successful_results} erfolgreiche,
-{session.failed_results} fehlgeschlagene Ergebnisse"
+                message=f"Batch-Suche abgeschlossen! {session.successful_results} erfolgreiche, {session.failed_results} fehlgeschlagene Ergebnisse"
             )
 
     def mark_error(self, session_id: str, error_message: str) -> None:
@@ -381,9 +376,7 @@ SessionProgress('', datetime.now(), datetime.now(), ProgressState.PROCESSING_CSV
 
             # Erweiterte Logs für Frontend-JavaScript-Polling
             logger.info(f"[BATCH-PROGRESS] {session_id} | {state.upper()} | {percent:.1f}% | {message}")
-            logger.info(f"[BATCH-PROGRESS-DETAIL] Mines:
-{session.completed_mines}/{session.total_mines}, Models:
-{session.completed_models}/{session.total_models}, Sources: {session.sources_found}")
+            logger.info(f"[BATCH-PROGRESS-DETAIL] Mines: {session.completed_mines}/{session.total_mines}, Models: {session.completed_models}/{session.total_models}, Sources: {session.sources_found}")
 
         if session_id in self._websocket_connections:
             # WebSocket-Implementation würde hier stehen

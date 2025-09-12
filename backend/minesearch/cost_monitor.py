@@ -15,7 +15,7 @@ class CostMonitor:
     """Überwacht Kosten für Premium-Modelle"""
 
     def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         self.tier_strategy = ModelTierStrategy()
         self.usage_warnings: Dict[str, int] = {}
         self.premium_models_used: Set[str] = set()

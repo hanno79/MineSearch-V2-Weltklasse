@@ -467,5 +467,4 @@ def normalize_mine_name_for_grouping(mine_name: str) -> str:
     return normalized.lower()
 
 
-# ÄNDERUNG 01.07.2025: Duplizierte Funktionen entfernt - diese existieren bereits in
-source_discovery.py und data_extraction.py  # Entferne Duplikate und sortiere
+# ÄNDERUNG 01.07.2025: Duplizierte Funktionen entfernt - diese existieren bereits in source_discovery.py und data_extraction.py  # Entferne Duplikate und sortiere

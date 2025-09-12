@@ -22,7 +22,7 @@ class ProviderStatusChecker:
     """Umfassende Provider-Status und API-Key Validierung"""
 
     def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         self.test_results = {}
 
     async def check_provider_health(self, provider_name: str, api_key: str) -> Dict[str, Any]:
@@ -171,8 +171,7 @@ class ProviderStatusChecker:
             #     'url': 'https://api.abacus.ai/api/v0/listProjects',
             #     'headers': {'apiKey': api_key, 'Content-Type': 'application/json'},
             #     'method': 'GET',
-            #     'budget_check': lambda r: 'insufficient_quota' not in str(r) and 'rate_limit' not
-in str(r) and 'authentication' not in str(r).lower()
+            #     'budget_check': lambda r: 'insufficient_quota' not in str(r) and 'rate_limit' not in str(r) and 'authentication' not in str(r).lower()
             # },
             'exa': {
                 'url': 'https://api.exa.ai/search',  # EXA-TEST-FIX 29.08.2025: Exa Neural Search API
@@ -214,8 +213,7 @@ in str(r) and 'authentication' not in str(r).lower()
                         elif response.status in [402, 433]:  # BUDGET-FIX 29.08.2025: Erkenne Budget-Limits auch bei GET
                             budget_ok = provider_config['budget_check'](text)
                             if not budget_ok:
-                                return {'accessible': True, 'budget_ok': False, 'error': f'Budget
-exceeded (HTTP {response.status})'}
+                                return {'accessible': True, 'budget_ok': False, 'error': f'Budget exceeded (HTTP {response.status})'}
                             return {'accessible': False, 'budget_ok': False, 'error': f'HTTP {response.status}'}
                         else:
                             return {'accessible': False, 'budget_ok': False, 'error': f'HTTP {response.status}'}
@@ -238,13 +236,10 @@ exceeded (HTTP {response.status})'}
                         elif response.status in [402, 433]:  # BUDGET-FIX 29.08.2025: Erkenne Budget-Limits
                             budget_ok = provider_config['budget_check'](text)
                             if not budget_ok:
-                                return {'accessible': True, 'budget_ok': False, 'error': f'Budget
-exceeded (HTTP {response.status})'}
-                            return {'accessible': False, 'budget_ok': False, 'error': f'HTTP
-{response.status}: {text[:200]}'}
+                                return {'accessible': True, 'budget_ok': False, 'error': f'Budget exceeded (HTTP {response.status})'}
+                            return {'accessible': False, 'budget_ok': False, 'error': f'HTTP {response.status}: {text[:200]}'}
                         else:
-                            return {'accessible': False, 'budget_ok': False, 'error': f'HTTP
-{response.status}: {text[:200]}'}
+                            return {'accessible': False, 'budget_ok': False, 'error': f'HTTP {response.status}: {text[:200]}'}
 
         except asyncio.TimeoutError:
             return {'accessible': False, 'budget_ok': False, 'error': 'Connection timeout'}
@@ -322,14 +317,11 @@ exceeded (HTTP {response.status})'}
         api_errors = len([r for r in self.test_results.values() if r['status'] in ['api_error',
 'invalid_key', 'connection_error']])
 
-        logger.info(f"[PROVIDER-STATUS] ✅ Validierung abgeschlossen:
-{healthy_providers}/{total_providers} Provider funktionsfähig")
+        logger.info(f"[PROVIDER-STATUS] ✅ Validierung abgeschlossen: {healthy_providers}/{total_providers} Provider funktionsfähig")
         if missing_keys > 0:
-            logger.warning(f"[PROVIDER-STATUS] ⚠️ {missing_keys} Provider ohne API-Key: {[k for k, v
-in self.test_results.items() if v['status'] == 'no_api_key']}")
+            logger.warning(f"[PROVIDER-STATUS] ⚠️ {missing_keys} Provider ohne API-Key: {[k for k, v in self.test_results.items() if v['status'] == 'no_api_key']}")
         if api_errors > 0:
-            logger.warning(f"[PROVIDER-STATUS] ❌ {api_errors} Provider mit API-Fehlern: {[k for k, v
-in self.test_results.items() if v['status'] in ['api_error', 'invalid_key', 'connection_error']]}")
+            logger.warning(f"[PROVIDER-STATUS] ❌ {api_errors} Provider mit API-Fehlern: {[k for k, v in self.test_results.items() if v['status'] in ['api_error', 'invalid_key', 'connection_error']]}" )
 
         return summary
 

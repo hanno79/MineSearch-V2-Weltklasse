@@ -310,5 +310,17 @@ class OpenAIProvider(AbstractProvider):
             'timestamp': datetime.now().isoformat()
         }
 
+    def get_models(self) -> List[str]:
+        """Abstrakte Methode: Hole verfügbare Modelle"""
+        return self.get_available_models()
+    
+    def validate_config(self) -> bool:
+        """Abstrakte Methode: Validiere Provider-Konfiguration"""
+        return bool(self.api_key)
+    
+    def get_system_prompt(self) -> str:
+        """Abstrakte Methode: System-Prompt für OpenAI"""
+        return "You are a professional mining data analysis assistant using OpenAI models."
+
 
 __all__ = ["OpenAIProvider"]

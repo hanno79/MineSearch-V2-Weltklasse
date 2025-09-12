@@ -19,7 +19,7 @@ except ImportError:
     # Fallback: Simple in-memory tracker
     class SimpleProgressTracker:
         def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+            """__init__ - TODO: Dokumentation hinzufügen"""
             self.sessions = {}
             self.websocket_connections = {}
 
@@ -34,12 +34,12 @@ except ImportError:
 
     class SimpleProgressTracker:
         def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+            """__init__ - TODO: Dokumentation hinzufügen"""
             self.sessions = {}
             self.websocket_connections = {}
 
         def create_session(self, total_operations):
-    """create_session - TODO: Dokumentation hinzufügen"""
+            """create_session - TODO: Dokumentation hinzufügen"""
             session_id = str(uuid.uuid4())
             self.sessions[session_id] = {
                 'total': total_operations,
@@ -52,7 +52,7 @@ except ImportError:
             return session_id
 
         def get_progress(self, session_id):
-    """get_progress - TODO: Dokumentation hinzufügen"""
+            """get_progress - TODO: Dokumentation hinzufügen"""
             return self.sessions.get(session_id, None)
 
         async def increment_progress(self, session_id, operation_key, success=True):
@@ -77,7 +77,7 @@ except ImportError:
                     pass
 
         def cleanup_old_sessions(self, max_age_hours=24):
-    """cleanup_old_sessions - TODO: Dokumentation hinzufügen"""
+            """cleanup_old_sessions - TODO: Dokumentation hinzufügen"""
             cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
             old_sessions = [
                 sid for sid, data_dict in self.sessions.items()
@@ -135,7 +135,7 @@ async def websocket_progress_endpoint(websocket: WebSocket, session_id: str):
                 break
             except json.JSONDecodeError:
                 logger.warning(f"Invalid JSON received from WebSocket client: {session_id}")
-        except ValueError as e:
+            except ValueError as e:
                 logger.error(f"Error processing WebSocket message: {e}")
                 break
 

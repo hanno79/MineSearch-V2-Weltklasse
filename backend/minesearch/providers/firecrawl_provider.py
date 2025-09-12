@@ -303,5 +303,72 @@ class FirecrawlProvider(AbstractProvider):
             logger.error(f"Fehler beim parallelen Crawlen: {e}")
             return []
 
+    def get_models(self) -> Dict[str, ModelConfig]:
+        """Gibt alle verfügbaren Modelle dieses Providers zurück"""
+        return {
+            "firecrawl:default": ModelConfig(
+                id="firecrawl:default",
+                name="Firecrawl Default",
+                provider="firecrawl",
+                description="Standard Firecrawl Web-Crawling",
+                max_tokens=8000,
+                timeout=30,
+                supports_web_search=True,
+                is_free=False
+            ),
+            "firecrawl:premium": ModelConfig(
+                id="firecrawl:premium",
+                name="Firecrawl Premium",
+                provider="firecrawl",
+                description="Premium Firecrawl mit erweiterten Features",
+                max_tokens=16000,
+                timeout=60,
+                supports_web_search=True,
+                is_free=False
+            )
+        }
+
+    def validate_config(self) -> bool:
+        """Validiert die Provider-Konfiguration (API-Key, etc.)"""
+        try:
+            # Prüfe ob API-Key vorhanden ist
+            if not self.api_key:
+                logger.warning("Firecrawl API-Key fehlt")
+                return False
+            
+            # Prüfe ob API-Key Format korrekt ist (einfache Validierung)
+            if len(self.api_key) < 10:
+                logger.warning("Firecrawl API-Key zu kurz")
+                return False
+            
+            logger.info("Firecrawl Konfiguration valide")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Fehler bei Firecrawl Konfigurationsvalidierung: {e}")
+            return False
+
+    def get_system_prompt(self, options: Dict[str, Any]) -> str:
+        """Gibt den System-Prompt für diesen Provider zurück"""
+        prompt = """Du bist ein Web-Crawling Assistant, der Firecrawl verwendet.
+        
+Deine Aufgaben:
+- Crawle und analysiere Webseiten
+- Extrahiere relevante Informationen
+- Konvertiere HTML zu strukturiertem Markdown
+- Bereinige und validiere den Inhalt
+
+Verhalte dich professionell und präzise. Fokussiere auf die wichtigsten Informationen.
+"""
+        
+        # Erweitere Prompt basierend auf Optionen
+        if options.get('detailed', False):
+            prompt += "\nExtrahiere detaillierte Informationen und Metadaten."
+        
+        if options.get('markdown_only', False):
+            prompt += "\nKonvertiere alle Inhalte zu strukturiertem Markdown."
+        
+        return prompt.strip()
+
 
 __all__ = ["FirecrawlProvider"]

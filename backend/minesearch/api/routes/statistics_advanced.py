@@ -111,8 +111,7 @@ async def get_model_performance_stats(
             # Sortiere Ergebnisse
             sort_key_map = {
                 'success_rate': lambda x: x[1]['performance_metrics']['success_rate'],
-                'response_time': lambda x: -x[1]['performance_metrics']['avg_response_time_ms'],  #
-Niedrigere Zeit = besser
+                'response_time': lambda x: -x[1]['performance_metrics']['avg_response_time_ms'],  # Niedrigere Zeit = besser
                 'field_coverage': lambda x: x[1]['performance_metrics']['avg_field_coverage_percent']
             }
 
@@ -300,8 +299,7 @@ async def get_data_quality_analysis(
                 'action_items': analyzer.prioritize_quality_improvements(quality_issues, recommendations)
             }
 
-            logger.info(f"[STATS-ADVANCED] Data Quality Analysis abgeschlossen - Score:
-{overall_quality['overall_score']}")
+            logger.info(f"[STATS-ADVANCED] Data Quality Analysis abgeschlossen - Score: {overall_quality['overall_score']}")
             return response
 
     except Exception as e:

@@ -64,14 +64,29 @@ async def lifespan(app: FastAPI):
         try:
             if FORCE_REFRESH:
                 logger.info("🔄 FORCE_REFRESH aktiv - Registry wird komplett neu aufgebaut")
-            provider_registry.initialize(config.PROVIDERS, force_refresh=FORCE_REFRESH)
-            available_models = list(provider_registry.get_all_models().keys())
-            logger.info(f"Provider-Registry initialisiert. Verfügbare Modelle: {available_models}")
+            
+            # Teste ob Provider-Registry importiert werden kann
+            try:
+                available_models = list(provider_registry.get_all_models().keys())
+                logger.info(f"Provider-Registry bereits initialisiert. Verfügbare Modelle: {len(available_models)}")
+                if available_models:
+                    logger.info(f"Erste 5 Modelle: {available_models[:5]}")
+                else:
+                    logger.warning("Registry leer - versuche Initialisierung...")
+                    provider_registry.initialize(config.PROVIDERS, force_refresh=FORCE_REFRESH)
+                    available_models = list(provider_registry.get_all_models().keys())
+                    logger.info(f"Nach Initialisierung: {len(available_models)} Modelle")
+            except AttributeError as registry_error:
+                logger.warning(f"Provider-Registry Methoden fehlen: {registry_error}")
+                logger.warning("Initialisierung wird übersprungen...")
+            
             if not available_models:
                 logger.warning("Keine Provider-Modelle verfügbar - System läuft ohne Such-Provider")
         except Exception as provider_error:
             logger.warning(f"Provider-Initialisierung fehlgeschlagen: {provider_error}")
             logger.warning("System läuft ohne Such-Provider weiter...")
+            import traceback
+            logger.debug(f"Provider-Error Stack: {traceback.format_exc()}")
 
     except Exception as e:
         logger.error(f"Fehler bei Provider-Initialisierung: {type(e).__name__}: {e}")

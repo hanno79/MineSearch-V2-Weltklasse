@@ -28,7 +28,7 @@ class ProviderRegistry:
     """Zentrale Registry für alle Search-Provider"""
 
     def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         self._providers: Dict[str, AbstractProvider] = {}
         self._available_models: Dict[str, ModelConfig] = {}
         self._provider_classes: Dict[str, Type[AbstractProvider]] = {
@@ -155,11 +155,9 @@ class ProviderRegistry:
 
                 expected_count = expected_models.get(provider_name, 0)
                 if registered_count == expected_count:
-                    logger.info(f"[REGISTRY] ✅ Provider {provider_name} erfolgreich initialisiert:
-{registered_count}/{expected_count} Modelle")
+                    logger.info(f"[REGISTRY] ✅ Provider {provider_name} erfolgreich initialisiert: {registered_count}/{expected_count} Modelle")
                 else:
-                    logger.warning(f"[REGISTRY] ⚠️  Provider {provider_name}: Nur
-{registered_count}/{expected_count} Modelle registriert")
+                    logger.warning(f"[REGISTRY] ⚠️  Provider {provider_name}: Nur {registered_count}/{expected_count} Modelle registriert")
 
             except Exception as e:
                 logger.error(f"[REGISTRY] ❌ Fehler beim Initialisieren von {provider_name}: {str(e)}")
@@ -170,8 +168,7 @@ class ProviderRegistry:
         total_models = len(self._available_models)
         total_providers = len(self._providers)
         self._initialized = (total_providers > 0) or (total_models > 0)
-        logger.info(f"[REGISTRY] 🏁 INITIALIZATION COMPLETE: {total_providers} Provider,
-{total_models} Modelle registriert")
+        logger.info(f"[REGISTRY] 🏁 INITIALIZATION COMPLETE: {total_providers} Provider, {total_models} Modelle registriert")
 
         if total_models == 0:
             logger.error(f"[REGISTRY] 🚨 CRITICAL: Keine Modelle registriert! Alle Provider fehlgeschlagen.")
@@ -246,11 +243,9 @@ class ProviderRegistry:
             # Detaillierte Diagnose für bessere Fehlermeldungen
             available_providers = list(self._providers.keys())
             if provider_name not in available_providers:
-                logger.error(f"[REGISTRY] Provider '{provider_name}' nicht registriert. Verfügbare
-Provider: {available_providers}")
+                logger.error(f"[REGISTRY] Provider '{provider_name}' nicht registriert. Verfügbare Provider: {available_providers}")
             else:
-                logger.error(f"[REGISTRY] Provider '{provider_name}' registriert aber nicht
-initialisiert - prüfen Sie API-Keys")
+                logger.error(f"[REGISTRY] Provider '{provider_name}' registriert aber nicht initialisiert - prüfen Sie API-Keys")
 
         return provider
 

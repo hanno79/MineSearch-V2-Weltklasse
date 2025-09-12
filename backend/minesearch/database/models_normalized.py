@@ -78,8 +78,7 @@ class NormalizedMine(Base):
     )
 
     def __repr__(self):
-        return f"<NormalizedMine(id={self.id}, name='{self.mine_name}', country='{self.country}',
-status='{self.production_status}')>"
+        return f"<NormalizedMine(id={self.id}, name='{self.mine_name}', country='{self.country}', status='{self.production_status}')>"
 
     def to_dict(self):
         """Konvertiert NormalizedMine zu Dictionary"""
@@ -158,9 +157,7 @@ class NormalizedFieldValue(Base):
     )
 
     def __repr__(self):
-        return f"<NormalizedFieldValue(id={self.id}, mine_id={self.mine_id},
-field='{self.field_name}', value='{self.normalized_value[:50] if self.normalized_value else
-None}...')>"
+        return f"<NormalizedFieldValue(id={self.id}, mine_id={self.mine_id}, field='{self.field_name}', value='{self.normalized_value[:50] if self.normalized_value else None}...')>"
 
     def to_dict(self):
         """Konvertiert NormalizedFieldValue zu Dictionary"""

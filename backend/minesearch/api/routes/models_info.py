@@ -7,7 +7,13 @@ Beschreibung: Model-Information Routes
 
 from fastapi import APIRouter, Query
 import logging
-from minesearch.providers.registry import provider_registry
+
+try:
+    from minesearch.providers.registry import provider_registry
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.error(f"Provider registry import failed: {e}")
+    provider_registry = None
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -39,6 +45,64 @@ async def get_available_models():
             "success": False,
             "error": str(e)
         }
+
+@router.get("/available-models")
+async def get_available_models_fallback():
+    """Fallback-Endpoint im selben Schema wie provider_status:/available-models.
+
+    Nutzt die Provider-Registry, um verfügbare Modelle zu liefern, falls der
+    provider_status Router nicht geladen wurde. Markiert alle Modelle als
+    'healthy' ohne externe Health-Checks.
+    """
+    try:
+        if provider_registry is None:
+            logger.warning("Provider registry nicht verfügbar - gebe leere Modelliste zurück")
+            return {
+                "success": True,
+                "data": {
+                    "available_models": {},
+                    "unavailable_models": {},
+                    "summary": {
+                        "total_available": 0,
+                        "total_unavailable": 0,
+                        "healthy_providers": 0,
+                        "total_providers": 0
+                    }
+                },
+                "error": "Provider registry nicht initialisiert"
+            }
+        
+        models = provider_registry.get_all_models()
+
+        available_models = {}
+        for model_id, config in models.items():
+            # model_id Format: provider:key
+            provider = model_id.split(":")[0] if ":" in model_id else getattr(config, 'provider', 'unknown')
+            available_models[model_id] = {
+                "name": getattr(config, 'name', model_id),
+                "description": getattr(config, 'description', ''),
+                "provider": provider,
+                "provider_status": "healthy",
+                "provider_category": getattr(config, 'provider_category', None)
+            }
+
+        response = {
+            "success": True,
+            "data": {
+                "available_models": available_models,
+                "unavailable_models": {},
+                "summary": {
+                    "total_available": len(available_models),
+                    "total_unavailable": 0,
+                    "healthy_providers": None,
+                    "total_providers": None
+                }
+            }
+        }
+        return response
+    except Exception as e:
+        logger.error(f"Fehler beim Abrufen der verfügbaren Modelle (Fallback): {str(e)}")
+        return {"success": False, "error": str(e)}
 
 @router.get("/models/{model_id}")
 async def get_model_info(model_id: str):

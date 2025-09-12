@@ -212,8 +212,7 @@ async def get_monitor_status() -> Dict[str, Any]:
         }
 
 @router.delete("/clear-patterns")
-async def clear_old_patterns(days_back: int = Query(30, description="Lösche Pattern älter als X
-Tage")) -> Dict[str, Any]:
+async def clear_old_patterns(days_back: int = Query(30, description="Lösche Pattern älter als X Tage")) -> Dict[str, Any]:
     """
     Lösche alte Pattern-Einträge zur Datenbankbereinigung
 

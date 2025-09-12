@@ -19,7 +19,7 @@ class BatchService:
     """Service für CSV Upload und Batch-Verarbeitung von Minen"""
 
     def __init__(self, cache: Dict, results_cache: Dict):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         self.cache = cache
         self.results_cache = results_cache
 

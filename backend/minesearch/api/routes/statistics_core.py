@@ -29,6 +29,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/statistics", tags=["Core Statistics"])
 
+# Export alias for orchestrator compatibility
+statistics_core_router = router
+
+# Provide a minimal field order constant for compatibility
+STATISTICS_FIELD_ORDER = [
+    'Modell', 'Provider', 'Erfolgsrate', 'Durchschn. Response Zeit', 'Gefundene Felder'
+]
+
 
 class StatisticsResponse(BaseModel):
     """Response-Modell für Statistiken"""
@@ -250,4 +258,4 @@ async def get_statistics_health():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-__all__ = ["router"]
+__all__ = ["router", "statistics_core_router", "STATISTICS_FIELD_ORDER"]

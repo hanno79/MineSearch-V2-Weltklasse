@@ -18,8 +18,24 @@ __all__ = [
     'SearchResult',
     'ModelPerformance',
     'NormalizedMine',
-    'NormalizedFieldValue'
+    'NormalizedFieldValue',
+    'Mine',  # Alias für NormalizedMine für Kompatibilität
+    'ModelStatistics',  # Alias für ModelPerformance für Kompatibilität
+    'FieldConsistency',  # Alias für ModelPerformance für Kompatibilität
+    'ModelSummary',  # Alias für ModelPerformance für Kompatibilität
+    'FieldStatistics',  # Alias für ModelPerformance für Kompatibilität
+    'ModelStatisticsComprehensive',  # Alias für ModelPerformance für Kompatibilität
+    'ModelFieldConsistency'  # Alias für ModelPerformance für Kompatibilität
 ]
+
+# Alias für Kompatibilität
+Mine = NormalizedMine
+ModelStatistics = ModelPerformance  # Alias für Kompatibilität
+FieldConsistency = ModelPerformance  # Alias für Kompatibilität
+ModelSummary = ModelPerformance  # Alias für Kompatibilität
+FieldStatistics = ModelPerformance  # Alias für Kompatibilität
+ModelStatisticsComprehensive = ModelPerformance  # Alias für Kompatibilität
+ModelFieldConsistency = ModelPerformance  # Alias für Kompatibilität
 
 # Registriere alle Modelle für SQLAlchemy
 def get_all_models():

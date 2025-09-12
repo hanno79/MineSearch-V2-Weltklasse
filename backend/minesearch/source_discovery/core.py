@@ -16,7 +16,7 @@ import time
 from collections.abc import Iterable
 
 from minesearch.config import config, Config, COUNTRY_CONFIG
-from minesearch.source_discovery import SourceDiscovery
+# Circular import vermieden - SourceDiscovery wird lokal importiert wenn nötig
 from minesearch.models import SearchSession
 import uuid
 from datetime import datetime, timedelta

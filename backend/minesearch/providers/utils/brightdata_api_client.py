@@ -20,7 +20,7 @@ class BrightdataAPIClient:
     """API Client für Brightdata-Anfragen"""
 
     def __init__(self, customer_id: str, password: str = ''):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         self.customer_id = customer_id
         self.password = password
         self.base_url = 'https://api.brightdata.com'

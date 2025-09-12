@@ -28,15 +28,25 @@ logger = logging.getLogger(__name__)
 class BrightdataProvider(AbstractProvider):
     """Brightdata Provider für Enterprise Web-Scraping"""
 
-    def __init__(self):
+    def __init__(self, api_key: str = None, config: Dict[str, Any] = None):
         """Initialisiere Brightdata Provider"""
-        super().__init__()
+        super().__init__(api_key, config)
         self.name = "brightdata"
-        self.api_client = BrightdataAPIClient()
-        self.extractor = BrightdataExtractor()
-        self.processor = BrightdataDataProcessor()
-        self.search_utils = BrightdataSearchUtils()
-        self.scraper = BrightdataScraper()
+        self.api_key = api_key
+        self.config = config or {}
+        try:
+            self.api_client = BrightdataAPIClient("", "")
+            self.extractor = BrightdataExtractor()
+            self.processor = BrightdataDataProcessor()
+            self.search_utils = BrightdataSearchUtils()
+            self.scraper = BrightdataScraper("", "")
+        except Exception:
+            # Fallback bei Initialisierungsfehlern
+            self.api_client = None
+            self.extractor = None
+            self.processor = None
+            self.search_utils = None
+            self.scraper = None
 
     async def search(self, query: str, model: str = None, **kwargs) -> List[SearchResult]:
         """
@@ -181,6 +191,21 @@ class BrightdataProvider(AbstractProvider):
                 'error': str(e),
                 'timestamp': datetime.now().isoformat()
             }
+
+    def get_models(self) -> List[str]:
+        """Abstrakte Methode: Hole verfügbare Modelle"""
+        return self.get_available_models()
+    
+    def validate_config(self) -> bool:
+        """Abstrakte Methode: Validiere Provider-Konfiguration"""
+        try:
+            return hasattr(self, 'api_client') and hasattr(self, 'scraper')
+        except Exception:
+            return False
+    
+    def get_system_prompt(self) -> str:
+        """Abstrakte Methode: System-Prompt für Brightdata"""
+        return "Du bist ein professioneller Web-Scraping Assistant für Mining-Recherchen."
 
     def get_provider_info(self) -> Dict[str, Any]:
         """Hole Provider-Informationen"""

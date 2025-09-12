@@ -7,6 +7,7 @@ Date: 2025-01-11
 """
 
 from sqlalchemy import create_engine, event
+from sqlalchemy.pool import NullPool
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Optional, Dict, List, Any
 import sqlite3
@@ -28,14 +29,28 @@ class DatabaseManager:
         except ImportError:
             self.database_url = database_url or "sqlite:///mines.db"
 
-        # Connection Pool für bessere Performance
-        self.engine = create_engine(
-            self.database_url,
-            pool_size=10,
-            max_overflow=20,
-            pool_pre_ping=True,
-            echo=False
-        )
+        # Connection / Pool-Konfiguration
+        if self.database_url.startswith("sqlite"):
+            # SQLite: Vermeide Connection-Pooling über Threads/Prozesse, erhöhe Timeout
+            self.engine = create_engine(
+                self.database_url,
+                poolclass=NullPool,
+                connect_args={
+                    "check_same_thread": False,
+                    "timeout": 60  # Sekunden – vermeidet "database is locked"
+                },
+                pool_pre_ping=True,
+                echo=False
+            )
+        else:
+            # Andere DBs können regulären Pool nutzen
+            self.engine = create_engine(
+                self.database_url,
+                pool_size=10,
+                max_overflow=20,
+                pool_pre_ping=True,
+                echo=False
+            )
         
         self.SessionLocal = sessionmaker(bind=self.engine)
         
@@ -52,6 +67,8 @@ class DatabaseManager:
             cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.execute("PRAGMA cache_size=10000")
             cursor.execute("PRAGMA temp_store=MEMORY")
+            # Kritisch gegen "database is locked"
+            cursor.execute("PRAGMA busy_timeout=60000")  # 60s
             cursor.close()
 
     def get_session(self) -> Session:

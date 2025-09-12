@@ -29,6 +29,18 @@ class TavilyProvider(AbstractProvider):
         self.base_url = config.get("base_url", 'https://api.tavily.com') if config else 'https://api.tavily.com'
         self.models = config.get("models", {}) if config else {}
 
+    def get_models(self) -> Dict[str, ModelConfig]:
+        """Gibt verfügbare Modelle zurück"""
+        return self.models
+
+    def get_system_prompt(self) -> str:
+        """Gibt System-Prompt zurück"""
+        return "Du bist ein Experte für Mining- und Bergbauinformationen. Suche nach relevanten Daten zu Minen, Rohstoffen und Bergbauaktivitäten."
+
+    def validate_config(self) -> bool:
+        """Validiert die Konfiguration"""
+        return bool(self.api_key and self.base_url)
+
     async def search(self, query: str, model: str = None, **kwargs) -> List[SearchResult]:
         """
         Führe Suche mit Tavily durch

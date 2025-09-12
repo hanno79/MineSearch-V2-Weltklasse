@@ -113,30 +113,30 @@ PROVIDERS_CONFIG = {
         'retry_delay': 10
     },
     'openai': {
-        # DEAKTIVIERT 03.09.2025: OpenAI Modelle über OpenRouter verfügbar
-        'enabled': False,
-        # 'api_key': APIKeysConfig.OPENAI_API_KEY,  # Über OpenRouter
-        'base_url': 'https://api.openai.com/v1',
+        # AKTIVIERT 15.01.2025: Separate OpenAI-Kategorie für bessere Übersicht
+        'enabled': True,
+        'api_key': APIKeysConfig.OPENROUTER_API_KEY,  # Über OpenRouter geroutet
+        'base_url': 'https://openrouter.ai/api/v1',
         'models': OPENAI_MODELS,
         'timeout': 140,  # Premium Provider - längere Timeouts
         'retry_attempts': 3,
         'retry_delay': 12
     },
     'anthropic': {
-        # DEAKTIVIERT 03.09.2025: Anthropic Modelle über OpenRouter verfügbar
-        'enabled': False,
-        # 'api_key': APIKeysConfig.ANTHROPIC_API_KEY,  # Über OpenRouter
-        'base_url': 'https://api.anthropic.com/v1',
+        # AKTIVIERT 15.01.2025: Separate Anthropic-Kategorie für bessere Übersicht
+        'enabled': True,
+        'api_key': APIKeysConfig.OPENROUTER_API_KEY,  # Über OpenRouter geroutet
+        'base_url': 'https://openrouter.ai/api/v1',
         'models': ANTHROPIC_MODELS,
         'timeout': 150,  # Premium Provider - längere Timeouts
         'retry_attempts': 3,
         'retry_delay': 15
     },
     'gemini': {
-        # DEAKTIVIERT 03.09.2025: Gemini Modelle über OpenRouter verfügbar
-        'enabled': False,
-        # 'api_key': APIKeysConfig.GEMINI_API_KEY,  # Über OpenRouter
-        'base_url': 'https://generativelanguage.googleapis.com/v1',
+        # AKTIVIERT 15.01.2025: Separate Google/Gemini-Kategorie für bessere Übersicht
+        'enabled': True,
+        'api_key': APIKeysConfig.OPENROUTER_API_KEY,  # Über OpenRouter geroutet
+        'base_url': 'https://openrouter.ai/api/v1',
         'models': GEMINI_MODELS,
         'timeout': 120,  # Meist schnell, aber variabel
         'retry_attempts': 3,

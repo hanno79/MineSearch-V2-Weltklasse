@@ -20,8 +20,7 @@ async def get_results(
     days_back: int = Query(30),
     limit: int = Query(50),
     offset: int = Query(0),
-    sort_by: str = Query("timestamp", description="Sort by: timestamp, mine_name, model_id,
-fields_found, response_time"),
+    sort_by: str = Query("timestamp", description="Sort by: timestamp, mine_name, model_id, fields_found, response_time"),
     order: str = Query("desc", description="Order: asc or desc"),
     exclude_exa: bool = Query(True, description="Exa-Modelle ausblenden")
 ):
@@ -117,8 +116,7 @@ async def get_result_statistics():
     try:
         models_data = db_manager.get_model_statistics_comprehensive()
     except Exception as exc:
-        logger.exception("Fehler beim Abrufen der Modell-Statistiken in /results/stats; setze leeres
-Fallback.", exc_info=True)
+        logger.exception("Fehler beim Abrufen der Modell-Statistiken in /results/stats; setze leeres Fallback.", exc_info=True)
         models_data = []
     stats['models'] = models_data
 
@@ -258,7 +256,7 @@ async def export_results_csv(
 
         # Stream Response erstellen
         def iter_csv():
-    """iter_csv - TODO: Dokumentation hinzufügen"""
+            """iter_csv - TODO: Dokumentation hinzufügen"""
             yield csv_content.encode('utf-8-sig')  # UTF-8 BOM für Excel
 
         return StreamingResponse(

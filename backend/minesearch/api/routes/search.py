@@ -44,8 +44,7 @@ async def search_mine(
 
     try:
         model = request.model  # Model aus Request Body holen
-        logger.info(f"[SEARCH API] Received request: model='{model}', mine='{request.mine_name}',
-country='{request.country}', sequential={use_sequential}")
+        logger.info(f"[SEARCH API] Received request: model='{model}', mine='{request.mine_name}', country='{request.country}', sequential={use_sequential}")
 
         # STABILITÄT WIEDERHERGESTELLT 01.09.2025: Sequential nur wenn explizit angefordert
         if use_sequential:
@@ -137,8 +136,7 @@ country='{request.country}', sequential={use_sequential}")
                 # Alle Statistiken werden jetzt in der normalisierten DB verwaltet
                 logger.info(f"✅ [SEARCH-API] Such-Statistiken in normalisierte DB integriert")
 
-                logger.info(f"[SEARCH API] Statistiken gespeichert: {model}, {filled_fields} Felder,
-{response_time_ms:.0f}ms")
+                logger.info(f"[SEARCH API] Statistiken gespeichert: {model}, {filled_fields} Felder, {response_time_ms:.0f}ms")
 
             except Exception as e:
                 logger.error(f"Fehler beim Speichern der Statistiken: {str(e)}")
@@ -152,7 +150,7 @@ country='{request.country}', sequential={use_sequential}")
     except ValueError as e:
         logger.error(f"Fehler bei der Suche: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
-        except ValueError as e:
+    except Exception as e:
         logger.error(f"Unerwarteter Fehler: {str(e)}")
         raise HTTPException(status_code=500, detail="Interner Serverfehler")
 

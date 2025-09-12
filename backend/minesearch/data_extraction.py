@@ -16,12 +16,11 @@ class DataExtractionService:
     """Service-Klasse für Datenextraktion - koordiniert verschiedene Extraktions-Module"""
 
     def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         self.extractor = DataExtractor()
 
-    def extract_all_fields(self, content: str, mine_name: str = "",
-    """extract_all_fields - TODO: Dokumentation hinzufügen"""
-                          activity_status: str = "", model_id: str = "") -> Dict[str, Any]:
+    def extract_all_fields(self, content: str, mine_name: str = "", activity_status: str = "", model_id: str = "") -> Dict[str, Any]:
+        """extract_all_fields - TODO: Dokumentation hinzufügen"""
         """
         Extrahiert alle verfügbaren Felder aus dem Inhalt
 
@@ -106,10 +105,8 @@ class DataExtractionService:
                 'activity_status': activity_status
             }
 
-    def extract_specific_fields(self, fields: List[str], content: str,
-    """extract_specific_fields - TODO: Dokumentation hinzufügen"""
-                              mine_name: str = "", activity_status: str = "",
-                              model_id: str = "") -> Dict[str, Any]:
+    def extract_specific_fields(self, fields: List[str], content: str, mine_name: str = "", activity_status: str = "", model_id: str = "") -> Dict[str, Any]:
+        """extract_specific_fields - TODO: Dokumentation hinzufügen"""
         """
         Extrahiert spezifische Felder aus dem Inhalt
 

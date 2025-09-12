@@ -114,12 +114,10 @@ class FallbackDetector:
         has_errors = len(scan_results["errors"]) > 0
 
         if has_errors and self.strict_mode:
-            logger.error(f"[FALLBACK-DETECTOR] REGEL 10: Suchergebnis BLOCKIERT wegen
-{len(scan_results['errors'])} Fallback-Werten")
+            logger.error(f"[FALLBACK-DETECTOR] REGEL 10: Suchergebnis BLOCKIERT wegen {len(scan_results['errors'])} Fallback-Werten")
             return False
         elif has_errors and not self.strict_mode:
-            logger.warning(f"[FALLBACK-DETECTOR] REGEL 10: {len(scan_results['errors'])}
-Fallback-Werte gefunden, aber durchgelassen (strict_mode=False)")
+            logger.warning(f"[FALLBACK-DETECTOR] REGEL 10: {len(scan_results['errors'])} Fallback-Werte gefunden, aber durchgelassen (strict_mode=False)")
 
         return True
 
