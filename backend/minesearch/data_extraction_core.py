@@ -15,19 +15,15 @@ from minesearch.source_discovery import extract_sources_from_content
 # Importiere neue Module
 from minesearch.extraction_patterns import get_extraction_patterns, get_enhanced_coordinate_patterns
 from minesearch.extraction_validators import (
-    is_placeholder_value, validate_coordinate,
-    validate_restoration_cost, validate_year, validate_area
+    is_placeholder_value, is_valid_coordinate,
+    validate_field_value, validate_extraction_result
 )
 from minesearch.extraction_processors import (
-    process_restoration_costs, process_activity_status,
-    split_country_region, find_region_from_content,
-    process_sources, post_process_data, clean_field_value,
-    is_template_or_dummy_value, extract_core_value,
-    extract_restoration_cost_year
+    is_template_or_dummy_value, clean_extracted_value
 )
 from minesearch.source_manager import SourceManager
 from minesearch.field_name_blacklist import is_field_name_value
-from minesearch.database.normalized_manager import NormalizedDatabaseManager
+# from minesearch.database.normalized_manager import NormalizedDatabaseManager # Removed to break circular import
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +35,7 @@ class DataExtractor:
         self.patterns = get_extraction_patterns()
         self.coordinate_patterns = get_enhanced_coordinate_patterns()
         self.source_manager = SourceManager()
-        self.normalized_db = NormalizedDatabaseManager()
+        # self.normalized_db = NormalizedDatabaseManager() # Removed to break circular import
 
     def _get_field_status_marker(self, field: str, activity_status: str) -> str:
         """

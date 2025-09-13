@@ -19,8 +19,7 @@ def get_extraction_patterns() -> Dict[str, List[str]]:
             r'Country:\s*([^\n]+)',
             r'Land:\s*([^\n]+)',
 
-r'(?:in|aus|from)\s+(Chile|Peru|Kanada|Canada|Mexiko|Mexico|USA|Indonesien|Indonesia|Australien|Australia|Botswana|Südafrika|South
-Africa)'
+r'(?:in|aus|from)\s+(Chile|Peru|Kanada|Canada|Mexiko|Mexico|USA|Indonesien|Indonesia|Australien|Australia|Botswana|Südafrika|South Africa)'
         ],
         'Region': [
             r'Region:\s*([^\n]+)',
@@ -109,8 +108,7 @@ Africa)'
             # In Tabellen oder Listen
             r'(?:Location|Standort|Position)[\s\S]{0,50}?Long?\.?\s*:?\s*([-+]?\d+\.?\d+)',
             # Koordinaten im Text mit Himmelsrichtung
-            r'(?:liegt bei|located
-at|position)\s+(?:etwa\s+)?[-+]?\d+\.?\d+\s*°?\s*[NS]\s*[,/]\s*([-+]?\d+\.?\d+)\s*°?\s*[EW]',
+            r'(?:liegt bei|located at|position)\s+(?:etwa\s+)?[-+]?\d+\.?\d+\s*°?\s*[NS]\s*[,/]\s*([-+]?\d+\.?\d+)\s*°?\s*[EW]',
             # Weitere Varianten
             r'Y\s*[:=]\s*([-+]?\d+\.?\d+)',
             r'(?:East|West|Ost|West|E|W)\s*[:=]\s*([-+]?\d+\.?\d+)'
@@ -216,8 +214,7 @@ r'((?:mine\s+)?(?:closed|shutdown|geschlossen)\s+(?:in\s+)?\d{4}\s*[,.]?\s*(?:re
             r'produziert\s+(?:jährlich\s+)?([\d,]+(?:\.\d+)?)\s*(tonnes?|tons?|t)\s*(?:Kupfer|Copper|Cu)',
             r'([\d,]+(?:\.\d+)?)\s*(oz|ounces|unzen)\s*(?:Gold|Au|of\s+gold)\s*(?:annually|per year|jährlich)?',
 
-r'([\d,]+(?:\.\d+)?)\s*(tonnes?|tons?|t)\s*(?:Kupfer|Copper|Cu|of\s+copper)\s*(?:annually|per
-year|jährlich)?',
+r'([\d,]+(?:\.\d+)?)\s*(tonnes?|tons?|t)\s*(?:Kupfer|Copper|Cu|of\s+copper)\s*(?:annually|per year|jährlich)?',
             r'Rohstoffproduktion:\s*([\d,]+(?:\.\d+)?)\s*([^\n]+)',
             r'Commodity production:\s*([\d,]+(?:\.\d+)?)\s*([^\n]+)'
         ],

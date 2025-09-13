@@ -18,7 +18,7 @@ class SmartValueExtractor:
     """
 
     def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         # Bekannte Rohstoffe
         self.commodity_keywords = {
             'gold', 'kupfer', 'copper', 'silber', 'silver', 'eisenerz', 'iron ore', 'iron',
@@ -218,8 +218,7 @@ class SmartValueExtractor:
         ]
 
         for company in known_companies:
-            pattern = r'\b' + re.escape(company.lower()) +
-r'(?:\s+(?:corp|corporation|inc|ltd|limited|company|co|ag|sa))?\b'
+            pattern = r'\b' + re.escape(company.lower()) + r'(?:\s+(?:corp|corporation|inc|ltd|limited|company|co|ag|sa))?\b'
             match = re.search(pattern, text_lower)
             if match:
                 extracted_name = match.group(0)
@@ -230,8 +229,7 @@ r'(?:\s+(?:corp|corporation|inc|ltd|limited|company|co|ag|sa))?\b'
 
         # Falls kein bekannter Name gefunden, prüfe ob es wie ein Firmenname aussieht
         # Firmen haben oft Corp, Inc, Ltd, etc.
-        company_suffix_pattern =
-r'\b([A-Z][a-zA-Z\s&.-]+(?:Corp|Corporation|Inc|Ltd|Limited|Company|Co|AG|SA|GmbH)\.?)\b'
+        company_suffix_pattern = r'\b([A-Z][a-zA-Z\s&.-]+(?:Corp|Corporation|Inc|Ltd|Limited|Company|Co|AG|SA|GmbH)\.?)\b'
         match = re.search(company_suffix_pattern, text)
         if match:
             result = match.group(1).strip()

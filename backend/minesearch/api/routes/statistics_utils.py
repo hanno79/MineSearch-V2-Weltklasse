@@ -15,6 +15,72 @@ from typing import Dict, Any, List, Optional, Union
 logger = logging.getLogger(__name__)
 
 
+class StatisticsTimeAnalyzer:
+    """Zeitanalyse für Statistik-Metriken"""
+
+    def analyze_response_times(self, search_results: List) -> Dict[str, Any]:
+        """Analysiert Antwortzeiten der Suchergebnisse"""
+        if not search_results:
+            return {
+                'average_response_time': 0.0,
+                'median_response_time': 0.0,
+                'min_response_time': 0.0,
+                'max_response_time': 0.0,
+                'total_requests': 0
+            }
+
+        response_times = []
+        for result in search_results:
+            if hasattr(result, 'response_time') and result.response_time:
+                response_times.append(result.response_time)
+
+        if not response_times:
+            return {
+                'average_response_time': 0.0,
+                'median_response_time': 0.0,
+                'min_response_time': 0.0,
+                'max_response_time': 0.0,
+                'total_requests': len(search_results)
+            }
+
+        return {
+            'average_response_time': statistics.mean(response_times),
+            'median_response_time': statistics.median(response_times),
+            'min_response_time': min(response_times),
+            'max_response_time': max(response_times),
+            'total_requests': len(search_results)
+        }
+
+    def analyze_timeframe_performance(self, search_results: List, hours: int = 24) -> Dict[str, Any]:
+        """Analysiert Performance in einem Zeitraum"""
+        if not search_results:
+            return {'timeframe_hours': hours, 'performance_data': []}
+
+        cutoff_time = datetime.now() - timedelta(hours=hours)
+        recent_results = []
+
+        for result in search_results:
+            if hasattr(result, 'created_at'):
+                if isinstance(result.created_at, str):
+                    try:
+                        result_time = datetime.fromisoformat(result.created_at.replace('Z', '+00:00'))
+                    except ValueError:
+                        continue
+                elif isinstance(result.created_at, datetime):
+                    result_time = result.created_at
+                else:
+                    continue
+
+                if result_time >= cutoff_time:
+                    recent_results.append(result)
+
+        return {
+            'timeframe_hours': hours,
+            'total_requests_in_timeframe': len(recent_results),
+            'performance_data': self.analyze_response_times(recent_results)
+        }
+
+
 class StatisticsCalculator:
     """Berechnungs-Engine für Statistik-Metriken"""
 
@@ -140,6 +206,7 @@ class StatisticsCalculator:
         except Exception as e:
             logger.error(f"Fehler beim Zählen der Suchen: {e}")
             return 0
+
 
     async def get_mines_with_stats(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         """Hole Minen mit Statistiken"""
@@ -376,4 +443,9 @@ class StatisticsAnalyzer:
             return {'error': str(e)}
 
 
-__all__ = ["StatisticsCalculator", "StatisticsAnalyzer"]
+# Instanziiere Utility-Klassen für globale Verwendung
+statistics_time_analyzer = StatisticsTimeAnalyzer()
+statistics_calculator = StatisticsCalculator()
+statistics_analyzer = StatisticsCalculator()  # Alias für Kompatibilität
+
+__all__ = ["StatisticsCalculator", "StatisticsTimeAnalyzer", "statistics_calculator", "statistics_analyzer", "statistics_time_analyzer"]

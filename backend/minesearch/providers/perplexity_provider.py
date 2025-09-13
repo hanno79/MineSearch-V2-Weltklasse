@@ -179,6 +179,37 @@ class PerplexityProvider(AbstractProvider):
     def get_available_models(self) -> List[str]:
         """Hole verfügbare Modelle"""
         return ["perplexity:sonar", "perplexity:sonar-pro", "perplexity:sonar-online"]
+    
+    def get_models(self) -> Dict[str, ModelConfig]:
+        """Abstrakte Methode: Hole verfügbare Modelle"""
+        # Hole Modelle aus der Konfiguration
+        models = self.models if hasattr(self, 'models') and self.models else {}
+        model_configs = {}
+        
+        for model_key, model_data in models.items():
+            if isinstance(model_data, dict):
+                model_configs[model_key] = ModelConfig(
+                    id=model_data.get('id', model_key),
+                    name=model_data.get('name', model_key),
+                    timeout=model_data.get('timeout', 30),
+                    max_tokens=model_data.get('max_tokens', 4096),
+                    description=model_data.get('description', ''),
+                    provider='perplexity',  # Korrekte Provider-Zuordnung
+                    supports_web_search=model_data.get('supports_web_search', True),
+                    supports_deep_research=model_data.get('supports_deep_research', False),
+                    is_free=model_data.get('is_free', False),
+                    provider_category=model_data.get('provider_category', 'perplexity')
+                )
+        
+        return model_configs
+    
+    def validate_config(self) -> bool:
+        """Abstrakte Methode: Validiere Provider-Konfiguration"""
+        return bool(self.api_key)
+    
+    def get_system_prompt(self) -> str:
+        """Abstrakte Methode: System-Prompt für Perplexity"""
+        return "You are Perplexity, a professional mining data analysis assistant with real-time web search capabilities."
 
     def get_model_config(self, model: str) -> Optional[ModelConfig]:
         """Hole Modell-Konfiguration"""

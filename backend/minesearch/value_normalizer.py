@@ -8,7 +8,7 @@ Date: 2025-01-11
 
 import re
 import logging
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Any
 from unicodedata import normalize
 
 logger = logging.getLogger(__name__)

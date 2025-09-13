@@ -14,7 +14,7 @@ import json
 from .base_provider import AbstractProvider, ModelConfig, SearchResult
 
 from minesearch.config.base import config as Config
-from minesearch.data_extraction import DataExtractor
+from minesearch.data_extraction_core import DataExtractor
 from minesearch.source_discovery import extract_sources_from_content
 from minesearch.enhanced_source_discovery import EnhancedSourceDiscovery
 from minesearch.utils import (
@@ -31,7 +31,7 @@ class GrokProvider(AbstractProvider):
     """Provider für xAI Grok mit Real-time Informationen"""
 
     def __init__(self, api_key: str, config: Dict[str, Any]):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         super().__init__(api_key, config)
         self.api_url = "https://api.x.ai/v1/chat/completions"
         self.models = self._init_models()
@@ -185,9 +185,9 @@ class GrokProvider(AbstractProvider):
             )
 
     def _build_enhanced_query(self, query: str, mine_name: str, country: Optional[str],
-    """_build_enhanced_query - TODO: Dokumentation hinzufügen"""
                             region: Optional[str], commodity: Optional[str],
                             sources: List[Dict], discovered_sources: List[Dict], focus: str) -> str:
+        """_build_enhanced_query - TODO: Dokumentation hinzufügen"""
         """Erstelle erweiterte Query mit speziellem Fokus"""
 
         # Basis-Query
@@ -332,7 +332,8 @@ ZEITLICHER FOKUS:
 
     def get_models(self) -> Dict[str, ModelConfig]:
         """Gibt verfügbare Modelle zurück"""
-        return self.models
+        # Modelle sind bereits als ModelConfig-Objekte in self.models gespeichert
+        return self.models if hasattr(self, 'models') and self.models else {}
 
     def validate_config(self) -> bool:
         """Validiert Provider-Konfiguration"""

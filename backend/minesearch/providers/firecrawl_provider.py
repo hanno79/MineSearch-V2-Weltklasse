@@ -27,7 +27,30 @@ class FirecrawlProvider(AbstractProvider):
         super().__init__(api_key, config)
         self.name = "firecrawl"
         self.base_url = config.get("base_url", 'https://api.firecrawl.dev/v1') if config else 'https://api.firecrawl.dev/v1'
-        self.models = config.get("models", {}) if config else {}
+        self.config = config or {}
+
+        # Initialisiere Modelle
+        self.models = self._init_models()
+
+    def _init_models(self) -> Dict[str, ModelConfig]:
+        """Initialisiere verfügbare Modelle"""
+        models = {}
+
+        # Konvertiere die FIRECRAWL_MODELS Konfiguration
+        for model_key, model_config in self.config.get("models", {}).items():
+            models[model_key] = ModelConfig(
+                id=model_config['id'],
+                name=model_config['name'],
+                timeout=model_config['timeout'],
+                max_tokens=model_config['max_tokens'],
+                description=model_config['description'],
+                provider='firecrawl',
+                supports_web_search=model_config.get("supports_web_search", True),
+                supports_deep_research=model_config.get("supports_deep_research", False),
+                is_free=model_config.get("is_free", False)
+            )
+
+        return models
 
     async def search(self, query: str, model: str = None, **kwargs) -> List[SearchResult]:
         """
@@ -305,28 +328,8 @@ class FirecrawlProvider(AbstractProvider):
 
     def get_models(self) -> Dict[str, ModelConfig]:
         """Gibt alle verfügbaren Modelle dieses Providers zurück"""
-        return {
-            "firecrawl:default": ModelConfig(
-                id="firecrawl:default",
-                name="Firecrawl Default",
-                provider="firecrawl",
-                description="Standard Firecrawl Web-Crawling",
-                max_tokens=8000,
-                timeout=30,
-                supports_web_search=True,
-                is_free=False
-            ),
-            "firecrawl:premium": ModelConfig(
-                id="firecrawl:premium",
-                name="Firecrawl Premium",
-                provider="firecrawl",
-                description="Premium Firecrawl mit erweiterten Features",
-                max_tokens=16000,
-                timeout=60,
-                supports_web_search=True,
-                is_free=False
-            )
-        }
+        # Modelle sind bereits als ModelConfig-Objekte in self.models gespeichert
+        return self.models if hasattr(self, 'models') and self.models else {}
 
     def validate_config(self) -> bool:
         """Validiert die Provider-Konfiguration (API-Key, etc.)"""

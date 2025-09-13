@@ -67,19 +67,38 @@ async def lifespan(app: FastAPI):
             
             # Teste ob Provider-Registry importiert werden kann
             try:
-                available_models = list(provider_registry.get_all_models().keys())
-                logger.info(f"Provider-Registry bereits initialisiert. Verfügbare Modelle: {len(available_models)}")
-                if available_models:
-                    logger.info(f"Erste 5 Modelle: {available_models[:5]}")
+                # Prüfe ob config.PROVIDERS existiert und gültig ist
+                if not hasattr(config, 'PROVIDERS'):
+                    logger.error("config.PROVIDERS nicht gefunden - Provider-Konfiguration fehlt")
+                    available_models = []
+                elif config.PROVIDERS is None:
+                    logger.warning("config.PROVIDERS ist None - keine Provider konfiguriert")
+                    available_models = []
                 else:
-                    logger.warning("Registry leer - versuche Initialisierung...")
-                    provider_registry.initialize(config.PROVIDERS, force_refresh=FORCE_REFRESH)
                     available_models = list(provider_registry.get_all_models().keys())
-                    logger.info(f"Nach Initialisierung: {len(available_models)} Modelle")
+                    logger.info(f"Provider-Registry bereits initialisiert. Verfügbare Modelle: {len(available_models)}")
+
+                    if available_models:
+                        logger.info(f"Erste 5 Modelle: {available_models[:5]}")
+                    else:
+                        logger.warning("Registry leer - versuche Initialisierung...")
+                        # Sichere Initialisierung mit Fallback
+                        try:
+                            provider_registry.initialize(config.PROVIDERS, force_refresh=FORCE_REFRESH)
+                            available_models = list(provider_registry.get_all_models().keys())
+                            logger.info(f"Nach Initialisierung: {len(available_models)} Modelle")
+                        except Exception as init_error:
+                            logger.error(f"Registry-Initialisierung fehlgeschlagen: {init_error}")
+                            available_models = []
+
             except AttributeError as registry_error:
                 logger.warning(f"Provider-Registry Methoden fehlen: {registry_error}")
                 logger.warning("Initialisierung wird übersprungen...")
-            
+                available_models = []
+            except Exception as general_error:
+                logger.error(f"Unerwarteter Fehler bei Provider-Registry: {general_error}")
+                available_models = []
+
             if not available_models:
                 logger.warning("Keine Provider-Modelle verfügbar - System läuft ohne Such-Provider")
         except Exception as provider_error:

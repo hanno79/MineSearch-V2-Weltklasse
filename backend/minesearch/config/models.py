@@ -36,31 +36,33 @@ def _apply_defaults_to_models(models_dict, provider_category_default=None, defau
         _model.setdefault('provider_category', provider_category_default)
         _model.setdefault('supports_deep_research', False)
 
+    return models_dict
+
 # Perplexity Modelle
 PERPLEXITY_MODELS = {
     "sonar": {
-        "id": "sonar",
+        "id": "perplexity/sonar",
         "name": "Basis Sonar (Schnell)",
         "timeout": 30,
         "max_tokens": 4000,
         "description": "Schnelle Suche mit guter Qualität"
     },
     "sonar-pro": {
-        "id": "sonar-pro",
+        "id": "perplexity/sonar-pro",
         "name": "Sonar Pro (Empfohlen)",
         "timeout": 60,
         "max_tokens": 8000,
         "description": "Erweiterte Suche mit mehr Details und Quellen"
     },
     "sonar-deep-research": {
-        "id": "sonar-deep-research",
+        "id": "perplexity/sonar-deep-research",
         "name": "Deep Research",
         "timeout": 300,
         "max_tokens": 16000,
         "description": "Umfassende Recherche mit dutzenden Suchen und hunderten Quellen"
     },
     "sonar-reasoning": {
-        "id": "sonar-reasoning",
+        "id": "perplexity/sonar-reasoning",
         "name": "Sonar mit Reasoning",
         "timeout": 90,
         "max_tokens": 8000,
@@ -77,45 +79,10 @@ _apply_defaults_to_models(
 
 # OpenRouter Modelle (DeepSeek wird jetzt separat geführt)
 OPENROUTER_MODELS = {
-    'deepseek-free': {
-        'id': 'deepseek/deepseek-chat-v3.1:free',
-        'name': 'DeepSeek Chat v3.1 (Kostenlos)',
-        'timeout': 120,
-        'max_tokens': 3000,
-        'description': 'Kostenloses Chat-Modell mit gutem Reasoning',
-        'supports_web_search': False,
-        'is_free': True
-    },
-    'deepseek-chat': {
-        'id': 'deepseek/deepseek-chat-v3.1',
-        'name': 'DeepSeek Chat v3.1',
-        'timeout': 120,
-        'max_tokens': 8000,
-        'description': 'Fortgeschrittenes Chat-Modell',
-        'supports_web_search': False,
-        'is_free': False
-    },
-    'deepseek-reasoner': {
-        # ÄNDERUNG 06.09.2025: Aktualisierte Model-ID für DeepSeek R1
-        'id': 'deepseek/deepseek-r1-0528:free',
-        'name': 'DeepSeek R1 (Reasoner) [Kostenlos]',
-        'timeout': 180,
-        'max_tokens': 12000,
-        'description': 'DeepSeek R1 - Experimentell: Niedriger Feldabdeckung, optimiert für Reasoning statt Datenextraktion',
-        'supports_web_search': False,
-        'supports_deep_research': True,
-        'is_free': False
-    },
+    # ENTFERNT: DeepSeek-Modelle über separaten DeepSeek-Provider verfügbar
+    # ENTFERNT: DeepSeek R1 über separaten DeepSeek-Provider verfügbar
     # ÄNDERUNG 09.07.2025: Neue kostenlose OpenRouter-Modelle hinzugefügt
-    'deepseek-chimera-free': {
-        'id': 'tngtech/deepseek-r1t2-chimera:free',
-        'name': 'DeepSeek R1 Chimera (Kostenlos)',
-        'timeout': 120,
-        'max_tokens': 4000,
-        'description': 'Kostenlose DeepSeek R1 Chimera Variante für schnelle Mining-Analysen',
-        'supports_web_search': False,
-        'is_free': True
-    },
+    # ENTFERNT: DeepSeek Chimera über separaten DeepSeek-Provider verfügbar
     'mistral-small-free': {
         'id': 'mistralai/mistral-small-3.2-24b-instruct:free',
         'name': 'Mistral Small 3.2 (Kostenlos)',
@@ -181,25 +148,7 @@ OPENROUTER_MODELS = {
         'supports_web_search': False,
         'is_free': True
     },
-    # NEUE OPENAI-MODELLE 06.08.2025: OpenAI OSS-Serie via OpenRouter
-    'gpt-oss-20b': {
-        'id': 'openai/gpt-oss-20b',
-        'name': 'GPT OSS 20B',
-        'timeout': 90,
-        'max_tokens': 8000,
-        'description': 'OpenAI GPT OSS 20B - Open Source Modell für Mining-Analysen',
-        'supports_web_search': False,
-        'is_free': False
-    },
-    'gpt-oss-120b': {
-        'id': 'openai/gpt-oss-120b',
-        'name': 'GPT OSS 120B',
-        'timeout': 150,
-        'max_tokens': 12000,
-        'description': 'OpenAI GPT OSS 120B - Größtes Open Source Modell für komplexe Mining-Dokumente',
-        'supports_web_search': False,
-        'is_free': False
-    },
+    # ENTFERNT 13.09.2025: GPT-Modelle verschoben zu OPENAI_MODELS
 
     # ENTFERNT 15.01.2025: Claude-Modelle verschoben zu separaten Anthropic-Provider
 
@@ -207,49 +156,11 @@ OPENROUTER_MODELS = {
 
     # ENTFERNT 15.01.2025: GPT-Modelle verschoben zu separaten OpenAI-Provider
 
-    # AKTUALISIERT 06.09.2025: Neueste xAI Grok Modelle über OpenRouter
-    'grok-3': {
-        'id': 'x-ai/grok-3',
-        'name': 'Grok 3',
-        'timeout': 180,
-        'max_tokens': 10000,
-        'description': 'xAI Grok 3 - Neueste Generation mit verbesserter Mining-Datenextraktion',
-        'supports_web_search': False,
-        'is_free': False,
-        'provider_category': 'grok'
-    },
-    'grok-4': {
-        'id': 'x-ai/grok-4',
-        'name': 'Grok 4',
-        'timeout': 200,
-        'max_tokens': 12000,
-        'description': 'xAI Grok 4 - Fortschrittlichstes Modell für komplexe Mining-Analysen',
-        'supports_web_search': False,
-        'is_free': False,
-        'provider_category': 'grok'
-    },
+    # ENTFERNT: Grok-Modelle über separaten Grok-Provider verfügbar
+    # ENTFERNT: Grok 4 über separaten Grok-Provider verfügbar
 
-    # ÄNDERUNG 24.08.2025: Premium-Modelle über OpenRouter - Perplexity
-    'perplexity-sonar-pro': {
-        'id': 'perplexity/sonar-pro',
-        'name': 'Perplexity Sonar Pro',
-        'timeout': 120,
-        'max_tokens': 8000,
-        'description': 'Perplexity Sonar Pro - Web-basierte Mining-Recherche mit aktuellen Daten',
-        'supports_web_search': True,
-        'is_free': False,
-        'provider_category': 'perplexity'
-    },
-    'perplexity-sonar': {
-        'id': 'perplexity/sonar',
-        'name': 'Perplexity Sonar',
-        'timeout': 90,
-        'max_tokens': 6000,
-        'description': 'Perplexity Sonar - Schnelle web-basierte Mining-Suche',
-        'supports_web_search': True,
-        'is_free': False,
-        'provider_category': 'perplexity'
-    },
+    # ENTFERNT: Perplexity-Modelle über separaten Perplexity-Provider verfügbar
+    # ENTFERNT: Perplexity Sonar über separaten Perplexity-Provider verfügbar
 
     # NEUE MODELLE 06.09.2025: Zusätzliche OpenRouter Modelle
     'mistral-codestral-2508': {
@@ -302,78 +213,9 @@ OPENROUTER_MODELS = {
         'is_free': False,
         'provider_category': 'deepcogito'
     },
-    'deepseek-chat-v3-1-free': {
-        'id': 'deepseek/deepseek-chat-v3.1:free',
-        'name': 'DeepSeek Chat v3.1 (Kostenlos)',
-        'timeout': 120,
-        'max_tokens': 4000,
-        'description': 'DeepSeek Chat v3.1 - Neueste kostenlose Version mit verbesserter Performance',
-        'supports_web_search': False,
-        'is_free': True,
-        'provider_category': 'deepseek'
-    },
-    'gpt-5-chat': {
-        'id': 'openai/gpt-5-chat',
-        'name': 'GPT-5 Chat',
-        'timeout': 200,
-        'max_tokens': 12000,
-        'description': 'OpenAI GPT-5 Chat - Nächste Generation der GPT-Serie',
-        'supports_web_search': False,
-        'is_free': False,
-        'provider_category': 'openai'
-    },
-    'gpt-5': {
-        'id': 'openai/gpt-5',
-        'name': 'GPT-5',
-        'timeout': 200,
-        'max_tokens': 12000,
-        'description': 'OpenAI GPT-5 - Neuestes Flaggschiff-Modell',
-        'supports_web_search': False,
-        'is_free': False,
-        'provider_category': 'openai'
-    },
-    'gpt-oss-120b-free': {
-        'id': 'openai/gpt-oss-120b:free',
-        'name': 'GPT OSS 120B (Kostenlos)',
-        'timeout': 150,
-        'max_tokens': 12000,
-        'description': 'OpenAI GPT OSS 120B - Kostenlose Open Source Version',
-        'supports_web_search': False,
-        'is_free': True,
-        'provider_category': 'openai'
-    },
-    'claude-opus-4-1': {
-        'id': 'anthropic/claude-opus-4.1',
-        'name': 'Claude Opus 4.1',
-        'timeout': 240,
-        'max_tokens': 12000,
-        'description': 'Anthropic Claude Opus 4.1 - Erweiterte Version mit verbesserter Analyse',
-        'supports_web_search': False,
-        'supports_deep_research': True,
-        'is_free': False,
-        'provider_category': 'anthropic'
-    },
-    'claude-sonnet-4': {
-        'id': 'anthropic/claude-sonnet-4',
-        'name': 'Claude Sonnet 4',
-        'timeout': 180,
-        'max_tokens': 8000,
-        'description': 'Anthropic Claude Sonnet 4 - Neueste Sonnet-Generation',
-        'supports_web_search': False,
-        'is_free': False,
-        'provider_category': 'anthropic'
-    },
-    'claude-3-7-sonnet-thinking': {
-        'id': 'anthropic/claude-3.7-sonnet:thinking',
-        'name': 'Claude 3.7 Sonnet (Thinking)',
-        'timeout': 180,
-        'max_tokens': 8000,
-        'description': 'Anthropic Claude 3.7 Sonnet - Mit Thinking-Modus für komplexe Reasoning',
-        'supports_web_search': False,
-        'supports_deep_research': True,
-        'is_free': False,
-        'provider_category': 'anthropic'
-    }
+    # ENTFERNT: DeepSeek Chat v3.1 über separaten DeepSeek-Provider verfügbar
+    # ENTFERNT 13.09.2025: GPT-5 Modelle verschoben zu OPENAI_MODELS
+    # ENTFERNT 13.09.2025: Claude-Modelle verschoben zu ANTHROPIC_MODELS
 }
 
 # Normalisierung: fehlende Standardfelder für OpenRouter-Modelle setzen
@@ -663,6 +505,52 @@ OPENAI_MODELS = {
         'supports_web_search': False,
         'supports_deep_research': False,
         'is_free': False
+    },
+    # HINZUGEFÜGT 13.09.2025: GPT-Modelle von OPENROUTER_MODELS hierhin verschoben
+    'gpt-5-chat': {
+        'id': 'openai/gpt-5-chat',
+        'name': 'GPT-5 Chat',
+        'timeout': 200,
+        'max_tokens': 12000,
+        'description': 'OpenAI GPT-5 Chat - Nächste Generation der GPT-Serie',
+        'supports_web_search': False,
+        'is_free': False
+    },
+    'gpt-5': {
+        'id': 'openai/gpt-5',
+        'name': 'GPT-5',
+        'timeout': 200,
+        'max_tokens': 12000,
+        'description': 'OpenAI GPT-5 - Neuestes Flaggschiff-Modell',
+        'supports_web_search': False,
+        'is_free': False
+    },
+    'gpt-oss-120b-free': {
+        'id': 'openai/gpt-oss-120b:free',
+        'name': 'GPT OSS 120B (Kostenlos)',
+        'timeout': 150,
+        'max_tokens': 12000,
+        'description': 'OpenAI GPT OSS 120B - Kostenlose Open Source Version',
+        'supports_web_search': False,
+        'is_free': True
+    },
+    'gpt-oss-20b': {
+        'id': 'openai/gpt-oss-20b',
+        'name': 'GPT OSS 20B',
+        'timeout': 120,
+        'max_tokens': 8000,
+        'description': 'OpenAI GPT OSS 20B - Open Source Version',
+        'supports_web_search': False,
+        'is_free': False
+    },
+    'gpt-oss-120b': {
+        'id': 'openai/gpt-oss-120b',
+        'name': 'GPT OSS 120B',
+        'timeout': 150,
+        'max_tokens': 12000,
+        'description': 'OpenAI GPT OSS 120B - Open Source Version',
+        'supports_web_search': False,
+        'is_free': False
     }
 }
 
@@ -721,6 +609,36 @@ ANTHROPIC_MODELS = {
         'timeout': 120,
         'max_tokens': 8000,
         'description': 'Leistungsstärkstes Claude 3 Modell für komplexe Mining-Analysen',
+        'supports_web_search': False,
+        'supports_deep_research': True,
+        'is_free': False
+    },
+    # HINZUGEFÜGT 13.09.2025: Claude-Modelle von OPENROUTER_MODELS hierhin verschoben
+    'claude-opus-4-1': {
+        'id': 'anthropic/claude-opus-4.1',
+        'name': 'Claude Opus 4.1',
+        'timeout': 240,
+        'max_tokens': 12000,
+        'description': 'Anthropic Claude Opus 4.1 - Erweiterte Version mit verbesserter Analyse',
+        'supports_web_search': False,
+        'supports_deep_research': True,
+        'is_free': False
+    },
+    'claude-sonnet-4-new': {
+        'id': 'anthropic/claude-sonnet-4',
+        'name': 'Claude Sonnet 4 (New)',
+        'timeout': 180,
+        'max_tokens': 8000,
+        'description': 'Anthropic Claude Sonnet 4 - Neueste Sonnet-Generation',
+        'supports_web_search': False,
+        'is_free': False
+    },
+    'claude-3-7-sonnet-thinking': {
+        'id': 'anthropic/claude-3.7-sonnet:thinking',
+        'name': 'Claude 3.7 Sonnet (Thinking)',
+        'timeout': 180,
+        'max_tokens': 8000,
+        'description': 'Anthropic Claude 3.7 Sonnet - Mit Thinking-Modus für komplexe Reasoning',
         'supports_web_search': False,
         'supports_deep_research': True,
         'is_free': False
@@ -806,11 +724,27 @@ _apply_defaults_to_models(
 
 # xAI Grok Modelle
 GROK_MODELS = {
-# ENTFERNT 02.09.2025: Doppelte Grok-Einträge mit falschen IDs - siehe Zeilen 300-319 für korrekte Konfiguration
-    # DEPRECATED 11.08.2025: grok-2 entfernt - Modell deprecated
-    # DEPRECATED 11.08.2025: grok-2-mini entfernt - Modell deprecated
-    # DEPRECATED 11.08.2025: grok-beta entfernt - Modell deprecated
-    # DEPRECATED 11.08.2025: grok-vision-beta entfernt - Modell deprecated
+    'grok-3': {
+        'id': 'x-ai/grok-3',
+        'name': 'Grok 3',
+        'timeout': 120,
+        'max_tokens': 131072,
+        'description': 'xAI Grok 3 - Flagship model with deep domain knowledge',
+        'supports_web_search': True,
+        'is_free': False,
+        'provider_category': 'grok'
+    },
+    'grok-4': {
+        'id': 'x-ai/grok-4',
+        'name': 'Grok 4',
+        'timeout': 180,
+        'max_tokens': 256000,
+        'description': 'xAI Grok 4 - Latest reasoning model with 256k context',
+        'supports_web_search': True,
+        'is_free': False,
+        'provider_category': 'grok'
+    }
+    # DEPRECATED: Ältere Grok-Modelle wurden entfernt
 }
 
 # Normalisierung: fehlende Standardfelder für Grok-Modelle setzen
@@ -820,11 +754,43 @@ _apply_defaults_to_models(
     default_supports_web_search=True
 )
 
-# ENTFERNT 06.08.2025: DeepSeek-Duplikate eliminiert
-# DeepSeek-Modelle werden nur noch über OpenRouter bereitgestellt
+# DEEPSEEK_MODELS als separater Premium-Provider
+DEEPSEEK_MODELS = _apply_defaults_to_models({
+    'deepseek-free': {
+        'id': 'deepseek/deepseek-chat-v3.1:free',
+        'name': 'DeepSeek Chat v3.1 (Kostenlos)',
+        'timeout': 60,
+        'max_tokens': 8192,
+        'description': 'DeepSeek Chat v3.1 - Kostenlose Version für grundlegende Mining-Analysen',
+        'supports_web_search': False,
+        'is_free': True,
+        'provider_category': 'deepseek'
+    },
+    'deepseek-chat': {
+        'id': 'deepseek/deepseek-chat-v3.1',
+        'name': 'DeepSeek Chat v3.1',
+        'timeout': 90,
+        'max_tokens': 8192,
+        'description': 'DeepSeek Chat v3.1 - Premium Version für erweiterte Mining-Analysen',
+        'supports_web_search': False,
+        'is_free': False,
+        'provider_category': 'deepseek'
+    },
+    'deepseek-reasoner': {
+        'id': 'deepseek/deepseek-r1-0528:free',
+        'name': 'DeepSeek R1 (Reasoner) [Kostenlos]',
+        'timeout': 180,
+        'max_tokens': 16000,
+        'description': 'DeepSeek R1 - Experimentell: Niedriger Feldabdeckung, optimiert für Reasoning statt Datenextraktion',
+        'supports_web_search': False,
+        'supports_deep_research': True,
+        'is_free': True,
+        'provider_category': 'deepseek'
+    }
+}, provider_category_default='deepseek')
 
 # Zusammenführung aller Modelle für einfachen Zugriff
-# BEREINIGT 06.08.2025: DeepSeek-Duplikate entfernt
+# BEREINIGT 06.08.2025: DeepSeek-Duplikate entfernt - DeepSeek als separater Premium-Provider reaktiviert
 MODELS_CONFIG = {
     'perplexity': PERPLEXITY_MODELS,
     'openrouter': OPENROUTER_MODELS,
@@ -836,12 +802,10 @@ MODELS_CONFIG = {
     'openai': OPENAI_MODELS,
     'anthropic': ANTHROPIC_MODELS,
     'gemini': GEMINI_MODELS,
-    'grok': GROK_MODELS
-    # 'deepseek': DEEPSEEK_MODELS  # ENTFERNT: Duplikate eliminiert, DeepSeek nur über OpenRouter
+    'grok': GROK_MODELS,
+    'deepseek': DEEPSEEK_MODELS  # REAKTIVIERT: DeepSeek als separater Premium-Provider
 }
 
-# DEEPSEEK_MODELS für Kompatibilität definieren (leer, da über OpenRouter)
-DEEPSEEK_MODELS = {}
 
 # Exportiere alle Konfigurationen für Provider-Import
 __all__ = [

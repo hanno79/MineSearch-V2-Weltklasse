@@ -32,7 +32,7 @@ ZWECK: Wartbarkeit und Lesbarkeit des Codes sicherstellen
 REGEL 2: KEINE DUPLIKATDATEIEN BEI FIXES
 ========================================
 
-Bei Fehlerbehebungen NIEMALS neue Dateien mit Endungen erstellen wie:
+Bei Fehlerbehebungen NIEMALS neue Dateien mit Endungen (Suffix oder prefix) erstellen wie:
 - *_fixed
 - *_korrigiert  
 - *_new

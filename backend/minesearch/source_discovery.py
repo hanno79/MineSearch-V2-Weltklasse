@@ -17,7 +17,7 @@ class SourceDiscovery:
     """Service für die Extraktion und Verarbeitung von Quellen aus Mining-Dokumenten"""
 
     def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         # Invalide Einträge die gefiltert werden sollen
         self.invalid_entries = [
             '', ' ', '...', 'k.A.', 'k.a.', '[', ']',
@@ -118,8 +118,7 @@ class SourceDiscovery:
         sources = []
 
         # Verbessertes URL-Pattern
-        url_pattern =
-r'https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*)'
+        url_pattern = r'https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*)'
         urls = re.findall(url_pattern, content)
 
         for url in urls:

@@ -34,6 +34,10 @@ class BrightdataProvider(AbstractProvider):
         self.name = "brightdata"
         self.api_key = api_key
         self.config = config or {}
+
+        # Initialisiere Modelle
+        self.models = self._init_models()
+
         try:
             self.api_client = BrightdataAPIClient("", "")
             self.extractor = BrightdataExtractor()
@@ -47,6 +51,26 @@ class BrightdataProvider(AbstractProvider):
             self.processor = None
             self.search_utils = None
             self.scraper = None
+
+    def _init_models(self) -> Dict[str, ModelConfig]:
+        """Initialisiere verfügbare Modelle"""
+        models = {}
+
+        # Konvertiere die BRIGHTDATA_MODELS Konfiguration
+        for model_key, model_config in self.config.get("models", {}).items():
+            models[model_key] = ModelConfig(
+                id=model_config['id'],
+                name=model_config['name'],
+                timeout=model_config['timeout'],
+                max_tokens=model_config['max_tokens'],
+                description=model_config['description'],
+                provider='brightdata',
+                supports_web_search=model_config.get("supports_web_search", True),
+                supports_deep_research=model_config.get("supports_deep_research", False),
+                is_free=model_config.get("is_free", False)
+            )
+
+        return models
 
     async def search(self, query: str, model: str = None, **kwargs) -> List[SearchResult]:
         """
@@ -192,9 +216,10 @@ class BrightdataProvider(AbstractProvider):
                 'timestamp': datetime.now().isoformat()
             }
 
-    def get_models(self) -> List[str]:
+    def get_models(self) -> Dict[str, ModelConfig]:
         """Abstrakte Methode: Hole verfügbare Modelle"""
-        return self.get_available_models()
+        # Modelle sind bereits als ModelConfig-Objekte in self.models gespeichert
+        return self.models if hasattr(self, 'models') and self.models else {}
     
     def validate_config(self) -> bool:
         """Abstrakte Methode: Validiere Provider-Konfiguration"""

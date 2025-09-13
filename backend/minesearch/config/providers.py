@@ -38,17 +38,18 @@ from minesearch.config.models import (
     OPENAI_MODELS,
     ANTHROPIC_MODELS,
     GEMINI_MODELS,
-    GROK_MODELS
-    # DEEPSEEK_MODELS  # ENTFERNT 06.08.2025: Duplikate eliminiert
+    GROK_MODELS,
+    DEEPSEEK_MODELS  # REAKTIVIERT: DeepSeek als separater Provider
 )
 
 # Provider Konfiguration
 # ÄNDERUNG 12.07.2025: Erweitert um Timeout-Konfigurationen und Retry-Mechanismus
 PROVIDERS_CONFIG = {
     'perplexity': {
-        # ÄNDERUNG 24.08.2025: Deaktiviert - Perplexity Modelle über OpenRouter geroutet
-        'enabled': False,
-        'api_key': APIKeysConfig.PERPLEXITY_API_KEY,
+        # AKTIVIERT: Perplexity als separater Premium-Provider (über OpenRouter geroutet)
+        'enabled': True,
+        'api_key': APIKeysConfig.OPENROUTER_API_KEY,  # Über OpenRouter geroutet
+        'base_url': 'https://openrouter.ai/api/v1',
         'models': PERPLEXITY_MODELS,
         'timeout': 90,  # Schnelle Web-Search Provider
         'retry_attempts': 2,
@@ -143,20 +144,23 @@ PROVIDERS_CONFIG = {
         'retry_delay': 8
     },
     'grok': {
-        # DEAKTIVIERT 03.09.2025: Grok Modelle über OpenRouter verfügbar
-        'enabled': False,
-        # 'api_key': APIKeysConfig.GROK_API_KEY,  # Über OpenRouter
-        'base_url': 'https://api.x.ai/v1',
+        # AKTIVIERT: Grok als separater Premium-Provider (über OpenRouter geroutet)
+        'enabled': True,
+        'api_key': APIKeysConfig.OPENROUTER_API_KEY,  # Über OpenRouter geroutet
+        'base_url': 'https://openrouter.ai/api/v1',
         'models': GROK_MODELS,
         'timeout': 180,  # Langsamer wegen Web-Access
         'retry_attempts': 2,
         'retry_delay': 20
     },
-    # 'deepseek': {
-    #     # ENTFERNT 06.08.2025: Duplikate eliminiert - DeepSeek nur noch über OpenRouter
-    #     'enabled': False,
-    #     'api_key': APIKeysConfig.DEEPSEEK_API_KEY,
-    #     'base_url': 'https://api.deepseek.com/v1',
-    #     'models': DEEPSEEK_MODELS
-    # }
+    'deepseek': {
+        # AKTIVIERT: DeepSeek als separater Premium-Provider (über OpenRouter geroutet)
+        'enabled': True,
+        'api_key': APIKeysConfig.OPENROUTER_API_KEY,  # Über OpenRouter geroutet
+        'base_url': 'https://openrouter.ai/api/v1',
+        'models': DEEPSEEK_MODELS,
+        'timeout': 120,  # Mittlere Geschwindigkeit
+        'retry_attempts': 2,
+        'retry_delay': 15
+    }
 }

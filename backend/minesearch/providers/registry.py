@@ -94,6 +94,17 @@ class ProviderRegistry:
             if force_refresh:
                 logger.info("[REGISTRY] 🔄 Force-Refresh angefordert – Registry wird neu aufgebaut")
 
+            # Validiere config Parameter
+            if not config:
+                logger.warning("[REGISTRY] ⚠️  Keine Provider-Konfiguration bereitgestellt - Registry bleibt leer")
+                self._initialized = True
+                return
+
+            if not isinstance(config, dict):
+                logger.error(f"[REGISTRY] ❌ Ungültige Provider-Konfiguration: {type(config)} - erwartet Dict")
+                self._initialized = True
+                return
+
             logger.info(f"[REGISTRY] 🚀 Starte Provider-Initialisierung für {len(config)} Provider")
 
             # Für deterministisches Verhalten: leeren vor Neuaufbau
@@ -105,6 +116,9 @@ class ProviderRegistry:
         for provider_name, provider_config in config.items():
             if provider_config.get("enabled", False):
                 models = provider_config.get("models", {})
+                if models is None:
+                    logger.warning(f"[REGISTRY] ⚠️  Provider {provider_name} hat None als models - verwende leeres Dict")
+                    models = {}
                 expected_models[provider_name] = len(models)
                 logger.info(f"[REGISTRY] 📋 Provider {provider_name}: {len(models)} Modelle erwartet")
 
@@ -143,6 +157,10 @@ class ProviderRegistry:
 
                 # Hole verfügbare Modelle vom Provider
                 provider_models = provider.get_models()
+                if provider_models is None:
+                    logger.warning(f"[REGISTRY] ⚠️  Provider {provider_name} get_models() gab None zurück")
+                    provider_models = {}
+
                 logger.info(f"[REGISTRY] 📊 Provider {provider_name} stellt {len(provider_models)} Modelle bereit")
 
                 # Registriere Modelle mit Provider-Präfix

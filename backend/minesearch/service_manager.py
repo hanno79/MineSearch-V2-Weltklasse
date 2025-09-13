@@ -31,7 +31,7 @@ class ServiceManager:
     """Intelligenter Service-Manager für MineSearch v2"""
 
     def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         self.backend_port = 8000
         self.frontend_port = 8080
         self.backend_process = None

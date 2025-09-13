@@ -310,9 +310,28 @@ class AnthropicProvider(AbstractProvider):
             'timestamp': datetime.now().isoformat()
         }
 
-    def get_models(self) -> List[str]:
+    def get_models(self) -> Dict[str, ModelConfig]:
         """Abstrakte Methode: Hole verfügbare Modelle"""
-        return self.get_available_models()
+        # Hole Modelle aus der Konfiguration
+        models = self.models if hasattr(self, 'models') and self.models else {}
+        model_configs = {}
+        
+        for model_key, model_data in models.items():
+            if isinstance(model_data, dict):
+                model_configs[model_key] = ModelConfig(
+                    id=model_data.get('id', model_key),
+                    name=model_data.get('name', model_key),
+                    timeout=model_data.get('timeout', 30),
+                    max_tokens=model_data.get('max_tokens', 4096),
+                    description=model_data.get('description', ''),
+                    provider='anthropic',  # Korrekte Provider-Zuordnung
+                    supports_web_search=model_data.get('supports_web_search', False),
+                    supports_deep_research=model_data.get('supports_deep_research', False),
+                    is_free=model_data.get('is_free', False),
+                    provider_category=model_data.get('provider_category', 'anthropic')
+                )
+        
+        return model_configs
     
     def validate_config(self) -> bool:
         """Abstrakte Methode: Validiere Provider-Konfiguration"""

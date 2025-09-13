@@ -227,8 +227,7 @@ def validate_extracted_fields(data: dict) -> dict:
     for field_name, field_value in data.items():
         if field_value and str(field_value).strip():
             if is_field_name_value(field_value, field_name):
-                logger.error(f"[FIELD-CONTAMINATION] Feldname-Kontamination entfernt:
-'{field_value}' aus Feld '{field_name}'")
+                logger.error(f"[FIELD-CONTAMINATION] Feldname-Kontamination entfernt: '{field_value}' aus Feld '{field_name}'")
                 cleaned_data[field_name] = None  # NULL in DB
                 contamination_count += 1
 

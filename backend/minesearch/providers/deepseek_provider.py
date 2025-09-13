@@ -13,7 +13,7 @@ import json
 
 from .base_provider import AbstractProvider, ModelConfig, SearchResult
 
-from minesearch.data_extraction import DataExtractor
+from minesearch.data_extraction_core import DataExtractor
 from minesearch.source_discovery import extract_sources_from_content
 from minesearch.enhanced_source_discovery import EnhancedSourceDiscovery
 from minesearch.utils import (
@@ -30,7 +30,7 @@ class DeepSeekProvider(AbstractProvider):
     """Provider für DeepSeek API (via OpenRouter)"""
 
     def __init__(self, api_key: str, config: Dict[str, Any]):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         super().__init__(api_key, config)
         # DeepSeek nutzt OpenRouter als Proxy
         self.api_url = config.get("base_url", 'https://openrouter.ai/api/v1') + '/chat/completions'
@@ -104,8 +104,8 @@ class DeepSeekProvider(AbstractProvider):
                 raise
 
     def _create_search_prompt(self, query: str, mine_type: str,
-    """_create_search_prompt - TODO: Dokumentation hinzufügen"""
                             country: str = None, language: str = None) -> str:
+        """_create_search_prompt - TODO: Dokumentation hinzufügen"""
         """Erstelle Suchprompt für DeepSeek"""
         # DeepSeek ist besonders gut im logischen Denken
         prompt = f"""Du bist ein Experte für Mining-Projekte und sollst präzise Informationen extrahieren.
@@ -235,7 +235,8 @@ Gib die Informationen strukturiert und vollständig zurück.
 
     def get_models(self) -> Dict[str, ModelConfig]:
         """Gibt alle verfügbaren Modelle zurück"""
-        return self.models
+        # Modelle sind bereits als ModelConfig-Objekte in self.models gespeichert
+        return self.models if hasattr(self, 'models') and self.models else {}
 
     def get_system_prompt(self, options: Dict[str, Any] = None) -> str:
         """System-Prompt für DeepSeek mit Anti-Dummy-Regeln"""

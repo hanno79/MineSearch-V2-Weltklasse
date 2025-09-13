@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 def save_mine_field_data(
-    """save_mine_field_data - TODO: Dokumentation hinzufügen"""
     manager_self,
     mine_id: int,
     search_result_id: int,
@@ -31,8 +30,7 @@ def save_mine_field_data(
     """
     Speichere strukturierte Minendaten in 3NF-Struktur (v4.0.0) mit atomaren Feldwerten
     """
-    logger.info(f"[FIELD_SAVE_DEBUG] ENTERING save_mine_field_data - Mine ID: {mine_id}, Fields:
-{list(structured_data.keys())}")
+    logger.info(f"[FIELD_SAVE_DEBUG] ENTERING save_mine_field_data - Mine ID: {mine_id}, Fields: {list(structured_data.keys())}")
 
     if not structured_data:
         logger.warning("Keine strukturierten Daten zum Speichern vorhanden")
@@ -83,8 +81,7 @@ def save_mine_field_data(
             if sources and len(sources) > 0:
                 source_name = sources[0].get('source_name')  # REGEL 10: Kein Default-Fallback
 
-            logger.info(f"[FIELD_DEBUG] Processing: {field_name} = '{atomic_value[:50]}...' (raw:
-'{raw_value[:30]}...')")
+            logger.info(f"[FIELD_DEBUG] Processing: {field_name} = '{atomic_value[:50]}...' (raw: '{raw_value[:30]}...')")
 
             # NEUE 3NF v4.0.0: Bestimme ob Feld normalisiert werden soll
             field_type = manager_self._determine_field_type(field_name)
@@ -108,24 +105,18 @@ smart_extractor=manager_self.smart_extractor, db_session=session)
                     logger.info(f"[NORMALIZATION] Commodity '{atomic_value}' -> ID {commodity_id}")
 
                 # Firmen-Normalisierung
-                elif 'eigentümer' in field_name.lower() or 'betreiber' in field_name.lower() or
-'owner' in field_name.lower() or 'operator' in field_name.lower():
-                    company_type = 'owner' if 'eigentümer' in field_name.lower() or 'owner' in
-field_name.lower() else 'operator'
-                    company_id = manager_self.get_or_create_company(atomic_value,
-smart_extractor=manager_self.smart_extractor, db_session=session)
+                elif 'eigentümer' in field_name.lower() or 'betreiber' in field_name.lower() or 'owner' in field_name.lower() or 'operator' in field_name.lower():
+                    company_type = 'owner' if 'eigentümer' in field_name.lower() or 'owner' in field_name.lower() else 'operator'
+                    company_id = manager_self.get_or_create_company(atomic_value, smart_extractor=manager_self.smart_extractor, db_session=session)
                     logger.info(f"[NORMALIZATION] Company '{atomic_value}' ({company_type}) -> ID {company_id}")
 
                 # Status-Normalisierung
-                elif 'aktivitätsstatus' in field_name.lower() or 'activity' in field_name.lower() or
-'status' in field_name.lower():
-                    activity_status_id = manager_self.get_or_create_activity_status(atomic_value,
-smart_extractor=manager_self.smart_extractor, db_session=session)
+                elif 'aktivitätsstatus' in field_name.lower() or 'activity' in field_name.lower() or 'status' in field_name.lower():
+                    activity_status_id = manager_self.get_or_create_activity_status(atomic_value, smart_extractor=manager_self.smart_extractor, db_session=session)
                     logger.info(f"[NORMALIZATION] Status '{atomic_value}' -> ID {activity_status_id}")
 
                 # Minentyp-Normalisierung
-                elif 'minentyp' in field_name.lower() or 'mine_type' in field_name.lower() or 'type'
-in field_name.lower():
+                elif 'minentyp' in field_name.lower() or 'mine_type' in field_name.lower() or 'type' in field_name.lower():
                     mine_type_id = manager_self.get_or_create_mine_type(atomic_value,
 smart_extractor=manager_self.smart_extractor, db_session=session)
                     logger.info(f"[NORMALIZATION] Mine Type '{atomic_value}' -> ID {mine_type_id}")
@@ -153,8 +144,7 @@ smart_extractor=manager_self.smart_extractor, country_id=country_for_region, db_
 
                 # Wenn keine Normalisierung gefunden, Fallback zu primitive
                 if not any([commodity_id, company_id, activity_status_id, mine_type_id, country_id, region_id]):
-                    logger.warning(f"[FIELD_TYPE] '{field_name}' als normalized klassifiziert aber
-keine Normalisierung gefunden - Fallback zu primitive")
+                    logger.warning(f"[FIELD_TYPE] '{field_name}' als normalized klassifiziert aber keine Normalisierung gefunden - Fallback zu primitive")
                     field_type = 'primitive'
                     primitive_value = atomic_value
 
@@ -255,7 +245,6 @@ keine Normalisierung gefunden - Fallback zu primitive")
 
 
 def save_search_result_normalized(
-    """save_search_result_normalized - TODO: Dokumentation hinzufügen"""
     manager_self,
     mine_name: str,
     structured_data: Dict[str, Any],
@@ -266,6 +255,7 @@ def save_search_result_normalized(
     db_session: Optional[Session] = None,
     value_normalizer=None
 ) -> Optional[int]:
+    """save_search_result_normalized - TODO: Dokumentation hinzufügen"""
     """
     Speichere vollständiges normalisiertes Suchergebnis in 3NF v4.0.0
     """
@@ -341,13 +331,13 @@ model_used, sources, session_id=session_id)
 
 
 def insert_mine_data_field_3nf(
-    """insert_mine_data_field_3nf - TODO: Dokumentation hinzufügen"""
     manager_self,
     session: Session,
     field_data: Dict[str, Any],
     actor: str = "system",
     reason: str = "data_import"
 ) -> None:
+    """insert_mine_data_field_3nf - TODO: Dokumentation hinzufügen"""
     """
     3NF-konforme Speicherung von Mine-Feldwerten (v4.0.0)
     """

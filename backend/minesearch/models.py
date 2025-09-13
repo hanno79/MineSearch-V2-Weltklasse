@@ -169,7 +169,7 @@ class SourceRegistry:
     """Source Registry mit Datenbank-Backend"""
 
     def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         # Import hier um zirkuläre Imports zu vermeiden
         from minesearch.database import db_manager
         self.db = db_manager
@@ -231,9 +231,7 @@ class SourceRegistry:
             db_sources = query.order_by(Source.reliability_score.desc()).limit(limit).all()
             return self._convert_db_sources(db_sources)
 
-    def create_session(self, mine_name: str, country: Optional[str] = None, region: Optional[str] =
-    """create_session - TODO: Dokumentation hinzufügen"""
-None) -> SearchSession:
+    def create_session(self, mine_name: str, country: Optional[str] = None, region: Optional[str] = None) -> SearchSession:
         """Erstelle neue Such-Session"""
         import uuid
         session_id = str(uuid.uuid4())
@@ -266,7 +264,7 @@ None) -> SearchSession:
                 # NORMALISIERUNG FIX 04.09.2025: JSON-Spalten entfernt
                 typical_content_types=[],
                 metadata={}
-            ) for db_source in db_sources])
+            ) for db_source in db_sources]
         return records
 
     def save_to_file(self, filepath: str):

@@ -41,7 +41,7 @@ class SourceManager:
     """
 
     def __init__(self):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         self.sources: Dict[int, SourceReference] = {}
         self.next_id = 1
         self.field_sources: Dict[str, List[int]] = {}

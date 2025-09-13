@@ -16,8 +16,16 @@ import time
 from collections.abc import Iterable
 
 from minesearch.config import config, Config, COUNTRY_CONFIG
-# Circular import vermieden - SourceDiscovery wird lokal importiert wenn nötig
 from minesearch.models import SearchSession
+# Import SourceDiscovery über absoluten Pfad um zirkuläre Imports zu vermeiden
+import importlib.util
+import sys
+import os
+spec = importlib.util.spec_from_file_location("source_discovery_module",
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "source_discovery.py"))
+source_discovery_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(source_discovery_module)
+SourceDiscovery = source_discovery_module.SourceDiscovery
 import uuid
 from datetime import datetime, timedelta
 from collections import defaultdict

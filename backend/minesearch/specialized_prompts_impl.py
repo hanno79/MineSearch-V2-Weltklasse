@@ -6,7 +6,7 @@ Author: MineSearch Development Team
 Date: 2025-01-11
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 
 class SpecializedPrompts:

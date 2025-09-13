@@ -14,7 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from minesearch.database.manager import DatabaseManager
-from minesearch.value_normalizer import value_normalizer
+from minesearch import value_normalizer
 from minesearch.smart_value_extractor import SmartValueExtractor
 
 # Import refactorierter Module
@@ -23,8 +23,8 @@ from .normalized_normalizers import (
     normalize_activity_status, calculate_confidence_score, detect_template_value
 )
 from .normalized_getters import (
-    get_or_create_company, get_or_create_country, get_or_create_region,
-    get_or_create_mine_type, get_or_create_commodity, get_or_create_activity_status,
+    get_or_create_company, get_or_create_country,
+    get_or_create_mine_type, get_or_create_activity_status,
     get_or_create_mine
 )
 from .normalized_savers import (
@@ -42,7 +42,7 @@ class NormalizedDatabaseManager(DatabaseManager):
     """
 
     def __init__(self, *args, **kwargs):
-    """__init__ - TODO: Dokumentation hinzufügen"""
+        """__init__ - TODO: Dokumentation hinzufügen"""
         super().__init__(*args, **kwargs)
         self.smart_extractor = SmartValueExtractor()
 
@@ -72,77 +72,52 @@ class NormalizedDatabaseManager(DatabaseManager):
         return detect_template_value(field_name, atomic_value)
 
     # GET OR CREATE FUNCTIONS (delegiert an normalized_getters.py)
-    def get_or_create_company(self, company_name: str, smart_extractor=None, db_session:
-    """get_or_create_company - TODO: Dokumentation hinzufügen"""
-Optional[Session] = None, db_manager=None) -> Optional[int]:
+    def get_or_create_company(self, company_name: str, smart_extractor=None, db_session: Optional[Session] = None, db_manager=None) -> Optional[int]:
+        """get_or_create_company - TODO: Dokumentation hinzufügen"""
         """Delegiert an normalized_getters.py"""
         return get_or_create_company(company_name, smart_extractor or self.smart_extractor,
 db_session, db_manager or self)
 
-    def get_or_create_country(self, country_name: str, db_session: Optional[Session] = None,
-    """get_or_create_country - TODO: Dokumentation hinzufügen"""
-db_manager=None) -> Optional[int]:
+    def get_or_create_country(self, country_name: str, db_session: Optional[Session] = None, db_manager=None) -> Optional[int]:
+        """get_or_create_country - TODO: Dokumentation hinzufügen"""
         """Delegiert an normalized_getters.py"""
         return get_or_create_country(country_name, db_session, db_manager or self)
 
-    def get_or_create_region(self, region_name: str, smart_extractor=None, country_id: Optional[int]
-    """get_or_create_region - TODO: Dokumentation hinzufügen"""
-= None, db_session: Optional[Session] = None, db_manager=None) -> Optional[int]:
-        """Delegiert an normalized_getters.py"""
-        return get_or_create_region(region_name, smart_extractor or self.smart_extractor,
-country_id, db_session, db_manager or self)
 
-    def get_or_create_mine_type(self, type_name: str, smart_extractor=None, db_session:
-    """get_or_create_mine_type - TODO: Dokumentation hinzufügen"""
-Optional[Session] = None, db_manager=None) -> Optional[int]:
+    def get_or_create_mine_type(self, type_name: str, smart_extractor=None, db_session: Optional[Session] = None, db_manager=None) -> Optional[int]:
+        """get_or_create_mine_type - TODO: Dokumentation hinzufügen"""
         """Delegiert an normalized_getters.py"""
         return get_or_create_mine_type(type_name, smart_extractor or self.smart_extractor,
 db_session, db_manager or self)
 
-    def get_or_create_commodity(self, commodity_name: str, smart_extractor=None, db_session:
-    """get_or_create_commodity - TODO: Dokumentation hinzufügen"""
-Optional[Session] = None, db_manager=None) -> Optional[int]:
-        """Delegiert an normalized_getters.py"""
-        return get_or_create_commodity(commodity_name, smart_extractor or self.smart_extractor,
-db_session, db_manager or self)
 
-    def get_or_create_activity_status(self, status_name: str, smart_extractor=None, db_session:
-    """get_or_create_activity_status - TODO: Dokumentation hinzufügen"""
-Optional[Session] = None, db_manager=None) -> Optional[int]:
+    def get_or_create_activity_status(self, status_name: str, smart_extractor=None, db_session: Optional[Session] = None, db_manager=None) -> Optional[int]:
+        """get_or_create_activity_status - TODO: Dokumentation hinzufügen"""
         """Delegiert an normalized_getters.py"""
         return get_or_create_activity_status(status_name, smart_extractor or self.smart_extractor,
 db_session, db_manager or self)
 
-    def get_or_create_mine(self, mine_name: str, smart_extractor=None, structured_data: Dict[str,
-    """get_or_create_mine - TODO: Dokumentation hinzufügen"""
-Any] = None, db_session: Optional[Session] = None, db_manager=None) -> Optional[int]:
+    def get_or_create_mine(self, mine_name: str, smart_extractor=None, structured_data: Dict[str, Any] = None, db_session: Optional[Session] = None, db_manager=None) -> Optional[int]:
+        """get_or_create_mine - TODO: Dokumentation hinzufügen"""
         """Delegiert an normalized_getters.py"""
         return get_or_create_mine(mine_name, smart_extractor or self.smart_extractor,
 structured_data, db_session, db_manager or self)
 
     # SAVE FUNCTIONS (delegiert an normalized_savers.py)
-    def save_mine_field_data(self, mine_id: int, search_result_id: int, structured_data: Dict[str, Any],
-    """save_mine_field_data - TODO: Dokumentation hinzufügen"""
-                           model_used: str, sources: List[Dict[str, str]] = None,
-                           session_id: str = None, db_session: Optional[Session] = None,
-                           value_normalizer=None) -> None:
+    def save_mine_field_data(self, mine_id: int, search_result_id: int, structured_data: Dict[str, Any], model_used: str, sources: List[Dict[str, str]] = None, session_id: str = None, db_session: Optional[Session] = None, value_normalizer=None) -> None:
+        """save_mine_field_data - TODO: Dokumentation hinzufügen"""
         """Delegiert an normalized_savers.py"""
         return save_mine_field_data(self, mine_id, search_result_id, structured_data, model_used,
 sources, session_id, db_session, value_normalizer)
 
-    def save_search_result_normalized(self, mine_name: str, structured_data: Dict[str, Any],
-    """save_search_result_normalized - TODO: Dokumentation hinzufügen"""
-                                    sources: List[Dict[str, str]], model_used: str,
-                                    search_duration: int, session_id: str,
-                                    db_session: Optional[Session] = None,
-                                    value_normalizer=None) -> Optional[int]:
+    def save_search_result_normalized(self, mine_name: str, structured_data: Dict[str, Any], sources: List[Dict[str, str]], model_used: str, search_duration: int, session_id: str, db_session: Optional[Session] = None, value_normalizer=None) -> Optional[int]:
+        """save_search_result_normalized - TODO: Dokumentation hinzufügen"""
         """Delegiert an normalized_savers.py"""
         return save_search_result_normalized(self, mine_name, structured_data, sources, model_used,
 search_duration, session_id, db_session, value_normalizer)
 
-    def _insert_mine_data_field_3nf(self, session: Session, field_data: Dict[str, Any],
-    """_insert_mine_data_field_3nf - TODO: Dokumentation hinzufügen"""
-                                   actor: str = "system", reason: str = "data_import") -> None:
+    def _insert_mine_data_field_3nf(self, session: Session, field_data: Dict[str, Any], actor: str = "system", reason: str = "data_import") -> None:
+        """_insert_mine_data_field_3nf - TODO: Dokumentation hinzufügen"""
         """Delegiert an normalized_savers.py"""
         return insert_mine_data_field_3nf(self, session, field_data, actor, reason)
 

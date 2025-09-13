@@ -23,7 +23,7 @@ except Exception:
 class SpecializedPrompts:  # type: ignore
     @staticmethod
     def get_enhanced_query(**kwargs: object) -> str:
-    """get_enhanced_query - TODO: Dokumentation hinzufügen"""
+        """get_enhanced_query - TODO: Dokumentation hinzufügen"""
         if _HAS_V2 and hasattr(_V2SpecializedPrompts, "get_enhanced_query"):
             return _V2SpecializedPrompts.get_enhanced_query(**kwargs)  # type: ignore
         if _HAS_IMPL and hasattr(_ImplSpecializedPrompts, "get_enhanced_query"):
@@ -32,7 +32,7 @@ class SpecializedPrompts:  # type: ignore
 
     @staticmethod
     def get_restoration_costs_prompt(*args: object, **kwargs: object) -> str:
-    """get_restoration_costs_prompt - TODO: Dokumentation hinzufügen"""
+        """get_restoration_costs_prompt - TODO: Dokumentation hinzufügen"""
         if _HAS_V2 and hasattr(_V2SpecializedPrompts, "get_restoration_costs_prompt"):
             return _V2SpecializedPrompts.get_restoration_costs_prompt(*args, **kwargs)  # type: ignore
         if _HAS_IMPL and hasattr(_ImplSpecializedPrompts, "get_restoration_costs_prompt"):
@@ -41,7 +41,7 @@ class SpecializedPrompts:  # type: ignore
 
     @staticmethod
     def get_universal_anti_template_instructions() -> str:
-    """get_universal_anti_template_instructions - TODO: Dokumentation hinzufügen"""
+        """get_universal_anti_template_instructions - TODO: Dokumentation hinzufügen"""
         # Sorgt dafuer, dass die Methode immer verfuegbar ist
         if _HAS_V2 and hasattr(_V2SpecializedPrompts, "get_universal_anti_template_instructions"):
             return _V2SpecializedPrompts.get_universal_anti_template_instructions()  # type: ignore
