@@ -49,10 +49,10 @@ else:
 class Config(APIKeysConfig):
     """Zentrale Konfigurationsklasse - KISS Prinzip"""
     
-    # Server Einstellungen
-    HOST = os.getenv('HOST', '0.0.0.0')
+    # Server Einstellungen - configured for Replit environment
+    HOST = os.getenv('HOST', 'localhost')  # Backend uses localhost as per Replit requirements
     PORT = int(os.getenv('PORT', 8000))
-    DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+    DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'  # Enable debug for development
     
     # Datenbank: URL bevorzugt; falls nicht vorhanden, aus DATABASE_PATH ableiten
     _ROOT = Path(__file__).resolve().parents[3]
