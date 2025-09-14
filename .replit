@@ -24,7 +24,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd backend && SAFE_MODE=1 PORT=8000 HOST=0.0.0.0 python -m minesearch.main"
+args = "cd backend && PORT=8000 HOST=0.0.0.0 python -m minesearch.main"
 waitForPort = 8000
 
 [workflows.workflow.metadata]
@@ -37,10 +37,6 @@ externalPort = 80
 [[ports]]
 localPort = 8000
 externalPort = 8000
-
-[[ports]]
-localPort = 37975
-externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"
