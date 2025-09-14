@@ -9,7 +9,7 @@ console.log('📊 [STATISTICS-LOADER] Loading Statistics Loader Module');
 
 // Global configuration
 if (typeof window.API_BASE_URL === 'undefined') {
-    window.API_BASE_URL = 'http://localhost:8000';
+    window.API_BASE_URL = window.location.origin;
 }
 
 /**

@@ -13,7 +13,7 @@
 // ============================================
 
 // API Base URL Konstante
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = window.location.origin;
 
 // CRITICAL FIX: Make API_BASE_URL globally accessible
 window.API_BASE_URL = API_BASE_URL;
