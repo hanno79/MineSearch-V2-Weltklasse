@@ -1,0 +1,25 @@
+
+<script>
+.ready(function() {
+    console.log('🔧 [MANUAL-TRIGGER] Manually triggering Progressive Model Selection...');
+    
+    // Force load via browser console injection
+    if (document.getElementById('model-selection')) {
+        console.log('✅ [MANUAL-TRIGGER] Model selection container found');
+        
+        // Try to trigger manual initialization
+        setTimeout(() => {
+            .trigger('progressiveModelSelectionInit');
+        }, 1000);
+    }
+    
+    // Test API response
+    $.get('/api/models', function(data) {
+        console.log('🧪 [MANUAL-TRIGGER] API Response:', data);
+        if (data.success && data.models) {
+            console.log('✅ [MANUAL-TRIGGER] API provides ' + Object.keys(data.models).length + ' models');
+        }
+    });
+});
+</script>
+

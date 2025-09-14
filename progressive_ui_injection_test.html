@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Progressive Model Selection UI Test</title>
+</head>
+<body>
+    <div id="test-results"></div>
+    
+    <script>
+        /**
+         * PROGRESSIVE MODEL SELECTION UI INJECTION TEST
+         * Testet alle interaktiven Features nach API Response Format Fix
+         */
+        
+        console.log('🧪 [INJECTION-TEST] Starting Progressive Model Selection UI test...');
+        
+        // Open the MineSearch page and inject test code
+        const testWindow = window.open('http://localhost:5000', 'minesearch-test');
+        
+        setTimeout(() => {
+            if (testWindow) {
+                console.log('📡 [INJECTION-TEST] Injecting test code into MineSearch window...');
+                
+                // Inject comprehensive test script
+                testWindow.eval(`
+                    console.log('🧪 [INJECTED-TEST] Progressive Model Selection comprehensive test started');
+                    
+                    // Test 1: Verify Progressive UI components
+                    setTimeout(() => {
+                        const results = [];
+                        
+                        console.log('\\n🎯 [INJECTED-TEST] TEST 1: Component Verification');
+                        
+                        // Check main container
+                        const modelSelection = document.getElementById('model-selection');
+                        if (modelSelection) {
+                            results.push('✅ Model selection container found');
+                            
+                            // Check Progressive UI container
+                            const progressiveContainer = modelSelection.querySelector('.model-selection-enhanced');
+                            if (progressiveContainer) {
+                                results.push('✅ Progressive Model Selection container found');
+                                
+                                // Count Quick Selection Pills
+                                const quickPills = progressiveContainer.querySelectorAll('.quick-model-pill');
+                                results.push('📊 Quick Selection Pills: ' + quickPills.length);
+                                
+                                quickPills.forEach((pill, i) => {
+                                    results.push('  🔸 Pill ' + (i+1) + ': "' + pill.textContent.trim() + '"');
+                                });
+                                
+                                // Check Advanced Mode Toggle
+                                const advancedToggle = progressiveContainer.querySelector('.advanced-toggle-btn');
+                                if (advancedToggle) {
+                                    results.push('✅ Advanced Mode Toggle found');
+                                } else {
+                                    results.push('❌ Advanced Mode Toggle NOT found');
+                                }
+                                
+                                // Check Advanced Browser
+                                const advancedBrowser = progressiveContainer.querySelector('.advanced-model-browser');
+                                if (advancedBrowser) {
+                                    results.push('✅ Advanced Model Browser found');
+                                    
+                                    const providerTabs = advancedBrowser.querySelectorAll('.provider-tab');
+                                    results.push('📊 Provider Tabs: ' + providerTabs.length);
+                                    
+                                    const modelCards = advancedBrowser.querySelectorAll('.model-card');
+                                    results.push('📊 Model Cards: ' + modelCards.length);
+                                }
+                                
+                            } else {
+                                results.push('❌ Progressive Model Selection container NOT found');
+                            }
+                        } else {
+                            results.push('❌ Model selection container NOT found');
+                        }
+                        
+                        console.log('📊 [INJECTED-TEST] Component Verification Results:');
+                        results.forEach(result => console.log(result));
+                        
+                    }, 2000);
+                    
+                    // Test 2: Interactive Features Test
+                    setTimeout(() => {
+                        console.log('\\n🎯 [INJECTED-TEST] TEST 2: Interactive Features');
+                        
+                        // Test Quick Selection Pills
+                        const quickPills = document.querySelectorAll('.quick-model-pill');
+                        if (quickPills.length > 0) {
+                            console.log('🔸 [INJECTED-TEST] Testing first Quick Selection Pill...');
+                            
+                            const firstPill = quickPills[0];
+                            firstPill.click();
+                            
+                            setTimeout(() => {
+                                const checkedBoxes = document.querySelectorAll('#model-selection input[type="checkbox"]:checked');
+                                console.log('📊 [INJECTED-TEST] Models selected after pill click: ' + checkedBoxes.length);
+                            }, 1000);
+                        }
+                        
+                        // Test Advanced Toggle
+                        setTimeout(() => {
+                            const advancedToggle = document.querySelector('.advanced-toggle-btn');
+                            if (advancedToggle) {
+                                console.log('🔸 [INJECTED-TEST] Testing Advanced Mode Toggle...');
+                                advancedToggle.click();
+                                
+                                setTimeout(() => {
+                                    const advancedBrowser = document.querySelector('.advanced-model-browser');
+                                    const isVisible = advancedBrowser && advancedBrowser.offsetParent !== null;
+                                    console.log('📊 [INJECTED-TEST] Advanced Browser visible after toggle: ' + isVisible);
+                                }, 500);
+                            }
+                        }, 2000);
+                        
+                    }, 4000);
+                    
+                    // Test 3: Model Count Verification
+                    setTimeout(() => {
+                        console.log('\\n🎯 [INJECTED-TEST] TEST 3: Model Count Verification');
+                        
+                        const allCheckboxes = document.querySelectorAll('#model-selection input[type="checkbox"]');
+                        const checkedCheckboxes = document.querySelectorAll('#model-selection input[type="checkbox"]:checked');
+                        
+                        console.log('📊 [INJECTED-TEST] Total models available: ' + allCheckboxes.length);
+                        console.log('📊 [INJECTED-TEST] Currently selected: ' + checkedCheckboxes.length);
+                        
+                        // Check if we have the expected 31 models
+                        if (allCheckboxes.length === 31) {
+                            console.log('✅ [INJECTED-TEST] CORRECT: Expected 31 models found');
+                        } else {
+                            console.log('⚠️ [INJECTED-TEST] Expected 31 models, found: ' + allCheckboxes.length);
+                        }
+                        
+                        // Extract provider information
+                        const providerCounts = {};
+                        allCheckboxes.forEach(checkbox => {
+                            const value = checkbox.value;
+                            const provider = value.includes(':') ? value.split(':')[0] : 'unknown';
+                            providerCounts[provider] = (providerCounts[provider] || 0) + 1;
+                        });
+                        
+                        console.log('📊 [INJECTED-TEST] Provider breakdown:');
+                        Object.entries(providerCounts).forEach(([provider, count]) => {
+                            console.log('  🔸 ' + provider + ': ' + count + ' models');
+                        });
+                        
+                    }, 6000);
+                    
+                    // Test 4: Final Status
+                    setTimeout(() => {
+                        console.log('\\n🎯 [INJECTED-TEST] TEST 4: Final Status Report');
+                        
+                        // Check Progressive Model Selection instance
+                        if (window.progressiveModelSelection) {
+                            const pms = window.progressiveModelSelection;
+                            console.log('✅ [INJECTED-TEST] Progressive Model Selection instance found');
+                            console.log('📊 [INJECTED-TEST] Instance models: ' + (pms.models ? pms.models.length : 'N/A'));
+                            console.log('📊 [INJECTED-TEST] Instance providers: ' + (pms.providers ? pms.providers.size : 'N/A'));
+                        } else {
+                            console.log('⚠️ [INJECTED-TEST] Progressive Model Selection instance not in window object');
+                        }
+                        
+                        // Final legacy check
+                        const legacyCheckboxes = document.querySelector('#legacy-checkboxes');
+                        if (legacyCheckboxes) {
+                            const isHidden = legacyCheckboxes.offsetParent === null;
+                            console.log('📊 [INJECTED-TEST] Legacy checkboxes properly hidden: ' + isHidden);
+                        }
+                        
+                        console.log('\\n🎉 [INJECTED-TEST] COMPREHENSIVE TEST COMPLETE');
+                        
+                    }, 8000);
+                `);
+            }
+        }, 3000);
+        
+        // Monitor results
+        setTimeout(() => {
+            if (testWindow) {
+                testWindow.close();
+                console.log('✅ [INJECTION-TEST] Test window closed - check console for results');
+            }
+        }, 15000);
+        
+    </script>
+</body>
+</html>

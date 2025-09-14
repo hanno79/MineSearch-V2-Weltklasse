@@ -37,7 +37,25 @@ class ProgressiveModelSelection {
             const data = await response.json();
             
             if (data.success && data.models) {
-                this.models = Array.isArray(data.models) ? data.models : [];
+                // Handle both array format and object format from API
+                if (Array.isArray(data.models)) {
+                    this.models = data.models;
+                } else if (typeof data.models === 'object') {
+                    // Convert object format to array format
+                    this.models = Object.entries(data.models).map(([model_id, config]) => ({
+                        model_id: model_id,
+                        provider_name: config.provider || model_id.split(':')[0],
+                        model_name: config.name || model_id.split(':')[1] || model_id,
+                        display_name: config.name || model_id,
+                        description: config.description,
+                        timeout: config.timeout,
+                        max_tokens: config.max_tokens,
+                        supports_web_search: config.supports_web_search,
+                        is_free: config.is_free
+                    }));
+                } else {
+                    this.models = [];
+                }
                 this.organizeProviders();
                 console.log(`📊 [MODEL-UX] Loaded ${this.models.length} models from ${this.providers.size} providers`);
             } else {
