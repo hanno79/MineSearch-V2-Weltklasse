@@ -28,7 +28,7 @@ class DatabaseManager:
         self.engine = create_engine(
             self.database_url, 
             echo=False,  # Setze auf True für SQL-Debugging
-            connect_args={"check_same_thread": False},  # Nur für SQLite
+            connect_args={"check_same_thread": False} if self.database_url.startswith('sqlite') else {},  # Nur für SQLite
             # Connection Pool Einstellungen
             pool_size=20,  # Anzahl permanenter Verbindungen
             max_overflow=30,  # Zusätzliche Verbindungen bei Bedarf

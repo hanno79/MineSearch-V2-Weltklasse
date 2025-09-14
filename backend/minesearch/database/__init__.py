@@ -25,8 +25,20 @@ from minesearch.database.connection import init_db, get_db, get_session
 # Import database manager
 from minesearch.database.manager import DatabaseManager
 
-# Create global database manager instance
-db_manager = DatabaseManager()
+# Lazy initialization - avoid creating database connection on import
+_db_manager = None
+
+def get_db_manager():
+    """Get global database manager instance with lazy initialization"""
+    global _db_manager
+    if _db_manager is None:
+        _db_manager = DatabaseManager()
+    return _db_manager
+
+# For backward compatibility - but prefer using get_db_manager()
+def db_manager():
+    """Backward compatibility function - returns database manager instance"""
+    return get_db_manager()
 
 # Convenience exports for backward compatibility
 __all__ = [
