@@ -15,8 +15,8 @@
     
     <!-- CRITICAL: Set API_BASE_URL before any module loading -->
     <script>
-        // Use Replit domain for API communication
-        window.API_BASE_URL = 'https://0cb32d38-ff6f-47b4-b525-204889ad9643-00-1xh9gvkgxp1of.kirk.replit.dev';
+        // Use dynamic origin for API communication (works in both dev and production)
+        window.API_BASE_URL = window.location.origin;
         console.log('🔧 [CONFIG] API_BASE_URL set to:', window.API_BASE_URL);
     </script>
     

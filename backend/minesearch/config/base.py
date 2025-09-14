@@ -50,8 +50,8 @@ class Config(APIKeysConfig):
     """Zentrale Konfigurationsklasse - KISS Prinzip"""
     
     # Server Einstellungen - configured for Replit environment
-    HOST = os.getenv('HOST', 'localhost')  # Backend uses localhost as per Replit requirements
-    PORT = int(os.getenv('PORT', 8000))
+    HOST = os.getenv('HOST', '0.0.0.0')  # Frontend on port 5000, bind to all interfaces
+    PORT = int(os.getenv('PORT', 5000))  # Use port 5000 for frontend access
     DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'  # Enable debug for development
     
     # Datenbank: URL bevorzugt; falls nicht vorhanden, aus DATABASE_PATH ableiten

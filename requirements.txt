@@ -33,3 +33,17 @@ typing-extensions==4.8.0
 
 # Additional utilities used in the codebase
 json5==0.9.14
+aiohttp
+amundsen-search
+beautifulsoup4
+datasetrising
+fastapi
+httpx
+playwright
+progress-tracker
+pydantic
+pytest
+python-dotenv
+requests
+sqlalchemy
+uvicorn

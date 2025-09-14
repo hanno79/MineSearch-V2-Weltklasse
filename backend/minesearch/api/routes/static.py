@@ -14,17 +14,15 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Frontend-Verzeichnis definieren
-FRONTEND_PATH = Path("/app/frontend")
+# Frontend-Verzeichnis definieren - use same path resolution as main.py
+project_root = Path(__file__).resolve().parents[3]
+FRONTEND_PATH = project_root / "frontend"
 
 @router.get("/", response_class=HTMLResponse)
 async def read_root():
-    """Hauptseite mit Suchformular"""
-    index_path = FRONTEND_PATH / "index.html"
-    if index_path.exists():
-        return FileResponse(index_path)
-    logger.error(f"Index-Datei nicht gefunden: {index_path}")
-    return HTMLResponse("<h1>Fehler beim Laden der Seite</h1>", status_code=500)
+    """Redirect to static frontend"""
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(url="/static/index.html")
 
 @router.get("/sources", response_class=HTMLResponse)
 async def sources_page():

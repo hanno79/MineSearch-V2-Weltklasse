@@ -8,9 +8,9 @@ Beschreibung: MineSearch 2.1 - Refactored Main Application
 # ABACUS-FIX 18.07.2025: Force correct .env loading before any imports
 from dotenv import load_dotenv
 from pathlib import Path
-# Lade Root-.env (Projektwurzel)
+# Lade Root-.env (Projektwurzel) - don't override workflow environment variables
 root_env = Path(__file__).resolve().parents[2] / '.env'
-load_dotenv(root_env, override=True)
+load_dotenv(root_env, override=False)
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -129,7 +129,11 @@ else:
 if __name__ == "__main__":
     import uvicorn
     
+    # Override for Replit: Frontend should be on port 5000
+    host = os.getenv('HOST', '0.0.0.0')
+    port = int(os.getenv('PORT', 5000))  # Use port 5000 for frontend access
+    
     if config.DEBUG:
-        uvicorn.run("backend.minesearch.main:app", host=config.HOST, port=config.PORT, reload=True)
+        uvicorn.run("backend.minesearch.main:app", host=host, port=port, reload=True)
     else:
-        uvicorn.run(app, host=config.HOST, port=config.PORT)
+        uvicorn.run(app, host=host, port=port)
