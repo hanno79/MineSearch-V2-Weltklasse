@@ -12,8 +12,8 @@
 // API CONFIGURATION
 // ============================================
 
-// API Base URL Konstante
-const API_BASE_URL = 'http://localhost:8000';
+// API Base URL - Use dynamic origin like index.html does
+const API_BASE_URL = window.location.origin;
 
 // CRITICAL FIX: Make API_BASE_URL globally accessible
 window.API_BASE_URL = API_BASE_URL;
