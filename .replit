@@ -4,7 +4,7 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["geckodriver", "glibcLocales", "libxcrypt", "xcodebuild", "zlib"]
+packages = ["geckodriver", "gitFull", "glibcLocales", "libxcrypt", "playwright-driver", "xcodebuild", "zlib"]
 
 [workflows]
 runButton = "Project"
@@ -37,6 +37,10 @@ externalPort = 80
 [[ports]]
 localPort = 8000
 externalPort = 8000
+
+[[ports]]
+localPort = 37975
+externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"
