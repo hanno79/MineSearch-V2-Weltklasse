@@ -99,11 +99,16 @@ setup_middleware(app)
 # Exception Handler aktivieren
 setup_exception_handlers(app)
 
-# Statische Dateien für Frontend
-app.mount("/static", StaticFiles(directory="/app/frontend"), name="static")
+# Statische Dateien für Frontend - fix for Replit environment
+import os
+from pathlib import Path
+# Get the project root directory (parent of backend directory)
+project_root = Path(__file__).resolve().parents[2]
+frontend_path = project_root / "frontend"
+app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
 
 # Statische Dateien für CSV-Zugriff
-app.mount("/csv", StaticFiles(directory="/app"), name="csv")
+app.mount("/csv", StaticFiles(directory=str(project_root)), name="csv")
 
 # API-Router einbinden
 if SAFE_MODE:
