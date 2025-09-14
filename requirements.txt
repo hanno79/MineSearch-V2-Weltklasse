@@ -6,7 +6,6 @@ uvicorn[standard]==0.24.0
 
 # Database
 sqlalchemy==2.0.23
-sqlite3
 
 # Environment & Configuration
 python-dotenv==1.0.0
@@ -30,11 +29,6 @@ google-generativeai==0.3.2
 selenium==4.15.2
 
 # Utilities
-pathlib2==2.3.7
-uuid==1.30
-logging==0.4.9.6
-asyncio==3.4.3
-contextlib2==21.6.0
 typing-extensions==4.8.0
 
 # Additional utilities used in the codebase
